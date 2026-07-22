@@ -1,0 +1,61 @@
+import { AuthUserMenu } from "@/features/auth/components/auth-user-menu";
+import type { AuthUser } from "@/features/auth/types";
+
+interface TopbarProps {
+  user: AuthUser;
+  onMenuClick: () => void;
+  onSidebarToggle: () => void;
+}
+
+export function Topbar({ user, onMenuClick, onSidebarToggle }: TopbarProps) {
+  return (
+    <header className="sticky top-0 z-30 flex h-[var(--topbar-height)] items-center gap-3 border-b border-hairline bg-white/95 px-4 shadow-topbar backdrop-blur sm:px-5 lg:px-6">
+      <button
+        aria-label="Mở menu"
+        className="flex h-10 w-10 items-center justify-center rounded-md border border-hairline bg-white text-xl font-semibold text-primary hover:bg-primary-soft md:hidden"
+        onClick={onMenuClick}
+        type="button"
+      >
+        ≡
+      </button>
+      <button
+        aria-label="Thu gọn menu"
+        className="hidden h-10 w-10 items-center justify-center rounded-md text-xl font-semibold text-primary hover:bg-primary-soft md:flex"
+        onClick={onSidebarToggle}
+        type="button"
+      >
+        ≡
+      </button>
+
+      <div className="hidden h-10 min-w-0 max-w-[520px] flex-1 items-center gap-3 rounded-lg border border-hairline bg-canvas px-4 text-sm text-ink-muted sm:flex">
+        <span className="text-lg text-primary">⌕</span>
+        <span className="truncate">Tìm kiếm học viên, phụ huynh, lớp học, ...</span>
+        <span className="ml-auto rounded-md border border-hairline bg-white px-2 py-1 text-xs font-semibold text-ink-muted">
+          ⌘ K
+        </span>
+      </div>
+
+      <div className="ml-auto flex items-center gap-2">
+        <button
+          aria-label="Thông báo"
+          className="relative flex h-10 w-10 items-center justify-center rounded-md text-xl text-primary hover:bg-primary-soft"
+          type="button"
+        >
+          ♢
+          <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-danger px-1 text-[10px] font-bold leading-none text-white">
+            12
+          </span>
+        </button>
+        <button
+          aria-label="Lịch hôm nay"
+          className="hidden h-10 w-10 items-center justify-center rounded-md text-xl text-primary hover:bg-primary-soft sm:flex"
+          type="button"
+        >
+          □
+        </button>
+        <div className="mx-1 hidden h-8 w-px bg-hairline sm:block" />
+        <AuthUserMenu user={user} />
+      </div>
+    </header>
+  );
+}
