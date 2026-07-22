@@ -6,8 +6,17 @@ export type StaffEmploymentStatus =
 
 export interface StaffRoleSummary {
   assignedAt: string;
+  assignmentId: string;
   code: string;
   id: string;
+  name: string;
+}
+
+export interface StaffRoleOption {
+  code: string;
+  description: string | null;
+  id: string;
+  isSystem: boolean;
   name: string;
 }
 
@@ -39,6 +48,7 @@ export type StaffDirectoryResult =
   | {
       ok: true;
       members: readonly StaffDirectoryMember[];
+      roleOptions: readonly StaffRoleOption[] | null;
     }
   | {
       ok: false;

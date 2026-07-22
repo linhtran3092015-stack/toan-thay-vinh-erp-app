@@ -6,6 +6,7 @@ import type {
   StaffDirectoryMember,
   StaffDirectoryResult,
   StaffEmploymentStatus,
+  StaffRoleOption,
   StaffRoleSummary,
 } from "@/features/staff/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -69,16 +70,17 @@ export async function getStaffDirectory(options: {
   }
 
   const rolesByUserId = new Map<string, StaffRoleSummary[]>();
+  let roleOptions: StaffRoleOption[] | null = null;
 
   if (options.includeRoles) {
     const [assignmentsResult, rolesResult] = await Promise.all([
       supabase
         .from("user_role_assignments")
-        .select("user_id, role_id, assigned_at")
+        .select("id, user_id, role_id, assigned_at")
         .is("revoked_at", null),
       supabase
         .from("roles")
-        .select("id, code, name, is_active"),
+        .select("id, code, name, description, is_system, is_active"),
     ]);
 
     if (assignmentsResult.error) {
@@ -99,6 +101,19 @@ export async function getStaffDirectory(options: {
       rolesResult.data.map((role) => [role.id, role]),
     );
 
+    roleOptions = rolesResult.data
+      .filter((role) => role.is_active)
+      .map((role) => ({
+        code: role.code,
+        description: role.description,
+        id: role.id,
+        isSystem: role.is_system,
+        name: role.name,
+      }))
+      .sort((left, right) =>
+        left.name.localeCompare(right.name, "vi"),
+      );
+
     for (const assignment of assignmentsResult.data) {
       const role = roleById.get(assignment.role_id);
 
@@ -110,6 +125,7 @@ export async function getStaffDirectory(options: {
 
       userRoles.push({
         assignedAt: assignment.assigned_at,
+        assignmentId: assignment.id,
         code: role.code,
         id: role.id,
         name: role.name,
@@ -153,5 +169,6 @@ export async function getStaffDirectory(options: {
   return {
     ok: true,
     members,
+    roleOptions,
   };
 }

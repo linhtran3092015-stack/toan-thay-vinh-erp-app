@@ -1,12 +1,16 @@
-import { cn } from "@/lib/utils";
+import { StaffRoleManagement } from "@/features/staff/components/staff-role-management";
 import type {
   StaffDirectoryMember,
   StaffEmploymentStatus,
+  StaffRoleOption,
 } from "@/features/staff/types";
+import { cn } from "@/lib/utils";
 
 interface StaffDirectoryPageProps {
+  canManageRoles: boolean;
   canViewRoles: boolean;
   members: readonly StaffDirectoryMember[];
+  roleOptions: readonly StaffRoleOption[];
 }
 
 const statusLabels: Record<StaffEmploymentStatus, string> = {
@@ -24,8 +28,10 @@ const statusClasses: Record<StaffEmploymentStatus, string> = {
 };
 
 export function StaffDirectoryPage({
+  canManageRoles,
   canViewRoles,
   members,
+  roleOptions,
 }: StaffDirectoryPageProps) {
   const activeCount = members.filter(
     (member) => member.employmentStatus === "active",
@@ -51,12 +57,12 @@ export function StaffDirectoryPage({
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">
             Dữ liệu được đọc trực tiếp từ hồ sơ đăng nhập và phân quyền trên
-            Supabase. Màn hình hiện tại chỉ cho phép xem.
+            Supabase. Mọi thay đổi vai trò đều yêu cầu lý do và được ghi audit.
           </p>
         </div>
 
         <span className="w-fit rounded-pill border border-primary/20 bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary">
-          Chỉ đọc
+          {canManageRoles ? "Có thể quản lý vai trò" : "Chỉ đọc"}
         </span>
       </header>
 
@@ -87,7 +93,9 @@ export function StaffDirectoryPage({
                 <th className="px-5 py-3 font-semibold">Nhân sự</th>
                 <th className="px-5 py-3 font-semibold">Liên hệ</th>
                 <th className="px-5 py-3 font-semibold">Trạng thái</th>
-                <th className="px-5 py-3 font-semibold">Vai trò</th>
+                <th className="min-w-[300px] px-5 py-3 font-semibold">
+                  Vai trò
+                </th>
                 <th className="px-5 py-3 font-semibold">Ngày vào</th>
                 <th className="px-5 py-3 font-semibold">
                   Đăng nhập gần nhất
@@ -120,6 +128,13 @@ export function StaffDirectoryPage({
                       canViewRoles={canViewRoles}
                       member={member}
                     />
+
+                    {canManageRoles ? (
+                      <StaffRoleManagement
+                        member={member}
+                        roleOptions={roleOptions}
+                      />
+                    ) : null}
                   </td>
 
                   <td className="px-5 py-4 text-ink-muted">
@@ -162,6 +177,13 @@ export function StaffDirectoryPage({
                       canViewRoles={canViewRoles}
                       member={member}
                     />
+
+                    {canManageRoles ? (
+                      <StaffRoleManagement
+                        member={member}
+                        roleOptions={roleOptions}
+                      />
+                    ) : null}
                   </dd>
                 </div>
 

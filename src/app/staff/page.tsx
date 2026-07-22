@@ -29,6 +29,10 @@ export default async function StaffRoute() {
   const canViewRoles =
     permissionResult.permissions.includes("staff.roles.view");
 
+  const canManageRoles =
+    canViewRoles &&
+    permissionResult.permissions.includes("staff.roles.manage");
+
   const directoryResult = await getStaffDirectory({
     includeRoles: canViewRoles,
   });
@@ -53,8 +57,10 @@ export default async function StaffRoute() {
 
   return (
     <StaffDirectoryPage
+      canManageRoles={canManageRoles}
       canViewRoles={canViewRoles}
       members={directoryResult.members}
+      roleOptions={directoryResult.roleOptions ?? []}
     />
   );
 }
