@@ -27,3 +27,26 @@
 - Mỗi policy phải xét organization và permission phù hợp; ẩn nút trên UI không phải là biện pháp bảo mật.
 - Không dùng service role key trên browser và không đặt secret trong biến `NEXT_PUBLIC_*`.
 - Nghiệp vụ nhiều bảng hoặc liên quan tài chính phải dùng database function/transaction đã được review và ghi audit.
+
+## Identity và RBAC
+
+- `auth.users` chỉ là nguồn định danh; hồ sơ nhân sự nằm ở `public.profiles`.
+- Không suy luận permission từ email, display name, tên role hoặc Auth metadata.
+- Permission code dùng exact match và được thêm bằng migration.
+- Một user có thể có nhiều role; assignment được thu hồi bằng thời điểm và lý do, không hard delete.
+- Role code bất biến sau khi đã có permission hoặc assignment; tên hiển thị có thể thay đổi.
+- Thay đổi role-permission và user-role phải có audit giữ dữ liệu trước/sau.
+
+## Functions và RLS
+
+- Chỉ dùng `SECURITY DEFINER` khi cần tránh RLS recursion hoặc bảo đảm trigger audit.
+- Hàm `SECURITY DEFINER` phải đặt `search_path` rỗng hoặc tối thiểu, dùng tên schema đầy đủ, revoke execute khỏi `PUBLIC` và chỉ grant đúng database role cần thiết.
+- Không tạo policy cho `anon` trên bảng nghiệp vụ hoặc RBAC.
+- Grants chỉ mở thao tác tối thiểu; RLS không thay thế application guard và application guard không thay thế RLS.
+- Không grant ghi trực tiếp cho browser khi workflow server/database chưa được duyệt.
+
+## Audit
+
+- Audit log là append-only; client không được update hoặc delete.
+- Không ghi access token, refresh token, authorization code, cookie, mật khẩu, secret hoặc raw Auth metadata không cần thiết.
+- Khi thao tác database không có `auth.uid()`, actor có thể null nhưng metadata phải ghi nguồn phù hợp.
