@@ -2,7 +2,7 @@
 
 ## Phạm vi
 
-Task 3.3A tạo nền tảng identity, profile, role, permission, assignment và audit. Migration chưa được push lên Supabase Cloud và giao diện hiện tại vẫn dùng mock permission.
+Task 3.3A tạo nền tảng identity, profile, role, permission, assignment và audit. Migration đã được áp dụng lên Supabase Cloud, owner đã được bootstrap và quyền thực tế đã được kiểm tra. Task 3.4 đã chuyển AppShell, Sidebar và các route Students sang database-backed permissions. Task 3.5A bổ sung danh sách nhân sự và vai trò ở chế độ chỉ đọc.
 
 Mô hình ban đầu là global cho một trung tâm. Organization membership và permission override trong `docs/supabase_schema_v0_1.sql` được hoãn để tránh đưa thiết kế đa tổ chức chưa được duyệt vào migration đầu tiên.
 
@@ -110,9 +110,13 @@ Không lưu token, cookie, mật khẩu, secret hoặc toàn bộ Auth metadata 
 
 Permission được đọc trực tiếp từ database để thay đổi role/permission có hiệu lực ngay mà không chờ refresh token. Custom Access Token Hook và cache permission chỉ được cân nhắc khi có số liệu hiệu năng thực tế và quy tắc invalidation rõ ràng.
 
-## Vì sao UI vẫn dùng mock permission
+## Trạng thái tích hợp ứng dụng
 
-Task 3.3A chỉ chuẩn bị schema và server helper. Migration chưa áp dụng lên Cloud và chưa có owner assignment, nên thay UI sang database permission lúc này sẽ khóa người dùng hiện tại. `mock-current-user` tiếp tục là nguồn quyền của giao diện cho đến Task 3.4.
+Ứng dụng hiện lấy permission trực tiếp từ `public.get_my_permissions()` bằng Supabase session của người dùng. `mock-current-user` đã được loại bỏ.
+
+AppShell và Sidebar dùng permission database thật. Các route Students có server guard theo exact permission code. Route `/staff` dùng `staff.view` để đọc hồ sơ nhân sự và chỉ hiển thị vai trò khi có `staff.roles.view`.
+
+Browser chưa được cấp quyền ghi trực tiếp vào các bảng RBAC. Luồng cấp, đổi và thu hồi vai trò được hoãn sang Task 3.5B để thực hiện qua database function hoặc server workflow đã được review và audit.
 
 ## Mở rộng role và permission
 

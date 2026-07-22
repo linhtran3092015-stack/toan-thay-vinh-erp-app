@@ -100,9 +100,10 @@ export const navigationSections: NavigationSection[] = [
     label: "Nhân sự",
     items: [
       {
-        available: false,
+        available: true,
         href: "/staff",
         label: "Nhân sự",
+        permission: "staff.view",
         shortLabel: "NS",
       },
       {
