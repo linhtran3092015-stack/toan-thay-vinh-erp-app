@@ -1,3 +1,4 @@
+import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { StudentDetailEmptyState } from "@/features/students/detail/components/student-detail-empty-state";
 import { StudentDetailErrorState } from "@/features/students/detail/components/student-detail-error-state";
@@ -5,18 +6,14 @@ import { StudentDetailSkeleton } from "@/features/students/detail/components/stu
 import { getMockStudentDetail } from "@/features/students/detail/mock-student-detail";
 import { StudentDetailPage } from "@/features/students/detail/student-detail-page";
 import type { StudentDetailDemoState } from "@/features/students/detail/types";
-import {
-  hasPermission,
-  mockCurrentUser,
-} from "@/lib/permissions/mock-current-user";
-import type { PermissionCode } from "@/types/domain";
+import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
+import { toLegacyPermissions } from "@/lib/permissions/legacy-permission-adapter";
 
 interface StudentDetailRouteProps {
   params: Promise<{
     studentId: string;
   }>;
   searchParams: Promise<{
-    permission?: string | string[];
     state?: string | string[];
   }>;
 }
@@ -28,18 +25,25 @@ export default async function StudentDetailRoute({
   const { studentId } = await params;
   const query = await searchParams;
   const demoState = parseDemoState(query.state);
-  const permissions = getEffectivePermissions(query.permission);
+  const permissionResult = await getCachedDatabasePermissions();
+
+  if (!permissionResult.ok) {
+    return (
+      <ErrorState
+        description="Hệ thống chưa tải được quyền xem hồ sơ học viên từ cơ sở dữ liệu."
+        title="Không tải được quyền truy cập"
+      />
+    );
+  }
+
   const canViewStudents =
     demoState !== "denied" &&
-    hasPermission(
-      { ...mockCurrentUser, permissions },
-      "students.view",
-    );
+    permissionResult.permissions.includes("students.view");
 
   if (!canViewStudents) {
     return (
       <PermissionDeniedState
-        description="Mock user hiện tại không có quyền students.view, nên route chi tiết học viên bị chặn."
+        description="Tài khoản hiện tại không có quyền students.view."
         title="Không có quyền xem hồ sơ học viên"
       />
     );
@@ -59,7 +63,12 @@ export default async function StudentDetailRoute({
     return <StudentDetailEmptyState />;
   }
 
-  return <StudentDetailPage detail={detail} permissions={permissions} />;
+  return (
+    <StudentDetailPage
+      detail={detail}
+      permissions={toLegacyPermissions(permissionResult.permissions)}
+    />
+  );
 }
 
 function parseDemoState(
@@ -77,16 +86,4 @@ function parseDemoState(
   }
 
   return "default";
-}
-
-function getEffectivePermissions(
-  value: string | string[] | undefined,
-): PermissionCode[] {
-  const permissionMode = Array.isArray(value) ? value[0] : value;
-
-  if (permissionMode === "student-only") {
-    return ["students.view"];
-  }
-
-  return mockCurrentUser.permissions;
 }

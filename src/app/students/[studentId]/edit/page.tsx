@@ -6,18 +6,14 @@ import { StudentFormSkeleton } from "@/features/students/form/components/student
 import { getDefaultStudentFormValues } from "@/features/students/form/helpers";
 import { StudentFormPage } from "@/features/students/form/student-form-page";
 import type { StudentFormDemoState } from "@/features/students/form/student-form-types";
-import {
-  hasPermission,
-  mockCurrentUser,
-} from "@/lib/permissions/mock-current-user";
-import type { PermissionCode } from "@/types/domain";
+import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
+import { toLegacyPermissions } from "@/lib/permissions/legacy-permission-adapter";
 
 interface EditStudentRouteProps {
   params: Promise<{
     studentId: string;
   }>;
   searchParams: Promise<{
-    permission?: string | string[];
     state?: string | string[];
   }>;
 }
@@ -29,15 +25,26 @@ export default async function EditStudentRoute({
   const { studentId } = await params;
   const query = await searchParams;
   const demoState = parseDemoState(query.state);
-  const permissions = getEffectivePermissions(query.permission);
-  const routeUser = { ...mockCurrentUser, permissions };
+  const permissionResult = await getCachedDatabasePermissions();
+
+  if (!permissionResult.ok) {
+    return (
+      <ErrorState
+        description="Hệ thống chưa tải được quyền chỉnh sửa học viên từ cơ sở dữ liệu."
+        title="Không tải được quyền truy cập"
+      />
+    );
+  }
+
   const canUpdate =
-    demoState !== "denied" && hasPermission(routeUser, "students.update");
+    demoState !== "denied" &&
+    permissionResult.permissions.includes("students.view") &&
+    permissionResult.permissions.includes("students.update");
 
   if (!canUpdate) {
     return (
       <PermissionDeniedState
-        description="Mock user hiện tại không có quyền students.update, nên route chỉnh sửa học viên bị chặn."
+        description="Tài khoản hiện tại cần có cả quyền students.view và students.update."
         title="Không có quyền chỉnh sửa học viên"
       />
     );
@@ -50,7 +57,7 @@ export default async function EditStudentRoute({
   if (demoState === "error") {
     return (
       <ErrorState
-        description="Trạng thái lỗi mock của form chỉnh sửa học viên. Chưa có API hoặc database nào được gọi."
+        description="Trạng thái lỗi mô phỏng của form chỉnh sửa học viên. Chưa có API ghi dữ liệu nào được gọi."
         title="Không tải được form chỉnh sửa"
       />
     );
@@ -72,7 +79,7 @@ export default async function EditStudentRoute({
       cancelHref={`/students/${studentId}`}
       defaultValues={getDefaultStudentFormValues("edit", detail)}
       mode="edit"
-      permissions={permissions}
+      permissions={toLegacyPermissions(permissionResult.permissions)}
     />
   );
 }
@@ -92,20 +99,4 @@ function parseDemoState(
   }
 
   return "default";
-}
-
-function getEffectivePermissions(
-  value: string | string[] | undefined,
-): PermissionCode[] {
-  const permissionMode = Array.isArray(value) ? value[0] : value;
-
-  if (permissionMode === "limited-form") {
-    return ["students.view", "students.update"];
-  }
-
-  if (permissionMode === "student-only") {
-    return ["students.view"];
-  }
-
-  return mockCurrentUser.permissions;
 }

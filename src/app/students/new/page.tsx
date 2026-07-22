@@ -4,15 +4,11 @@ import { StudentFormSkeleton } from "@/features/students/form/components/student
 import { getDefaultStudentFormValues } from "@/features/students/form/helpers";
 import { StudentFormPage } from "@/features/students/form/student-form-page";
 import type { StudentFormDemoState } from "@/features/students/form/student-form-types";
-import {
-  hasPermission,
-  mockCurrentUser,
-} from "@/lib/permissions/mock-current-user";
-import type { PermissionCode } from "@/types/domain";
+import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
+import { toLegacyPermissions } from "@/lib/permissions/legacy-permission-adapter";
 
 interface NewStudentRouteProps {
   searchParams: Promise<{
-    permission?: string | string[];
     state?: string | string[];
   }>;
 }
@@ -22,15 +18,25 @@ export default async function NewStudentRoute({
 }: NewStudentRouteProps) {
   const query = await searchParams;
   const demoState = parseDemoState(query.state);
-  const permissions = getEffectivePermissions(query.permission);
-  const routeUser = { ...mockCurrentUser, permissions };
+  const permissionResult = await getCachedDatabasePermissions();
+
+  if (!permissionResult.ok) {
+    return (
+      <ErrorState
+        description="Hệ thống chưa tải được quyền tạo học viên từ cơ sở dữ liệu."
+        title="Không tải được quyền truy cập"
+      />
+    );
+  }
+
   const canCreate =
-    demoState !== "denied" && hasPermission(routeUser, "students.create");
+    demoState !== "denied" &&
+    permissionResult.permissions.includes("students.create");
 
   if (!canCreate) {
     return (
       <PermissionDeniedState
-        description="Mock user hiện tại không có quyền students.create, nên route /students/new bị chặn trước khi mở form."
+        description="Tài khoản hiện tại không có quyền students.create."
         title="Không có quyền tạo học viên"
       />
     );
@@ -43,7 +49,7 @@ export default async function NewStudentRoute({
   if (demoState === "error") {
     return (
       <ErrorState
-        description="Trạng thái lỗi mock của form tạo học viên. Chưa có API hoặc database nào được gọi."
+        description="Trạng thái lỗi mô phỏng của form tạo học viên. Chưa có API ghi dữ liệu nào được gọi."
         title="Không tải được form tạo học viên"
       />
     );
@@ -54,7 +60,7 @@ export default async function NewStudentRoute({
       cancelHref="/students"
       defaultValues={getDefaultStudentFormValues("create")}
       mode="create"
-      permissions={permissions}
+      permissions={toLegacyPermissions(permissionResult.permissions)}
     />
   );
 }
@@ -69,20 +75,4 @@ function parseDemoState(
   }
 
   return "default";
-}
-
-function getEffectivePermissions(
-  value: string | string[] | undefined,
-): PermissionCode[] {
-  const permissionMode = Array.isArray(value) ? value[0] : value;
-
-  if (permissionMode === "limited-form") {
-    return ["students.view", "students.create"];
-  }
-
-  if (permissionMode === "student-only") {
-    return ["students.view"];
-  }
-
-  return mockCurrentUser.permissions;
 }

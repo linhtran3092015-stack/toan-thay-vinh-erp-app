@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { z } from "zod";
 
 import {
@@ -94,6 +95,9 @@ export async function getDatabasePermissions(): Promise<DatabasePermissionsResul
     };
   }
 }
+
+
+export const getCachedDatabasePermissions = cache(getDatabasePermissions);
 
 export async function hasDatabasePermission(
   requiredPermission: PermissionCode,

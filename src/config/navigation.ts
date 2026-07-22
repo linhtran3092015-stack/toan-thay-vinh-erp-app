@@ -1,11 +1,12 @@
-import type { PermissionCode } from "@/types/domain";
+import type { PermissionCode } from "@/lib/permissions/types";
 
 export interface NavigationItem {
+  available: boolean;
+  badge?: string;
   href: string;
   label: string;
+  permission?: PermissionCode;
   shortLabel: string;
-  permission: PermissionCode;
-  badge?: string;
 }
 
 export interface NavigationSection {
@@ -17,10 +18,11 @@ export const navigationSections: NavigationSection[] = [
   {
     items: [
       {
+        available: true,
         href: "/",
         label: "Tổng quan",
+        permission: "app.access",
         shortLabel: "TQ",
-        permission: "dashboard.view",
       },
     ],
   },
@@ -28,34 +30,35 @@ export const navigationSections: NavigationSection[] = [
     label: "Học vụ",
     items: [
       {
+        available: true,
         href: "/students",
         label: "Học viên",
-        shortLabel: "HV",
         permission: "students.view",
+        shortLabel: "HV",
       },
       {
+        available: false,
         href: "/classes",
         label: "Lớp học & Lịch học",
         shortLabel: "LH",
-        permission: "classes.view",
       },
       {
+        available: false,
         href: "/sessions",
         label: "Buổi học",
         shortLabel: "BH",
-        permission: "sessions.view",
       },
       {
+        available: false,
         href: "/attendance",
         label: "Điểm danh",
         shortLabel: "DD",
-        permission: "attendance.view",
       },
       {
+        available: false,
         href: "/learning-results",
         label: "Kết quả học tập",
         shortLabel: "KQ",
-        permission: "results.view",
       },
     ],
   },
@@ -63,22 +66,22 @@ export const navigationSections: NavigationSection[] = [
     label: "Tài chính",
     items: [
       {
+        available: false,
         href: "/finance",
         label: "Học phí & Công nợ",
         shortLabel: "TC",
-        permission: "finance.view",
       },
       {
+        available: false,
         href: "/finance/sepay",
         label: "Giao dịch SePay",
         shortLabel: "SP",
-        permission: "sepay.view",
       },
       {
+        available: false,
         href: "/finance/session-ledger",
         label: "Sổ cái số buổi",
         shortLabel: "SC",
-        permission: "session_ledger.view",
       },
     ],
   },
@@ -86,10 +89,10 @@ export const navigationSections: NavigationSection[] = [
     label: "Tuyển sinh & CRM",
     items: [
       {
+        available: false,
         href: "/crm",
         label: "CRM & Tuyển sinh",
         shortLabel: "CRM",
-        permission: "crm.view",
       },
     ],
   },
@@ -97,28 +100,28 @@ export const navigationSections: NavigationSection[] = [
     label: "Nhân sự",
     items: [
       {
+        available: false,
         href: "/staff",
         label: "Nhân sự",
         shortLabel: "NS",
-        permission: "staff.view",
       },
       {
+        available: false,
         href: "/timekeeping",
         label: "Chấm công",
         shortLabel: "CC",
-        permission: "timekeeping.view",
       },
       {
+        available: false,
         href: "/payroll",
         label: "Lương & Tạm ứng",
         shortLabel: "LU",
-        permission: "payroll.view",
       },
       {
+        available: false,
         href: "/commissions",
         label: "Hoa hồng",
         shortLabel: "HH",
-        permission: "commissions.view",
       },
     ],
   },
@@ -126,29 +129,29 @@ export const navigationSections: NavigationSection[] = [
     label: "Khác",
     items: [
       {
+        available: false,
         href: "/coaching",
         label: "Coaching",
         shortLabel: "CO",
-        permission: "coaching.view",
       },
       {
+        available: false,
         href: "/reports",
         label: "Báo cáo & Dashboard",
         shortLabel: "BC",
-        permission: "reports.view",
       },
       {
+        available: false,
+        badge: "12",
         href: "/notifications",
         label: "Thông báo",
         shortLabel: "TB",
-        permission: "notifications.view",
-        badge: "12",
       },
       {
+        available: false,
         href: "/settings",
         label: "Cài đặt hệ thống",
         shortLabel: "CD",
-        permission: "settings.view",
       },
     ],
   },

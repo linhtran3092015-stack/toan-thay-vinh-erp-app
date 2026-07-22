@@ -1,10 +1,8 @@
+import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { StudentListPage } from "@/features/students/student-list-page";
 import type { StudentListDemoState } from "@/features/students/types";
-import {
-  hasPermission,
-  mockCurrentUser,
-} from "@/lib/permissions/mock-current-user";
+import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 interface StudentsRouteProps {
   searchParams: Promise<{
@@ -17,13 +15,25 @@ export default async function StudentsRoute({
 }: StudentsRouteProps) {
   const params = await searchParams;
   const demoState = parseDemoState(params.state);
+  const permissionResult = await getCachedDatabasePermissions();
+
+  if (!permissionResult.ok) {
+    return (
+      <ErrorState
+        description="Hệ thống chưa tải được quyền học viên từ cơ sở dữ liệu."
+        title="Không tải được quyền truy cập"
+      />
+    );
+  }
+
   const canViewStudents =
-    demoState !== "denied" && hasPermission(mockCurrentUser, "students.view");
+    demoState !== "denied" &&
+    permissionResult.permissions.includes("students.view");
 
   if (!canViewStudents) {
     return (
       <PermissionDeniedState
-        description="Mock user hiện tại không có quyền students.view, nên route /students bị chặn trước khi hiển thị danh sách."
+        description="Tài khoản hiện tại không có quyền students.view."
         title="Không có quyền xem danh sách học viên"
       />
     );
@@ -31,7 +41,9 @@ export default async function StudentsRoute({
 
   return (
     <StudentListPage
-      canCreateStudent={hasPermission(mockCurrentUser, "students.create")}
+      canCreateStudent={permissionResult.permissions.includes(
+        "students.create",
+      )}
       demoState={demoState}
     />
   );

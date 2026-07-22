@@ -2,25 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 import { navigationSections } from "@/config/navigation";
+import type { PermissionCode } from "@/lib/permissions/types";
 import { cn } from "@/lib/utils";
-import { hasPermission } from "@/lib/permissions/mock-current-user";
-import type { CurrentUser } from "@/types/domain";
 
 interface SidebarProps {
-  user: CurrentUser;
+  academicYear: string;
   isDesktopCollapsed: boolean;
   isMobileOpen: boolean;
   onClose: () => void;
   onToggleDesktopCollapse: () => void;
+  organizationName: string;
+  permissions: readonly PermissionCode[];
 }
 
 export function Sidebar({
-  user,
+  academicYear,
   isDesktopCollapsed,
   isMobileOpen,
   onClose,
   onToggleDesktopCollapse,
+  organizationName,
+  permissions,
 }: SidebarProps) {
   const pathname = usePathname();
 
@@ -30,6 +34,7 @@ export function Sidebar({
         <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-white text-sm font-bold text-primary">
           TV
         </div>
+
         <div
           className={cn(
             "min-w-0",
@@ -37,7 +42,7 @@ export function Sidebar({
           )}
         >
           <div className="truncate text-sm font-bold tracking-wide">
-            {user.organizationName}
+            {organizationName}
           </div>
           <div className="mt-0.5 truncate text-xs text-white/[0.65]">
             Management System
@@ -47,8 +52,10 @@ export function Sidebar({
 
       <nav className="flex-1 overflow-y-auto px-3 pb-4">
         {navigationSections.map((section, sectionIndex) => {
-          const items = section.items.filter((item) =>
-            hasPermission(user, item.permission),
+          const items = section.items.filter(
+            (item) =>
+              item.available &&
+              (!item.permission || permissions.includes(item.permission)),
           );
 
           if (items.length === 0) {
@@ -67,6 +74,7 @@ export function Sidebar({
                   {section.label}
                 </div>
               ) : null}
+
               <div className="space-y-1">
                 {items.map((item) => {
                   const isActive =
@@ -90,6 +98,7 @@ export function Sidebar({
                       <span className="flex h-7 w-7 flex-none items-center justify-center rounded-md bg-white/10 text-[11px] font-bold text-white md:h-9 md:w-9 lg:h-7 lg:w-7">
                         {item.shortLabel}
                       </span>
+
                       <span
                         className={cn(
                           "min-w-0 flex-1 truncate",
@@ -98,6 +107,7 @@ export function Sidebar({
                       >
                         {item.label}
                       </span>
+
                       {item.badge ? (
                         <span
                           className={cn(
@@ -125,8 +135,9 @@ export function Sidebar({
           )}
         >
           <span className="font-semibold text-white">2024</span>
-          <span className="truncate">{user.academicYear}</span>
+          <span className="truncate">{academicYear}</span>
         </div>
+
         <button
           className="hidden h-9 w-full items-center justify-center rounded-lg text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white lg:flex"
           onClick={onToggleDesktopCollapse}
@@ -148,6 +159,7 @@ export function Sidebar({
       >
         {renderSidebar(isDesktopCollapsed)}
       </div>
+
       <div
         className={cn(
           "fixed inset-0 z-50 bg-ink/[0.35] transition-opacity md:hidden",
@@ -157,6 +169,7 @@ export function Sidebar({
         )}
         onClick={onClose}
       />
+
       <div
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-[280px] transform transition-transform md:hidden",
