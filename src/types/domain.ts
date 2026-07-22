@@ -32,6 +32,7 @@ export type PermissionCode =
   | "crm.view"
   | "dashboard.view"
   | "finance.view"
+  | "guardians.view"
   | "imports.students"
   | "notifications.view"
   | "payroll.view"

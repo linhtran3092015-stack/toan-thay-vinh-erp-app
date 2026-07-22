@@ -1,5 +1,6 @@
 export const DATABASE_PERMISSION_CODES = [
   "app.access",
+  "guardians.view",
   "students.view",
   "students.create",
   "students.update",

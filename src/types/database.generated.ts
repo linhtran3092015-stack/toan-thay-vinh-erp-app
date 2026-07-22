@@ -67,6 +67,53 @@ export type Database = {
           },
         ]
       }
+      guardians: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string | null
+          full_name: string
+          id: string
+          normalized_phone: string | null
+          notes: string | null
+          phone: string
+          updated_at: string
+          zalo: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          full_name: string
+          id?: string
+          normalized_phone?: string | null
+          notes?: string | null
+          phone: string
+          updated_at?: string
+          zalo?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          normalized_phone?: string | null
+          notes?: string | null
+          phone?: string
+          updated_at?: string
+          zalo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guardians_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permissions: {
         Row: {
           code: string
@@ -221,6 +268,145 @@ export type Database = {
         }
         Relationships: []
       }
+      student_guardians: {
+        Row: {
+          created_at: string
+          end_reason: string | null
+          ended_at: string | null
+          ended_by: string | null
+          guardian_id: string
+          id: string
+          is_primary: boolean
+          linked_at: string
+          linked_by: string | null
+          relationship: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_reason?: string | null
+          ended_at?: string | null
+          ended_by?: string | null
+          guardian_id: string
+          id?: string
+          is_primary?: boolean
+          linked_at?: string
+          linked_by?: string | null
+          relationship: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_reason?: string | null
+          ended_at?: string | null
+          ended_by?: string | null
+          guardian_id?: string
+          id?: string
+          is_primary?: boolean
+          linked_at?: string
+          linked_by?: string | null
+          relationship?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_guardians_ended_by_fkey"
+            columns: ["ended_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_guardians_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_guardians_linked_by_fkey"
+            columns: ["linked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_guardians_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          birth_year: number
+          created_at: string
+          created_by: string | null
+          current_grade: number
+          full_name: string
+          id: string
+          internal_notes: string | null
+          learning_goal: string | null
+          learning_level: string | null
+          lifecycle_status: string
+          nickname: string | null
+          official_start_date: string | null
+          province_city: string | null
+          public_code: string
+          registered_mode: string | null
+          updated_at: string
+        }
+        Insert: {
+          birth_year: number
+          created_at?: string
+          created_by?: string | null
+          current_grade: number
+          full_name: string
+          id?: string
+          internal_notes?: string | null
+          learning_goal?: string | null
+          learning_level?: string | null
+          lifecycle_status?: string
+          nickname?: string | null
+          official_start_date?: string | null
+          province_city?: string | null
+          public_code?: string
+          registered_mode?: string | null
+          updated_at?: string
+        }
+        Update: {
+          birth_year?: number
+          created_at?: string
+          created_by?: string | null
+          current_grade?: number
+          full_name?: string
+          id?: string
+          internal_notes?: string | null
+          learning_goal?: string | null
+          learning_level?: string | null
+          lifecycle_status?: string
+          nickname?: string | null
+          official_start_date?: string | null
+          province_city?: string | null
+          public_code?: string
+          registered_mode?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_role_assignments: {
         Row: {
           assigned_at: string
@@ -317,6 +503,11 @@ export type Database = {
       has_permission: {
         Args: { required_permission: string }
         Returns: boolean
+      }
+      next_student_public_code: { Args: never; Returns: string }
+      normalize_vietnam_phone: {
+        Args: { phone_value: string }
+        Returns: string
       }
       revoke_user_role_assignment: {
         Args: { revocation_reason: string; target_assignment_id: string }
