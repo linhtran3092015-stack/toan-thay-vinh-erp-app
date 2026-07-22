@@ -294,6 +294,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_user_role: {
+        Args: {
+          assignment_reason: string
+          target_role_code: string
+          target_user_id: string
+        }
+        Returns: {
+          assigned_at: string
+          assignment_id: string
+          role_code: string
+          role_id: string
+          user_id: string
+        }[]
+      }
       get_my_permissions: {
         Args: never
         Returns: {
@@ -303,6 +317,16 @@ export type Database = {
       has_permission: {
         Args: { required_permission: string }
         Returns: boolean
+      }
+      revoke_user_role_assignment: {
+        Args: { revocation_reason: string; target_assignment_id: string }
+        Returns: {
+          assignment_id: string
+          revoked_at: string
+          role_code: string
+          role_id: string
+          user_id: string
+        }[]
       }
     }
     Enums: {
