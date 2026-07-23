@@ -1,4 +1,3 @@
-import type { Student } from "@/features/students/types";
 import type {
   AlertSeverity,
   CoachingPriority,
@@ -96,7 +95,9 @@ export function formatShortDate(value: string): string {
   return value;
 }
 
-export function getStudentDetailHref(student: Student): string {
+export function getStudentDetailHref(
+  student: { id: string },
+): string {
   return `/students/${student.id}`;
 }
 

@@ -1,89 +1,114 @@
 "use client";
 
 import { useMemo, useState } from "react";
+
 import { Button } from "@/components/ui/button";
-import { mockStudents, studentClassNames, studentSaleOwners } from "./mock-data";
+import { StudentFilters } from "./components/student-filters";
+import { StudentListEmptyState } from "./components/student-list-empty-state";
+import { StudentListToolbar } from "./components/student-list-toolbar";
+import { StudentMobileCard } from "./components/student-mobile-card";
+import { StudentTable } from "./components/student-table";
+import type {
+  StudentDirectoryFiltersState,
+  StudentDirectoryItem,
+} from "./read-models";
 import {
   defaultStudentFilters,
   filterStudents,
   paginateStudents,
 } from "./student-filters";
-import { StudentFilters } from "./components/student-filters";
-import { StudentListEmptyState } from "./components/student-list-empty-state";
-import { StudentListErrorState } from "./components/student-list-error-state";
-import { StudentListToolbar } from "./components/student-list-toolbar";
-import { StudentMobileCard } from "./components/student-mobile-card";
-import { StudentTable } from "./components/student-table";
-import { StudentTableSkeleton } from "./components/student-table-skeleton";
-import type { StudentFiltersState, StudentListDemoState } from "./types";
 
 interface StudentListPageProps {
   canCreateStudent?: boolean;
-  demoState?: Exclude<StudentListDemoState, "denied">;
+  students: StudentDirectoryItem[];
 }
 
 export function StudentListPage({
-  canCreateStudent = true,
-  demoState = "default",
+  canCreateStudent = false,
+  students,
 }: StudentListPageProps) {
   const [filters, setFilters] =
-    useState<StudentFiltersState>(defaultStudentFilters);
+    useState<StudentDirectoryFiltersState>(
+      defaultStudentFilters,
+    );
   const [page, setPage] = useState(1);
-  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] =
+    useState(false);
 
-  const students = useMemo(
-    () => (demoState === "empty" ? [] : mockStudents),
-    [demoState],
+  const classNames = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          students
+            .map(
+              (student) =>
+                student.activeEnrollment?.classInfo?.name,
+            )
+            .filter(
+              (value): value is string =>
+                typeof value === "string" &&
+                value.length > 0,
+            ),
+        ),
+      ).sort((left, right) =>
+        left.localeCompare(right, "vi"),
+      ),
+    [students],
   );
+
   const filteredStudents = useMemo(
     () => filterStudents(students, filters),
     [filters, students],
   );
+
   const pagination = useMemo(
     () => paginateStudents(filteredStudents, page),
     [filteredStudents, page],
   );
 
-  const handleFiltersChange = (nextFilters: StudentFiltersState) => {
+  const handleFiltersChange = (
+    nextFilters: StudentDirectoryFiltersState,
+  ) => {
     setPage(1);
     setFilters(nextFilters);
   };
-
-  const isLoading = demoState === "loading";
-  const isError = demoState === "error";
 
   return (
     <div className="grid gap-4">
       <StudentListToolbar
         canCreateStudent={canCreateStudent}
-        onOpenFilters={() => setIsMobileFiltersOpen(true)}
-        resultCount={isLoading ? students.length : filteredStudents.length}
-        totalCount={mockStudents.length}
+        onOpenFilters={() =>
+          setIsMobileFiltersOpen(true)
+        }
+        resultCount={filteredStudents.length}
+        totalCount={students.length}
       />
 
       <StudentFilters
-        classNames={studentClassNames}
+        classNames={classNames}
         filters={filters}
         isMobileOpen={isMobileFiltersOpen}
         onChange={handleFiltersChange}
-        onCloseMobile={() => setIsMobileFiltersOpen(false)}
-        saleOwners={studentSaleOwners}
+        onCloseMobile={() =>
+          setIsMobileFiltersOpen(false)
+        }
       />
 
-      {isLoading ? (
-        <StudentTableSkeleton />
-      ) : isError ? (
-        <StudentListErrorState />
-      ) : filteredStudents.length === 0 ? (
+      {filteredStudents.length === 0 ? (
         <StudentListEmptyState />
       ) : (
         <>
           <StudentTable students={pagination.rows} />
+
           <div className="grid gap-3 lg:hidden">
             {pagination.rows.map((student) => (
-              <StudentMobileCard key={student.id} student={student} />
+              <StudentMobileCard
+                key={student.id}
+                student={student}
+              />
             ))}
           </div>
+
           <StudentPagination
             end={pagination.end}
             page={pagination.page}
@@ -115,13 +140,17 @@ function StudentPagination({
   start,
   total,
 }: StudentPaginationProps) {
-  const pages = Array.from({ length: pageCount }).map((_, index) => index + 1);
+  const pages = Array.from({
+    length: pageCount,
+  }).map((_, index) => index + 1);
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 px-4 py-3 text-sm shadow-card md:flex-row md:items-center md:justify-between">
       <p className="text-ink-muted">
-        Hiển thị {start}-{end} của {total} học viên · Trang {page}/{pageCount}
+        Hiển thị {start}-{end} của {total} học viên ·
+        Trang {page}/{pageCount}
       </p>
+
       <div className="flex flex-wrap gap-2">
         <Button
           className="min-h-11"
@@ -129,25 +158,29 @@ function StudentPagination({
           onClick={() => setPage(page - 1)}
           variant="outline"
         >
-          Previous
+          Trước
         </Button>
+
         {pages.map((pageNumber) => (
           <Button
             className="min-h-11 min-w-11"
             key={pageNumber}
             onClick={() => setPage(pageNumber)}
-            variant={pageNumber === page ? "secondary" : "ghost"}
+            variant={
+              pageNumber === page ? "secondary" : "ghost"
+            }
           >
             {pageNumber}
           </Button>
         ))}
+
         <Button
           className="min-h-11"
           disabled={page >= pageCount}
           onClick={() => setPage(page + 1)}
           variant="outline"
         >
-          Next
+          Sau
         </Button>
       </div>
     </div>

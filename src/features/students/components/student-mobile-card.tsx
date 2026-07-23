@@ -1,15 +1,22 @@
 import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
-import { SessionBalanceBadge } from "@/features/students/components/session-balance-badge";
 import { StudentStatusBadge } from "@/features/students/components/student-status-badge";
 import { getStudentDetailHref } from "@/features/students/detail/helpers";
-import type { Student } from "@/features/students/types";
+import type { StudentDirectoryItem } from "@/features/students/read-models";
 
 interface StudentMobileCardProps {
-  student: Student;
+  student: StudentDirectoryItem;
 }
 
-export function StudentMobileCard({ student }: StudentMobileCardProps) {
+export function StudentMobileCard({
+  student,
+}: StudentMobileCardProps) {
+  const classInfo = student.activeEnrollment?.classInfo;
+  const registeredMode =
+    student.activeEnrollment?.registeredMode ??
+    student.registeredMode;
+
   return (
     <article className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
       <div className="flex items-start justify-between gap-3">
@@ -24,26 +31,49 @@ export function StudentMobileCard({ student }: StudentMobileCardProps) {
             {student.publicCode}
           </p>
         </div>
-        <StudentStatusBadge status={student.lifecycleStatus} />
+
+        <StudentStatusBadge
+          status={student.lifecycleStatus}
+        />
       </div>
 
       <div className="mt-4 grid gap-3 text-sm">
+        <InfoLine
+          label="Lớp"
+          value={
+            classInfo
+              ? `Khối ${student.currentGrade} · ${classInfo.name}`
+              : `Khối ${student.currentGrade} · Chưa xếp lớp`
+          }
+        />
+
+        <InfoLine
+          label="Phụ huynh"
+          value={
+            student.primaryGuardian
+              ? `${student.primaryGuardian.fullName} · ${student.primaryGuardian.phone}`
+              : "Chưa liên kết"
+          }
+        />
+
         <div className="flex items-center justify-between gap-3">
-          <span className="text-ink-muted">Lớp</span>
-          <span className="font-semibold text-ink">
-            Khối {student.currentGrade} · {student.mainClassName}
-          </span>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-ink-muted">Số dư buổi</span>
-          <SessionBalanceBadge balance={student.sessionBalance} />
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-ink-muted">Cảnh báo</span>
-          {student.alertCount > 0 ? (
-            <Badge tone="danger">{student.alertCount} cảnh báo</Badge>
+          <span className="text-ink-muted">Hình thức</span>
+          {registeredMode ? (
+            <Badge
+              tone={
+                registeredMode === "online"
+                  ? "purple"
+                  : "info"
+              }
+            >
+              {registeredMode === "online"
+                ? "Online"
+                : "Offline"}
+            </Badge>
           ) : (
-            <Badge tone="neutral">Không có</Badge>
+            <span className="font-semibold text-ink">
+              Chưa xác định
+            </span>
           )}
         </div>
       </div>
@@ -55,5 +85,22 @@ export function StudentMobileCard({ student }: StudentMobileCardProps) {
         Xem hồ sơ
       </Link>
     </article>
+  );
+}
+
+function InfoLine({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-ink-muted">{label}</span>
+      <span className="text-right font-semibold text-ink">
+        {value}
+      </span>
+    </div>
   );
 }

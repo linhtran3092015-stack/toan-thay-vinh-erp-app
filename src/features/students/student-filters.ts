@@ -1,22 +1,17 @@
-import type { StudentLifecycleStatus } from "@/types/domain";
 import type {
-  Student,
-  StudentFiltersState,
-  StudentStatusMeta,
-} from "./types";
+  StudentDirectoryFiltersState,
+  StudentDirectoryItem,
+} from "@/features/students/read-models";
+import type { StudentLifecycleStatus } from "@/types/domain";
+import type { StudentStatusMeta } from "./types";
 
 export const STUDENTS_PAGE_SIZE = 20;
 
-export const defaultStudentFilters: StudentFiltersState = {
-  alert: "all",
-  balance: "all",
+export const defaultStudentFilters: StudentDirectoryFiltersState = {
   className: "all",
-  communicationGroup: "all",
   grade: "all",
-  leadSourceGroup: "all",
   learningLevel: "all",
   registeredMode: "all",
-  saleOwnerName: "all",
   search: "",
   status: "all",
 };
@@ -26,6 +21,7 @@ export const studentStatusOptions: Array<{
   label: string;
 }> = [
   { value: "interested", label: "Đang quan tâm" },
+  { value: "trial_booked", label: "Đã đặt lịch học thử" },
   { value: "trial_completed", label: "Đã học thử" },
   {
     value: "pending_enrollment_confirmation",
@@ -38,71 +34,80 @@ export const studentStatusOptions: Array<{
   { value: "completed", label: "Hoàn thành" },
 ];
 
-export const studentStatusMeta: Record<StudentLifecycleStatus, StudentStatusMeta> =
-  {
-    active: { label: "Đang học", tone: "success" },
-    completed: { label: "Hoàn thành", tone: "success" },
-    interested: { label: "Đang quan tâm", tone: "info" },
-    pending_enrollment_confirmation: {
-      label: "Chờ xác nhận nhập học",
-      tone: "warning",
-    },
-    reserved: { label: "Bảo lưu", tone: "warning" },
-    resumed: { label: "Quay lại học", tone: "purple" },
-    trial_booked: { label: "Đã đặt lịch học thử", tone: "purple" },
-    trial_completed: { label: "Đã học thử", tone: "purple" },
-    waiting_class: { label: "Chờ chọn lớp", tone: "info" },
-  };
+export const studentStatusMeta: Record<
+  StudentLifecycleStatus,
+  StudentStatusMeta
+> = {
+  active: { label: "Đang học", tone: "success" },
+  completed: { label: "Hoàn thành", tone: "success" },
+  interested: { label: "Đang quan tâm", tone: "info" },
+  pending_enrollment_confirmation: {
+    label: "Chờ xác nhận nhập học",
+    tone: "warning",
+  },
+  reserved: { label: "Bảo lưu", tone: "warning" },
+  resumed: { label: "Quay lại học", tone: "purple" },
+  trial_booked: {
+    label: "Đã đặt lịch học thử",
+    tone: "purple",
+  },
+  trial_completed: { label: "Đã học thử", tone: "purple" },
+  waiting_class: { label: "Chờ chọn lớp", tone: "info" },
+};
 
 export function filterStudents(
-  students: Student[],
-  filters: StudentFiltersState,
-): Student[] {
+  students: StudentDirectoryItem[],
+  filters: StudentDirectoryFiltersState,
+): StudentDirectoryItem[] {
   const normalizedSearch = normalize(filters.search);
   const normalizedPhoneSearch = normalizePhone(filters.search);
 
   return students.filter((student) => {
+    const guardian = student.primaryGuardian;
+    const activeClass = student.activeEnrollment?.classInfo;
+    const className = activeClass?.name ?? "";
+    const learningLevel =
+      activeClass?.level ?? student.learningLevel;
+    const registeredMode =
+      student.activeEnrollment?.registeredMode ??
+      student.registeredMode;
+
     const matchesPhoneSearch =
       normalizedPhoneSearch.length > 0 &&
-      normalizePhone(student.guardianPhone).includes(normalizedPhoneSearch);
+      guardian !== null &&
+      normalizePhone(guardian.phone).includes(
+        normalizedPhoneSearch,
+      );
+
     const matchesSearch =
       normalizedSearch.length === 0 ||
       normalize(student.fullName).includes(normalizedSearch) ||
       normalize(student.publicCode).includes(normalizedSearch) ||
+      normalize(student.nickname ?? "").includes(normalizedSearch) ||
+      normalize(guardian?.fullName ?? "").includes(
+        normalizedSearch,
+      ) ||
       matchesPhoneSearch;
 
     const matchesGrade =
-      filters.grade === "all" || String(student.currentGrade) === filters.grade;
+      filters.grade === "all" ||
+      String(student.currentGrade) === filters.grade;
+
     const matchesClass =
-      filters.className === "all" || student.mainClassName === filters.className;
+      filters.className === "all" ||
+      className === filters.className;
+
     const matchesStatus =
-      filters.status === "all" || student.lifecycleStatus === filters.status;
+      filters.status === "all" ||
+      student.lifecycleStatus === filters.status;
+
     const matchesLevel =
       filters.learningLevel === "all" ||
-      student.learningLevel === filters.learningLevel;
+      learningLevel === filters.learningLevel;
+
     const matchesMode =
       filters.registeredMode === "all" ||
-      student.registeredMode === filters.registeredMode;
-    const matchesSource =
-      filters.leadSourceGroup === "all" ||
-      student.leadSourceGroup === filters.leadSourceGroup;
-    const matchesSale =
-      filters.saleOwnerName === "all" ||
-      student.saleOwnerName === filters.saleOwnerName;
-    const matchesBalance =
-      filters.balance === "all" ||
-      (filters.balance === "positive" && student.sessionBalance > 0) ||
-      (filters.balance === "zero" && student.sessionBalance === 0) ||
-      (filters.balance === "negative" && student.sessionBalance < 0);
-    const matchesAlert =
-      filters.alert === "all" ||
-      (filters.alert === "has_alert" && student.alertCount > 0);
-    const matchesCommunicationGroup =
-      filters.communicationGroup === "all" ||
-      (filters.communicationGroup === "has_group" &&
-        student.hasCommunicationGroup) ||
-      (filters.communicationGroup === "no_group" &&
-        !student.hasCommunicationGroup);
+      registeredMode === filters.registeredMode;
 
     return (
       matchesSearch &&
@@ -110,31 +115,40 @@ export function filterStudents(
       matchesClass &&
       matchesStatus &&
       matchesLevel &&
-      matchesMode &&
-      matchesSource &&
-      matchesSale &&
-      matchesBalance &&
-      matchesAlert &&
-      matchesCommunicationGroup
+      matchesMode
     );
   });
 }
 
-export function paginateStudents(students: Student[], page: number) {
-  const pageCount = Math.max(1, Math.ceil(students.length / STUDENTS_PAGE_SIZE));
+export function paginateStudents(
+  students: StudentDirectoryItem[],
+  page: number,
+) {
+  const pageCount = Math.max(
+    1,
+    Math.ceil(students.length / STUDENTS_PAGE_SIZE),
+  );
   const safePage = Math.min(Math.max(page, 1), pageCount);
   const start = (safePage - 1) * STUDENTS_PAGE_SIZE;
 
   return {
-    end: Math.min(start + STUDENTS_PAGE_SIZE, students.length),
+    end: Math.min(
+      start + STUDENTS_PAGE_SIZE,
+      students.length,
+    ),
     page: safePage,
     pageCount,
-    rows: students.slice(start, start + STUDENTS_PAGE_SIZE),
+    rows: students.slice(
+      start,
+      start + STUDENTS_PAGE_SIZE,
+    ),
     start: students.length === 0 ? 0 : start + 1,
   };
 }
 
-export function hasActiveStudentFilters(filters: StudentFiltersState): boolean {
+export function hasActiveStudentFilters(
+  filters: StudentDirectoryFiltersState,
+): boolean {
   return Object.entries(filters).some(([key, value]) => {
     if (key === "search") {
       return value.trim().length > 0;
