@@ -473,6 +473,96 @@ export type Database = {
         }
         Relationships: []
       }
+      student_enrollments: {
+        Row: {
+          class_id: string
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          end_reason: string | null
+          ended_by: string | null
+          id: string
+          registered_mode: string
+          start_reason: string | null
+          started_by: string | null
+          status: string
+          student_id: string
+          supersedes_enrollment_id: string | null
+          transition_kind: string
+          updated_at: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          effective_from: string
+          effective_to?: string | null
+          end_reason?: string | null
+          ended_by?: string | null
+          id?: string
+          registered_mode: string
+          start_reason?: string | null
+          started_by?: string | null
+          status?: string
+          student_id: string
+          supersedes_enrollment_id?: string | null
+          transition_kind?: string
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          end_reason?: string | null
+          ended_by?: string | null
+          id?: string
+          registered_mode?: string
+          start_reason?: string | null
+          started_by?: string | null
+          status?: string
+          student_id?: string
+          supersedes_enrollment_id?: string | null
+          transition_kind?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_enrollments_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_enrollments_ended_by_fkey"
+            columns: ["ended_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_enrollments_started_by_fkey"
+            columns: ["started_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_enrollments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_enrollments_supersedes_enrollment_id_fkey"
+            columns: ["supersedes_enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "student_enrollments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_guardians: {
         Row: {
           created_at: string
