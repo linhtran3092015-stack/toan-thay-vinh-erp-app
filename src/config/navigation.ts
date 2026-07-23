@@ -37,9 +37,10 @@ export const navigationSections: NavigationSection[] = [
         shortLabel: "HV",
       },
       {
-        available: false,
+        available: true,
         href: "/classes",
         label: "Lớp học & Lịch học",
+        permission: "classes.view",
         shortLabel: "LH",
       },
       {
