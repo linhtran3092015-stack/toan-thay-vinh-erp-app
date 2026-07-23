@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -110,27 +110,22 @@ export function StudentProfileForm({
     guardianPhone: duplicateValues[2] ?? "",
   });
 
-  const watchedFullName = form.watch("fullName");
+  const watchedFullName = useWatch({
+    control: form.control,
+    name: "fullName",
+  });
   const isSubmitting = form.formState.isSubmitting;
 
-  useEffect(() => {
-    if (
-      checkedDuplicateKey &&
-      checkedDuplicateKey !== currentDuplicateKey
-    ) {
-      setDuplicateResult(null);
-      setCheckedDuplicateKey(null);
-      form.clearErrors("duplicateOverrideReason");
-    }
-  }, [
-    checkedDuplicateKey,
-    currentDuplicateKey,
-    form,
-  ]);
+  const visibleDuplicateResult =
+    checkedDuplicateKey === currentDuplicateKey
+      ? duplicateResult
+      : null;
 
   async function runDuplicateLookup(
     values: StudentProfileFormValues,
   ): Promise<StudentDuplicateLookupResult> {
+    form.clearErrors("duplicateOverrideReason");
+
     const result =
       await findStudentFormDuplicatesAction({
         birthYear: values.birthYear,
@@ -764,13 +759,13 @@ export function StudentProfileForm({
           </CardContent>
         </Card>
 
-        {duplicateResult ? (
+        {visibleDuplicateResult ? (
           <DuplicateLookupPanel
-            result={duplicateResult}
+            result={visibleDuplicateResult}
           />
         ) : null}
 
-        {duplicateResult?.hasExactStudentDuplicate ? (
+        {visibleDuplicateResult?.hasExactStudentDuplicate ? (
           <Card className="border-warning-border bg-warning-bg shadow-none">
             <CardHeader>
               <CardTitle>
