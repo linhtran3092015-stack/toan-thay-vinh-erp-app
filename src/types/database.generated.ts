@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       academic_years: {
@@ -789,6 +814,33 @@ export type Database = {
           user_id: string
         }[]
       }
+      create_student_with_primary_guardian: {
+        Args: {
+          p_birth_year: number
+          p_current_grade: number
+          p_duplicate_override_reason: string
+          p_full_name: string
+          p_guardian_email: string
+          p_guardian_full_name: string
+          p_guardian_notes: string
+          p_guardian_phone: string
+          p_guardian_relationship: string
+          p_guardian_zalo: string
+          p_internal_notes: string
+          p_learning_goal: string
+          p_learning_level: string
+          p_nickname: string
+          p_province_city: string
+          p_reason: string
+          p_registered_mode: string
+        }
+        Returns: {
+          guardian_id: string
+          guardian_reused: boolean
+          student_id: string
+          student_public_code: string
+        }[]
+      }
       enroll_student_in_class: {
         Args: {
           p_class_id: string
@@ -821,6 +873,25 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      find_student_form_duplicates: {
+        Args: {
+          p_birth_year: number
+          p_full_name: string
+          p_guardian_phone: string
+          p_student_id: string
+        }
+        Returns: {
+          guardian_full_name: string
+          guardian_id: string
+          guardian_phone: string
+          is_exact_student_duplicate: boolean
+          linked_student_birth_year: number
+          linked_student_full_name: string
+          linked_student_id: string
+          linked_student_lifecycle_status: string
+          linked_student_public_code: string
+        }[]
+      }
       get_my_permissions: {
         Args: never
         Returns: {
@@ -832,6 +903,7 @@ export type Database = {
         Returns: boolean
       }
       next_student_public_code: { Args: never; Returns: string }
+      normalize_student_name: { Args: { name_value: string }; Returns: string }
       normalize_vietnam_phone: {
         Args: { phone_value: string }
         Returns: string
@@ -939,6 +1011,34 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      update_student_with_primary_guardian: {
+        Args: {
+          p_birth_year: number
+          p_current_grade: number
+          p_duplicate_override_reason: string
+          p_full_name: string
+          p_guardian_email: string
+          p_guardian_full_name: string
+          p_guardian_notes: string
+          p_guardian_phone: string
+          p_guardian_relationship: string
+          p_guardian_zalo: string
+          p_internal_notes: string
+          p_learning_goal: string
+          p_learning_level: string
+          p_nickname: string
+          p_province_city: string
+          p_reason: string
+          p_registered_mode: string
+          p_student_id: string
+        }
+        Returns: {
+          guardian_id: string
+          guardian_reused: boolean
+          student_id: string
+          student_public_code: string
+        }[]
       }
     }
     Enums: {
@@ -1068,6 +1168,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
