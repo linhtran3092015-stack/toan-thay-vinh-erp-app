@@ -8,6 +8,7 @@ export interface StudentGuardianReadModel {
   fullName: string;
   id: string;
   isPrimary: boolean;
+  notes: string | null;
   phone: string;
   relationship: string;
   zalo: string | null;

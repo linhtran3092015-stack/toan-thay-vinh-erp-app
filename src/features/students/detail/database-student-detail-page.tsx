@@ -17,12 +17,14 @@ import type {
 } from "@/features/students/read-models";
 
 interface DatabaseStudentDetailPageProps {
+  canUpdateStudent: boolean;
   canViewClasses: boolean;
   canViewGuardians: boolean;
   detail: StudentDetailReadModel;
 }
 
 export function DatabaseStudentDetailPage({
+  canUpdateStudent,
   canViewClasses,
   canViewGuardians,
   detail,
@@ -113,6 +115,15 @@ export function DatabaseStudentDetailPage({
               ) : null}
             </div>
           </div>
+
+          {canUpdateStudent ? (
+            <Link
+              className="inline-flex min-h-10 flex-none items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink transition-colors hover:border-secondary hover:bg-canvas focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-secondary/25 sm:ml-auto"
+              href={`/students/${detail.id}/edit`}
+            >
+              Chỉnh sửa hồ sơ
+            </Link>
+          ) : null}
         </div>
       </section>
 

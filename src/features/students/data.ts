@@ -209,6 +209,7 @@ function mapGuardian(
     fullName: guardian.full_name,
     id: guardian.id,
     isPrimary: link.is_primary,
+    notes: guardian.notes,
     phone: guardian.phone,
     relationship: link.relationship,
     zalo: guardian.zalo,

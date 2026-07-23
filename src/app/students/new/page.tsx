@@ -1,24 +1,16 @@
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
-import { StudentFormSkeleton } from "@/features/students/form/components/student-form-skeleton";
-import { getDefaultStudentFormValues } from "@/features/students/form/helpers";
+import {
+  getStudentProfileFormDefaults,
+} from "@/features/students/form/student-profile-form-helpers";
 import { StudentFormPage } from "@/features/students/form/student-form-page";
-import type { StudentFormDemoState } from "@/features/students/form/student-form-types";
-import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
-import { toLegacyPermissions } from "@/lib/permissions/legacy-permission-adapter";
+import {
+  getCachedDatabasePermissions,
+} from "@/lib/permissions/database-permissions";
 
-interface NewStudentRouteProps {
-  searchParams: Promise<{
-    state?: string | string[];
-  }>;
-}
-
-export default async function NewStudentRoute({
-  searchParams,
-}: NewStudentRouteProps) {
-  const query = await searchParams;
-  const demoState = parseDemoState(query.state);
-  const permissionResult = await getCachedDatabasePermissions();
+export default async function NewStudentRoute() {
+  const permissionResult =
+    await getCachedDatabasePermissions();
 
   if (!permissionResult.ok) {
     return (
@@ -29,11 +21,11 @@ export default async function NewStudentRoute({
     );
   }
 
-  const canCreate =
-    demoState !== "denied" &&
-    permissionResult.permissions.includes("students.create");
-
-  if (!canCreate) {
+  if (
+    !permissionResult.permissions.includes(
+      "students.create",
+    )
+  ) {
     return (
       <PermissionDeniedState
         description="Tài khoản hiện tại không có quyền students.create."
@@ -42,37 +34,13 @@ export default async function NewStudentRoute({
     );
   }
 
-  if (demoState === "loading") {
-    return <StudentFormSkeleton />;
-  }
-
-  if (demoState === "error") {
-    return (
-      <ErrorState
-        description="Trạng thái lỗi mô phỏng của form tạo học viên. Chưa có API ghi dữ liệu nào được gọi."
-        title="Không tải được form tạo học viên"
-      />
-    );
-  }
-
   return (
     <StudentFormPage
       cancelHref="/students"
-      defaultValues={getDefaultStudentFormValues("create")}
+      defaultValues={getStudentProfileFormDefaults(
+        "create",
+      )}
       mode="create"
-      permissions={toLegacyPermissions(permissionResult.permissions)}
     />
   );
-}
-
-function parseDemoState(
-  value: string | string[] | undefined,
-): StudentFormDemoState {
-  const state = Array.isArray(value) ? value[0] : value;
-
-  if (state === "denied" || state === "error" || state === "loading") {
-    return state;
-  }
-
-  return "default";
 }

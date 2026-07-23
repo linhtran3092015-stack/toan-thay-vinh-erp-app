@@ -1,28 +1,30 @@
-import type { PermissionCode } from "@/types/domain";
-import { buildFormPermissions } from "./helpers";
-import type { StudentFormValues } from "./student-form-schema";
-import type { StudentFormMode } from "./student-form-types";
-import { StudentForm } from "./components/student-form";
+import { StudentProfileForm } from "@/features/students/form/components/student-profile-form";
+import type {
+  StudentProfileFormMode,
+} from "@/features/students/form/student-profile-form-helpers";
+import type {
+  StudentProfileFormValues,
+} from "@/features/students/form/student-profile-form-schema";
 
 interface StudentFormPageProps {
   cancelHref: string;
-  defaultValues: StudentFormValues;
-  mode: StudentFormMode;
-  permissions: PermissionCode[];
+  defaultValues: StudentProfileFormValues;
+  lifecycleStatus?: string;
+  mode: StudentProfileFormMode;
 }
 
 export function StudentFormPage({
   cancelHref,
   defaultValues,
+  lifecycleStatus,
   mode,
-  permissions,
 }: StudentFormPageProps) {
   return (
-    <StudentForm
+    <StudentProfileForm
       cancelHref={cancelHref}
       defaultValues={defaultValues}
+      lifecycleStatus={lifecycleStatus}
       mode={mode}
-      permissions={buildFormPermissions(permissions)}
     />
   );
 }

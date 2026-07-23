@@ -40,6 +40,11 @@ export default async function StudentDetailRoute({
     );
   }
 
+  const canUpdateStudent =
+    permissionResult.permissions.includes(
+      "students.update",
+    );
+
   const canViewClasses =
     permissionResult.permissions.includes("classes.view");
 
@@ -75,6 +80,7 @@ export default async function StudentDetailRoute({
 
   return (
     <DatabaseStudentDetailPage
+      canUpdateStudent={canUpdateStudent}
       canViewClasses={canViewClasses}
       canViewGuardians={canViewGuardians}
       detail={detailResult.detail}
