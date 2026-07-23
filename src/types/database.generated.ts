@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      academic_years: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          ends_on: string
+          id: string
+          is_current: boolean
+          name: string
+          starts_on: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          ends_on: string
+          id?: string
+          is_current?: boolean
+          name: string
+          starts_on: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          ends_on?: string
+          id?: string
+          is_current?: boolean
+          name?: string
+          starts_on?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "academic_years_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -61,6 +108,164 @@ export type Database = {
           {
             foreignKeyName: "audit_logs_actor_user_id_fkey"
             columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_schedule_templates: {
+        Row: {
+          class_id: string
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          end_reason: string | null
+          end_time: string
+          ended_by: string | null
+          id: string
+          is_active: boolean
+          learning_mode: string
+          meeting_url: string | null
+          room_name: string | null
+          start_time: string
+          supersedes_schedule_template_id: string | null
+          updated_at: string
+          weekday: number
+        }
+        Insert: {
+          class_id: string
+          component_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          effective_to?: string | null
+          end_reason?: string | null
+          end_time: string
+          ended_by?: string | null
+          id?: string
+          is_active?: boolean
+          learning_mode: string
+          meeting_url?: string | null
+          room_name?: string | null
+          start_time: string
+          supersedes_schedule_template_id?: string | null
+          updated_at?: string
+          weekday: number
+        }
+        Update: {
+          class_id?: string
+          component_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          end_reason?: string | null
+          end_time?: string
+          ended_by?: string | null
+          id?: string
+          is_active?: boolean
+          learning_mode?: string
+          meeting_url?: string | null
+          room_name?: string | null
+          start_time?: string
+          supersedes_schedule_template_id?: string | null
+          updated_at?: string
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_schedule_templates_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_schedule_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_schedule_templates_ended_by_fkey"
+            columns: ["ended_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_schedule_templates_supersedes_schedule_template_id_fkey"
+            columns: ["supersedes_schedule_template_id"]
+            isOneToOne: false
+            referencedRelation: "class_schedule_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classes: {
+        Row: {
+          academic_year_id: string
+          classin_url: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          default_learning_mode: string
+          grade: number
+          id: string
+          level: string
+          name: string
+          notes: string | null
+          status: string
+          updated_at: string
+          weekly_session_count: number
+        }
+        Insert: {
+          academic_year_id: string
+          classin_url?: string | null
+          code: string
+          created_at?: string
+          created_by?: string | null
+          default_learning_mode?: string
+          grade: number
+          id?: string
+          level: string
+          name: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          weekly_session_count?: number
+        }
+        Update: {
+          academic_year_id?: string
+          classin_url?: string | null
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          default_learning_mode?: string
+          grade?: number
+          id?: string
+          level?: string
+          name?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          weekly_session_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classes_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classes_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

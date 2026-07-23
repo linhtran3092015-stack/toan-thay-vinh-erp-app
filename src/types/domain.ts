@@ -24,6 +24,8 @@ export type PermissionCode =
   | "attendance.view"
   | "audit.view"
   | "cashflow.view"
+  | "classes.create"
+  | "classes.manage_schedule"
   | "classes.view"
   | "coaching.view"
   | "commissions.view"
