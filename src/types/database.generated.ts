@@ -789,6 +789,38 @@ export type Database = {
           user_id: string
         }[]
       }
+      enroll_student_in_class: {
+        Args: {
+          p_class_id: string
+          p_effective_from: string
+          p_reason: string
+          p_registered_mode: string
+          p_student_id: string
+        }
+        Returns: {
+          class_id: string
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          end_reason: string | null
+          ended_by: string | null
+          id: string
+          registered_mode: string
+          start_reason: string | null
+          started_by: string | null
+          status: string
+          student_id: string
+          supersedes_enrollment_id: string | null
+          transition_kind: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "student_enrollments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_my_permissions: {
         Args: never
         Returns: {
@@ -804,6 +836,68 @@ export type Database = {
         Args: { phone_value: string }
         Returns: string
       }
+      reserve_student_enrollment: {
+        Args: {
+          p_reason: string
+          p_reserved_from: string
+          p_student_id: string
+        }
+        Returns: {
+          class_id: string
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          end_reason: string | null
+          ended_by: string | null
+          id: string
+          registered_mode: string
+          start_reason: string | null
+          started_by: string | null
+          status: string
+          student_id: string
+          supersedes_enrollment_id: string | null
+          transition_kind: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "student_enrollments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      resume_student_enrollment: {
+        Args: {
+          p_effective_from: string
+          p_reason: string
+          p_registered_mode: string
+          p_student_id: string
+          p_target_class_id: string
+        }
+        Returns: {
+          class_id: string
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          end_reason: string | null
+          ended_by: string | null
+          id: string
+          registered_mode: string
+          start_reason: string | null
+          started_by: string | null
+          status: string
+          student_id: string
+          supersedes_enrollment_id: string | null
+          transition_kind: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "student_enrollments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       revoke_user_role_assignment: {
         Args: { revocation_reason: string; target_assignment_id: string }
         Returns: {
@@ -813,6 +907,38 @@ export type Database = {
           role_id: string
           user_id: string
         }[]
+      }
+      transfer_student_class: {
+        Args: {
+          p_effective_from: string
+          p_reason: string
+          p_registered_mode: string
+          p_student_id: string
+          p_target_class_id: string
+        }
+        Returns: {
+          class_id: string
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          end_reason: string | null
+          ended_by: string | null
+          id: string
+          registered_mode: string
+          start_reason: string | null
+          started_by: string | null
+          status: string
+          student_id: string
+          supersedes_enrollment_id: string | null
+          transition_kind: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "student_enrollments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
