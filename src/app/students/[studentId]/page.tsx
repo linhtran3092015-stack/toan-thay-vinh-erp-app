@@ -1,46 +1,37 @@
+import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
-import { StudentDetailEmptyState } from "@/features/students/detail/components/student-detail-empty-state";
-import { StudentDetailErrorState } from "@/features/students/detail/components/student-detail-error-state";
-import { StudentDetailSkeleton } from "@/features/students/detail/components/student-detail-skeleton";
-import { getMockStudentDetail } from "@/features/students/detail/mock-student-detail";
-import { StudentDetailPage } from "@/features/students/detail/student-detail-page";
-import type { StudentDetailDemoState } from "@/features/students/detail/types";
+import { getStudentDetail } from "@/features/students/data";
+import { DatabaseStudentDetailPage } from "@/features/students/detail/database-student-detail-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
-import { toLegacyPermissions } from "@/lib/permissions/legacy-permission-adapter";
 
 interface StudentDetailRouteProps {
   params: Promise<{
     studentId: string;
   }>;
-  searchParams: Promise<{
-    state?: string | string[];
-  }>;
 }
 
 export default async function StudentDetailRoute({
   params,
-  searchParams,
 }: StudentDetailRouteProps) {
   const { studentId } = await params;
-  const query = await searchParams;
-  const demoState = parseDemoState(query.state);
-  const permissionResult = await getCachedDatabasePermissions();
+  const permissionResult =
+    await getCachedDatabasePermissions();
 
   if (!permissionResult.ok) {
     return (
       <ErrorState
-        description="Hệ thống chưa tải được quyền xem hồ sơ học viên từ cơ sở dữ liệu."
+        description="Hệ thống chưa tải được quyền xem hồ sơ học viên."
         title="Không tải được quyền truy cập"
       />
     );
   }
 
-  const canViewStudents =
-    demoState !== "denied" &&
-    permissionResult.permissions.includes("students.view");
-
-  if (!canViewStudents) {
+  if (
+    !permissionResult.permissions.includes(
+      "students.view",
+    )
+  ) {
     return (
       <PermissionDeniedState
         description="Tài khoản hiện tại không có quyền students.view."
@@ -49,41 +40,44 @@ export default async function StudentDetailRoute({
     );
   }
 
-  if (demoState === "loading") {
-    return <StudentDetailSkeleton />;
-  }
+  const canViewClasses =
+    permissionResult.permissions.includes("classes.view");
 
-  if (demoState === "error") {
-    return <StudentDetailErrorState />;
-  }
+  const canViewGuardians =
+    permissionResult.permissions.includes(
+      "guardians.view",
+    );
 
-  const detail = getMockStudentDetail(studentId);
+  const detailResult = await getStudentDetail(studentId, {
+    includeClasses: canViewClasses,
+    includeGuardians: canViewGuardians,
+  });
 
-  if (demoState === "not-found" || !detail) {
-    return <StudentDetailEmptyState />;
+  if (!detailResult.ok) {
+    if (
+      detailResult.error.code === "student_not_found"
+    ) {
+      return (
+        <EmptyState
+          description="Hồ sơ có thể đã bị xóa, đường dẫn không chính xác hoặc tài khoản không còn quyền truy cập."
+          title="Không tìm thấy học viên"
+        />
+      );
+    }
+
+    return (
+      <ErrorState
+        description={detailResult.error.message}
+        title="Không tải được hồ sơ học viên"
+      />
+    );
   }
 
   return (
-    <StudentDetailPage
-      detail={detail}
-      permissions={toLegacyPermissions(permissionResult.permissions)}
+    <DatabaseStudentDetailPage
+      canViewClasses={canViewClasses}
+      canViewGuardians={canViewGuardians}
+      detail={detailResult.detail}
     />
   );
-}
-
-function parseDemoState(
-  value: string | string[] | undefined,
-): StudentDetailDemoState {
-  const state = Array.isArray(value) ? value[0] : value;
-
-  if (
-    state === "denied" ||
-    state === "error" ||
-    state === "loading" ||
-    state === "not-found"
-  ) {
-    return state;
-  }
-
-  return "default";
 }
