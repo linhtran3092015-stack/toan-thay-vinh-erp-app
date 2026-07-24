@@ -8,6 +8,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ClassScheduleCreateForm } from "@/features/classes/management/class-schedule-create-form";
+import { ClassScheduleEndAction } from "@/features/classes/management/class-schedule-end-action";
+import { ClassScheduleReplaceAction } from "@/features/classes/management/class-schedule-replace-action";
+import { ClassStatusActions } from "@/features/classes/management/class-status-actions";
 import type {
   ClassDetailReadModel,
   ClassLearningMode,
@@ -15,11 +19,15 @@ import type {
 } from "@/features/classes/read-models";
 
 interface ClassDetailPageProps {
+  canEditClass: boolean;
+  canManageSchedule: boolean;
   canViewStudentCount: boolean;
   detail: ClassDetailReadModel;
 }
 
 export function ClassDetailPage({
+  canEditClass,
+  canManageSchedule,
   canViewStudentCount,
   detail,
 }: ClassDetailPageProps) {
@@ -32,6 +40,21 @@ export function ClassDetailPage({
   );
 
   const classStatus = getClassStatusMeta(detail.status);
+
+  const remainingScheduleSlots = Math.max(
+    0,
+    detail.weeklySessionCount -
+      detail.activeScheduleCount,
+  );
+
+  const canModifySchedule =
+    canManageSchedule &&
+    detail.status === "active" &&
+    detail.academicYear?.status === "active";
+
+  const canCreateSchedule =
+    canModifySchedule &&
+    remainingScheduleSlots > 0;
 
   return (
     <div className="grid min-w-0 gap-4">
@@ -89,6 +112,28 @@ export function ClassDetailPage({
               ) : null}
             </div>
           </div>
+
+          {canEditClass ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {["draft", "active"].includes(
+                detail.status,
+              ) ? (
+                <Link
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink transition hover:bg-surface-2"
+                  href={`/classes/${detail.id}/edit`}
+                >
+                  Chỉnh sửa lớp
+                </Link>
+              ) : null}
+
+              <ClassStatusActions
+                classCode={detail.code}
+                classId={detail.id}
+                className={detail.name}
+                status={detail.status}
+              />
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -196,7 +241,28 @@ export function ClassDetailPage({
               </CardTitle>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="grid gap-4">
+              {canCreateSchedule ? (
+                <ClassScheduleCreateForm
+                  classId={detail.id}
+                  defaultLearningMode={
+                    detail.defaultLearningMode
+                  }
+                  remainingScheduleSlots={
+                    remainingScheduleSlots
+                  }
+                />
+              ) : canManageSchedule ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  {detail.status !== "active"
+                    ? "Cần kích hoạt lớp trước khi thiết lập lịch học."
+                    : detail.academicYear?.status !==
+                        "active"
+                      ? "Năm học của lớp chưa ở trạng thái hoạt động."
+                      : "Lớp đã đủ số lịch học cố định theo cấu hình số buổi mỗi tuần."}
+                </div>
+              ) : null}
+
               {activeSchedules.length === 0 ? (
                 <NoticeText>
                   Lớp chưa có lịch học đang hiệu lực.
@@ -205,6 +271,9 @@ export function ClassDetailPage({
                 <div className="grid gap-3 md:grid-cols-2">
                   {activeSchedules.map((schedule) => (
                     <ScheduleCard
+                      canManageSchedule={
+                        canModifySchedule
+                      }
                       key={schedule.id}
                       schedule={schedule}
                     />
@@ -360,8 +429,10 @@ export function ClassDetailPage({
 }
 
 function ScheduleCard({
+  canManageSchedule = false,
   schedule,
 }: {
+  canManageSchedule?: boolean;
   schedule: ClassScheduleReadModel;
 }) {
   return (
@@ -439,6 +510,19 @@ function ScheduleCard({
         >
           Mở phòng học trực tuyến
         </a>
+      ) : null}
+
+      {canManageSchedule &&
+      schedule.isActive ? (
+        <div className="mt-4 grid gap-2">
+          <ClassScheduleReplaceAction
+            schedule={schedule}
+          />
+
+          <ClassScheduleEndAction
+            schedule={schedule}
+          />
+        </div>
       ) : null}
 
       {schedule.endReason ? (

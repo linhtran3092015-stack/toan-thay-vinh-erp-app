@@ -48,6 +48,9 @@ export default async function ClassesRoute() {
 
   return (
     <ClassListPage
+      canCreateClass={permissionResult.permissions.includes(
+        "classes.create",
+      )}
       classes={directoryResult.classes}
     />
   );

@@ -57,6 +57,16 @@ export default async function ClassDetailRoute({
       "students.view",
     );
 
+  const canEditClass =
+    permissionResult.permissions.includes(
+      "classes.create",
+    );
+
+  const canManageSchedule =
+    permissionResult.permissions.includes(
+      "classes.manage_schedule",
+    );
+
   const detailResult = await getClassDetail(classId, {
     includeStudentCounts: canViewStudentCount,
   });
@@ -83,6 +93,8 @@ export default async function ClassDetailRoute({
 
   return (
     <ClassDetailPage
+      canEditClass={canEditClass}
+      canManageSchedule={canManageSchedule}
       canViewStudentCount={canViewStudentCount}
       detail={detailResult.detail}
     />

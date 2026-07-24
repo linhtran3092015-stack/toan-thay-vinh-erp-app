@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import type { ClassDirectoryItem } from "@/features/classes/read-models";
 
 interface ClassListPageProps {
+  canCreateClass: boolean;
   classes: ClassDirectoryItem[];
 }
 
@@ -33,6 +34,7 @@ const defaultFilters: ClassFiltersState = {
 };
 
 export function ClassListPage({
+  canCreateClass,
   classes,
 }: ClassListPageProps) {
   const [filters, setFilters] =
@@ -139,9 +141,27 @@ export function ClassListPage({
           </p>
         </div>
 
-        <Badge tone="info">
-          Dữ liệu Supabase
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink transition hover:bg-surface-2"
+            href="/classes/academic-years"
+          >
+            Quản lý năm học
+          </Link>
+
+          {canCreateClass ? (
+            <Link
+              className="inline-flex min-h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white transition hover:opacity-90"
+              href="/classes/new"
+            >
+              Tạo lớp
+            </Link>
+          ) : null}
+
+          <Badge tone="info">
+            Dữ liệu Supabase
+          </Badge>
+        </div>
       </section>
 
       <section className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">

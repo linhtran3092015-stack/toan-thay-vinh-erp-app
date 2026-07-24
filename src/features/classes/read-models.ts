@@ -82,3 +82,36 @@ export type ClassDetailResult =
       ok: false;
       error: ClassDataError;
     };
+
+export interface AcademicYearClassCounts {
+  active: number;
+  archived: number;
+  closed: number;
+  draft: number;
+  total: number;
+}
+
+export interface AcademicYearManagementItem
+  extends AcademicYearReadModel {
+  classCounts: AcademicYearClassCounts;
+}
+
+export type AcademicYearManagementDataErrorCode =
+  | "academic_years_query_failed"
+  | "classes_query_failed"
+  | "invalid_academic_year_data";
+
+export interface AcademicYearManagementDataError {
+  code: AcademicYearManagementDataErrorCode;
+  message: string;
+}
+
+export type AcademicYearManagementResult =
+  | {
+      academicYears: AcademicYearManagementItem[];
+      ok: true;
+    }
+  | {
+      error: AcademicYearManagementDataError;
+      ok: false;
+    };

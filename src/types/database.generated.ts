@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       academic_years: {
@@ -800,6 +775,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      activate_academic_year: {
+        Args: { p_academic_year_id: string; p_reason: string }
+        Returns: {
+          code: string
+          created_at: string
+          created_by: string | null
+          ends_on: string
+          id: string
+          is_current: boolean
+          name: string
+          starts_on: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "academic_years"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       assign_user_role: {
         Args: {
           assignment_reason: string
@@ -813,6 +809,156 @@ export type Database = {
           role_id: string
           user_id: string
         }[]
+      }
+      change_academic_year_status: {
+        Args: {
+          p_academic_year_id: string
+          p_reason: string
+          p_target_status: string
+        }
+        Returns: {
+          code: string
+          created_at: string
+          created_by: string | null
+          ends_on: string
+          id: string
+          is_current: boolean
+          name: string
+          starts_on: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "academic_years"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      change_class_status: {
+        Args: { p_class_id: string; p_reason: string; p_target_status: string }
+        Returns: {
+          academic_year_id: string
+          classin_url: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          default_learning_mode: string
+          grade: number
+          id: string
+          level: string
+          name: string
+          notes: string | null
+          status: string
+          updated_at: string
+          weekly_session_count: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "classes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_academic_year: {
+        Args: {
+          p_code: string
+          p_ends_on: string
+          p_name: string
+          p_starts_on: string
+        }
+        Returns: {
+          code: string
+          created_at: string
+          created_by: string | null
+          ends_on: string
+          id: string
+          is_current: boolean
+          name: string
+          starts_on: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "academic_years"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_class: {
+        Args: {
+          p_academic_year_id: string
+          p_classin_url: string
+          p_code: string
+          p_default_learning_mode: string
+          p_grade: number
+          p_level: string
+          p_name: string
+          p_notes: string
+          p_weekly_session_count: number
+        }
+        Returns: {
+          academic_year_id: string
+          classin_url: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          default_learning_mode: string
+          grade: number
+          id: string
+          level: string
+          name: string
+          notes: string | null
+          status: string
+          updated_at: string
+          weekly_session_count: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "classes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_class_schedule_template: {
+        Args: {
+          p_class_id: string
+          p_component_code: string
+          p_effective_from: string
+          p_end_time: string
+          p_learning_mode: string
+          p_meeting_url: string
+          p_room_name: string
+          p_start_time: string
+          p_weekday: number
+        }
+        Returns: {
+          class_id: string
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          end_reason: string | null
+          end_time: string
+          ended_by: string | null
+          id: string
+          is_active: boolean
+          learning_mode: string
+          meeting_url: string | null
+          room_name: string | null
+          start_time: string
+          supersedes_schedule_template_id: string | null
+          updated_at: string
+          weekday: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_schedule_templates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_student_with_primary_guardian: {
         Args: {
@@ -840,6 +986,39 @@ export type Database = {
           student_id: string
           student_public_code: string
         }[]
+      }
+      end_class_schedule_template: {
+        Args: {
+          p_effective_to: string
+          p_reason: string
+          p_schedule_template_id: string
+        }
+        Returns: {
+          class_id: string
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          end_reason: string | null
+          end_time: string
+          ended_by: string | null
+          id: string
+          is_active: boolean
+          learning_mode: string
+          meeting_url: string | null
+          room_name: string | null
+          start_time: string
+          supersedes_schedule_template_id: string | null
+          updated_at: string
+          weekday: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_schedule_templates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       enroll_student_in_class: {
         Args: {
@@ -907,6 +1086,45 @@ export type Database = {
       normalize_vietnam_phone: {
         Args: { phone_value: string }
         Returns: string
+      }
+      replace_class_schedule_template: {
+        Args: {
+          p_effective_from: string
+          p_end_time: string
+          p_learning_mode: string
+          p_meeting_url: string
+          p_reason: string
+          p_room_name: string
+          p_schedule_template_id: string
+          p_start_time: string
+          p_weekday: number
+        }
+        Returns: {
+          class_id: string
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          end_reason: string | null
+          end_time: string
+          ended_by: string | null
+          id: string
+          is_active: boolean
+          learning_mode: string
+          meeting_url: string | null
+          room_name: string | null
+          start_time: string
+          supersedes_schedule_template_id: string | null
+          updated_at: string
+          weekday: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_schedule_templates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       reserve_student_enrollment: {
         Args: {
@@ -1008,6 +1226,43 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "student_enrollments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_class: {
+        Args: {
+          p_academic_year_id: string
+          p_class_id: string
+          p_classin_url: string
+          p_code: string
+          p_default_learning_mode: string
+          p_grade: number
+          p_level: string
+          p_name: string
+          p_notes: string
+          p_reason: string
+          p_weekly_session_count: number
+        }
+        Returns: {
+          academic_year_id: string
+          classin_url: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          default_learning_mode: string
+          grade: number
+          id: string
+          level: string
+          name: string
+          notes: string | null
+          status: string
+          updated_at: string
+          weekly_session_count: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "classes"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1168,9 +1423,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
