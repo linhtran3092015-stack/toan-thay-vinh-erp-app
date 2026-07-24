@@ -1,8 +1,8 @@
 # ERP QUẢN LÝ TRUNG TÂM TOÁN THẦY VINH
 ## Tài liệu bàn giao kỹ thuật cho Codex tài khoản mới
 
-**Cập nhật:** 23/07/2026  
-**Trạng thái:** đang phát triển trên nhánh Task 4  
+**Cập nhật:** 23/07/2026
+**Trạng thái:** đang phát triển trên nhánh Task 4
 **Ngôn ngữ làm việc:** Tiếng Việt
 
 ---
