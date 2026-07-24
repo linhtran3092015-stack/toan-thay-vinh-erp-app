@@ -2,6 +2,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getStudentDetail } from "@/features/students/data";
+import { getStudentEnrollmentUiModel } from "@/features/students/enrollment/student-enrollment-data";
 import { DatabaseStudentDetailPage } from "@/features/students/detail/database-student-detail-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -45,6 +46,17 @@ export default async function StudentDetailRoute({
       "students.update",
     );
 
+  const canManageEnrollment =
+    permissionResult.permissions.includes(
+      "students.manage_status",
+    ) ||
+    permissionResult.permissions.includes(
+      "students.transfer_class",
+    ) ||
+    permissionResult.permissions.includes(
+      "students.reserve",
+    );
+
   const canViewClasses =
     permissionResult.permissions.includes("classes.view");
 
@@ -54,7 +66,8 @@ export default async function StudentDetailRoute({
     );
 
   const detailResult = await getStudentDetail(studentId, {
-    includeClasses: canViewClasses,
+    includeClasses:
+      canViewClasses || canManageEnrollment,
     includeGuardians: canViewGuardians,
   });
 
@@ -78,12 +91,19 @@ export default async function StudentDetailRoute({
     );
   }
 
+  const enrollmentUiModel =
+    await getStudentEnrollmentUiModel(
+      detailResult.detail,
+      permissionResult.permissions,
+    );
+
   return (
     <DatabaseStudentDetailPage
       canUpdateStudent={canUpdateStudent}
       canViewClasses={canViewClasses}
       canViewGuardians={canViewGuardians}
       detail={detailResult.detail}
+      enrollmentUiModel={enrollmentUiModel}
     />
   );
 }

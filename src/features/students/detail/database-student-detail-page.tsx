@@ -9,6 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StudentStatusBadge } from "@/features/students/components/student-status-badge";
+import { StudentEnrollmentManagement } from "@/features/students/enrollment/student-enrollment-management";
+import type { StudentEnrollmentUiModel } from "@/features/students/enrollment/student-enrollment-ui-types";
 import { getInitials } from "@/features/students/detail/helpers";
 import type {
   StudentDetailReadModel,
@@ -21,6 +23,7 @@ interface DatabaseStudentDetailPageProps {
   canViewClasses: boolean;
   canViewGuardians: boolean;
   detail: StudentDetailReadModel;
+  enrollmentUiModel: StudentEnrollmentUiModel;
 }
 
 export function DatabaseStudentDetailPage({
@@ -28,6 +31,7 @@ export function DatabaseStudentDetailPage({
   canViewClasses,
   canViewGuardians,
   detail,
+  enrollmentUiModel,
 }: DatabaseStudentDetailPageProps) {
   const activeClass = detail.activeEnrollment?.classInfo;
   const learningLevel =
@@ -129,6 +133,12 @@ export function DatabaseStudentDetailPage({
 
       <div className="grid gap-4 xl:grid-cols-[1.3fr_0.7fr]">
         <div className="grid content-start gap-4">
+          <StudentEnrollmentManagement
+            model={enrollmentUiModel}
+            studentId={detail.id}
+            studentName={detail.fullName}
+          />
+
           <Card>
             <CardHeader>
               <CardTitle>Thông tin học viên</CardTitle>
