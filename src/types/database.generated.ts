@@ -206,6 +206,153 @@ export type Database = {
           },
         ]
       }
+      class_sessions: {
+        Row: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          class_id: string
+          completed_at: string | null
+          completed_by: string | null
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          learning_mode: string
+          lock_reason: string | null
+          locked_at: string | null
+          locked_by: string | null
+          makeup_for_session_id: string | null
+          meeting_url: string | null
+          notes: string | null
+          room_name: string | null
+          schedule_template_id: string | null
+          session_date: string
+          session_kind: string
+          start_time: string
+          started_at: string | null
+          started_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          class_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          component_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_time: string
+          id?: string
+          learning_mode: string
+          lock_reason?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          makeup_for_session_id?: string | null
+          meeting_url?: string | null
+          notes?: string | null
+          room_name?: string | null
+          schedule_template_id?: string | null
+          session_date: string
+          session_kind?: string
+          start_time: string
+          started_at?: string | null
+          started_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          class_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          component_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_time?: string
+          id?: string
+          learning_mode?: string
+          lock_reason?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          makeup_for_session_id?: string | null
+          meeting_url?: string | null
+          notes?: string | null
+          room_name?: string | null
+          schedule_template_id?: string | null
+          session_date?: string
+          session_kind?: string
+          start_time?: string
+          started_at?: string | null
+          started_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_sessions_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_sessions_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_sessions_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_sessions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_sessions_locked_by_fkey"
+            columns: ["locked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_sessions_makeup_for_session_id_fkey"
+            columns: ["makeup_for_session_id"]
+            isOneToOne: false
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_sessions_schedule_template_id_fkey"
+            columns: ["schedule_template_id"]
+            isOneToOne: false
+            referencedRelation: "class_schedule_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_sessions_started_by_fkey"
+            columns: ["started_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classes: {
         Row: {
           academic_year_id: string
@@ -472,6 +619,147 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      session_attendance: {
+        Row: {
+          actual_learning_mode: string
+          attendance_status: string
+          class_session_id: string
+          created_at: string
+          id: string
+          is_late_update: boolean
+          marked_at: string
+          marked_by: string
+          notes: string | null
+          student_enrollment_id: string | null
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          actual_learning_mode: string
+          attendance_status: string
+          class_session_id: string
+          created_at?: string
+          id?: string
+          is_late_update?: boolean
+          marked_at?: string
+          marked_by: string
+          notes?: string | null
+          student_enrollment_id?: string | null
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          actual_learning_mode?: string
+          attendance_status?: string
+          class_session_id?: string
+          created_at?: string
+          id?: string
+          is_late_update?: boolean
+          marked_at?: string
+          marked_by?: string
+          notes?: string | null
+          student_enrollment_id?: string | null
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_attendance_class_session_id_fkey"
+            columns: ["class_session_id"]
+            isOneToOne: false
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_attendance_marked_by_fkey"
+            columns: ["marked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_attendance_student_enrollment_id_fkey"
+            columns: ["student_enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "student_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_attendance_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_results: {
+        Row: {
+          class_session_id: string
+          comment: string | null
+          created_at: string
+          created_by: string
+          graded_at: string | null
+          graded_by: string | null
+          id: string
+          notebook_score: number | null
+          notebook_status: string
+          student_id: string
+          test_score: number | null
+          updated_at: string
+        }
+        Insert: {
+          class_session_id: string
+          comment?: string | null
+          created_at?: string
+          created_by: string
+          graded_at?: string | null
+          graded_by?: string | null
+          id?: string
+          notebook_score?: number | null
+          notebook_status?: string
+          student_id: string
+          test_score?: number | null
+          updated_at?: string
+        }
+        Update: {
+          class_session_id?: string
+          comment?: string | null
+          created_at?: string
+          created_by?: string
+          graded_at?: string | null
+          graded_by?: string | null
+          id?: string
+          notebook_score?: number | null
+          notebook_status?: string
+          student_id?: string
+          test_score?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_results_attendance_fk"
+            columns: ["class_session_id", "student_id"]
+            isOneToOne: true
+            referencedRelation: "session_attendance"
+            referencedColumns: ["class_session_id", "student_id"]
+          },
+          {
+            foreignKeyName: "session_results_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_results_graded_by_fkey"
+            columns: ["graded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       student_enrollments: {
         Row: {
@@ -810,6 +1098,44 @@ export type Database = {
           user_id: string
         }[]
       }
+      cancel_class_session: {
+        Args: { p_class_session_id: string; p_reason: string }
+        Returns: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          class_id: string
+          completed_at: string | null
+          completed_by: string | null
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          learning_mode: string
+          lock_reason: string | null
+          locked_at: string | null
+          locked_by: string | null
+          makeup_for_session_id: string | null
+          meeting_url: string | null
+          notes: string | null
+          room_name: string | null
+          schedule_template_id: string | null
+          session_date: string
+          session_kind: string
+          start_time: string
+          started_at: string | null
+          started_by: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       change_academic_year_status: {
         Args: {
           p_academic_year_id: string
@@ -856,6 +1182,44 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "classes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      complete_class_session: {
+        Args: { p_class_session_id: string }
+        Returns: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          class_id: string
+          completed_at: string | null
+          completed_by: string | null
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          learning_mode: string
+          lock_reason: string | null
+          locked_at: string | null
+          locked_by: string | null
+          makeup_for_session_id: string | null
+          meeting_url: string | null
+          notes: string | null
+          room_name: string | null
+          schedule_template_id: string | null
+          session_date: string
+          session_kind: string
+          start_time: string
+          started_at: string | null
+          started_by: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_sessions"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -956,6 +1320,57 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "class_schedule_templates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_class_session: {
+        Args: {
+          p_class_id: string
+          p_component_code?: string
+          p_end_time?: string
+          p_learning_mode?: string
+          p_makeup_for_session_id?: string
+          p_meeting_url?: string
+          p_notes?: string
+          p_room_name?: string
+          p_schedule_template_id?: string
+          p_session_date: string
+          p_session_kind: string
+          p_start_time?: string
+        }
+        Returns: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          class_id: string
+          completed_at: string | null
+          completed_by: string | null
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          learning_mode: string
+          lock_reason: string | null
+          locked_at: string | null
+          locked_by: string | null
+          makeup_for_session_id: string | null
+          meeting_url: string | null
+          notes: string | null
+          room_name: string | null
+          schedule_template_id: string | null
+          session_date: string
+          session_kind: string
+          start_time: string
+          started_at: string | null
+          started_by: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_sessions"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1081,11 +1496,108 @@ export type Database = {
         Args: { required_permission: string }
         Returns: boolean
       }
+      lock_class_session: {
+        Args: { p_class_session_id: string; p_reason: string }
+        Returns: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          class_id: string
+          completed_at: string | null
+          completed_by: string | null
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          learning_mode: string
+          lock_reason: string | null
+          locked_at: string | null
+          locked_by: string | null
+          makeup_for_session_id: string | null
+          meeting_url: string | null
+          notes: string | null
+          room_name: string | null
+          schedule_template_id: string | null
+          session_date: string
+          session_kind: string
+          start_time: string
+          started_at: string | null
+          started_by: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      mark_session_attendance: {
+        Args: {
+          p_actual_learning_mode: string
+          p_attendance_status: string
+          p_class_session_id: string
+          p_notes?: string
+          p_student_id: string
+        }
+        Returns: {
+          actual_learning_mode: string
+          attendance_status: string
+          class_session_id: string
+          created_at: string
+          id: string
+          is_late_update: boolean
+          marked_at: string
+          marked_by: string
+          notes: string | null
+          student_enrollment_id: string | null
+          student_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "session_attendance"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       next_student_public_code: { Args: never; Returns: string }
       normalize_student_name: { Args: { name_value: string }; Returns: string }
       normalize_vietnam_phone: {
         Args: { phone_value: string }
         Returns: string
+      }
+      record_session_result: {
+        Args: {
+          p_class_session_id: string
+          p_comment?: string
+          p_notebook_score?: number
+          p_notebook_status?: string
+          p_student_id: string
+          p_test_score?: number
+        }
+        Returns: {
+          class_session_id: string
+          comment: string | null
+          created_at: string
+          created_by: string
+          graded_at: string | null
+          graded_by: string | null
+          id: string
+          notebook_score: number | null
+          notebook_status: string
+          student_id: string
+          test_score: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "session_results"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       replace_class_schedule_template: {
         Args: {
@@ -1198,6 +1710,44 @@ export type Database = {
           user_id: string
         }[]
       }
+      start_class_session: {
+        Args: { p_class_session_id: string }
+        Returns: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          class_id: string
+          completed_at: string | null
+          completed_by: string | null
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          learning_mode: string
+          lock_reason: string | null
+          locked_at: string | null
+          locked_by: string | null
+          makeup_for_session_id: string | null
+          meeting_url: string | null
+          notes: string | null
+          room_name: string | null
+          schedule_template_id: string | null
+          session_date: string
+          session_kind: string
+          start_time: string
+          started_at: string | null
+          started_by: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       transfer_student_class: {
         Args: {
           p_effective_from: string
@@ -1263,6 +1813,65 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "classes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_session_attendance: {
+        Args: {
+          p_actual_learning_mode: string
+          p_attendance_status: string
+          p_notes: string
+          p_reason: string
+          p_session_attendance_id: string
+        }
+        Returns: {
+          actual_learning_mode: string
+          attendance_status: string
+          class_session_id: string
+          created_at: string
+          id: string
+          is_late_update: boolean
+          marked_at: string
+          marked_by: string
+          notes: string | null
+          student_enrollment_id: string | null
+          student_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "session_attendance"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_session_result: {
+        Args: {
+          p_comment: string
+          p_notebook_score: number
+          p_notebook_status: string
+          p_reason: string
+          p_session_result_id: string
+          p_test_score: number
+        }
+        Returns: {
+          class_session_id: string
+          comment: string | null
+          created_at: string
+          created_by: string
+          graded_at: string | null
+          graded_by: string | null
+          id: string
+          notebook_score: number | null
+          notebook_status: string
+          student_id: string
+          test_score: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "session_results"
           isOneToOne: true
           isSetofReturn: false
         }

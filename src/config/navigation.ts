@@ -44,9 +44,10 @@ export const navigationSections: NavigationSection[] = [
         shortLabel: "LH",
       },
       {
-        available: false,
+        available: true,
         href: "/sessions",
         label: "Buổi học",
+        permission: "sessions.view",
         shortLabel: "BH",
       },
       {
