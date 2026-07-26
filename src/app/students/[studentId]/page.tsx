@@ -3,6 +3,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getStudentDetail } from "@/features/students/data";
 import { getStudentEnrollmentUiModel } from "@/features/students/enrollment/student-enrollment-data";
+import { getStudentLedgerSummary } from "@/features/students/ledger-data";
 import { DatabaseStudentDetailPage } from "@/features/students/detail/database-student-detail-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -65,6 +66,11 @@ export default async function StudentDetailRoute({
       "guardians.view",
     );
 
+  const canViewLedger =
+    permissionResult.permissions.includes(
+      "session_ledger.view",
+    );
+
   const detailResult = await getStudentDetail(studentId, {
     includeClasses:
       canViewClasses || canManageEnrollment,
@@ -97,13 +103,19 @@ export default async function StudentDetailRoute({
       permissionResult.permissions,
     );
 
+  const ledgerSummary = canViewLedger
+    ? await getStudentLedgerSummary(studentId)
+    : null;
+
   return (
     <DatabaseStudentDetailPage
       canUpdateStudent={canUpdateStudent}
       canViewClasses={canViewClasses}
       canViewGuardians={canViewGuardians}
+      canViewLedger={canViewLedger}
       detail={detailResult.detail}
       enrollmentUiModel={enrollmentUiModel}
+      ledgerSummary={ledgerSummary}
     />
   );
 }

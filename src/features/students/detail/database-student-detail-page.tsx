@@ -11,6 +11,8 @@ import {
 import { StudentStatusBadge } from "@/features/students/components/student-status-badge";
 import { StudentEnrollmentManagement } from "@/features/students/enrollment/student-enrollment-management";
 import type { StudentEnrollmentUiModel } from "@/features/students/enrollment/student-enrollment-ui-types";
+import { StudentSessionLedgerCard } from "@/features/students/detail/components/student-session-ledger-card";
+import type { StudentLedgerReadModel } from "@/features/students/ledger-data";
 import { getInitials } from "@/features/students/detail/helpers";
 import type {
   StudentDetailReadModel,
@@ -22,16 +24,20 @@ interface DatabaseStudentDetailPageProps {
   canUpdateStudent: boolean;
   canViewClasses: boolean;
   canViewGuardians: boolean;
+  canViewLedger?: boolean;
   detail: StudentDetailReadModel;
   enrollmentUiModel: StudentEnrollmentUiModel;
+  ledgerSummary?: StudentLedgerReadModel | null;
 }
 
 export function DatabaseStudentDetailPage({
   canUpdateStudent,
   canViewClasses,
   canViewGuardians,
+  canViewLedger = false,
   detail,
   enrollmentUiModel,
+  ledgerSummary = null,
 }: DatabaseStudentDetailPageProps) {
   const activeClass = detail.activeEnrollment?.classInfo;
   const learningLevel =
@@ -138,6 +144,10 @@ export function DatabaseStudentDetailPage({
             studentId={detail.id}
             studentName={detail.fullName}
           />
+
+          {canViewLedger ? (
+            <StudentSessionLedgerCard summary={ledgerSummary} />
+          ) : null}
 
           <Card>
             <CardHeader>

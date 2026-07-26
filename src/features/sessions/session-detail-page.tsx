@@ -381,6 +381,16 @@ export function SessionDetailPage({
                     "Không có lý do"
                   }
                 />
+
+                <InfoLine
+                  label="Ghi nhận sổ cái"
+                  value={
+                    detail.sessionKind === "regular" ||
+                    detail.sessionKind === "makeup"
+                      ? "Đã phát sinh trừ 1 buổi (-1)"
+                      : "Buổi bổ sung (không trừ buổi)"
+                  }
+                />
               </CardContent>
             </Card>
           ) : null}
