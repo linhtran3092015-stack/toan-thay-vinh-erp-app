@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       academic_years: {
@@ -689,6 +714,103 @@ export type Database = {
           },
         ]
       }
+      finance_cashflow_records: {
+        Row: {
+          amount_vnd: number
+          category: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string
+          record_type: string
+          reference_code: string
+          sepay_transaction_id: string | null
+          student_id: string | null
+        }
+        Insert: {
+          amount_vnd: number
+          category: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note: string
+          record_type: string
+          reference_code: string
+          sepay_transaction_id?: string | null
+          student_id?: string | null
+        }
+        Update: {
+          amount_vnd?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string
+          record_type?: string
+          reference_code?: string
+          sepay_transaction_id?: string | null
+          student_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_cashflow_records_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_cashflow_records_sepay_transaction_id_fkey"
+            columns: ["sepay_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "sepay_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_cashflow_records_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_fee_policies: {
+        Row: {
+          area_code: string | null
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          learning_mode: string
+          name: string
+          standard_unit_price_vnd: number
+        }
+        Insert: {
+          area_code?: string | null
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          learning_mode: string
+          name: string
+          standard_unit_price_vnd: number
+        }
+        Update: {
+          area_code?: string | null
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          learning_mode?: string
+          name?: string
+          standard_unit_price_vnd?: number
+        }
+        Relationships: []
+      }
       guardians: {
         Row: {
           created_at: string
@@ -732,6 +854,87 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_split_allocations: {
+        Row: {
+          allocated_amount_vnd: number
+          allocated_by: string | null
+          allocated_sessions: number
+          bonus_sessions: number
+          created_at: string
+          credit_lot_id: string | null
+          guardian_id: string
+          id: string
+          notes: string | null
+          sepay_transaction_id: string
+          student_id: string
+          unit_price_vnd: number
+        }
+        Insert: {
+          allocated_amount_vnd: number
+          allocated_by?: string | null
+          allocated_sessions: number
+          bonus_sessions?: number
+          created_at?: string
+          credit_lot_id?: string | null
+          guardian_id: string
+          id?: string
+          notes?: string | null
+          sepay_transaction_id: string
+          student_id: string
+          unit_price_vnd: number
+        }
+        Update: {
+          allocated_amount_vnd?: number
+          allocated_by?: string | null
+          allocated_sessions?: number
+          bonus_sessions?: number
+          created_at?: string
+          credit_lot_id?: string | null
+          guardian_id?: string
+          id?: string
+          notes?: string | null
+          sepay_transaction_id?: string
+          student_id?: string
+          unit_price_vnd?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_split_allocations_allocated_by_fkey"
+            columns: ["allocated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_split_allocations_credit_lot_id_fkey"
+            columns: ["credit_lot_id"]
+            isOneToOne: false
+            referencedRelation: "student_credit_lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_split_allocations_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_split_allocations_sepay_transaction_id_fkey"
+            columns: ["sepay_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "sepay_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_split_allocations_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -890,6 +1093,146 @@ export type Database = {
         }
         Relationships: []
       }
+      sepay_transactions: {
+        Row: {
+          account_number: string
+          amount_vnd: number
+          bank_brand: string
+          bank_transaction_id: string
+          created_at: string
+          id: string
+          match_status: string
+          matched_at: string | null
+          matched_by: string | null
+          matched_payment_request_id: string | null
+          matched_student_id: string | null
+          sepay_webhook_id: string | null
+          transaction_at: string
+          transfer_content: string
+        }
+        Insert: {
+          account_number: string
+          amount_vnd: number
+          bank_brand: string
+          bank_transaction_id: string
+          created_at?: string
+          id?: string
+          match_status?: string
+          matched_at?: string | null
+          matched_by?: string | null
+          matched_payment_request_id?: string | null
+          matched_student_id?: string | null
+          sepay_webhook_id?: string | null
+          transaction_at: string
+          transfer_content: string
+        }
+        Update: {
+          account_number?: string
+          amount_vnd?: number
+          bank_brand?: string
+          bank_transaction_id?: string
+          created_at?: string
+          id?: string
+          match_status?: string
+          matched_at?: string | null
+          matched_by?: string | null
+          matched_payment_request_id?: string | null
+          matched_student_id?: string | null
+          sepay_webhook_id?: string | null
+          transaction_at?: string
+          transfer_content?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sepay_transactions_matched_by_fkey"
+            columns: ["matched_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sepay_transactions_matched_payment_request_id_fkey"
+            columns: ["matched_payment_request_id"]
+            isOneToOne: false
+            referencedRelation: "student_payment_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sepay_transactions_matched_student_id_fkey"
+            columns: ["matched_student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sepay_transactions_sepay_webhook_id_fkey"
+            columns: ["sepay_webhook_id"]
+            isOneToOne: false
+            referencedRelation: "sepay_webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sepay_webhooks: {
+        Row: {
+          account_number: string
+          accumulated: number | null
+          amount_in: number
+          amount_out: number
+          body_raw: Json
+          code: string | null
+          content: string
+          created_at: string
+          error_message: string | null
+          gateway: string
+          id: string
+          processed_at: string | null
+          processing_status: string
+          reference_number: string | null
+          sepay_id: number | null
+          transaction_date: string
+          transfer_type: string
+        }
+        Insert: {
+          account_number: string
+          accumulated?: number | null
+          amount_in?: number
+          amount_out?: number
+          body_raw: Json
+          code?: string | null
+          content: string
+          created_at?: string
+          error_message?: string | null
+          gateway: string
+          id?: string
+          processed_at?: string | null
+          processing_status?: string
+          reference_number?: string | null
+          sepay_id?: number | null
+          transaction_date: string
+          transfer_type: string
+        }
+        Update: {
+          account_number?: string
+          accumulated?: number | null
+          amount_in?: number
+          amount_out?: number
+          body_raw?: Json
+          code?: string | null
+          content?: string
+          created_at?: string
+          error_message?: string | null
+          gateway?: string
+          id?: string
+          processed_at?: string | null
+          processing_status?: string
+          reference_number?: string | null
+          sepay_id?: number | null
+          transaction_date?: string
+          transfer_type?: string
+        }
+        Relationships: []
+      }
       session_attendance: {
         Row: {
           actual_learning_mode: string
@@ -1027,6 +1370,89 @@ export type Database = {
             columns: ["graded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_credit_lots: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          payment_request_id: string | null
+          remaining_sessions: number
+          sepay_transaction_id: string | null
+          status: string
+          student_id: string
+          topup_type: string
+          total_bonus_sessions: number
+          total_purchased_sessions: number
+          total_sessions: number
+          unit_price_vnd: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          payment_request_id?: string | null
+          remaining_sessions: number
+          sepay_transaction_id?: string | null
+          status?: string
+          student_id: string
+          topup_type?: string
+          total_bonus_sessions?: number
+          total_purchased_sessions: number
+          total_sessions: number
+          unit_price_vnd: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          payment_request_id?: string | null
+          remaining_sessions?: number
+          sepay_transaction_id?: string | null
+          status?: string
+          student_id?: string
+          topup_type?: string
+          total_bonus_sessions?: number
+          total_purchased_sessions?: number
+          total_sessions?: number
+          unit_price_vnd?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_credit_lots_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_credit_lots_payment_request_id_fkey"
+            columns: ["payment_request_id"]
+            isOneToOne: false
+            referencedRelation: "student_payment_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_credit_lots_sepay_transaction_id_fkey"
+            columns: ["sepay_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "sepay_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_credit_lots_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -1270,6 +1696,101 @@ export type Database = {
           },
           {
             foreignKeyName: "student_guardians_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_payment_requests: {
+        Row: {
+          bonus_sessions: number
+          calculated_unit_price_vnd: number
+          created_at: string
+          created_by: string | null
+          crm_case_id: string | null
+          expected_amount_vnd: number
+          guardian_id: string | null
+          id: string
+          notes: string | null
+          paid_amount_vnd: number
+          paid_at: string | null
+          public_code: string
+          purchased_sessions: number
+          qr_payload_url: string | null
+          status: string
+          student_id: string | null
+          topup_type: string
+          transfer_code: string
+          updated_at: string
+        }
+        Insert: {
+          bonus_sessions?: number
+          calculated_unit_price_vnd: number
+          created_at?: string
+          created_by?: string | null
+          crm_case_id?: string | null
+          expected_amount_vnd: number
+          guardian_id?: string | null
+          id?: string
+          notes?: string | null
+          paid_amount_vnd?: number
+          paid_at?: string | null
+          public_code: string
+          purchased_sessions: number
+          qr_payload_url?: string | null
+          status?: string
+          student_id?: string | null
+          topup_type?: string
+          transfer_code: string
+          updated_at?: string
+        }
+        Update: {
+          bonus_sessions?: number
+          calculated_unit_price_vnd?: number
+          created_at?: string
+          created_by?: string | null
+          crm_case_id?: string | null
+          expected_amount_vnd?: number
+          guardian_id?: string | null
+          id?: string
+          notes?: string | null
+          paid_amount_vnd?: number
+          paid_at?: string | null
+          public_code?: string
+          purchased_sessions?: number
+          qr_payload_url?: string | null
+          status?: string
+          student_id?: string | null
+          topup_type?: string
+          transfer_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_payment_requests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_payment_requests_crm_case_id_fkey"
+            columns: ["crm_case_id"]
+            isOneToOne: false
+            referencedRelation: "crm_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_payment_requests_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_payment_requests_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
@@ -2781,6 +3302,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

@@ -29,6 +29,12 @@ export const DATABASE_PERMISSION_CODES = [
   "staff.view",
   "staff.roles.view",
   "staff.roles.manage",
+  "finance.view",
+  "payments.manage",
+  "sepay.view",
+  "sepay.webhook_manage",
+  "refunds.manage",
+  "cashflow.view",
 ] as const;
 
 export type PermissionCode = (typeof DATABASE_PERMISSION_CODES)[number];
