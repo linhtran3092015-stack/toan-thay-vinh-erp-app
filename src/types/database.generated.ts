@@ -925,6 +925,116 @@ export type Database = {
           },
         ]
       }
+      student_session_ledger_entries: {
+        Row: {
+          class_session_id: string | null
+          created_at: string
+          created_by: string | null
+          delta_sessions: number
+          effective_on: string
+          entry_type: string
+          event_key: string
+          id: string
+          metadata: Json
+          note: string
+          reference_code: string | null
+          reverses_entry_id: string | null
+          session_attendance_id: string | null
+          student_enrollment_id: string | null
+          student_id: string
+          transfer_group_id: string | null
+          unit_price_vnd: number | null
+        }
+        Insert: {
+          class_session_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          delta_sessions: number
+          effective_on: string
+          entry_type: string
+          event_key: string
+          id?: string
+          metadata?: Json
+          note: string
+          reference_code?: string | null
+          reverses_entry_id?: string | null
+          session_attendance_id?: string | null
+          student_enrollment_id?: string | null
+          student_id: string
+          transfer_group_id?: string | null
+          unit_price_vnd?: number | null
+        }
+        Update: {
+          class_session_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          delta_sessions?: number
+          effective_on?: string
+          entry_type?: string
+          event_key?: string
+          id?: string
+          metadata?: Json
+          note?: string
+          reference_code?: string | null
+          reverses_entry_id?: string | null
+          session_attendance_id?: string | null
+          student_enrollment_id?: string | null
+          student_id?: string
+          transfer_group_id?: string | null
+          unit_price_vnd?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_session_ledger_entries_class_session_id_fkey"
+            columns: ["class_session_id"]
+            isOneToOne: false
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_session_ledger_entries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_session_ledger_entries_reverses_entry_id_fkey"
+            columns: ["reverses_entry_id"]
+            isOneToOne: false
+            referencedRelation: "student_session_ledger_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_session_ledger_entries_reverses_entry_id_fkey"
+            columns: ["reverses_entry_id"]
+            isOneToOne: false
+            referencedRelation: "student_session_ledger_running_balances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_session_ledger_entries_session_attendance_id_fkey"
+            columns: ["session_attendance_id"]
+            isOneToOne: false
+            referencedRelation: "session_attendance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_session_ledger_entries_student_enrollment_id_fkey"
+            columns: ["student_enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "student_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_session_ledger_entries_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           birth_year: number
@@ -1060,7 +1170,117 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      student_session_balance_alerts: {
+        Row: {
+          alert_type: string | null
+          balance_sessions: number | null
+          description: string | null
+          severity: string | null
+          student_id: string | null
+          title: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_session_ledger_entries_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_session_balances: {
+        Row: {
+          balance_sessions: number | null
+          latest_entry_at: string | null
+          ledger_entry_count: number | null
+          student_id: string | null
+          total_credit_sessions: number | null
+          total_debit_sessions: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_session_ledger_entries_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_session_ledger_running_balances: {
+        Row: {
+          balance_after: number | null
+          class_session_id: string | null
+          created_at: string | null
+          created_by: string | null
+          delta_sessions: number | null
+          effective_on: string | null
+          entry_type: string | null
+          event_key: string | null
+          id: string | null
+          metadata: Json | null
+          note: string | null
+          reference_code: string | null
+          reverses_entry_id: string | null
+          session_attendance_id: string | null
+          student_enrollment_id: string | null
+          student_id: string | null
+          transfer_group_id: string | null
+          unit_price_vnd: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_session_ledger_entries_class_session_id_fkey"
+            columns: ["class_session_id"]
+            isOneToOne: false
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_session_ledger_entries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_session_ledger_entries_reverses_entry_id_fkey"
+            columns: ["reverses_entry_id"]
+            isOneToOne: false
+            referencedRelation: "student_session_ledger_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_session_ledger_entries_reverses_entry_id_fkey"
+            columns: ["reverses_entry_id"]
+            isOneToOne: false
+            referencedRelation: "student_session_ledger_running_balances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_session_ledger_entries_session_attendance_id_fkey"
+            columns: ["session_attendance_id"]
+            isOneToOne: false
+            referencedRelation: "session_attendance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_session_ledger_entries_student_enrollment_id_fkey"
+            columns: ["student_enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "student_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_session_ledger_entries_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       activate_academic_year: {
