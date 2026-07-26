@@ -1670,6 +1670,34 @@ export type Database = {
           user_id: string
         }[]
       }
+      book_crm_trial_session: {
+        Args: {
+          p_class_session_id?: string
+          p_crm_case_id: string
+          p_learning_mode: string
+          p_sale_notes?: string
+          p_trial_date: string
+        }
+        Returns: {
+          class_session_id: string | null
+          created_at: string
+          created_by: string | null
+          crm_case_id: string
+          id: string
+          learning_mode: string
+          sale_notes: string | null
+          status: string
+          teacher_feedback: string | null
+          trial_date: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "crm_trial_bookings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       cancel_class_session: {
         Args: { p_class_session_id: string; p_reason: string }
         Returns: {
@@ -1792,6 +1820,39 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "class_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      convert_crm_case_to_official_student: {
+        Args: {
+          p_checklist_items?: Json
+          p_class_id: string
+          p_crm_case_id: string
+          p_official_start_date: string
+          p_registered_mode: string
+        }
+        Returns: {
+          birth_year: number
+          created_at: string
+          created_by: string | null
+          current_grade: number
+          full_name: string
+          id: string
+          internal_notes: string | null
+          learning_goal: string | null
+          learning_level: string | null
+          lifecycle_status: string
+          nickname: string | null
+          official_start_date: string | null
+          province_city: string | null
+          public_code: string
+          registered_mode: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "students"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1943,6 +2004,55 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "class_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_crm_case: {
+        Args: {
+          p_birth_year: number
+          p_discount_notes?: string
+          p_expected_grade: number
+          p_expected_level?: string
+          p_expected_mode?: string
+          p_expected_tuition_fee_vnd?: number
+          p_full_name: string
+          p_guardian_full_name: string
+          p_guardian_phone: string
+          p_lead_source_code: string
+          p_notes?: string
+          p_province_city?: string
+          p_sale_owner_id?: string
+        }
+        Returns: {
+          birth_year: number
+          created_at: string
+          created_by: string | null
+          discount_notes: string | null
+          expected_grade: number
+          expected_level: string | null
+          expected_mode: string | null
+          expected_official_start_date: string | null
+          expected_tuition_fee_vnd: number | null
+          full_name: string
+          guardian_full_name: string
+          guardian_id: string | null
+          guardian_phone: string
+          guardian_relationship: string
+          id: string
+          lead_source_id: string | null
+          nickname: string | null
+          notes: string | null
+          province_city: string | null
+          public_code: string
+          sale_owner_id: string | null
+          status: string
+          student_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "crm_cases"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -2344,6 +2454,45 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "class_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      transfer_crm_case_lead: {
+        Args: {
+          p_crm_case_id: string
+          p_new_sale_owner_id: string
+          p_reason: string
+        }
+        Returns: {
+          birth_year: number
+          created_at: string
+          created_by: string | null
+          discount_notes: string | null
+          expected_grade: number
+          expected_level: string | null
+          expected_mode: string | null
+          expected_official_start_date: string | null
+          expected_tuition_fee_vnd: number | null
+          full_name: string
+          guardian_full_name: string
+          guardian_id: string | null
+          guardian_phone: string
+          guardian_relationship: string
+          id: string
+          lead_source_id: string | null
+          nickname: string | null
+          notes: string | null
+          province_city: string | null
+          public_code: string
+          sale_owner_id: string | null
+          status: string
+          student_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "crm_cases"
           isOneToOne: true
           isSetofReturn: false
         }
