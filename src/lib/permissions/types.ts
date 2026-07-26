@@ -19,6 +19,7 @@ export const DATABASE_PERMISSION_CODES = [
   "results.view",
   "results.manage",
   "session_ledger.view",
+  "session_ledger.reverse",
   "audit.view",
   "staff.view",
   "staff.roles.view",

@@ -1920,6 +1920,34 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reverse_session_charge: {
+        Args: { p_reason: string; p_session_attendance_id: string }
+        Returns: {
+          class_session_id: string | null
+          created_at: string
+          created_by: string | null
+          delta_sessions: number
+          effective_on: string
+          entry_type: string
+          event_key: string
+          id: string
+          metadata: Json
+          note: string
+          reference_code: string | null
+          reverses_entry_id: string | null
+          session_attendance_id: string | null
+          student_enrollment_id: string | null
+          student_id: string
+          transfer_group_id: string | null
+          unit_price_vnd: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "student_session_ledger_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       revoke_user_role_assignment: {
         Args: { revocation_reason: string; target_assignment_id: string }
         Returns: {
