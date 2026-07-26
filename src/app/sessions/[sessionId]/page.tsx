@@ -1,6 +1,7 @@
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
+import { getAdditionalStudyCandidates } from "@/features/sessions/attendance-data";
 import { getSessionDetail } from "@/features/sessions/detail-data";
 import { SessionDetailPage } from "@/features/sessions/session-detail-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
@@ -63,6 +64,11 @@ export default async function SessionDetailRoute({
       "results.view",
     );
 
+  const canMarkAttendance =
+    permissionResult.permissions.includes(
+      "attendance.mark",
+    );
+
   const canViewStudents =
     permissionResult.permissions.includes(
       "students.view",
@@ -72,7 +78,8 @@ export default async function SessionDetailRoute({
     sessionId,
     {
       includeAttendance:
-        canViewAttendance,
+        canViewAttendance ||
+        canMarkAttendance,
       includeResults:
         canViewResults,
       includeRoster:
@@ -103,8 +110,41 @@ export default async function SessionDetailRoute({
     );
   }
 
+  const canAddAdditionalStudy =
+    canMarkAttendance &&
+    canViewStudents &&
+    detailResult.detail.lockedAt === null &&
+    (
+      detailResult.detail.status ===
+        "in_progress" ||
+      detailResult.detail.status ===
+        "completed"
+    );
+
+  const candidateResult =
+    canAddAdditionalStudy
+      ? await getAdditionalStudyCandidates()
+      : {
+          ok: true as const,
+          students: [],
+        };
+
+  if (!candidateResult.ok) {
+    return (
+      <ErrorState
+        description={
+          candidateResult.error.message
+        }
+        title="Không tải được học viên học thêm"
+      />
+    );
+  }
+
   return (
     <SessionDetailPage
+      additionalStudyCandidates={
+        candidateResult.students
+      }
       canLockSession={permissionResult.permissions.includes(
         "sessions.lock",
       )}
@@ -114,9 +154,9 @@ export default async function SessionDetailRoute({
       canManageSessions={permissionResult.permissions.includes(
         "sessions.manage",
       )}
-      canMarkAttendance={permissionResult.permissions.includes(
-        "attendance.mark",
-      )}
+      canMarkAttendance={
+        canMarkAttendance
+      }
       canViewAttendance={canViewAttendance}
       canViewResults={canViewResults}
       canViewStudents={canViewStudents}

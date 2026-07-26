@@ -1,12 +1,14 @@
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import type { AdditionalStudyCandidate } from "@/features/sessions/attendance-data";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { SessionAttendanceManagement } from "@/features/sessions/components/session-attendance-management";
 import { SessionLifecycleActions } from "@/features/sessions/components/session-lifecycle-actions";
 import type {
   SessionAttendanceStatus,
@@ -21,6 +23,8 @@ import type {
 } from "@/features/sessions/read-models";
 
 interface SessionDetailPageProps {
+  additionalStudyCandidates:
+    AdditionalStudyCandidate[];
   canLockSession: boolean;
   canManageResults: boolean;
   canManageSessions: boolean;
@@ -32,6 +36,7 @@ interface SessionDetailPageProps {
 }
 
 export function SessionDetailPage({
+  additionalStudyCandidates,
   canLockSession,
   canManageResults,
   canManageSessions,
@@ -188,6 +193,30 @@ export function SessionDetailPage({
           }
         />
       </section>
+
+      {canViewAttendance ||
+      canMarkAttendance ? (
+        <SessionAttendanceManagement
+          additionalStudyCandidates={
+            additionalStudyCandidates
+          }
+          canMarkAttendance={
+            canMarkAttendance
+          }
+          canViewStudents={
+            canViewStudents
+          }
+          defaultLearningMode={
+            detail.learningMode
+          }
+          lockedAt={detail.lockedAt}
+          participants={
+            detail.participants
+          }
+          sessionId={detail.id}
+          sessionStatus={detail.status}
+        />
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
         <div className="grid content-start gap-4">
