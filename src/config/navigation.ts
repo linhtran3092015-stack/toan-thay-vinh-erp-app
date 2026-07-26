@@ -91,9 +91,10 @@ export const navigationSections: NavigationSection[] = [
     label: "Tuyển sinh & CRM",
     items: [
       {
-        available: false,
+        available: true,
         href: "/crm",
         label: "CRM & Tuyển sinh",
+        permission: "crm.view",
         shortLabel: "CRM",
       },
     ],
