@@ -419,6 +419,276 @@ export type Database = {
           },
         ]
       }
+      crm_cases: {
+        Row: {
+          birth_year: number
+          created_at: string
+          created_by: string | null
+          discount_notes: string | null
+          expected_grade: number
+          expected_level: string | null
+          expected_mode: string | null
+          expected_official_start_date: string | null
+          expected_tuition_fee_vnd: number | null
+          full_name: string
+          guardian_full_name: string
+          guardian_id: string | null
+          guardian_phone: string
+          guardian_relationship: string
+          id: string
+          lead_source_id: string | null
+          nickname: string | null
+          notes: string | null
+          province_city: string | null
+          public_code: string
+          sale_owner_id: string | null
+          status: string
+          student_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          birth_year: number
+          created_at?: string
+          created_by?: string | null
+          discount_notes?: string | null
+          expected_grade: number
+          expected_level?: string | null
+          expected_mode?: string | null
+          expected_official_start_date?: string | null
+          expected_tuition_fee_vnd?: number | null
+          full_name: string
+          guardian_full_name: string
+          guardian_id?: string | null
+          guardian_phone: string
+          guardian_relationship?: string
+          id?: string
+          lead_source_id?: string | null
+          nickname?: string | null
+          notes?: string | null
+          province_city?: string | null
+          public_code: string
+          sale_owner_id?: string | null
+          status?: string
+          student_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          birth_year?: number
+          created_at?: string
+          created_by?: string | null
+          discount_notes?: string | null
+          expected_grade?: number
+          expected_level?: string | null
+          expected_mode?: string | null
+          expected_official_start_date?: string | null
+          expected_tuition_fee_vnd?: number | null
+          full_name?: string
+          guardian_full_name?: string
+          guardian_id?: string | null
+          guardian_phone?: string
+          guardian_relationship?: string
+          id?: string
+          lead_source_id?: string | null
+          nickname?: string | null
+          notes?: string | null
+          province_city?: string | null
+          public_code?: string
+          sale_owner_id?: string | null
+          status?: string
+          student_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_cases_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_cases_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_cases_lead_source_id_fkey"
+            columns: ["lead_source_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_cases_sale_owner_id_fkey"
+            columns: ["sale_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_cases_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_lead_assignment_history: {
+        Row: {
+          assigned_by: string | null
+          assignment_method: string
+          created_at: string
+          crm_case_id: string
+          id: string
+          new_sale_owner_id: string
+          previous_sale_owner_id: string | null
+          reason: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          assignment_method: string
+          created_at?: string
+          crm_case_id: string
+          id?: string
+          new_sale_owner_id: string
+          previous_sale_owner_id?: string | null
+          reason: string
+        }
+        Update: {
+          assigned_by?: string | null
+          assignment_method?: string
+          created_at?: string
+          crm_case_id?: string
+          id?: string
+          new_sale_owner_id?: string
+          previous_sale_owner_id?: string | null
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_lead_assignment_history_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_lead_assignment_history_crm_case_id_fkey"
+            columns: ["crm_case_id"]
+            isOneToOne: false
+            referencedRelation: "crm_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_lead_assignment_history_new_sale_owner_id_fkey"
+            columns: ["new_sale_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_lead_assignment_history_previous_sale_owner_id_fkey"
+            columns: ["previous_sale_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_lead_sources: {
+        Row: {
+          code: string
+          created_at: string
+          group_code: string
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          group_code: string
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          group_code?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
+      crm_trial_bookings: {
+        Row: {
+          class_session_id: string | null
+          created_at: string
+          created_by: string | null
+          crm_case_id: string
+          id: string
+          learning_mode: string
+          sale_notes: string | null
+          status: string
+          teacher_feedback: string | null
+          trial_date: string
+          updated_at: string
+        }
+        Insert: {
+          class_session_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          crm_case_id: string
+          id?: string
+          learning_mode: string
+          sale_notes?: string | null
+          status?: string
+          teacher_feedback?: string | null
+          trial_date: string
+          updated_at?: string
+        }
+        Update: {
+          class_session_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          crm_case_id?: string
+          id?: string
+          learning_mode?: string
+          sale_notes?: string | null
+          status?: string
+          teacher_feedback?: string | null
+          trial_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_trial_bookings_class_session_id_fkey"
+            columns: ["class_session_id"]
+            isOneToOne: false
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_trial_bookings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_trial_bookings_crm_case_id_fkey"
+            columns: ["crm_case_id"]
+            isOneToOne: false
+            referencedRelation: "crm_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guardians: {
         Row: {
           created_at: string
@@ -757,6 +1027,88 @@ export type Database = {
             columns: ["graded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_enrollment_checklists: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          crm_case_id: string | null
+          id: string
+          is_fully_completed: boolean
+          item_1_payment_received: boolean
+          item_10_communication_group_ready: boolean
+          item_2_source_confirmed: boolean
+          item_3_sale_confirmed: boolean
+          item_4_class_selected: boolean
+          item_5_mode_confirmed: boolean
+          item_6_fee_confirmed: boolean
+          item_7_assistant_sessions_confirmed: boolean
+          item_8_accountant_transaction_confirmed: boolean
+          item_9_official_start_date_entered: boolean
+          student_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          crm_case_id?: string | null
+          id?: string
+          is_fully_completed?: boolean
+          item_1_payment_received?: boolean
+          item_10_communication_group_ready?: boolean
+          item_2_source_confirmed?: boolean
+          item_3_sale_confirmed?: boolean
+          item_4_class_selected?: boolean
+          item_5_mode_confirmed?: boolean
+          item_6_fee_confirmed?: boolean
+          item_7_assistant_sessions_confirmed?: boolean
+          item_8_accountant_transaction_confirmed?: boolean
+          item_9_official_start_date_entered?: boolean
+          student_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          crm_case_id?: string | null
+          id?: string
+          is_fully_completed?: boolean
+          item_1_payment_received?: boolean
+          item_10_communication_group_ready?: boolean
+          item_2_source_confirmed?: boolean
+          item_3_sale_confirmed?: boolean
+          item_4_class_selected?: boolean
+          item_5_mode_confirmed?: boolean
+          item_6_fee_confirmed?: boolean
+          item_7_assistant_sessions_confirmed?: boolean
+          item_8_accountant_transaction_confirmed?: boolean
+          item_9_official_start_date_entered?: boolean
+          student_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_enrollment_checklists_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_enrollment_checklists_crm_case_id_fkey"
+            columns: ["crm_case_id"]
+            isOneToOne: false
+            referencedRelation: "crm_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_enrollment_checklists_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
