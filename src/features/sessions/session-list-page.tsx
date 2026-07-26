@@ -197,6 +197,15 @@ export function SessionListPage({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {canManageSessions ? (
+            <Link
+              className="inline-flex min-h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white transition hover:opacity-90"
+              href="/sessions/new"
+            >
+              Tạo buổi học
+            </Link>
+          ) : null}
+
           <Badge
             tone={
               canManageSessions

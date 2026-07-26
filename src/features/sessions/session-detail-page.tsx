@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { SessionLifecycleActions } from "@/features/sessions/components/session-lifecycle-actions";
 import type {
   SessionAttendanceStatus,
   SessionDetailReadModel,
@@ -137,6 +138,16 @@ export function SessionDetailPage({
           </div>
         </div>
       </section>
+
+      {canManageSessions ? (
+        <SessionLifecycleActions
+          classCode={detail.classCode}
+          lockedAt={detail.lockedAt}
+          sessionDate={detail.sessionDate}
+          sessionId={detail.id}
+          status={detail.status}
+        />
+      ) : null}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
