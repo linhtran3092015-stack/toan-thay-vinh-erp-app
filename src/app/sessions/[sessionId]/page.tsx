@@ -64,9 +64,19 @@ export default async function SessionDetailRoute({
       "results.view",
     );
 
+  const canManageResults =
+    permissionResult.permissions.includes(
+      "results.manage",
+    );
+
   const canMarkAttendance =
     permissionResult.permissions.includes(
       "attendance.mark",
+    );
+
+  const canLockSession =
+    permissionResult.permissions.includes(
+      "sessions.lock",
     );
 
   const canViewStudents =
@@ -79,11 +89,15 @@ export default async function SessionDetailRoute({
     {
       includeAttendance:
         canViewAttendance ||
-        canMarkAttendance,
+        canMarkAttendance ||
+        canLockSession,
       includeResults:
-        canViewResults,
+        canViewResults ||
+        canManageResults ||
+        canLockSession,
       includeRoster:
-        canViewStudents,
+        canViewStudents ||
+        canLockSession,
       includeStudentIdentity:
         canViewStudents,
     },
@@ -145,12 +159,12 @@ export default async function SessionDetailRoute({
       additionalStudyCandidates={
         candidateResult.students
       }
-      canLockSession={permissionResult.permissions.includes(
-        "sessions.lock",
-      )}
-      canManageResults={permissionResult.permissions.includes(
-        "results.manage",
-      )}
+      canLockSession={
+        canLockSession
+      }
+      canManageResults={
+        canManageResults
+      }
       canManageSessions={permissionResult.permissions.includes(
         "sessions.manage",
       )}

@@ -9,6 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { SessionAttendanceManagement } from "@/features/sessions/components/session-attendance-management";
+import { SessionResultManagement } from "@/features/sessions/components/session-result-management";
+import { SessionLockActions } from "@/features/sessions/components/session-lock-actions";
 import { SessionLifecycleActions } from "@/features/sessions/components/session-lifecycle-actions";
 import type {
   SessionAttendanceStatus,
@@ -214,6 +216,37 @@ export function SessionDetailPage({
             detail.participants
           }
           sessionId={detail.id}
+          sessionStatus={detail.status}
+        />
+      ) : null}
+
+      {canViewResults ||
+      canManageResults ? (
+        <SessionResultManagement
+          canManageResults={
+            canManageResults
+          }
+          canViewStudents={
+            canViewStudents
+          }
+          lockedAt={detail.lockedAt}
+          participants={
+            detail.participants
+          }
+          sessionId={detail.id}
+          sessionStatus={detail.status}
+        />
+      ) : null}
+
+      {canLockSession ? (
+        <SessionLockActions
+          lockedAt={detail.lockedAt}
+          lockReason={detail.lockReason}
+          participants={
+            detail.participants
+          }
+          sessionId={detail.id}
+          sessionKind={detail.sessionKind}
           sessionStatus={detail.status}
         />
       ) : null}
