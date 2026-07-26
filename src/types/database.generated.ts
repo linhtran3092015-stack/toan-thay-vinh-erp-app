@@ -2177,6 +2177,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      allocate_payment_to_students: {
+        Args: {
+          p_allocations: Json
+          p_guardian_id: string
+          p_sepay_transaction_id: string
+        }
+        Returns: Json
+      }
       assign_user_role: {
         Args: {
           assignment_reason: string
@@ -2578,6 +2586,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_student_payment_request: {
+        Args: {
+          p_bonus_sessions?: number
+          p_calculated_unit_price_vnd?: number
+          p_expected_amount_vnd: number
+          p_notes?: string
+          p_purchased_sessions: number
+          p_student_id: string
+          p_topup_type?: string
+        }
+        Returns: Json
+      }
       create_student_with_primary_guardian: {
         Args: {
           p_birth_year: number
@@ -2771,6 +2791,31 @@ export type Database = {
       normalize_vietnam_phone: {
         Args: { phone_value: string }
         Returns: string
+      }
+      process_sepay_webhook_transaction: {
+        Args: {
+          p_account_number: string
+          p_amount_in: number
+          p_amount_out: number
+          p_body_raw?: Json
+          p_code: string
+          p_content: string
+          p_gateway: string
+          p_reference_number?: string
+          p_sepay_id: number
+          p_transaction_date: string
+          p_transfer_type: string
+        }
+        Returns: Json
+      }
+      process_student_refund: {
+        Args: {
+          p_reason: string
+          p_refund_amount_vnd: number
+          p_refund_sessions: number
+          p_student_id: string
+        }
+        Returns: Json
       }
       record_session_result: {
         Args: {
