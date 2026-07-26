@@ -68,21 +68,24 @@ export const navigationSections: NavigationSection[] = [
     label: "Tài chính",
     items: [
       {
-        available: false,
+        available: true,
         href: "/finance",
         label: "Học phí & Công nợ",
+        permission: "finance.view",
         shortLabel: "TC",
       },
       {
-        available: false,
+        available: true,
         href: "/finance/sepay",
         label: "Giao dịch SePay",
+        permission: "sepay.view",
         shortLabel: "SP",
       },
       {
-        available: false,
+        available: true,
         href: "/finance/session-ledger",
         label: "Sổ cái số buổi",
+        permission: "session_ledger.view",
         shortLabel: "SC",
       },
     ],
