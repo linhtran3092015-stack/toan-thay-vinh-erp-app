@@ -1014,6 +1014,69 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          dedupe_key: string
+          entity_id: string | null
+          entity_type: string | null
+          event_code: string
+          href: string | null
+          id: string
+          message: string
+          metadata: Json
+          read_at: string | null
+          recipient_user_id: string
+          title: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          dedupe_key: string
+          entity_id?: string | null
+          entity_type?: string | null
+          event_code: string
+          href?: string | null
+          id?: string
+          message: string
+          metadata?: Json
+          read_at?: string | null
+          recipient_user_id: string
+          title: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          dedupe_key?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          event_code?: string
+          href?: string | null
+          id?: string
+          message?: string
+          metadata?: Json
+          read_at?: string | null
+          recipient_user_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_recipient_user_id_fkey"
+            columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_split_allocations: {
         Row: {
           allocated_amount_vnd: number
@@ -4255,6 +4318,31 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "class_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      mark_all_notifications_read: { Args: never; Returns: number }
+      mark_notification_read: {
+        Args: { p_notification_id: string }
+        Returns: {
+          actor_user_id: string | null
+          created_at: string
+          dedupe_key: string
+          entity_id: string | null
+          entity_type: string | null
+          event_code: string
+          href: string | null
+          id: string
+          message: string
+          metadata: Json
+          read_at: string | null
+          recipient_user_id: string
+          title: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "notifications"
           isOneToOne: true
           isSetofReturn: false
         }
