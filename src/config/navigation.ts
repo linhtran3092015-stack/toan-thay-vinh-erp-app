@@ -21,7 +21,7 @@ export const navigationSections: NavigationSection[] = [
         available: true,
         href: "/",
         label: "Tổng quan",
-        permission: "app.access",
+        permission: "dashboard.view",
         shortLabel: "TQ",
       },
     ],
