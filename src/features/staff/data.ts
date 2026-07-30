@@ -1,6 +1,10 @@
 import "server-only";
 
 import type {
+  StaffDetailError,
+  StaffDetailErrorCode,
+  StaffDetailReadModel,
+  StaffDetailResult,
   StaffDirectoryError,
   StaffDirectoryErrorCode,
   StaffDirectoryMember,
@@ -17,6 +21,23 @@ function createStaffDirectoryError(
   const messages: Record<StaffDirectoryErrorCode, string> = {
     profiles_query_failed: "Không thể tải danh sách hồ sơ nhân sự.",
     assignments_query_failed: "Không thể tải vai trò đang được cấp.",
+    roles_query_failed: "Không thể tải danh mục vai trò.",
+  };
+
+  return {
+    code,
+    message: messages[code],
+  };
+}
+
+function createStaffDetailError(
+  code: StaffDetailErrorCode,
+): StaffDetailError {
+  const messages: Record<StaffDetailErrorCode, string> = {
+    assignments_query_failed: "Không thể tải vai trò đang được cấp.",
+    profile_not_found: "Không tìm thấy hồ sơ nhân sự.",
+    profiles_query_failed: "Không thể tải hồ sơ nhân sự.",
+    rate_versions_query_failed: "Không thể tải lịch sử đơn giá nhân sự.",
     roles_query_failed: "Không thể tải danh mục vai trò.",
   };
 
@@ -170,5 +191,141 @@ export async function getStaffDirectory(options: {
     ok: true,
     members,
     roleOptions,
+  };
+}
+
+export async function getStaffDetail(
+  staffId: string,
+  options: {
+    includeRateVersions: boolean;
+    includeRoles: boolean;
+  },
+): Promise<StaffDetailResult> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select(
+      "id, email, display_name, avatar_url, phone, employee_code, employment_status, joined_at, left_at, last_login_at",
+    )
+    .eq("id", staffId)
+    .maybeSingle();
+
+  if (profileError) {
+    return {
+      ok: false,
+      error: createStaffDetailError("profiles_query_failed"),
+    };
+  }
+
+  if (!profile) {
+    return {
+      ok: false,
+      error: createStaffDetailError("profile_not_found"),
+    };
+  }
+
+  let roles: StaffRoleSummary[] | null = null;
+
+  if (options.includeRoles) {
+    const [assignmentsResult, rolesResult] = await Promise.all([
+      supabase
+        .from("user_role_assignments")
+        .select("id, user_id, role_id, assigned_at")
+        .eq("user_id", staffId)
+        .is("revoked_at", null),
+      supabase
+        .from("roles")
+        .select("id, code, name, is_active"),
+    ]);
+
+    if (assignmentsResult.error) {
+      return {
+        ok: false,
+        error: createStaffDetailError("assignments_query_failed"),
+      };
+    }
+
+    if (rolesResult.error) {
+      return {
+        ok: false,
+        error: createStaffDetailError("roles_query_failed"),
+      };
+    }
+
+    const roleById = new Map(
+      rolesResult.data.map((role) => [role.id, role]),
+    );
+
+    roles = assignmentsResult.data
+      .flatMap((assignment) => {
+        const role = roleById.get(assignment.role_id);
+
+        if (!role?.is_active) {
+          return [];
+        }
+
+        return [
+          {
+            assignedAt: assignment.assigned_at,
+            assignmentId: assignment.id,
+            code: role.code,
+            id: role.id,
+            name: role.name,
+          },
+        ];
+      })
+      .sort((left, right) =>
+        left.name.localeCompare(right.name, "vi"),
+      );
+  }
+
+  let rateVersions: StaffDetailReadModel["rateVersions"] = null;
+
+  if (options.includeRateVersions) {
+    const { data, error } = await supabase
+      .from("staff_rate_versions")
+      .select(
+        "id, effective_from, offline_hourly_rate_vnd, online_hourly_rate_vnd, note, created_at",
+      )
+      .eq("staff_id", staffId)
+      .order("effective_from", { ascending: false });
+
+    if (error) {
+      return {
+        ok: false,
+        error: createStaffDetailError("rate_versions_query_failed"),
+      };
+    }
+
+    rateVersions = data.map((rateVersion) => ({
+      createdAt: rateVersion.created_at,
+      effectiveFrom: rateVersion.effective_from,
+      id: rateVersion.id,
+      note: rateVersion.note,
+      offlineHourlyRateVnd: rateVersion.offline_hourly_rate_vnd,
+      onlineHourlyRateVnd:
+        rateVersion.online_hourly_rate_vnd ??
+        rateVersion.offline_hourly_rate_vnd / 2,
+    }));
+  }
+
+  return {
+    ok: true,
+    detail: {
+      avatarUrl: profile.avatar_url,
+      displayName: getDisplayName(profile.display_name, profile.email),
+      email: profile.email,
+      employeeCode: profile.employee_code,
+      employmentStatus: normalizeEmploymentStatus(profile.employment_status),
+      id: profile.id,
+      joinedAt: profile.joined_at,
+      lastLoginAt: profile.last_login_at,
+      leftAt: profile.left_at,
+      phone: profile.phone,
+      profileDisplayName: profile.display_name,
+      rateVersions,
+      roles,
+    },
   };
 }

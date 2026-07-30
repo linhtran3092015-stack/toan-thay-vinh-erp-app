@@ -1,4 +1,5 @@
 import { StaffRoleManagement } from "@/features/staff/components/staff-role-management";
+import Link from "next/link";
 import type {
   StaffDirectoryMember,
   StaffEmploymentStatus,
@@ -107,7 +108,7 @@ export function StaffDirectoryPage({
               {members.map((member) => (
                 <tr className="align-top hover:bg-canvas/70" key={member.id}>
                   <td className="px-5 py-4">
-                    <StaffIdentity member={member} />
+                    <StaffProfileLink member={member} />
                   </td>
 
                   <td className="px-5 py-4">
@@ -157,7 +158,7 @@ export function StaffDirectoryPage({
               key={member.id}
             >
               <div className="flex items-start justify-between gap-3">
-                <StaffIdentity member={member} />
+                <StaffProfileLink member={member} />
                 <EmploymentStatusBadge status={member.employmentStatus} />
               </div>
 
@@ -239,6 +240,21 @@ function StaffIdentity({
         </p>
       </div>
     </div>
+  );
+}
+
+function StaffProfileLink({
+  member,
+}: {
+  member: StaffDirectoryMember;
+}) {
+  return (
+    <Link
+      className="block rounded-md focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-secondary/25"
+      href={`/staff/${member.id}`}
+    >
+      <StaffIdentity member={member} />
+    </Link>
   );
 }
 
