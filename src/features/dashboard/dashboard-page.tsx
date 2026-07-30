@@ -1,338 +1,550 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import {
-  attentionStudents,
-  gradeDistribution,
-  kpiMetrics,
-  notifications,
-  quickActions,
-  revenuePoints,
-  sourceDistribution,
-  todaySchedule,
-  type KpiMetric,
-} from "./mock-data";
+import type {
+  DashboardSectionState,
+  RoleAwareDashboardReadModel,
+} from "@/features/dashboard/read-models";
 
-const metricToneClasses: Record<KpiMetric["tone"], string> = {
-  danger: "bg-danger-bg text-danger border-danger-border",
-  primary: "bg-primary-soft text-primary border-primary/20",
-  purple: "bg-purple-bg text-accent-purple border-accent-purple/30",
-  success: "bg-success-bg text-success border-success-border",
-  warning: "bg-warning-bg text-warning border-warning-border",
-};
+const currencyFormatter = new Intl.NumberFormat(
+  "vi-VN",
+  {
+    currency: "VND",
+    maximumFractionDigits: 0,
+    style: "currency",
+  },
+);
 
-const sparklineToneClasses: Record<KpiMetric["tone"], string> = {
-  danger: "bg-danger/80",
-  primary: "bg-primary/80",
-  purple: "bg-accent-purple/80",
-  success: "bg-success/80",
-  warning: "bg-warning/80",
-};
+const integerFormatter = new Intl.NumberFormat(
+  "vi-VN",
+  {
+    maximumFractionDigits: 2,
+  },
+);
 
-const notificationToneClasses = {
-  danger: "bg-danger",
-  info: "bg-info",
-  purple: "bg-accent-purple",
-  success: "bg-success",
-  warning: "bg-warning",
-};
+interface DashboardPageProps {
+  dashboard: RoleAwareDashboardReadModel;
+}
 
-const maxRevenue = Math.max(...revenuePoints.map((point) => point.revenue));
+export function DashboardPage({
+  dashboard,
+}: DashboardPageProps) {
+  const sections = [
+    dashboard.finance,
+    dashboard.payroll,
+    dashboard.advances,
+    dashboard.gradingCredits,
+    dashboard.commissions,
+    dashboard.coaching,
+  ];
 
-export function DashboardPage() {
+  const visibleSectionCount = sections.filter(
+    (section) => section.status !== "hidden",
+  ).length;
+
+  const errorSectionCount = sections.filter(
+    (section) => section.status === "error",
+  ).length;
+
   return (
-    <div className="grid gap-6">
-      {/* Header Section */}
-      <section className="flex flex-col gap-3 rounded-2xl border border-hairline bg-surface-1 p-6 shadow-xs md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-success animate-pulse" />
-            <p className="font-display text-xs font-bold uppercase tracking-wider text-primary">
-              Toán Thầy Vinh ERP
+    <div className="grid min-w-0 gap-6">
+      <section className="rounded-2xl border border-hairline bg-surface-1 p-5 shadow-xs md:p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-success" />
+              <p className="text-xs font-bold uppercase tracking-wider text-primary">
+                Toán Thầy Vinh ERP
+              </p>
+            </div>
+
+            <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
+              Tổng quan theo quyền truy cập
+            </h1>
+
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-muted">
+              Dashboard chỉ tải và hiển thị những dữ liệu
+              nghiệp vụ mà tài khoản hiện tại được phép xem.
+              Số liệu được lấy trực tiếp từ hệ thống, không sử
+              dụng dữ liệu minh họa.
             </p>
           </div>
-          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
-            Tổng quan vận hành
-          </h1>
-          <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-ink-muted">
-            Hệ thống quản lý thông tin học viên, lớp học, điểm danh và doanh thu học phí trung tâm.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2.5">
-          <Button size="sm" variant="outline">
-            <span>📥</span> Xuất báo cáo
-          </Button>
-          <Button size="sm" variant="primary">
-            <span>✨</span> Thêm nhanh
-          </Button>
+
+          <div className="flex flex-wrap gap-2">
+            <Badge tone="info">
+              {visibleSectionCount} khối dữ liệu
+            </Badge>
+
+            {errorSectionCount > 0 ? (
+              <Badge tone="warning">
+                {errorSectionCount} khối cần tải lại
+              </Badge>
+            ) : (
+              <Badge tone="success">
+                Dữ liệu đã sẵn sàng
+              </Badge>
+            )}
+          </div>
         </div>
       </section>
 
-      {/* KPI Metrics */}
-      <section className="dashboard-grid kpi-grid">
-        {kpiMetrics.map((metric) => (
-          <Card className="hover:border-hairline-strong hover:shadow-md" key={metric.label}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-bold uppercase tracking-wider text-ink-subtle">
-                    {metric.label}
-                  </p>
-                  <p className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">
-                    {metric.value}
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "flex h-9 w-9 flex-none items-center justify-center rounded-xl border text-xs font-bold shadow-xs",
-                    metricToneClasses[metric.tone],
-                  )}
-                >
-                  {metric.trend === "up"
-                    ? "↑"
-                    : metric.trend === "down"
-                      ? "↓"
-                      : "•"}
-                </span>
-              </div>
-              <div className="mt-4 flex h-10 items-end gap-1">
-                {metric.points.map((point, index) => (
-                  <span
-                    className={cn(
-                      "w-full rounded-t-xs transition-all hover:opacity-100 opacity-85",
-                      sparklineToneClasses[metric.tone],
-                    )}
-                    key={`${metric.label}-${index}`}
-                    style={{ height: `${Math.max(point, 6)}px` }}
-                  />
-                ))}
-              </div>
-              <p className="mt-3 text-xs font-medium text-ink-muted">
-                {metric.helper}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
-
-      {/* Main Dashboard Grid */}
-      <section className="dashboard-grid main-dashboard-grid">
+      {visibleSectionCount === 0 ? (
         <Card>
-          <CardHeader>
-            <div>
-              <CardTitle>Doanh thu 6 tháng</CardTitle>
-              <p className="mt-1 text-xs text-ink-muted">
-                Biểu đồ tổng hợp doanh thu học phí theo từng tháng (triệu VNĐ)
+          <CardContent className="p-6">
+            <div className="rounded-xl border border-hairline bg-surface-2 p-5 text-center">
+              <p className="font-display text-base font-bold text-ink">
+                Chưa có khối dữ liệu phù hợp
+              </p>
+              <p className="mt-2 text-sm text-ink-muted">
+                Tài khoản được vào Dashboard nhưng chưa có
+                quyền xem các module nghiệp vụ bên dưới.
               </p>
             </div>
-            <Badge tone="info">Cập nhật mới</Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="grid min-h-[280px] grid-cols-6 items-end gap-4 pt-4">
-              {revenuePoints.map((point) => (
-                <div className="flex h-full min-w-0 flex-col justify-end" key={point.month}>
-                  <div className="flex flex-1 items-end">
-                    <div
-                      className="w-full rounded-t-lg bg-gradient-to-t from-primary to-secondary transition-all hover:brightness-110 shadow-xs"
-                      style={{
-                        height: `${Math.max((point.revenue / maxRevenue) * 100, 18)}%`,
-                      }}
-                    />
-                  </div>
-                  <div className="mt-3 text-center">
-                    <p className="truncate text-xs font-bold text-ink">
-                      {point.month}
-                    </p>
-                    <p className="mt-0.5 font-display text-xs font-bold text-primary">
-                      {point.revenue}tr
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
           </CardContent>
         </Card>
+      ) : null}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Phân bổ học viên</CardTitle>
-            <Badge tone="success">1.248 HS</Badge>
-          </CardHeader>
-          <CardContent className="grid gap-6">
-            <DistributionList title="Theo khối lớp" items={gradeDistribution} />
-            <DistributionList title="Theo nguồn tuyển sinh" items={sourceDistribution} />
-          </CardContent>
-        </Card>
-      </section>
+      <div className="grid gap-5 xl:grid-cols-2">
+        <DashboardSectionCard
+          badge="Tài chính"
+          description="Thu, chi, hoàn phí và yêu cầu thanh toán."
+          href="/finance"
+          section={dashboard.finance}
+          title="Tổng quan tài chính"
+        >
+          {(data) => (
+            <DashboardMetricGrid>
+              <DashboardMetric
+                helper="Tổng tiền thu đã ghi nhận"
+                label="Tiền vào"
+                value={formatCurrency(data.receiptVnd)}
+              />
+              <DashboardMetric
+                helper="Các khoản chi đã ghi nhận"
+                label="Tiền ra"
+                value={formatCurrency(
+                  data.disbursementVnd,
+                )}
+              />
+              <DashboardMetric
+                helper="Khoản hoàn học phí"
+                label="Hoàn phí"
+                value={formatCurrency(data.refundVnd)}
+              />
+              <DashboardMetric
+                helper="Thu trừ chi và hoàn phí"
+                label="Dòng tiền ròng"
+                value={formatCurrency(
+                  data.netCashflowVnd,
+                )}
+              />
+              <DashboardMetric
+                helper="Tổng yêu cầu trong phạm vi truy cập"
+                label="Yêu cầu thanh toán"
+                value={formatInteger(
+                  data.paymentRequestCount,
+                )}
+              />
+            </DashboardMetricGrid>
+          )}
+        </DashboardSectionCard>
 
-      {/* Lower Dashboard Grid 1 */}
-      <section className="dashboard-grid lower-dashboard-grid">
-        <Card>
-          <CardHeader>
-            <CardTitle>Lịch học hôm nay</CardTitle>
-            <Badge tone="neutral">{todaySchedule.length} lớp</Badge>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {todaySchedule.map((item) => (
-              <div
-                className="grid gap-3 rounded-xl border border-hairline bg-surface-2 p-3.5 transition-colors hover:border-hairline-strong sm:grid-cols-[80px_1fr_auto]"
-                key={`${item.time}-${item.className}`}
-              >
-                <div className="font-display text-xs font-bold text-primary">{item.time}</div>
-                <div className="min-w-0">
-                  <p className="truncate font-display text-sm font-bold text-ink">
-                    {item.className}
-                  </p>
-                  <p className="mt-0.5 text-xs text-ink-muted">
-                    🧑‍🏫 {item.tutor} · 🚪 {item.room}
-                  </p>
-                </div>
-                <Badge tone={item.tone === "success" ? "success" : "neutral"}>
-                  {item.attendance}
-                </Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <DashboardSectionCard
+          badge="Nhân sự"
+          description="Tổng hợp bảng lương trong phạm vi tài khoản."
+          href="/payroll"
+          section={dashboard.payroll}
+          title="Bảng lương"
+        >
+          {(data) => (
+            <DashboardMetricGrid>
+              <DashboardMetric
+                helper="Các bảng lương được phép xem"
+                label="Số bảng lương"
+                value={formatInteger(
+                  data.statementCount,
+                )}
+              />
+              <DashboardMetric
+                helper="Tổng số tiền cần thanh toán"
+                label="Thực lĩnh"
+                value={formatCurrency(
+                  data.totalPayableVnd,
+                )}
+              />
+              <DashboardMetric
+                helper="Bảng lương chưa gửi đối soát"
+                label="Bản nháp"
+                value={formatInteger(
+                  data.draftStatementCount,
+                )}
+              />
+              <DashboardMetric
+                helper="Đang chờ kiểm tra hoặc phê duyệt"
+                label="Chờ duyệt"
+                value={formatInteger(
+                  data.reviewStatementCount,
+                )}
+              />
+              <DashboardMetric
+                helper="Bảng lương đã hoàn tất"
+                label="Đã duyệt"
+                value={formatInteger(
+                  data.approvedStatementCount,
+                )}
+              />
+              <DashboardMetric
+                helper="Kỳ mới nhất trong phạm vi"
+                label="Kỳ gần nhất"
+                value={formatPeriodMonth(
+                  data.latestPeriodMonth,
+                )}
+              />
+            </DashboardMetricGrid>
+          )}
+        </DashboardSectionCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Thông báo ưu tiên</CardTitle>
-            <Badge tone="warning">{notifications.length}</Badge>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            {notifications.map((item) => (
-              <div className="flex items-start gap-3 rounded-lg border border-transparent p-2 transition-colors hover:border-hairline hover:bg-surface-2" key={`${item.title}-${item.time}`}>
-                <span
-                  className={cn(
-                    "mt-1.5 h-2.5 w-2.5 flex-none rounded-pill shadow-xs",
-                    notificationToneClasses[item.tone],
-                  )}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-ink">
-                    {item.title}
-                  </p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
-                    {item.description}
-                  </p>
-                </div>
-                <span className="flex-none text-xs font-semibold text-ink-subtle">
-                  {item.time}
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </section>
+        <DashboardSectionCard
+          badge="Tạm ứng"
+          description="Trạng thái các yêu cầu tạm ứng lương."
+          href="/advances"
+          section={dashboard.advances}
+          title="Tạm ứng lương"
+        >
+          {(data) => (
+            <DashboardMetricGrid>
+              <DashboardMetric
+                helper="Tổng yêu cầu được phép xem"
+                label="Yêu cầu"
+                value={formatInteger(data.requestCount)}
+              />
+              <DashboardMetric
+                helper="Tổng số tiền đã yêu cầu"
+                label="Giá trị yêu cầu"
+                value={formatCurrency(
+                  data.totalRequestedVnd,
+                )}
+              />
+              <DashboardMetric
+                helper="Đang chờ review hoặc phê duyệt"
+                label="Chờ xử lý"
+                value={formatInteger(
+                  data.pendingReviewCount,
+                )}
+              />
+              <DashboardMetric
+                helper="Đã duyệt nhưng chưa khấu trừ"
+                label="Chờ khấu trừ"
+                value={formatInteger(
+                  data.approvedUndeductedCount,
+                )}
+              />
+              <DashboardMetric
+                helper="Đã đưa vào bảng lương"
+                label="Đã khấu trừ"
+                value={formatInteger(
+                  data.deductedCount,
+                )}
+              />
+              <DashboardMetric
+                helper="Yêu cầu không được duyệt"
+                label="Đã từ chối"
+                value={formatInteger(
+                  data.rejectedCount,
+                )}
+              />
+            </DashboardMetricGrid>
+          )}
+        </DashboardSectionCard>
 
-      {/* Lower Dashboard Grid 2 */}
-      <section className="dashboard-grid lower-dashboard-grid">
-        <Card>
-          <CardHeader>
-            <CardTitle>Học viên cần chú ý</CardTitle>
-            <Badge tone="danger">{attentionStudents.length}</Badge>
-          </CardHeader>
-          <CardContent className="overflow-x-auto p-0">
-            <table className="w-full min-w-[680px] border-separate border-spacing-0 text-left text-sm">
-              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle">
-                <tr>
-                  <th className="px-5 py-3.5 font-bold">Học viên</th>
-                  <th className="px-5 py-3.5 font-bold">Lớp</th>
-                  <th className="px-5 py-3.5 font-bold">Vấn đề</th>
-                  <th className="px-5 py-3.5 font-bold">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline">
-                {attentionStudents.map((student) => (
-                  <tr className="transition-colors hover:bg-surface-2/60" key={student.code}>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/20 bg-primary-soft text-xs font-bold text-primary shadow-xs">
-                          {student.initials}
-                        </span>
-                        <div>
-                          <p className="font-display text-sm font-bold text-ink">
-                            {student.name}
-                          </p>
-                          <p className="mt-0.5 text-xs text-ink-subtle">
-                            {student.code}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5 font-medium text-ink-muted">
-                      {student.className}
-                    </td>
-                    <td className="px-5 py-3.5 text-xs text-ink-muted">
-                      {student.issue}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <Badge tone={student.statusTone}>{student.status}</Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+        <DashboardSectionCard
+          badge="Chấm bài"
+          description="Tín chỉ chấm bài được ghi nhận tự động."
+          href="/grading-credits"
+          section={dashboard.gradingCredits}
+          title="Tín chỉ chấm bài"
+        >
+          {(data) => (
+            <DashboardMetricGrid>
+              <DashboardMetric
+                helper="Số lượt chấm đã được ghi nhận"
+                label="Lượt ghi nhận"
+                value={formatInteger(data.entryCount)}
+              />
+              <DashboardMetric
+                helper="Tổng số đơn vị tín chỉ"
+                label="Tổng tín chỉ"
+                value={formatInteger(
+                  data.totalCreditUnits,
+                )}
+              />
+              <DashboardMetric
+                helper="Thời điểm ghi nhận gần nhất"
+                label="Cập nhật gần nhất"
+                value={formatDateTime(
+                  data.latestCreditedAt,
+                )}
+              />
+            </DashboardMetricGrid>
+          )}
+        </DashboardSectionCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Thao tác nhanh</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {quickActions.map((action) => (
-                <Button className="justify-start text-xs font-bold" key={action} variant="outline">
-                  ⚡ {action}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <DashboardSectionCard
+          badge="Hoa hồng"
+          description="Doanh thu đủ điều kiện ghi nhận hoa hồng."
+          href="/commissions"
+          section={dashboard.commissions}
+          title="Doanh thu hoa hồng"
+        >
+          {(data) => (
+            <DashboardMetricGrid>
+              <DashboardMetric
+                helper="Số bản ghi doanh thu đủ điều kiện"
+                label="Bản ghi"
+                value={formatInteger(data.accrualCount)}
+              />
+              <DashboardMetric
+                helper="Chưa áp dụng công thức tính tiền hoa hồng"
+                label="Doanh thu ghi nhận"
+                value={formatCurrency(
+                  data.recognizedRevenueVnd,
+                )}
+              />
+              <DashboardMetric
+                helper="Nguồn tuyển sinh MMA"
+                label="MMA"
+                value={formatInteger(
+                  data.mmaAccrualCount,
+                )}
+              />
+              <DashboardMetric
+                helper="Nguồn đối tác Sandbox"
+                label="Sandbox"
+                value={formatInteger(
+                  data.sandboxAccrualCount,
+                )}
+              />
+              <DashboardMetric
+                helper="Thời điểm ghi nhận gần nhất"
+                label="Cập nhật gần nhất"
+                value={formatDateTime(
+                  data.latestRecognizedAt,
+                )}
+              />
+            </DashboardMetricGrid>
+          )}
+        </DashboardSectionCard>
+
+        <DashboardSectionCard
+          badge="Coaching"
+          description="Phiếu coaching trong phạm vi được phép xem."
+          href="/coaching"
+          section={dashboard.coaching}
+          title="Theo dõi Coaching"
+        >
+          {(data) => (
+            <DashboardMetricGrid>
+              <DashboardMetric
+                helper="Tổng phiếu trong phạm vi truy cập"
+                label="Tổng phiếu"
+                value={formatInteger(data.recordCount)}
+              />
+              <DashboardMetric
+                helper="Phiếu chưa bắt đầu xử lý"
+                label="Đang mở"
+                value={formatInteger(data.openCount)}
+              />
+              <DashboardMetric
+                helper="Phiếu đang được theo dõi"
+                label="Đang xử lý"
+                value={formatInteger(
+                  data.inProgressCount,
+                )}
+              />
+              <DashboardMetric
+                helper="Phiếu đã hoàn tất"
+                label="Đã đóng"
+                value={formatInteger(data.closedCount)}
+              />
+              <DashboardMetric
+                helper="Phiếu ưu tiên cao chưa đóng"
+                label="Ưu tiên cao"
+                value={formatInteger(
+                  data.highPriorityCount,
+                )}
+              />
+            </DashboardMetricGrid>
+          )}
+        </DashboardSectionCard>
+      </div>
+
+      <section className="rounded-xl border border-hairline bg-surface-2 p-4">
+        <p className="text-xs leading-relaxed text-ink-muted">
+          Phạm vi dữ liệu của từng khối tiếp tục được bảo vệ
+          bởi permission, RPC và Row Level Security của module
+          tương ứng. Dashboard không cấp thêm quyền truy cập
+          nghiệp vụ.
+        </p>
       </section>
     </div>
   );
 }
 
-function DistributionList({
-  items,
-  title,
-}: {
-  items: typeof gradeDistribution;
+interface DashboardSectionCardProps<T> {
+  badge: string;
+  children: (data: T) => ReactNode;
+  description: string;
+  href: string;
+  section: DashboardSectionState<T>;
   title: string;
+}
+
+function DashboardSectionCard<T>({
+  badge,
+  children,
+  description,
+  href,
+  section,
+  title,
+}: DashboardSectionCardProps<T>) {
+  if (section.status === "hidden") {
+    return null;
+  }
+
+  return (
+    <Card className="min-w-0">
+      <CardHeader>
+        <div className="min-w-0">
+          <CardTitle>{title}</CardTitle>
+          <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+            {description}
+          </p>
+        </div>
+
+        <Badge
+          tone={
+            section.status === "error"
+              ? "warning"
+              : "info"
+          }
+        >
+          {section.status === "error"
+            ? "Không tải được"
+            : badge}
+        </Badge>
+      </CardHeader>
+
+      <CardContent className="grid gap-4">
+        {section.status === "error" ? (
+          <div className="rounded-xl border border-warning-border bg-warning-bg p-4">
+            <p className="text-sm font-bold text-warning">
+              Khối dữ liệu này chưa tải được
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+              Các khối còn lại vẫn hoạt động bình thường.
+              Có thể mở module để kiểm tra chi tiết.
+            </p>
+          </div>
+        ) : (
+          children(section.data)
+        )}
+
+        <div className="border-t border-hairline pt-3">
+          <Link
+            className="text-sm font-bold text-primary transition-opacity hover:opacity-75"
+            href={href}
+          >
+            Mở module →
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DashboardMetricGrid({
+  children,
+}: {
+  children: ReactNode;
 }) {
   return (
-    <div>
-      <h3 className="mb-3 font-display text-xs font-bold uppercase tracking-wider text-ink-muted">{title}</h3>
-      <div className="grid gap-3">
-        {items.map((item) => (
-          <div key={item.label}>
-            <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
-              <span className="font-semibold text-ink">{item.label}</span>
-              <span className="text-xs font-bold text-ink-muted">
-                {item.count} · {item.percent}%
-              </span>
-            </div>
-            <div className="h-2 rounded-pill bg-surface-2 overflow-hidden border border-hairline">
-              <div
-                className="h-full rounded-pill transition-all duration-300"
-                style={{
-                  backgroundColor: item.color,
-                  width: `${item.percent}%`,
-                }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {children}
     </div>
   );
+}
+
+function DashboardMetric({
+  helper,
+  label,
+  value,
+}: {
+  helper: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-xl border border-hairline bg-surface-2 p-4">
+      <p className="text-xs font-bold uppercase tracking-wider text-ink-subtle">
+        {label}
+      </p>
+      <p className="mt-2 break-words font-display text-xl font-bold tracking-tight text-ink">
+        {value}
+      </p>
+      <p className="mt-2 text-xs leading-relaxed text-ink-muted">
+        {helper}
+      </p>
+    </div>
+  );
+}
+
+function formatCurrency(value: number): string {
+  return currencyFormatter.format(value);
+}
+
+function formatInteger(value: number): string {
+  return integerFormatter.format(value);
+}
+
+function formatPeriodMonth(
+  value: string | null,
+): string {
+  if (!value) {
+    return "Chưa có";
+  }
+
+  const match = /^(\d{4})-(\d{2})/.exec(value);
+
+  if (!match) {
+    return value;
+  }
+
+  return `Tháng ${Number(match[2])}/${match[1]}`;
+}
+
+function formatDateTime(
+  value: string | null,
+): string {
+  if (!value) {
+    return "Chưa có";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "Asia/Ho_Chi_Minh",
+  }).format(date);
 }
