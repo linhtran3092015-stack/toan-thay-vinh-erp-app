@@ -36,7 +36,7 @@ insert into public.role_permissions (
 select distinct
   role.id,
   notification_permission.id,
-  null
+  null::uuid
 from public.roles as role
 join public.role_permissions as app_role_permission
   on app_role_permission.role_id = role.id
