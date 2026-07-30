@@ -13,12 +13,14 @@ interface AppShellProps {
   authUser: AuthUser;
   children: ReactNode;
   permissions: readonly PermissionCode[];
+  unreadNotificationCount: number;
 }
 
 export function AppShell({
   authUser,
   children,
   permissions,
+  unreadNotificationCount,
 }: AppShellProps) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
@@ -50,6 +52,7 @@ export function AppShell({
           onSidebarToggle={() =>
             setIsDesktopCollapsed((isCollapsed) => !isCollapsed)
           }
+          unreadNotificationCount={unreadNotificationCount}
           user={authUser}
         />
 

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getCurrentAuthUser } from "@/features/auth/current-user";
+import { getCachedUnreadNotificationCountResult } from "@/features/notifications/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 interface AuthenticatedAppShellProps {
@@ -46,10 +47,21 @@ export async function AuthenticatedAppShell({
     );
   }
 
+  const unreadNotificationCountResult =
+    permissionResult.permissions.includes("notifications.view")
+      ? await getCachedUnreadNotificationCountResult()
+      : { data: 0, ok: true as const };
+
+  const unreadNotificationCount =
+    unreadNotificationCountResult.ok
+      ? unreadNotificationCountResult.data
+      : 0;
+
   return (
     <AppShell
       authUser={authResult.user}
       permissions={permissionResult.permissions}
+      unreadNotificationCount={unreadNotificationCount}
     >
       {children}
     </AppShell>

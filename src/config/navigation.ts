@@ -167,9 +167,9 @@ export const navigationSections: NavigationSection[] = [
         shortLabel: "BC",
       },
       {
-        available: false,
-        badge: "12",
+        available: true,
         href: "/notifications",
+        permission: "notifications.view",
         label: "Thông báo",
         shortLabel: "TB",
       },

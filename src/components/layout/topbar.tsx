@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { AuthUserMenu } from "@/features/auth/components/auth-user-menu";
 import type { AuthUser } from "@/features/auth/types";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -8,9 +10,20 @@ interface TopbarProps {
   user: AuthUser;
   onMenuClick: () => void;
   onSidebarToggle: () => void;
+  unreadNotificationCount: number;
 }
 
-export function Topbar({ user, onMenuClick, onSidebarToggle }: TopbarProps) {
+export function Topbar({
+  user,
+  onMenuClick,
+  onSidebarToggle,
+  unreadNotificationCount,
+}: TopbarProps) {
+  const notificationBadge =
+    unreadNotificationCount > 99
+      ? "99+"
+      : String(unreadNotificationCount);
+
   return (
     <header className="sticky top-0 z-30 flex h-[var(--topbar-height)] items-center gap-3 border-b border-hairline bg-surface-1/95 px-4 shadow-topbar backdrop-blur-md transition-colors duration-200 sm:px-5 lg:px-6">
       <button
@@ -41,16 +54,22 @@ export function Topbar({ user, onMenuClick, onSidebarToggle }: TopbarProps) {
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
 
-        <button
-          aria-label="Thông báo"
-          className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-xl text-primary transition-colors hover:border-hairline hover:bg-primary-soft"
-          type="button"
+        <Link
+          aria-label={
+            unreadNotificationCount > 0
+              ? `Thông báo, ${unreadNotificationCount} chưa đọc`
+              : "Thông báo"
+          }
+          className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-lg text-primary transition-colors hover:border-hairline hover:bg-primary-soft"
+          href="/notifications"
         >
-          ♢
-          <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-danger px-1 text-[10px] font-bold leading-none text-white shadow-sm">
-            12
-          </span>
-        </button>
+          <span aria-hidden="true">🔔</span>
+          {unreadNotificationCount > 0 ? (
+            <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-danger px-1 text-[10px] font-bold leading-none text-white shadow-sm">
+              {notificationBadge}
+            </span>
+          ) : null}
+        </Link>
         <button
           aria-label="Lịch hôm nay"
           className="hidden h-10 w-10 items-center justify-center rounded-lg border border-transparent text-xl text-primary transition-colors hover:border-hairline hover:bg-primary-soft sm:flex"
