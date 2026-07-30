@@ -160,9 +160,10 @@ export const navigationSections: NavigationSection[] = [
         shortLabel: "CO",
       },
       {
-        available: false,
+        available: true,
         href: "/reports",
-        label: "Báo cáo & Dashboard",
+        label: "Báo cáo & Xuất dữ liệu",
+        permission: "reports.view",
         shortLabel: "BC",
       },
       {

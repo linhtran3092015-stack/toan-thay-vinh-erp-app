@@ -1,6 +1,7 @@
 export const DATABASE_PERMISSION_CODES = [
   "app.access",
   "dashboard.view",
+  "reports.view",
   "classes.view",
   "classes.create",
   "classes.manage_schedule",
