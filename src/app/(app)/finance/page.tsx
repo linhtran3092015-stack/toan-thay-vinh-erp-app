@@ -5,8 +5,7 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreatePaymentRequestDialog } from "@/features/finance/components/create-payment-request-dialog";
-import { ProcessRefundDialog } from "@/features/finance/components/process-refund-dialog";
-import { getFinanceOverview } from "@/features/finance/data";
+import { getFinanceOverviewResult } from "@/features/finance/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -31,25 +30,48 @@ export default async function FinanceOverviewPage() {
     );
   }
 
-  const canManagePayments = permissionResult.permissions.includes("payments.manage");
-  const canManageRefunds = permissionResult.permissions.includes("refunds.manage");
+  const canCreatePaymentRequests =
+    permissionResult.permissions.includes("payments.create_request") ||
+    permissionResult.permissions.includes("payments.manage");
 
-  const overview = await getFinanceOverview();
+  const overviewResult = await getFinanceOverviewResult();
+  if (!overviewResult.ok) {
+    return (
+      <ErrorState
+        description="Hệ thống chưa tải được dữ liệu học phí và công nợ. Vui lòng thử lại sau."
+        title="Không tải được dữ liệu tài chính"
+      />
+    );
+  }
 
-  // Fetch student options for payment request dialog
-  const supabase = await createSupabaseServerClient();
-  const { data: studentRows } = await supabase
-    .from("students")
-    .select("id, full_name, public_code")
-    .eq("lifecycle_status", "active")
-    .order("full_name")
-    .limit(100);
+  const overview = overviewResult.data;
 
-  const activeStudents = (studentRows ?? []).map((s) => ({
-    id: s.id,
-    name: s.full_name,
-    publicCode: s.public_code,
-  }));
+  let activeStudents: { id: string; name: string; publicCode: string }[] = [];
+
+  if (canCreatePaymentRequests) {
+    const supabase = await createSupabaseServerClient();
+    const { data: studentRows, error: studentsError } = await supabase
+      .from("students")
+      .select("id, full_name, public_code")
+      .eq("lifecycle_status", "active")
+      .order("full_name")
+      .limit(100);
+
+    if (studentsError) {
+      return (
+        <ErrorState
+          description="Hệ thống chưa tải được danh sách học viên để tạo yêu cầu nạp tiền."
+          title="Không tải được dữ liệu học viên"
+        />
+      );
+    }
+
+    activeStudents = (studentRows ?? []).map((student) => ({
+      id: student.id,
+      name: student.full_name,
+      publicCode: student.public_code,
+    }));
+  }
 
   return (
     <div className="grid min-w-0 gap-4">
@@ -64,8 +86,7 @@ export default async function FinanceOverviewPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {canManageRefunds ? <ProcessRefundDialog students={activeStudents} /> : null}
-            {canManagePayments ? <CreatePaymentRequestDialog students={activeStudents} /> : null}
+            {canCreatePaymentRequests ? <CreatePaymentRequestDialog students={activeStudents} /> : null}
           </div>
         </div>
       </section>

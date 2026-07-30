@@ -36,6 +36,18 @@ export interface SupabasePublicEnv {
   publishableKey: string;
 }
 
+const sepayWebhookEnvSchema = z.object({
+  SEPAY_ACCOUNT_NUMBER: z.string().trim().min(1),
+  SEPAY_WEBHOOK_SECRET: z.string().trim().min(1),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().trim().min(20),
+});
+
+export interface SepayWebhookEnv {
+  accountNumber: string;
+  serviceRoleKey: string;
+  webhookSecret: string;
+}
+
 function readSupabasePublicEnv() {
   return {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -68,5 +80,23 @@ export function getSupabasePublicEnv(): SupabasePublicEnv {
     publishableKey:
       result.data.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
       result.data.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  };
+}
+
+export function getSepayWebhookEnv(): SepayWebhookEnv {
+  const result = sepayWebhookEnvSchema.safeParse({
+    SEPAY_ACCOUNT_NUMBER: process.env.SEPAY_ACCOUNT_NUMBER,
+    SEPAY_WEBHOOK_SECRET: process.env.SEPAY_WEBHOOK_SECRET,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  });
+
+  if (!result.success) {
+    throw new Error("SePay webhook environment is not configured correctly.");
+  }
+
+  return {
+    accountNumber: result.data.SEPAY_ACCOUNT_NUMBER,
+    serviceRoleKey: result.data.SUPABASE_SERVICE_ROLE_KEY,
+    webhookSecret: result.data.SEPAY_WEBHOOK_SECRET,
   };
 }

@@ -4,7 +4,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getSepayTransactions } from "@/features/finance/data";
+import { getSepayTransactionsResult } from "@/features/finance/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 export default async function SepayTransactionsPage() {
@@ -28,7 +28,17 @@ export default async function SepayTransactionsPage() {
     );
   }
 
-  const transactions = await getSepayTransactions();
+  const transactionsResult = await getSepayTransactionsResult();
+  if (!transactionsResult.ok) {
+    return (
+      <ErrorState
+        description="Hệ thống chưa tải được lịch sử giao dịch SePay. Vui lòng thử lại sau."
+        title="Không tải được giao dịch SePay"
+      />
+    );
+  }
+
+  const transactions = transactionsResult.data;
 
   return (
     <div className="grid min-w-0 gap-4">
@@ -87,12 +97,26 @@ export default async function SepayTransactionsPage() {
                         {t.transferContent}
                       </td>
                       <td className="py-3 px-4">
-                        <Badge tone={t.matchStatus === "auto_matched" ? "success" : t.matchStatus === "split_allocated" ? "purple" : "neutral"}>
+                        <Badge
+                          tone={
+                            t.matchStatus === "auto_matched"
+                              ? "success"
+                              : t.matchStatus === "split_allocated"
+                                ? "purple"
+                                : t.matchStatus === "amount_mismatch"
+                                  ? "warning"
+                                  : "neutral"
+                          }
+                        >
                           {t.matchStatus === "auto_matched"
                             ? `Khớp tự động (${t.matchedPaymentRequestCode ?? ""})`
+                            : t.matchStatus === "manual_matched"
+                              ? "Khớp thủ công"
                             : t.matchStatus === "split_allocated"
                               ? "Phân bổ nhiều con"
-                              : "Chưa khớp"}
+                              : t.matchStatus === "amount_mismatch"
+                                ? "Sai số tiền - cần đối soát"
+                                : "Chưa khớp"}
                         </Badge>
                       </td>
                     </tr>

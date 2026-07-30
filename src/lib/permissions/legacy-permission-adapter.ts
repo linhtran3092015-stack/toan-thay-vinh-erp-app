@@ -8,6 +8,8 @@ const databaseToLegacyPermission: Partial<
   "attendance.view": "attendance.view",
   "audit.view": "audit.view",
   "coaching.view": "coaching.view",
+  "payments.create_request": "payments.create_request",
+  "payments.view": "payments.view",
   "results.manage": "results.manage",
   "results.view": "results.view",
   "session_ledger.view": "session_ledger.view",

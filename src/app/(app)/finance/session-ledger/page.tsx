@@ -4,7 +4,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCenterSessionLedgerEntries } from "@/features/finance/data";
+import { getCenterSessionLedgerEntriesResult } from "@/features/finance/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 export default async function CenterSessionLedgerPage() {
@@ -28,7 +28,17 @@ export default async function CenterSessionLedgerPage() {
     );
   }
 
-  const entries = await getCenterSessionLedgerEntries();
+  const entriesResult = await getCenterSessionLedgerEntriesResult();
+  if (!entriesResult.ok) {
+    return (
+      <ErrorState
+        description="Hệ thống chưa tải được sổ cái số buổi. Vui lòng thử lại sau."
+        title="Không tải được sổ cái số buổi"
+      />
+    );
+  }
+
+  const entries = entriesResult.data;
 
   return (
     <div className="grid min-w-0 gap-4">

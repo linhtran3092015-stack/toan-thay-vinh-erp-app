@@ -26,7 +26,12 @@ export interface SepayTransactionReadModel {
   bankTransactionId: string;
   createdAt: string;
   id: string;
-  matchStatus: "unmatched" | "auto_matched" | "manual_matched" | "split_allocated";
+  matchStatus:
+    | "unmatched"
+    | "auto_matched"
+    | "manual_matched"
+    | "split_allocated"
+    | "amount_mismatch";
   matchedAt: string | null;
   matchedPaymentRequestCode: string | null;
   matchedStudentFullName: string | null;

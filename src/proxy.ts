@@ -14,7 +14,11 @@ import {
 } from "@/lib/supabase/middleware";
 
 const LOGIN_PATH = "/login";
-const PUBLIC_PATHS = new Set(["/auth/callback", "/api/health/supabase"]);
+const PUBLIC_PATHS = new Set([
+  "/auth/callback",
+  "/api/health/supabase",
+  "/api/webhooks/sepay",
+]);
 
 function hasAuthCookie(request: NextRequest): boolean {
   return request.cookies

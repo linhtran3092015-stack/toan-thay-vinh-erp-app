@@ -7,12 +7,10 @@ import type {
   CreatePaymentRequestInput,
   FinanceActionFieldErrors,
   FinanceActionResultState,
-  ProcessRefundInput,
 } from "@/features/finance/forms/finance-action-types";
 import {
   allocatePaymentSchema,
   createPaymentRequestSchema,
-  processRefundSchema,
 } from "@/features/finance/forms/finance-schemas";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -20,7 +18,6 @@ import type { Database } from "@/types/database.generated";
 
 type CreatePaymentRequestRpcArgs = Database["public"]["Functions"]["create_student_payment_request"]["Args"];
 type AllocatePaymentRpcArgs = Database["public"]["Functions"]["allocate_payment_to_students"]["Args"];
-type ProcessRefundRpcArgs = Database["public"]["Functions"]["process_student_refund"]["Args"];
 
 function createErrorState(
   message: string,
@@ -38,11 +35,26 @@ function getFinanceRpcErrorMessage(message: string): string {
     ALLOCATION_EXCEEDS_TRANSACTION:
       "Tổng số tiền phân bổ vượt quá số tiền của giao dịch SePay.",
 
+    ALLOCATION_TOTAL_MUST_MATCH_TRANSACTION:
+      "Tổng số tiền phân bổ phải bằng đúng số tiền của giao dịch SePay.",
+
+    ALLOCATION_ALREADY_EXISTS:
+      "Giao dịch này đã có phân bổ học phí.",
+
     AUTHENTICATION_REQUIRED:
       "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
 
     EMPTY_ALLOCATIONS:
       "Vui lòng chọn ít nhất 1 học viên để phân bổ học phí.",
+
+    DUPLICATE_ALLOCATION_STUDENT:
+      "Một học viên chỉ được phân bổ một lần trong cùng giao dịch.",
+
+    GUARDIAN_ID_REQUIRED:
+      "Vui lòng chọn phụ huynh cho giao dịch phân bổ.",
+
+    INVALID_ALLOCATION_ITEM:
+      "Dữ liệu phân bổ học phí không hợp lệ.",
 
     INVALID_EXPECTED_AMOUNT:
       "Số tiền dự kiến nạp không hợp lệ.",
@@ -56,14 +68,26 @@ function getFinanceRpcErrorMessage(message: string): string {
     INVALID_REFUND_SESSIONS:
       "Số buổi hoàn trả phải lớn hơn 0.",
 
-    PAYMENTS_MANAGE_PERMISSION_DENIED:
-      "Tài khoản hiện tại không có quyền quản lý thanh toán (payments.manage).",
+    PAYMENTS_CREATE_REQUEST_PERMISSION_DENIED:
+      "Tài khoản hiện tại không có quyền tạo yêu cầu nạp tiền.",
 
-    REFUNDS_MANAGE_PERMISSION_DENIED:
-      "Tài khoản hiện tại không có quyền duyệt hoàn phí (refunds.manage).",
+    SEPAY_ALLOCATE_PERMISSION_DENIED:
+      "Tài khoản hiện tại không có quyền phân bổ giao dịch SePay.",
 
     STUDENT_NOT_FOUND:
       "Không tìm thấy học viên trong hệ thống.",
+
+    STUDENT_GUARDIAN_MISMATCH:
+      "Có học viên không thuộc phụ huynh đã chọn.",
+
+    STUDENT_PRIMARY_GUARDIAN_NOT_FOUND:
+      "Học viên chưa có phụ huynh chính đang hoạt động.",
+
+    TRANSACTION_NOT_AVAILABLE_FOR_ALLOCATION:
+      "Giao dịch này đã được xử lý hoặc đang cần đối soát.",
+
+    TRANSACTION_NOT_INBOUND:
+      "Chỉ giao dịch chuyển vào mới được phân bổ học phí.",
 
     TRANSACTION_NOT_FOUND:
       "Giao dịch SePay không tồn tại.",
@@ -82,8 +106,12 @@ export async function createPaymentRequestAction(
   input: CreatePaymentRequestInput,
 ): Promise<FinanceActionResultState> {
   const permissionResult = await getDatabasePermissions();
-  if (!permissionResult.ok || !permissionResult.permissions.includes("payments.manage")) {
-    return createErrorState("Tài khoản hiện tại không có quyền payments.manage.");
+  if (
+    !permissionResult.ok ||
+    (!permissionResult.permissions.includes("payments.create_request") &&
+      !permissionResult.permissions.includes("payments.manage"))
+  ) {
+    return createErrorState("Tài khoản hiện tại không có quyền tạo yêu cầu nạp tiền.");
   }
 
   const parsed = createPaymentRequestSchema.safeParse(input);
@@ -135,8 +163,12 @@ export async function allocatePaymentAction(
   input: AllocatePaymentInput,
 ): Promise<FinanceActionResultState> {
   const permissionResult = await getDatabasePermissions();
-  if (!permissionResult.ok || !permissionResult.permissions.includes("payments.manage")) {
-    return createErrorState("Tài khoản hiện tại không có quyền payments.manage.");
+  if (
+    !permissionResult.ok ||
+    (!permissionResult.permissions.includes("sepay.allocate") &&
+      !permissionResult.permissions.includes("payments.manage"))
+  ) {
+    return createErrorState("Tài khoản hiện tại không có quyền phân bổ giao dịch SePay.");
   }
 
   const parsed = allocatePaymentSchema.safeParse(input);
@@ -180,51 +212,5 @@ export async function allocatePaymentAction(
     };
   } catch {
     return createErrorState("Không thể kết nối tới hệ thống phân bổ học phí.");
-  }
-}
-
-export async function processRefundAction(
-  input: ProcessRefundInput,
-): Promise<FinanceActionResultState> {
-  const permissionResult = await getDatabasePermissions();
-  if (!permissionResult.ok || !permissionResult.permissions.includes("refunds.manage")) {
-    return createErrorState("Tài khoản hiện tại không có quyền refunds.manage.");
-  }
-
-  const parsed = processRefundSchema.safeParse(input);
-  if (!parsed.success) {
-    return createErrorState(
-      "Vui lòng kiểm tra lại thông tin hoàn phí.",
-      parsed.error.flatten().fieldErrors,
-    );
-  }
-
-  try {
-    const supabase = await createSupabaseServerClient();
-    const rpcArgs = {
-      p_reason: parsed.data.reason,
-      p_refund_amount_vnd: parsed.data.refundAmountVnd,
-      p_refund_sessions: parsed.data.refundSessions,
-      p_student_id: parsed.data.studentId,
-    } as unknown as ProcessRefundRpcArgs;
-
-    const { data: rawData, error } = await supabase.rpc("process_student_refund", rpcArgs);
-
-    if (error) {
-      return createErrorState(getFinanceRpcErrorMessage(error.message));
-    }
-
-    const data = rawData as unknown as { reference_code?: string } | null;
-
-    revalidatePath("/finance");
-    revalidatePath(`/students/${parsed.data.studentId}`);
-
-    return {
-      id: parsed.data.studentId,
-      message: `Đã xử lý hoàn phí thành công! (Mã chứng từ: ${data?.reference_code ?? ""})`,
-      status: "success",
-    };
-  } catch {
-    return createErrorState("Không thể kết nối tới hệ thống hoàn phí.");
   }
 }
