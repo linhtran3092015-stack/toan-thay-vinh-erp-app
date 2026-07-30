@@ -129,21 +129,27 @@ export function ClassListPage({
   );
 
   return (
-    <div className="grid gap-4">
-      <section className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 p-4 shadow-card md:flex-row md:items-center md:justify-between">
+    <div className="grid gap-6">
+      {/* Header Banner */}
+      <section className="flex flex-col gap-4 rounded-2xl border border-hairline bg-surface-1 p-6 shadow-xs md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">
+          <div className="flex items-center gap-2">
+            <span className="font-display text-xs font-bold uppercase tracking-wider text-primary">
+              Quản Lý Đào Tạo
+            </span>
+          </div>
+          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
             Lớp học &amp; Lịch học
           </h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            Hiển thị {filteredClasses.length} trên tổng số{" "}
-            {classes.length} lớp.
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink-muted">
+            Hiển thị <span className="font-bold text-ink">{filteredClasses.length}</span> trên tổng số{" "}
+            <span className="font-bold text-ink">{classes.length}</span> lớp học toàn trung tâm.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Link
-            className="inline-flex min-h-10 items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink transition hover:bg-surface-2"
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-hairline bg-surface-1 px-4 text-xs font-bold text-ink transition-colors hover:border-hairline-strong hover:bg-surface-2 active:scale-95"
             href="/classes/academic-years"
           >
             Quản lý năm học
@@ -151,24 +157,21 @@ export function ClassListPage({
 
           {canCreateClass ? (
             <Link
-              className="inline-flex min-h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white transition hover:opacity-90"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 text-xs font-bold text-white shadow-xs transition-colors hover:bg-primary-strong active:scale-95"
               href="/classes/new"
             >
-              Tạo lớp
+              + Tạo lớp mới
             </Link>
           ) : null}
-
-          <Badge tone="info">
-            Dữ liệu Supabase
-          </Badge>
         </div>
       </section>
 
-      <section className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(240px,1.5fr)_repeat(5,minmax(130px,1fr))_auto]">
+      {/* Filter Bar */}
+      <section className="rounded-xl border border-hairline bg-surface-1 p-5 shadow-card">
+        <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-[minmax(240px,1.5fr)_repeat(5,minmax(130px,1fr))_auto]">
           <FilterLabel label="Tìm kiếm">
             <input
-              className="h-11 rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20"
+              className="h-10 rounded-lg border border-hairline bg-surface-2 px-3 text-sm font-normal text-ink outline-none transition focus:border-primary focus:bg-surface-1 focus:ring-2 focus:ring-primary/20"
               onChange={(event) =>
                 updateFilter("search", event.target.value)
               }
@@ -258,7 +261,7 @@ export function ClassListPage({
 
           <div className="flex items-end">
             <Button
-              className="min-h-11 w-full"
+              className="h-10 w-full text-xs font-bold"
               disabled={!hasActiveFilters}
               onClick={() => {
                 setFilters(defaultFilters);
@@ -272,21 +275,24 @@ export function ClassListPage({
         </div>
       </section>
 
+      {/* Main List Table & Cards */}
       {filteredClasses.length === 0 ? (
-        <section className="rounded-lg border border-dashed border-hairline bg-surface-1 p-8 text-center shadow-card">
-          <h2 className="font-semibold text-ink">
-            Không có lớp phù hợp
+        <section className="rounded-xl border border-dashed border-hairline-strong bg-surface-1 p-10 text-center shadow-xs">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-2 text-2xl">
+            🏫
+          </div>
+          <h2 className="font-display text-base font-bold text-ink">
+            Không có lớp học phù hợp
           </h2>
-          <p className="mt-2 text-sm text-ink-muted">
-            Chưa có lớp học hoặc không có lớp nào khớp
-            với bộ lọc hiện tại.
+          <p className="mt-1 text-sm text-ink-muted">
+            Không tìm thấy lớp học nào khớp với bộ lọc tìm kiếm hiện tại.
           </p>
         </section>
       ) : (
         <>
           <ClassTable classes={rows} />
 
-          <div className="grid gap-3 lg:hidden">
+          <div className="grid gap-3.5 lg:hidden">
             {rows.map((item) => (
               <ClassMobileCard
                 item={item}
@@ -322,9 +328,9 @@ function ClassTable({
   classes: ClassDirectoryItem[];
 }) {
   return (
-    <div className="hidden overflow-x-auto rounded-lg border border-hairline bg-surface-1 shadow-card lg:block">
+    <div className="hidden overflow-x-auto rounded-xl border border-hairline bg-surface-1 shadow-card lg:block">
       <table className="min-w-[1120px] border-separate border-spacing-0 text-left text-sm">
-        <thead className="bg-canvas text-xs uppercase tracking-[0.08em] text-ink-subtle">
+        <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle">
           <tr>
             <TableHeader>Mã lớp</TableHeader>
             <TableHeader>Tên lớp</TableHeader>
@@ -342,33 +348,33 @@ function ClassTable({
           </tr>
         </thead>
 
-        <tbody>
+        <tbody className="divide-y divide-hairline">
           {classes.map((item) => (
             <tr
-              className="transition hover:bg-[#F8FAFF]"
+              className="transition-colors hover:bg-surface-2/70"
               key={item.id}
             >
               <TableCell>
-                <span className="font-mono text-xs font-semibold">
+                <span className="font-mono text-xs font-bold text-ink-muted">
                   {item.code}
                 </span>
               </TableCell>
 
               <TableCell>
                 <Link
-                  className="font-semibold text-primary hover:underline"
+                  className="font-display text-sm font-bold text-primary hover:underline"
                   href={`/classes/${item.id}`}
                 >
                   {item.name}
                 </Link>
               </TableCell>
 
-              <TableCell>
+              <TableCell className="font-medium text-ink-muted">
                 {item.academicYear?.code ??
                   "Chưa xác định"}
               </TableCell>
 
-              <TableCell>Khối {item.grade}</TableCell>
+              <TableCell className="font-medium">Khối {item.grade}</TableCell>
 
               <TableCell>
                 <Badge
@@ -388,15 +394,11 @@ function ClassTable({
                 />
               </TableCell>
 
-              <TableCell>
-                {item.weeklySessionCount}
-              </TableCell>
+              <TableCell className="font-semibold">{item.weeklySessionCount}</TableCell>
 
-              <TableCell>
-                {item.activeScheduleCount}
-              </TableCell>
+              <TableCell className="font-semibold">{item.activeScheduleCount}</TableCell>
 
-              <TableCell>
+              <TableCell className="font-semibold text-ink">
                 {item.activeStudentCount ?? "Không có quyền"}
               </TableCell>
 
@@ -406,10 +408,10 @@ function ClassTable({
 
               <TableCell className="text-right">
                 <Link
-                  className="inline-flex h-8 items-center justify-center rounded-md px-3 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink"
+                  className="inline-flex h-8 items-center justify-center rounded-lg border border-hairline bg-surface-1 px-3 text-xs font-bold text-ink-muted transition-colors hover:border-hairline-strong hover:bg-surface-2 hover:text-ink focus-visible:outline-none"
                   href={`/classes/${item.id}`}
                 >
-                  Xem
+                  Xem chi tiết
                 </Link>
               </TableCell>
             </tr>
@@ -426,16 +428,16 @@ function ClassMobileCard({
   item: ClassDirectoryItem;
 }) {
   return (
-    <article className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
+    <article className="rounded-xl border border-hairline bg-surface-1 p-4 shadow-card transition-all active:scale-[0.99]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <Link
-            className="font-semibold text-primary hover:underline"
+            className="font-display text-base font-bold text-primary hover:underline"
             href={`/classes/${item.id}`}
           >
             {item.name}
           </Link>
-          <p className="mt-1 font-mono text-xs text-ink-muted">
+          <p className="mt-0.5 font-mono text-xs font-semibold text-ink-muted">
             {item.code}
           </p>
         </div>
@@ -443,7 +445,7 @@ function ClassMobileCard({
         <ClassStatusBadge status={item.status} />
       </div>
 
-      <div className="mt-4 grid gap-2 text-sm">
+      <div className="mt-3.5 grid gap-2 rounded-lg bg-surface-2 p-3 text-xs">
         <InfoLine
           label="Năm học"
           value={
@@ -469,10 +471,10 @@ function ClassMobileCard({
       </div>
 
       <Link
-        className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink hover:border-secondary hover:bg-canvas"
+        className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-hairline bg-surface-1 px-4 text-xs font-bold text-ink transition-colors hover:border-hairline-strong hover:bg-surface-2 focus-visible:outline-none active:scale-[0.98]"
         href={`/classes/${item.id}`}
       >
-        Xem lớp học
+        Xem thông tin lớp ➔
       </Link>
     </article>
   );
@@ -557,7 +559,7 @@ function FilterLabel({
   label: string;
 }) {
   return (
-    <label className="grid gap-1.5 text-xs font-semibold text-ink-muted">
+    <label className="grid gap-1.5 text-xs font-bold text-ink-muted">
       {label}
       {children}
     </label>
@@ -578,7 +580,7 @@ function FilterSelect({
   return (
     <FilterLabel label={label}>
       <select
-        className="h-11 rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20"
+        className="h-10 rounded-lg border border-hairline bg-surface-2 px-3 text-xs font-medium text-ink outline-none transition focus:border-primary focus:bg-surface-1 focus:ring-2 focus:ring-primary/20"
         onChange={(event) =>
           onChange(event.target.value)
         }
@@ -599,7 +601,7 @@ function TableHeader({
 }) {
   return (
     <th
-      className={`whitespace-nowrap border-b border-hairline px-4 py-3 font-semibold ${className ?? ""}`}
+      className={`whitespace-nowrap border-b border-hairline px-4 py-3.5 font-bold ${className ?? ""}`}
     >
       {children}
     </th>
@@ -615,7 +617,7 @@ function TableCell({
 }) {
   return (
     <td
-      className={`border-b border-hairline px-4 py-3 align-middle text-ink ${className ?? ""}`}
+      className={`px-4 py-3.5 align-middle text-ink ${className ?? ""}`}
     >
       {children}
     </td>
@@ -655,9 +657,9 @@ function Pagination({
   total: number;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 px-4 py-3 text-sm shadow-card md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-3 rounded-xl border border-hairline bg-surface-1 px-4 py-3 text-xs font-semibold shadow-card md:flex-row md:items-center md:justify-between">
       <p className="text-ink-muted">
-        Hiển thị {start}-{end} của {total} lớp · Trang{" "}
+        Hiển thị <span className="font-bold text-ink">{start}-{end}</span> của <span className="font-bold text-ink">{total}</span> lớp · Trang{" "}
         {page}/{pageCount}
       </p>
 
@@ -665,17 +667,19 @@ function Pagination({
         <Button
           disabled={page <= 1}
           onClick={() => setPage(page - 1)}
+          size="sm"
           variant="outline"
         >
-          Trước
+          ← Trước
         </Button>
 
         <Button
           disabled={page >= pageCount}
           onClick={() => setPage(page + 1)}
+          size="sm"
           variant="outline"
         >
-          Sau
+          Sau →
         </Button>
       </div>
     </div>

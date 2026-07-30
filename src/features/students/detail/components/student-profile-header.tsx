@@ -18,7 +18,7 @@ interface StudentProfileHeaderProps {
 
 const profileActions: StudentDetailAction[] = [
   { label: "Chỉnh sửa", permission: "students.update" },
-  { label: "Tạo thanh toán", permission: "payments.view" },
+  { label: "Tạo thanh toán", permission: "payments.create_request" },
   { label: "Chuyển lớp", permission: "students.transfer_class" },
   { label: "Bảo lưu", permission: "students.reserve" },
   { label: "Thêm coaching", permission: "coaching.view" },

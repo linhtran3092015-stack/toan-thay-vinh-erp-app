@@ -18,16 +18,16 @@ export function StudentMobileCard({
     student.registeredMode;
 
   return (
-    <article className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
+    <article className="rounded-xl border border-hairline bg-surface-1 p-4 shadow-card transition-all active:scale-[0.99]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <Link
-            className="block truncate text-base font-semibold text-primary hover:underline"
+            className="block truncate font-display text-base font-bold text-primary hover:underline"
             href={getStudentDetailHref(student)}
           >
             {student.fullName}
           </Link>
-          <p className="mt-1 text-xs font-medium text-ink-muted">
+          <p className="mt-0.5 font-mono text-xs font-semibold text-ink-muted">
             {student.publicCode}
           </p>
         </div>
@@ -37,7 +37,7 @@ export function StudentMobileCard({
         />
       </div>
 
-      <div className="mt-4 grid gap-3 text-sm">
+      <div className="mt-4 grid gap-2.5 rounded-lg bg-surface-2 p-3 text-xs">
         <InfoLine
           label="Lớp"
           value={
@@ -51,7 +51,7 @@ export function StudentMobileCard({
           label="Phụ huynh"
           value={
             student.primaryGuardian
-              ? `${student.primaryGuardian.fullName} · ${student.primaryGuardian.phone}`
+              ? `${student.primaryGuardian.fullName} (${student.primaryGuardian.phone})`
               : "Chưa liên kết"
           }
         />
@@ -79,10 +79,10 @@ export function StudentMobileCard({
       </div>
 
       <Link
-        className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink transition-colors hover:border-secondary hover:bg-canvas focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-secondary/25"
+        className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-hairline bg-surface-1 px-4 text-xs font-bold text-ink transition-colors hover:border-hairline-strong hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 active:scale-[0.98]"
         href={getStudentDetailHref(student)}
       >
-        Xem hồ sơ
+        Xem hồ sơ học viên ➔
       </Link>
     </article>
   );

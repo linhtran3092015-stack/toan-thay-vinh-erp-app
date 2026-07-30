@@ -5,7 +5,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <section
       className={cn(
-        "rounded-lg border border-hairline bg-surface-1 shadow-card",
+        "rounded-xl border border-hairline bg-surface-1 shadow-card transition-all duration-200",
         className,
       )}
       {...props}
@@ -20,7 +20,7 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "flex min-h-14 items-center justify-between gap-3 border-b border-hairline px-5 py-3",
+        "flex min-h-14 items-center justify-between gap-3 border-b border-hairline px-5 py-3.5",
         className,
       )}
       {...props}
@@ -34,7 +34,10 @@ export function CardTitle({
 }: HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h2
-      className={cn("text-card-title font-semibold text-ink", className)}
+      className={cn(
+        "font-display text-base font-bold tracking-tight text-ink",
+        className,
+      )}
       {...props}
     />
   );

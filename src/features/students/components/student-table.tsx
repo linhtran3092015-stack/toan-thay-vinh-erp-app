@@ -14,9 +14,9 @@ export function StudentTable({
   students,
 }: StudentTableProps) {
   return (
-    <div className="hidden max-w-full overflow-x-auto rounded-lg border border-hairline bg-surface-1 shadow-card lg:block">
+    <div className="hidden max-w-full overflow-x-auto rounded-xl border border-hairline bg-surface-1 shadow-card lg:block">
       <table className="min-w-[1120px] border-separate border-spacing-0 text-left text-sm">
-        <thead className="bg-canvas text-xs uppercase tracking-[0.08em] text-ink-subtle">
+        <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle">
           <tr>
             <TableHeader>Mã học viên</TableHeader>
             <TableHeader>Họ tên</TableHeader>
@@ -34,7 +34,7 @@ export function StudentTable({
           </tr>
         </thead>
 
-        <tbody>
+        <tbody className="divide-y divide-hairline">
           {students.map((student) => {
             const classInfo =
               student.activeEnrollment?.classInfo;
@@ -46,46 +46,44 @@ export function StudentTable({
 
             return (
               <tr
-                className="group border-t border-hairline transition hover:bg-[#F8FAFF]"
+                className="group border-t border-hairline transition-colors hover:bg-surface-2/70"
                 key={student.id}
               >
                 <TableCell>
-                  <span className="font-mono text-xs font-semibold text-ink-muted">
+                  <span className="font-mono text-xs font-bold text-ink-muted">
                     {student.publicCode}
                   </span>
                 </TableCell>
 
                 <TableCell>
                   <Link
-                    className="block w-fit font-semibold leading-5 text-primary hover:underline"
+                    className="block w-fit font-display text-sm font-bold text-primary hover:underline"
                     href={getStudentDetailHref(student)}
                   >
                     {student.fullName}
                   </Link>
-                  <div className="mt-0.5 text-xs text-ink-muted">
-                    Tên thường gọi:{" "}
-                    {student.nickname ?? "Chưa có"}
+                  <div className="mt-0.5 text-xs text-ink-subtle">
+                    {student.nickname ? `Tên gọi: ${student.nickname}` : ""}
                   </div>
                 </TableCell>
 
-                <TableCell>{student.birthYear}</TableCell>
+                <TableCell className="font-medium">{student.birthYear}</TableCell>
 
-                <TableCell>
-                  {student.primaryGuardian?.fullName ??
-                    "Chưa liên kết"}
+                <TableCell className="font-medium">
+                  {student.primaryGuardian?.fullName ?? "—"}
                 </TableCell>
 
                 <TableCell>
-                  <span className="font-medium tabular-nums">
+                  <span className="font-mono text-xs font-semibold tabular-nums text-ink">
                     {student.primaryGuardian?.phone ?? "—"}
                   </span>
                 </TableCell>
 
-                <TableCell>
+                <TableCell className="font-medium">
                   Khối {student.currentGrade}
                 </TableCell>
 
-                <TableCell>
+                <TableCell className="font-medium text-ink">
                   {classInfo?.name ?? "Chưa xếp lớp"}
                 </TableCell>
 
@@ -103,7 +101,7 @@ export function StudentTable({
                         : "Offline"}
                     </Badge>
                   ) : (
-                    <span className="text-ink-muted">
+                    <span className="text-xs text-ink-muted">
                       Chưa xác định
                     </span>
                   )}
@@ -133,10 +131,10 @@ export function StudentTable({
 
                 <TableCell className="text-right">
                   <Link
-                    className="inline-flex h-8 items-center justify-center rounded-md border border-transparent px-3 text-xs font-semibold text-ink-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-secondary/25"
+                    className="inline-flex h-8 items-center justify-center rounded-lg border border-hairline bg-surface-1 px-3 text-xs font-bold text-ink-muted transition-colors hover:border-hairline-strong hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
                     href={getStudentDetailHref(student)}
                   >
-                    Xem
+                    Xem chi tiết
                   </Link>
                 </TableCell>
               </tr>
@@ -159,7 +157,7 @@ function TableHeader({
 }: TablePartProps) {
   return (
     <th
-      className={`whitespace-nowrap border-b border-hairline px-4 py-3 font-semibold ${className ?? ""}`}
+      className={`whitespace-nowrap border-b border-hairline px-4 py-3.5 font-bold ${className ?? ""}`}
     >
       {children}
     </th>
@@ -172,7 +170,7 @@ function TableCell({
 }: TablePartProps) {
   return (
     <td
-      className={`border-b border-hairline px-4 py-3 align-middle text-ink ${className ?? ""}`}
+      className={`px-4 py-3.5 align-middle text-ink ${className ?? ""}`}
     >
       {children}
     </td>

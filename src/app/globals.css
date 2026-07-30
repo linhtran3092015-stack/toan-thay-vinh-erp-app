@@ -1,51 +1,180 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f7fb;
-  --foreground: #182033;
-  --font-sans: "Inter", "SF Pro Display", "Segoe UI", Arial, sans-serif;
+  --background: oklch(0.975 0.005 250);
+  --foreground: oklch(0.20 0.04 255);
+
+  --font-display: var(--font-display), "Plus Jakarta Sans", sans-serif;
+  --font-sans: var(--font-sans), "Outfit", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: var(--font-body), "Inter", sans-serif;
+
   --sidebar-width: 260px;
   --topbar-height: 74px;
+
+  /* Surface tokens (Light Mode) */
+  --color-canvas: oklch(0.975 0.005 250);
+  --color-surface-1: oklch(1 0 0);
+  --color-surface-2: oklch(0.988 0.004 250);
+  --color-surface-elevated: oklch(1 0 0);
+  --color-ink: oklch(0.20 0.04 255);
+  --color-ink-muted: oklch(0.48 0.03 255);
+  --color-ink-subtle: oklch(0.68 0.02 255);
+  --color-hairline: oklch(0.92 0.008 250);
+  --color-hairline-strong: oklch(0.85 0.015 250);
+
+  /* Brand colors - Option A: Professional Enterprise Blue */
+  --color-primary: oklch(0.32 0.09 262);
+  --color-primary-strong: oklch(0.24 0.09 262);
+  --color-primary-soft: oklch(0.95 0.02 262);
+  --color-secondary: oklch(0.55 0.16 250);
+  --color-secondary-strong: oklch(0.45 0.16 250);
+  --color-secondary-soft: oklch(0.94 0.03 250);
+
+  /* Status Colors */
+  --color-success: oklch(0.52 0.16 150);
+  --color-success-bg: oklch(0.96 0.03 150);
+  --color-success-border: oklch(0.88 0.06 150);
+
+  --color-warning: oklch(0.58 0.15 70);
+  --color-warning-bg: oklch(0.96 0.04 75);
+  --color-warning-border: oklch(0.88 0.08 75);
+
+  --color-danger: oklch(0.55 0.18 25);
+  --color-danger-bg: oklch(0.96 0.04 25);
+  --color-danger-border: oklch(0.88 0.08 25);
+
+  --color-info: oklch(0.52 0.15 240);
+  --color-info-bg: oklch(0.95 0.03 240);
+  --color-info-border: oklch(0.87 0.06 240);
+
+  --color-accent-purple: oklch(0.52 0.20 300);
+  --color-purple-bg: oklch(0.95 0.03 300);
+
+  --color-neutral: oklch(0.48 0.03 255);
+  --color-neutral-bg: oklch(0.94 0.01 250);
+
+  /* Sidebar Tokens (Light Mode - Enterprise Deep Navy Sidebar) */
+  --sidebar-bg: oklch(0.22 0.08 262);
+  --sidebar-fg: oklch(0.98 0 0);
+  --sidebar-muted: oklch(0.72 0.03 262);
+  --sidebar-hover: oklch(0.28 0.08 262);
+  --sidebar-active: oklch(0.35 0.09 262);
+  --sidebar-border: oklch(0.30 0.06 262);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(18, 24, 38, 0.05);
+  --shadow-card: 0 4px 16px -2px rgba(18, 24, 38, 0.06), 0 1px 3px rgba(18, 24, 38, 0.04);
+  --shadow-drawer: 0 0 40px rgba(18, 24, 38, 0.18);
+  --shadow-modal: 0 20px 50px -10px rgba(18, 24, 38, 0.22), 0 4px 12px rgba(18, 24, 38, 0.08);
+  --shadow-topbar: 0 1px 3px rgba(18, 24, 38, 0.04);
+
+  --radius-pill: 999px;
+}
+
+.dark, [data-theme="dark"] {
+  --background: oklch(0.14 0.02 260);
+  --foreground: oklch(0.94 0.01 250);
+
+  /* Surface tokens (Dark Mode) */
+  --color-canvas: oklch(0.14 0.02 260);
+  --color-surface-1: oklch(0.19 0.03 260);
+  --color-surface-2: oklch(0.22 0.03 260);
+  --color-surface-elevated: oklch(0.24 0.03 260);
+  --color-ink: oklch(0.95 0.01 250);
+  --color-ink-muted: oklch(0.72 0.02 250);
+  --color-ink-subtle: oklch(0.52 0.02 250);
+  --color-hairline: oklch(0.26 0.03 260);
+  --color-hairline-strong: oklch(0.32 0.04 260);
+
+  /* Brand colors (Dark Mode) */
+  --color-primary: oklch(0.62 0.16 250);
+  --color-primary-strong: oklch(0.68 0.16 250);
+  --color-primary-soft: oklch(0.24 0.05 260);
+  --color-secondary: oklch(0.68 0.16 240);
+  --color-secondary-strong: oklch(0.74 0.14 240);
+  --color-secondary-soft: oklch(0.24 0.05 240);
+
+  /* Status Colors (Dark Mode) */
+  --color-success: oklch(0.72 0.16 150);
+  --color-success-bg: oklch(0.22 0.05 150);
+  --color-success-border: oklch(0.32 0.08 150);
+
+  --color-warning: oklch(0.78 0.16 75);
+  --color-warning-bg: oklch(0.24 0.06 75);
+  --color-warning-border: oklch(0.35 0.09 75);
+
+  --color-danger: oklch(0.72 0.18 25);
+  --color-danger-bg: oklch(0.24 0.06 25);
+  --color-danger-border: oklch(0.35 0.10 25);
+
+  --color-info: oklch(0.70 0.15 240);
+  --color-info-bg: oklch(0.22 0.05 240);
+  --color-info-border: oklch(0.32 0.08 240);
+
+  --color-accent-purple: oklch(0.70 0.18 300);
+  --color-purple-bg: oklch(0.24 0.06 300);
+
+  --color-neutral: oklch(0.72 0.02 250);
+  --color-neutral-bg: oklch(0.22 0.03 260);
+
+  /* Sidebar Tokens (Dark Mode) */
+  --sidebar-bg: oklch(0.16 0.03 260);
+  --sidebar-fg: oklch(0.95 0.01 250);
+  --sidebar-muted: oklch(0.68 0.02 250);
+  --sidebar-hover: oklch(0.22 0.04 260);
+  --sidebar-active: oklch(0.26 0.05 260);
+  --sidebar-border: oklch(0.25 0.03 260);
+
+  /* Shadows (Dark Mode) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 4px 16px -2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-drawer: 0 0 40px rgba(0, 0, 0, 0.6);
+  --shadow-modal: 0 20px 50px -10px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-topbar: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 @theme inline {
-  --color-canvas: #f4f7fb;
-  --color-surface-1: #ffffff;
-  --color-surface-2: #fafbfd;
-  --color-ink: #182033;
-  --color-ink-muted: #64708a;
-  --color-ink-subtle: #9aa4b8;
-  --color-hairline: #e4e9f2;
-  --color-primary: #24348b;
-  --color-primary-strong: #1a266f;
-  --color-primary-soft: #eef2ff;
-  --color-secondary: #2f80ed;
-  --color-secondary-strong: #1d67c8;
-  --color-success: #0f9f6e;
-  --color-success-bg: #e8f8f1;
-  --color-success-border: #b7e9d0;
-  --color-warning: #c47a00;
-  --color-warning-bg: #fff4df;
-  --color-warning-border: #f9d5a1;
-  --color-danger: #d14343;
-  --color-danger-bg: #ffecec;
-  --color-danger-border: #f4b8b8;
-  --color-info: #2374d1;
-  --color-info-bg: #e8f2ff;
-  --color-info-border: #b6d2fd;
-  --color-accent-purple: #7c3aed;
-  --color-purple-bg: #f2eaff;
-  --color-neutral: #5d667a;
-  --color-neutral-bg: #edf1f7;
+  --color-canvas: var(--color-canvas);
+  --color-surface-1: var(--color-surface-1);
+  --color-surface-2: var(--color-surface-2);
+  --color-surface-elevated: var(--color-surface-elevated);
+  --color-ink: var(--color-ink);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-ink-subtle: var(--color-ink-subtle);
+  --color-hairline: var(--color-hairline);
+  --color-hairline-strong: var(--color-hairline-strong);
+  --color-primary: var(--color-primary);
+  --color-primary-strong: var(--color-primary-strong);
+  --color-primary-soft: var(--color-primary-soft);
+  --color-secondary: var(--color-secondary);
+  --color-secondary-strong: var(--color-secondary-strong);
+  --color-secondary-soft: var(--color-secondary-soft);
+  --color-success: var(--color-success);
+  --color-success-bg: var(--color-success-bg);
+  --color-success-border: var(--color-success-border);
+  --color-warning: var(--color-warning);
+  --color-warning-bg: var(--color-warning-bg);
+  --color-warning-border: var(--color-warning-border);
+  --color-danger: var(--color-danger);
+  --color-danger-bg: var(--color-danger-bg);
+  --color-danger-border: var(--color-danger-border);
+  --color-info: var(--color-info);
+  --color-info-bg: var(--color-info-bg);
+  --color-info-border: var(--color-info-border);
+  --color-accent-purple: var(--color-accent-purple);
+  --color-purple-bg: var(--color-purple-bg);
+  --color-neutral: var(--color-neutral);
+  --color-neutral-bg: var(--color-neutral-bg);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-body: var(--font-body);
+
   --radius-pill: 999px;
-  --shadow-card: 0 8px 24px rgba(24, 32, 51, 0.06);
-  --shadow-drawer: 0 0 40px rgba(23, 32, 58, 0.14);
-  --shadow-modal: 0 20px 60px rgba(23, 32, 58, 0.18), 0 4px 16px rgba(23, 32, 58, 0.08);
-  --shadow-topbar: 0 1px 0 rgba(24, 32, 51, 0.06);
-  --text-card-title: 1rem;
-  --text-card-title--line-height: 1.5rem;
-  --text-section: 1.125rem;
-  --text-section--line-height: 1.75rem;
+  --shadow-card: var(--shadow-card);
+  --shadow-drawer: var(--shadow-drawer);
+  --shadow-modal: var(--shadow-modal);
+  --shadow-topbar: var(--shadow-topbar);
 }
 
 * {
@@ -53,22 +182,30 @@
 }
 
 html {
-  background: var(--background);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }
 
 body {
   min-height: 100vh;
   margin: 0;
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-canvas);
+  color: var(--color-ink);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: var(--font-display);
 }
 
 button,
 input,
 select,
 textarea {
-  font: inherit;
+  font-family: inherit;
 }
 
 a {

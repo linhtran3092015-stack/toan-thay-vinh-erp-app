@@ -16,16 +16,21 @@ export function ErrorState({
   onReset,
 }: ErrorStateProps) {
   return (
-    <div className="rounded-lg border border-danger-border bg-danger-bg p-5 text-danger">
+    <div className="rounded-xl border border-danger-border bg-danger-bg p-6 text-danger shadow-xs">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-section font-semibold">{title}</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink">
-            {description}
-          </p>
+        <div className="flex items-start gap-4">
+          <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-danger/15 text-lg font-bold text-danger">
+            ⚠️
+          </div>
+          <div>
+            <h2 className="font-display text-base font-bold tracking-tight text-danger">{title}</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink">
+              {description}
+            </p>
+          </div>
         </div>
         {onReset ? (
-          <Button onClick={onReset} size="sm" variant="secondary">
+          <Button onClick={onReset} size="sm" variant="danger">
             {actionLabel}
           </Button>
         ) : null}

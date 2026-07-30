@@ -4,24 +4,26 @@ interface EmptyStateProps {
   title: string;
   description: string;
   actionLabel?: string;
+  onAction?: () => void;
 }
 
 export function EmptyState({
   title,
   description,
   actionLabel,
+  onAction,
 }: EmptyStateProps) {
   return (
-    <div className="flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed border-hairline bg-surface-1 px-6 py-10 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-pill bg-primary-soft text-sm font-bold text-primary">
-        TV
+    <div className="flex min-h-72 flex-col items-center justify-center rounded-xl border border-dashed border-hairline-strong bg-surface-1 px-6 py-12 text-center shadow-xs">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary-soft text-xl font-bold text-primary shadow-xs">
+        📂
       </div>
-      <h2 className="text-section font-semibold text-ink">{title}</h2>
-      <p className="mt-2 max-w-md text-sm leading-6 text-ink-muted">
+      <h2 className="font-display text-lg font-bold tracking-tight text-ink">{title}</h2>
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-muted">
         {description}
       </p>
       {actionLabel ? (
-        <Button className="mt-5" size="sm" variant="secondary">
+        <Button className="mt-6" onClick={onAction} size="md" variant="primary">
           {actionLabel}
         </Button>
       ) : null}
