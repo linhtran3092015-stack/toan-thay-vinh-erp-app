@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       academic_years: {
@@ -2440,6 +2465,56 @@ export type Database = {
           },
         ]
       }
+      student_import_batches: {
+        Row: {
+          committed_at: string
+          committed_by: string
+          guardian_created_count: number
+          guardian_reused_count: number
+          id: string
+          metadata: Json
+          reason: string
+          row_count: number
+          source_filename: string
+          source_sha256: string
+          student_count: number
+        }
+        Insert: {
+          committed_at?: string
+          committed_by: string
+          guardian_created_count: number
+          guardian_reused_count: number
+          id?: string
+          metadata?: Json
+          reason: string
+          row_count: number
+          source_filename: string
+          source_sha256: string
+          student_count: number
+        }
+        Update: {
+          committed_at?: string
+          committed_by?: string
+          guardian_created_count?: number
+          guardian_reused_count?: number
+          id?: string
+          metadata?: Json
+          reason?: string
+          row_count?: number
+          source_filename?: string
+          source_sha256?: string
+          student_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_import_batches_committed_by_fkey"
+            columns: ["committed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_payment_requests: {
         Row: {
           bonus_sessions: number
@@ -3447,6 +3522,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      commit_student_import_rows: {
+        Args: {
+          p_reason: string
+          p_rows: Json
+          p_source_filename: string
+          p_source_sha256: string
+        }
+        Returns: Json
       }
       complete_class_session: {
         Args: { p_class_session_id: string }
@@ -5040,6 +5124,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      validate_student_import_rows: { Args: { p_rows: Json }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
@@ -5168,6 +5253,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
