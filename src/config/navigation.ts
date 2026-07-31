@@ -174,6 +174,13 @@ export const navigationSections: NavigationSection[] = [
         shortLabel: "TB",
       },
       {
+        available: true,
+        href: "/audit",
+        label: "Nhật ký hệ thống",
+        permission: "audit.view",
+        shortLabel: "NK",
+      },
+      {
         available: false,
         href: "/settings",
         label: "Cài đặt hệ thống",
