@@ -176,6 +176,7 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+<<student_import_validation>>
 declare
   actor_user_id uuid := auth.uid();
 
@@ -825,7 +826,8 @@ begin
         where public.normalize_student_name(
             student.full_name
           ) = normalized_student_name
-          and student.birth_year = birth_year
+          and student.birth_year =
+            student_import_validation.birth_year
           and guardian.normalized_phone =
             normalized_guardian_phone
       )
