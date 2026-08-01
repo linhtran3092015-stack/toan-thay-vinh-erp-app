@@ -38,6 +38,13 @@ export const navigationSections: NavigationSection[] = [
       },
       {
         available: true,
+        href: "/imports/students",
+        label: "Import học viên",
+        permission: "imports.students",
+        shortLabel: "IM",
+      },
+      {
+        available: true,
         href: "/classes",
         label: "Lớp học & Lịch học",
         permission: "classes.view",
