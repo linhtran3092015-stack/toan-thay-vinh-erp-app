@@ -125,3 +125,36 @@ export interface StudentImportActionSuccess<TData> {
 export type StudentImportActionResult<TData> =
   | StudentImportActionSuccess<TData>
   | StudentImportActionFailure;
+
+export type StudentImportFieldKey = Exclude<
+  keyof StudentImportRowInput,
+  "row_number"
+>;
+
+export interface StudentImportFieldDefinition {
+  key: StudentImportFieldKey;
+  label: string;
+  required: boolean;
+  templateHeader: string;
+  width: number;
+}
+
+export interface StudentImportWorkbookColumn {
+  columnIndex: number;
+  columnKey: string;
+  sourceHeader: string | null;
+}
+
+export interface StudentImportWorkbookRow {
+  rowNumber: number;
+  values: Record<string, StudentImportCellValue>;
+}
+
+export interface StudentImportParsedWorkbook {
+  columns: StudentImportWorkbookColumn[];
+  rowCount: number;
+  rows: StudentImportWorkbookRow[];
+  sheetName: string;
+  sourceFilename: string;
+  sourceSha256: string;
+}
