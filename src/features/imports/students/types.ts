@@ -158,3 +158,32 @@ export interface StudentImportParsedWorkbook {
   sourceFilename: string;
   sourceSha256: string;
 }
+
+export type StudentImportColumnMapping = Partial<
+  Record<StudentImportFieldKey, string | null>
+>;
+
+export type StudentImportMappingIssueCode =
+  | "duplicate_source_column"
+  | "missing_required_field"
+  | "unknown_source_column"
+  | "unknown_target_field";
+
+export interface StudentImportMappingIssue {
+  code: StudentImportMappingIssueCode;
+  columnKey?: string;
+  fieldKey?: StudentImportFieldKey;
+  message: string;
+}
+
+export interface StudentImportMappingValidation {
+  isValid: boolean;
+  issues: StudentImportMappingIssue[];
+  missingRequiredFields: StudentImportFieldKey[];
+}
+
+export interface StudentImportAutomaticMapping {
+  ambiguousFields: StudentImportFieldKey[];
+  mapping: StudentImportColumnMapping;
+  unmatchedColumns: string[];
+}
