@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       academic_years: {
@@ -80,6 +55,119 @@ export type Database = {
           {
             foreignKeyName: "academic_years_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      account_invitation_roles: {
+        Row: {
+          granted_at: string
+          granted_by: string
+          invitation_id: string
+          role_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by: string
+          invitation_id: string
+          role_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string
+          invitation_id?: string
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_invitation_roles_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_invitation_roles_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: false
+            referencedRelation: "account_invitations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_invitation_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      account_invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          email: string
+          id: string
+          invitation_reason: string
+          invited_at: string
+          invited_by: string
+          revocation_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          invitation_reason: string
+          invited_at?: string
+          invited_by: string
+          revocation_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          invitation_reason?: string
+          invited_at?: string
+          invited_by?: string
+          revocation_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_invitations_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_invitations_revoked_by_fkey"
+            columns: ["revoked_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -3219,6 +3307,7 @@ export type Database = {
       }
     }
     Functions: {
+      accept_my_account_invitation: { Args: never; Returns: boolean }
       activate_academic_year: {
         Args: { p_academic_year_id: string; p_reason: string }
         Returns: {
@@ -3648,6 +3737,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      create_account_invitation: {
+        Args: {
+          invitation_reason: string
+          target_email: string
+          target_role_ids: string[]
+        }
+        Returns: {
+          email: string
+          invitation_id: string
+          invited_at: string
+        }[]
       }
       create_class: {
         Args: {
@@ -4442,6 +4543,7 @@ export type Database = {
         Args: { required_permission: string }
         Returns: boolean
       }
+      is_active_owner: { Args: never; Returns: boolean }
       lock_class_session: {
         Args: { p_class_session_id: string; p_reason: string }
         Returns: {
@@ -4880,6 +4982,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      revoke_account_invitation: {
+        Args: { revocation_reason: string; target_invitation_id: string }
+        Returns: boolean
+      }
       revoke_user_role_assignment: {
         Args: { revocation_reason: string; target_assignment_id: string }
         Returns: {
@@ -4889,6 +4995,22 @@ export type Database = {
           role_id: string
           user_id: string
         }[]
+      }
+      set_role_permissions: {
+        Args: {
+          change_reason: string
+          target_permission_ids: string[]
+          target_role_id: string
+        }
+        Returns: number
+      }
+      set_user_roles: {
+        Args: {
+          change_reason: string
+          target_role_ids: string[]
+          target_user_id: string
+        }
+        Returns: number
       }
       start_class_session: {
         Args: { p_class_session_id: string }
@@ -5327,9 +5449,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

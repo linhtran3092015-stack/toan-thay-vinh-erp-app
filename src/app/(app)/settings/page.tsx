@@ -1,5 +1,8 @@
 import { ErrorState } from "@/components/shared/error-state";
-import { getSettingsPermissionMatrix } from "@/features/settings/data";
+import {
+  getCurrentOwnerStatus,
+  getSettingsPermissionMatrix,
+} from "@/features/settings/data";
 import { SettingsOverviewPage } from "@/features/settings/settings-overview-page";
 import { getStaffDirectory } from "@/features/staff/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
@@ -17,11 +20,12 @@ export default async function SettingsRoute() {
   }
 
   const canViewUsers = permissionResult.permissions.includes("staff.view");
-  const [matrixResult, directoryResult] = await Promise.all([
+  const [matrixResult, directoryResult, ownerStatus] = await Promise.all([
     getSettingsPermissionMatrix(),
     canViewUsers
       ? getStaffDirectory({ includeRoles: true })
       : Promise.resolve(null),
+    getCurrentOwnerStatus(),
   ]);
 
   if (!matrixResult.ok) {
@@ -42,11 +46,18 @@ export default async function SettingsRoute() {
     );
   }
 
+  if (!ownerStatus.ok) {
+    return (
+      <ErrorState
+        description={ownerStatus.error}
+        title="Không xác minh được quyền Owner"
+      />
+    );
+  }
+
   return (
     <SettingsOverviewPage
-      canManageRoles={permissionResult.permissions.includes(
-        "staff.roles.manage",
-      )}
+      canManageRoles={ownerStatus.isOwner}
       canViewAudit={permissionResult.permissions.includes("audit.view")}
       canViewUsers={canViewUsers}
       matrix={matrixResult.data}

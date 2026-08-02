@@ -69,8 +69,25 @@ export async function GET(request: NextRequest) {
     }
 
     if (!isEmailAllowed(email, allowedEmails)) {
-      await supabase.auth.signOut();
-      return createFailureRedirect(request, "unauthorized_email");
+      const { data: existingAccess, error: accessError } =
+        await supabase.rpc("has_permission", {
+          required_permission: "app.access",
+        });
+
+      let databaseAccessAllowed = !accessError && existingAccess === true;
+
+      if (!databaseAccessAllowed) {
+        const { data: invitationAccepted, error: invitationError } =
+          await supabase.rpc("accept_my_account_invitation");
+
+        databaseAccessAllowed =
+          !invitationError && invitationAccepted === true;
+      }
+
+      if (!databaseAccessAllowed) {
+        await supabase.auth.signOut();
+        return createFailureRedirect(request, "unauthorized_email");
+      }
     }
 
     const nextPath = getSafeAuthRedirect(

@@ -79,7 +79,14 @@ export async function getCurrentAuthUser(): Promise<CurrentAuthUserResult> {
     }
 
     if (!isEmailAllowed(email, allowedEmails)) {
-      return { ok: false, error: "unauthorized_email" };
+      const { data: appAccessAllowed, error: accessError } =
+        await supabase.rpc("has_permission", {
+          required_permission: "app.access",
+        });
+
+      if (accessError || appAccessAllowed !== true) {
+        return { ok: false, error: "unauthorized_email" };
+      }
     }
 
     return {

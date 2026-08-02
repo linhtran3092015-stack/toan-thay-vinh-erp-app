@@ -59,7 +59,7 @@ export function SettingsOverviewPage({
             <SettingsLinkRow
               description={
                 canManageRoles
-                  ? "Xem tài khoản, cấp hoặc thu hồi vai trò có ghi nhật ký."
+                  ? "Thêm tài khoản, cấp vai trò ban đầu và cập nhật vai trò có ghi nhật ký."
                   : "Xem tài khoản và vai trò hiện tại ở chế độ chỉ đọc."
               }
               href="/settings/users"
@@ -69,9 +69,13 @@ export function SettingsOverviewPage({
           ) : null}
 
           <SettingsLinkRow
-            description="Đối chiếu quyền đang được cấp cho từng vai trò trong hệ thống."
+            description={
+              canManageRoles
+                ? "Thiết lập bộ quyền theo từng vai trò và lưu thay đổi theo lô."
+                : "Đối chiếu quyền đang được cấp cho từng vai trò trong hệ thống."
+            }
             href="/settings/permissions"
-            status="Chỉ đọc"
+            status={canManageRoles ? "Có thể quản lý" : "Chỉ đọc"}
             title="Ma trận phân quyền"
           />
 

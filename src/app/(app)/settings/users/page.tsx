@@ -1,8 +1,12 @@
-import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
+import { AccountManagementPage } from "@/features/settings/account-management-page";
+import {
+  getCurrentOwnerStatus,
+  getSettingsAccountInvitations,
+  getSettingsPermissionMatrix,
+} from "@/features/settings/data";
 import { getStaffDirectory } from "@/features/staff/data";
-import { StaffDirectoryPage } from "@/features/staff/staff-directory-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 export default async function SettingsUsersRoute() {
@@ -26,7 +30,11 @@ export default async function SettingsUsersRoute() {
     );
   }
 
-  const directoryResult = await getStaffDirectory({ includeRoles: true });
+  const [directoryResult, matrixResult, ownerStatus] = await Promise.all([
+    getStaffDirectory({ includeRoles: true }),
+    getSettingsPermissionMatrix(),
+    getCurrentOwnerStatus(),
+  ]);
 
   if (!directoryResult.ok) {
     return (
@@ -37,27 +45,44 @@ export default async function SettingsUsersRoute() {
     );
   }
 
-  if (directoryResult.members.length === 0) {
+  if (!matrixResult.ok) {
     return (
-      <EmptyState
-        description="Chưa có profile nào được đồng bộ từ Supabase Auth."
-        title="Danh sách người dùng đang trống"
+      <ErrorState
+        description={matrixResult.error.message}
+        title="Không tải được danh mục vai trò"
+      />
+    );
+  }
+
+  if (!ownerStatus.ok) {
+    return (
+      <ErrorState
+        description={ownerStatus.error}
+        title="Không xác minh được quyền Owner"
+      />
+    );
+  }
+
+  const invitationsResult = ownerStatus.isOwner
+    ? await getSettingsAccountInvitations()
+    : { invitations: [], ok: true as const };
+
+  if (!invitationsResult.ok) {
+    return (
+      <ErrorState
+        description={invitationsResult.error.message}
+        title="Không tải được tài khoản đang chờ"
       />
     );
   }
 
   return (
-    <StaffDirectoryPage
-      canManageRoles={permissionResult.permissions.includes(
-        "staff.roles.manage",
-      )}
-      canViewRoles
-      description="Các tài khoản đã được đồng bộ từ Supabase Auth. Mọi thay đổi vai trò đều yêu cầu lý do và được ghi audit."
-      eyebrow="Tài khoản truy cập"
-      headingLevel={2}
+    <AccountManagementPage
+      canManage={ownerStatus.isOwner}
+      invitations={invitationsResult.invitations}
       members={directoryResult.members}
       roleOptions={directoryResult.roleOptions ?? []}
-      title="Người dùng và vai trò"
+      roles={matrixResult.data.roles}
     />
   );
 }

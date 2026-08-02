@@ -1,7 +1,11 @@
 import "server-only";
 
 import type {
+  SettingsAccountInvitation,
   SettingsDataResult,
+  SettingsInvitationDataResult,
+  SettingsInvitationStatus,
+  SettingsOwnerStatusResult,
   SettingsPermission,
   SettingsRole,
 } from "@/features/settings/types";
@@ -89,4 +93,86 @@ export async function getSettingsPermissionMatrix(): Promise<SettingsDataResult>
     },
     ok: true,
   };
+}
+
+export async function getCurrentOwnerStatus(): Promise<SettingsOwnerStatusResult> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("is_active_owner");
+
+  if (error) {
+    return {
+      error: "Không thể xác minh quyền Owner hiện tại.",
+      ok: false,
+    };
+  }
+
+  return { isOwner: data === true, ok: true };
+}
+
+export async function getSettingsAccountInvitations(): Promise<SettingsInvitationDataResult> {
+  const supabase = await createSupabaseServerClient();
+  const [invitationsResult, invitationRolesResult] = await Promise.all([
+    supabase
+      .from("account_invitations")
+      .select(
+        "id, email, status, invited_at, invitation_reason, accepted_at, revoked_at",
+      )
+      .order("invited_at", { ascending: false })
+      .limit(100),
+    supabase
+      .from("account_invitation_roles")
+      .select("invitation_id, role_id"),
+  ]);
+
+  if (invitationsResult.error) {
+    return {
+      error: {
+        code: "account_invitations_query_failed",
+        message: "Không thể tải danh sách tài khoản đang chờ.",
+      },
+      ok: false,
+    };
+  }
+
+  if (invitationRolesResult.error) {
+    return {
+      error: {
+        code: "account_invitation_roles_query_failed",
+        message: "Không thể tải vai trò của các lời mời tài khoản.",
+      },
+      ok: false,
+    };
+  }
+
+  const roleIdsByInvitationId = new Map<string, string[]>();
+
+  for (const invitationRole of invitationRolesResult.data) {
+    const roleIds =
+      roleIdsByInvitationId.get(invitationRole.invitation_id) ?? [];
+    roleIds.push(invitationRole.role_id);
+    roleIdsByInvitationId.set(invitationRole.invitation_id, roleIds);
+  }
+
+  const invitations: SettingsAccountInvitation[] = invitationsResult.data.map(
+    (invitation) => ({
+      acceptedAt: invitation.accepted_at,
+      email: invitation.email,
+      id: invitation.id,
+      invitedAt: invitation.invited_at,
+      invitationReason: invitation.invitation_reason,
+      revokedAt: invitation.revoked_at,
+      roleIds: roleIdsByInvitationId.get(invitation.id) ?? [],
+      status: normalizeInvitationStatus(invitation.status),
+    }),
+  );
+
+  return { invitations, ok: true };
+}
+
+function normalizeInvitationStatus(value: string): SettingsInvitationStatus {
+  if (value === "accepted" || value === "revoked") {
+    return value;
+  }
+
+  return "pending";
 }

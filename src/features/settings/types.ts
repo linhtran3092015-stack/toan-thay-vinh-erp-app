@@ -27,6 +27,27 @@ export interface SettingsPermissionMatrix {
   roles: readonly SettingsRole[];
 }
 
+export type SettingsInvitationStatus = "accepted" | "pending" | "revoked";
+
+export interface SettingsAccountInvitation {
+  acceptedAt: string | null;
+  email: string;
+  id: string;
+  invitedAt: string;
+  invitationReason: string;
+  revokedAt: string | null;
+  roleIds: readonly string[];
+  status: SettingsInvitationStatus;
+}
+
+export type SettingsOwnerStatusResult =
+  | { isOwner: boolean; ok: true }
+  | { error: string; ok: false };
+
+export type SettingsInvitationDataResult =
+  | { invitations: readonly SettingsAccountInvitation[]; ok: true }
+  | { error: { code: string; message: string }; ok: false };
+
 export type SettingsDataResult =
   | {
       data: SettingsPermissionMatrix;

@@ -15,6 +15,7 @@ export interface VerifiedAuthIdentity {
 }
 
 export interface SupabaseSessionState {
+  appAccessAllowed: boolean;
   response: NextResponse;
   identity: VerifiedAuthIdentity | null;
   cookieMutations: SessionCookieMutation[];
@@ -73,7 +74,13 @@ export async function updateSupabaseSession(
     const { data, error } = await supabase.auth.getClaims();
 
     if (!error && data?.claims.sub) {
+      const { data: appAccessAllowed, error: accessError } =
+        await supabase.rpc("has_permission", {
+          required_permission: "app.access",
+        });
+
       return {
+        appAccessAllowed: !accessError && appAccessAllowed === true,
         response,
         identity: {
           id: data.claims.sub,
@@ -88,6 +95,7 @@ export async function updateSupabaseSession(
   }
 
   return {
+    appAccessAllowed: false,
     response,
     identity: null,
     cookieMutations,

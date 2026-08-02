@@ -79,10 +79,9 @@ export async function proxy(request: NextRequest) {
   }
 
   const sessionState = await updateSupabaseSession(request);
-  const isAuthorized = isEmailAllowed(
-    sessionState.identity?.email,
-    allowedEmails,
-  );
+  const isAuthorized =
+    isEmailAllowed(sessionState.identity?.email, allowedEmails) ||
+    sessionState.appAccessAllowed;
 
   if (pathname === LOGIN_PATH) {
     return isAuthorized
