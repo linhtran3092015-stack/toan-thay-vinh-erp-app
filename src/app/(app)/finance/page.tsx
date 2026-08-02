@@ -3,11 +3,9 @@ import Link from "next/link";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreatePaymentRequestDialog } from "@/features/finance/components/create-payment-request-dialog";
 import { PaymentRequestStatusBadge } from "@/features/finance/components/payment-request-status-badge";
 import { getFinanceOverviewResult } from "@/features/finance/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function FinanceOverviewPage() {
   const permissionResult = await getCachedDatabasePermissions();
@@ -49,33 +47,6 @@ export default async function FinanceOverviewPage() {
 
   const overview = overviewResult.data;
 
-  let activeStudents: { id: string; name: string; publicCode: string }[] = [];
-
-  if (canCreatePaymentRequests) {
-    const supabase = await createSupabaseServerClient();
-    const { data: studentRows, error: studentsError } = await supabase
-      .from("students")
-      .select("id, full_name, public_code")
-      .eq("lifecycle_status", "active")
-      .order("full_name")
-      .limit(100);
-
-    if (studentsError) {
-      return (
-        <ErrorState
-          description="Hệ thống chưa tải được danh sách học viên để tạo yêu cầu nạp tiền."
-          title="Không tải được dữ liệu học viên"
-        />
-      );
-    }
-
-    activeStudents = (studentRows ?? []).map((student) => ({
-      id: student.id,
-      name: student.full_name,
-      publicCode: student.public_code,
-    }));
-  }
-
   return (
     <div className="grid min-w-0 gap-4">
       {/* Header */}
@@ -89,7 +60,14 @@ export default async function FinanceOverviewPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {canCreatePaymentRequests ? <CreatePaymentRequestDialog students={activeStudents} /> : null}
+            {canCreatePaymentRequests ? (
+              <Link
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-primary bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-strong"
+                href="/finance/payment-requests/new"
+              >
+                Tạo yêu cầu thanh toán
+              </Link>
+            ) : null}
           </div>
         </div>
       </section>

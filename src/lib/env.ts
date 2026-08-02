@@ -42,10 +42,43 @@ const sepayWebhookEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().trim().min(20),
 });
 
+const optionalSepayTextSchema = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().trim().optional(),
+);
+
+const sepayPaymentEnvSchema = z.object({
+  SEPAY_ACCOUNT_HOLDER: optionalSepayTextSchema.pipe(
+    z.string().max(100).regex(/^[A-Za-z0-9 .-]+$/).optional(),
+  ),
+  SEPAY_ACCOUNT_NUMBER: z
+    .string()
+    .trim()
+    .min(4)
+    .max(34)
+    .regex(/^[A-Za-z0-9]+$/),
+  SEPAY_BANK_CODE: z
+    .string()
+    .trim()
+    .min(2)
+    .max(40)
+    .regex(/^[A-Za-z0-9_-]+$/),
+  SEPAY_TRANSFER_PREFIX: optionalSepayTextSchema.pipe(
+    z.string().max(32).regex(/^[A-Za-z0-9 -]+$/).optional(),
+  ),
+});
+
 export interface SepayWebhookEnv {
   accountNumber: string;
   serviceRoleKey: string;
   webhookSecret: string;
+}
+
+export interface SepayPaymentEnv {
+  accountHolder?: string;
+  accountNumber: string;
+  bankCode: string;
+  transferPrefix?: string;
 }
 
 function readSupabasePublicEnv() {
@@ -99,4 +132,33 @@ export function getSepayWebhookEnv(): SepayWebhookEnv {
     serviceRoleKey: result.data.SUPABASE_SERVICE_ROLE_KEY,
     webhookSecret: result.data.SEPAY_WEBHOOK_SECRET,
   };
+}
+
+export function getSepayPaymentEnv(): SepayPaymentEnv {
+  const result = sepayPaymentEnvSchema.safeParse({
+    SEPAY_ACCOUNT_HOLDER: process.env.SEPAY_ACCOUNT_HOLDER,
+    SEPAY_ACCOUNT_NUMBER: process.env.SEPAY_ACCOUNT_NUMBER,
+    SEPAY_BANK_CODE: process.env.SEPAY_BANK_CODE,
+    SEPAY_TRANSFER_PREFIX: process.env.SEPAY_TRANSFER_PREFIX,
+  });
+
+  if (!result.success) {
+    throw new Error("SePay payment environment is not configured correctly.");
+  }
+
+  return {
+    accountHolder: result.data.SEPAY_ACCOUNT_HOLDER,
+    accountNumber: result.data.SEPAY_ACCOUNT_NUMBER,
+    bankCode: result.data.SEPAY_BANK_CODE,
+    transferPrefix: result.data.SEPAY_TRANSFER_PREFIX,
+  };
+}
+
+export function isSepayPaymentConfigured(): boolean {
+  try {
+    getSepayPaymentEnv();
+    return true;
+  } catch {
+    return false;
+  }
 }

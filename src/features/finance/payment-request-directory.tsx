@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -22,8 +23,10 @@ const defaultFilters: PaymentRequestFiltersState = {
 };
 
 export function PaymentRequestDirectory({
+  canCreatePaymentRequests,
   items,
 }: {
+  canCreatePaymentRequests: boolean;
   items: PaymentRequestReadModel[];
 }) {
   const [filters, setFilters] = useState(defaultFilters);
@@ -53,7 +56,7 @@ export function PaymentRequestDirectory({
 
   return (
     <div className="grid min-w-0 gap-5">
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase text-ink-muted">Tài chính</p>
           <h1 className="mt-1 font-display text-2xl font-bold text-ink">
@@ -63,9 +66,19 @@ export function PaymentRequestDirectory({
             Theo dõi yêu cầu nạp học phí và tiến độ khớp tiền qua SePay.
           </p>
         </div>
-        <p className="text-sm font-semibold text-ink-muted">
-          {filteredItems.length}/{items.length} yêu cầu
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm font-semibold text-ink-muted">
+            {filteredItems.length}/{items.length} yêu cầu
+          </p>
+          {canCreatePaymentRequests ? (
+            <Link
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-primary bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-strong"
+              href="/finance/payment-requests/new"
+            >
+              Tạo yêu cầu
+            </Link>
+          ) : null}
+        </div>
       </header>
 
       <section
@@ -242,4 +255,3 @@ const compactCurrencyFormatter = new Intl.NumberFormat("vi-VN", {
 function formatCompactCurrency(value: number): string {
   return compactCurrencyFormatter.format(value);
 }
-

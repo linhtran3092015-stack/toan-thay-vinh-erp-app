@@ -38,6 +38,13 @@ export default async function PaymentRequestsPage() {
     );
   }
 
-  return <PaymentRequestDirectory items={requestsResult.data} />;
+  return (
+    <PaymentRequestDirectory
+      canCreatePaymentRequests={
+        permissionResult.permissions.includes("payments.create_request") ||
+        permissionResult.permissions.includes("payments.manage")
+      }
+      items={requestsResult.data}
+    />
+  );
 }
-

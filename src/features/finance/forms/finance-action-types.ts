@@ -18,5 +18,15 @@ export type FinanceActionResultState =
   | {
       id: string;
       message: string;
+      paymentRequest?: {
+        accountHolder?: string;
+        accountNumber: string;
+        bankCode: string;
+        expectedAmountVnd: number;
+        publicCode: string;
+        qrImageUrl: string;
+        transferCode: string;
+        transferDescription: string;
+      };
       status: "success";
     };

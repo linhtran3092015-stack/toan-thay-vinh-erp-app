@@ -12,6 +12,8 @@ import {
   allocatePaymentSchema,
   createPaymentRequestSchema,
 } from "@/features/finance/forms/finance-schemas";
+import { buildVietQrPaymentDetails } from "@/features/finance/vietqr";
+import { getSepayPaymentEnv } from "@/lib/env";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.generated";
@@ -122,6 +124,15 @@ export async function createPaymentRequestAction(
     );
   }
 
+  let paymentConfig: ReturnType<typeof getSepayPaymentEnv>;
+  try {
+    paymentConfig = getSepayPaymentEnv();
+  } catch {
+    return createErrorState(
+      "Chưa cấu hình tài khoản nhận tiền VietQR. Vui lòng liên hệ quản trị hệ thống.",
+    );
+  }
+
   try {
     const supabase = await createSupabaseServerClient();
     const rpcArgs = {
@@ -140,11 +151,24 @@ export async function createPaymentRequestAction(
       return createErrorState(getFinanceRpcErrorMessage(error.message));
     }
 
-    const data = rawData as unknown as { id?: string; transfer_code?: string } | null;
+    const data = rawData as unknown as {
+      expected_amount_vnd?: number;
+      id?: string;
+      public_code?: string;
+      transfer_code?: string;
+    } | null;
 
-    if (!data?.id) {
+    if (!data?.id || !data.public_code || !data.transfer_code) {
       return createErrorState("Database không trả về thông tin yêu cầu nạp tiền.");
     }
+
+    const expectedAmountVnd = Number(
+      data.expected_amount_vnd ?? parsed.data.expectedAmountVnd,
+    );
+    const qrDetails = buildVietQrPaymentDetails(paymentConfig, {
+      amountVnd: expectedAmountVnd,
+      transferCode: data.transfer_code,
+    });
 
     revalidatePath("/finance");
     revalidatePath("/finance/payment-requests");
@@ -152,7 +176,17 @@ export async function createPaymentRequestAction(
 
     return {
       id: data.id,
-      message: `Đã tạo Yêu cầu Nạp tiền thành công! (Mã chuyển khoản: ${data.transfer_code ?? ""})`,
+      message: "Đã tạo yêu cầu thanh toán và mã VietQR.",
+      paymentRequest: {
+        accountHolder: qrDetails.accountHolder,
+        accountNumber: qrDetails.accountNumber,
+        bankCode: qrDetails.bankCode,
+        expectedAmountVnd,
+        publicCode: data.public_code,
+        qrImageUrl: qrDetails.imageUrl,
+        transferCode: data.transfer_code,
+        transferDescription: qrDetails.transferDescription,
+      },
       status: "success",
     };
   } catch {
