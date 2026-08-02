@@ -53,6 +53,8 @@ export async function GET(): Promise<Response> {
             "private, no-store, max-age=0",
           "Content-Disposition":
             `attachment; filename="${STUDENT_IMPORT_TEMPLATE_FILENAME}"`,
+          "Content-Length":
+            String(workbook.byteLength),
           "Content-Type":
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "X-Content-Type-Options":

@@ -40,6 +40,7 @@ import type {
 } from "@/features/imports/students/types";
 import {
   parseStudentImportWorkbook,
+  STUDENT_IMPORT_TEMPLATE_FILENAME,
   StudentImportWorkbookError,
 } from "@/features/imports/students/workbook";
 
@@ -133,6 +134,16 @@ export function StudentImportPage({
   ] = useState<string | null>(null);
 
   const [
+    templateDownloadError,
+    setTemplateDownloadError,
+  ] = useState<string | null>(null);
+
+  const [
+    isTemplateDownloading,
+    setIsTemplateDownloading,
+  ] = useState(false);
+
+  const [
     actionError,
     setActionError,
   ] = useState<string | null>(null);
@@ -188,6 +199,89 @@ export function StudentImportPage({
 
   const validationRows =
     validationResult?.rows.slice(0, 100) ?? [];
+
+  async function handleTemplateDownload(): Promise<void> {
+    setTemplateDownloadError(null);
+    setIsTemplateDownloading(true);
+
+    try {
+      const response = await fetch(
+        "/imports/students/template",
+        {
+          cache: "no-store",
+          credentials: "same-origin",
+          method: "GET",
+        },
+      );
+
+      if (!response.ok) {
+        const payload = await response
+          .json()
+          .catch(() => null) as {
+            message?: unknown;
+          } | null;
+
+        const serverMessage =
+          typeof payload?.message === "string"
+            ? payload.message
+            : null;
+
+        throw new Error(
+          serverMessage ??
+            `Không thể tải file mẫu (HTTP ${response.status}).`,
+        );
+      }
+
+      const contentType =
+        response.headers.get("content-type") ?? "";
+
+      if (
+        !contentType.includes(
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+      ) {
+        throw new Error(
+          "Máy chủ không trả về đúng định dạng Excel .xlsx.",
+        );
+      }
+
+      const workbookBlob = await response.blob();
+
+      if (workbookBlob.size === 0) {
+        throw new Error(
+          "File mẫu được tạo nhưng không có dữ liệu.",
+        );
+      }
+
+      const objectUrl =
+        URL.createObjectURL(workbookBlob);
+
+      const downloadAnchor =
+        document.createElement("a");
+
+      downloadAnchor.href = objectUrl;
+      downloadAnchor.download =
+        STUDENT_IMPORT_TEMPLATE_FILENAME;
+      downloadAnchor.style.display = "none";
+
+      document.body.append(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      window.setTimeout(
+        () => URL.revokeObjectURL(objectUrl),
+        1_000,
+      );
+    } catch (error) {
+      setTemplateDownloadError(
+        error instanceof Error
+          ? error.message
+          : "Không thể tải file mẫu import học viên.",
+      );
+    } finally {
+      setIsTemplateDownloading(false);
+    }
+  }
 
   function resetImport(): void {
     setWorkbook(null);
@@ -349,13 +443,26 @@ export function StudentImportPage({
             </p>
           </div>
 
-          <a
-            className="inline-flex h-10 flex-none items-center justify-center rounded-md border border-primary bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
-            download
-            href="/imports/students/template"
-          >
-            Tải file mẫu .xlsx
-          </a>
+          <div className="grid flex-none gap-2">
+            <Button
+              disabled={isTemplateDownloading}
+              onClick={handleTemplateDownload}
+              type="button"
+            >
+              {isTemplateDownloading
+                ? "Đang tạo file mẫu..."
+                : "Tải file mẫu .xlsx"}
+            </Button>
+
+            {templateDownloadError ? (
+              <p
+                aria-live="polite"
+                className="max-w-sm text-xs font-medium text-danger"
+              >
+                {templateDownloadError}
+              </p>
+            ) : null}
+          </div>
         </div>
       </section>
 
