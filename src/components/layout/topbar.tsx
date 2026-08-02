@@ -28,7 +28,7 @@ export function Topbar({
     <header className="sticky top-0 z-30 flex h-[var(--topbar-height)] items-center gap-3 border-b border-hairline bg-surface-1/95 px-4 shadow-topbar backdrop-blur-md transition-colors duration-200 sm:px-5 lg:px-6">
       <button
         aria-label="Mở menu"
-        className="flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-surface-1 text-xl font-semibold text-primary transition-colors hover:bg-primary-soft md:hidden"
+        className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline bg-surface-1 text-xl font-semibold text-primary transition-colors hover:bg-primary-soft md:hidden"
         onClick={onMenuClick}
         type="button"
       >
@@ -36,7 +36,7 @@ export function Topbar({
       </button>
       <button
         aria-label="Thu gọn menu"
-        className="hidden h-10 w-10 items-center justify-center rounded-lg border border-transparent text-xl font-semibold text-primary transition-colors hover:border-hairline hover:bg-primary-soft md:flex"
+        className="hidden h-11 w-11 items-center justify-center rounded-lg border border-transparent text-xl font-semibold text-primary transition-colors hover:border-hairline hover:bg-primary-soft md:flex"
         onClick={onSidebarToggle}
         type="button"
       >
@@ -60,7 +60,7 @@ export function Topbar({
               ? `Thông báo, ${unreadNotificationCount} chưa đọc`
               : "Thông báo"
           }
-          className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-lg text-primary transition-colors hover:border-hairline hover:bg-primary-soft"
+          className="relative flex h-11 w-11 items-center justify-center rounded-lg border border-transparent text-lg text-primary transition-colors hover:border-hairline hover:bg-primary-soft"
           href="/notifications"
         >
           <span aria-hidden="true">🔔</span>
@@ -72,7 +72,7 @@ export function Topbar({
         </Link>
         <button
           aria-label="Lịch hôm nay"
-          className="hidden h-10 w-10 items-center justify-center rounded-lg border border-transparent text-xl text-primary transition-colors hover:border-hairline hover:bg-primary-soft sm:flex"
+          className="hidden h-11 w-11 items-center justify-center rounded-lg border border-transparent text-xl text-primary transition-colors hover:border-hairline hover:bg-primary-soft sm:flex"
           type="button"
         >
           □

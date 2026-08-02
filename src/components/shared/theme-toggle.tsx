@@ -42,7 +42,7 @@ export function ThemeToggle() {
     return (
       <button
         aria-label="Chuyển chế độ giao diện"
-        className="flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-surface-1 text-ink-muted transition-colors hover:bg-surface-2"
+        className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline bg-surface-1 text-ink-muted transition-colors hover:bg-surface-2"
         type="button"
       >
         <span className="text-base">☀️</span>
@@ -57,7 +57,7 @@ export function ThemeToggle() {
           ? "Chuyển sang Giao diện Sáng"
           : "Chuyển sang Giao diện Tối"
       }
-      className="flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-surface-1 text-ink transition-all hover:border-hairline-strong hover:bg-surface-2 active:scale-95"
+      className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline bg-surface-1 text-ink transition-all hover:border-hairline-strong hover:bg-surface-2 active:scale-95"
       onClick={toggleTheme}
       title={
         currentTheme === "dark"

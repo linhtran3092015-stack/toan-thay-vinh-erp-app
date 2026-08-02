@@ -64,9 +64,10 @@ export const navigationSections: NavigationSection[] = [
         shortLabel: "DD",
       },
       {
-        available: false,
+        available: true,
         href: "/learning-results",
         label: "Kết quả học tập",
+        permission: "results.view",
         shortLabel: "KQ",
       },
     ],

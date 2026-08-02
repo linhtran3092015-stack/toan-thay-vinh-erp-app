@@ -4214,6 +4214,30 @@ export type Database = {
           student_public_code: string
         }[]
       }
+      get_learning_results_directory: {
+        Args: { p_limit?: number }
+        Returns: {
+          class_code: string
+          class_grade: number
+          class_id: string
+          class_level: string
+          class_name: string
+          class_session_id: string
+          current_grade: number
+          graded_at: string
+          locked_at: string
+          notebook_score: number
+          notebook_status: string
+          result_comment: string
+          result_id: string
+          session_date: string
+          session_status: string
+          student_code: string
+          student_id: string
+          student_name: string
+          test_score: number
+        }[]
+      }
       get_my_permissions: {
         Args: never
         Returns: {
