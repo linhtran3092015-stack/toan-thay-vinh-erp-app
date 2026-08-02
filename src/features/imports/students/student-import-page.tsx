@@ -19,6 +19,9 @@ import {
   validateStudentImportRowsAction,
 } from "@/features/imports/students/actions";
 import {
+  StudentImportCommitPanel,
+} from "@/features/imports/students/student-import-commit-panel";
+import {
   STUDENT_IMPORT_FIELD_DEFINITIONS,
 } from "@/features/imports/students/fields";
 import {
@@ -694,7 +697,7 @@ export function StudentImportPage({
         </Card>
       ) : null}
 
-      {validationResult ? (
+      {validationResult && workbook ? (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Card>
@@ -881,6 +884,14 @@ export function StudentImportPage({
               )}
             </CardContent>
           </Card>
+
+          <StudentImportCommitPanel
+            canCreateStudents={canCreateStudents}
+            rows={mappedRows}
+            sourceFilename={workbook.sourceFilename}
+            sourceSha256={workbook.sourceSha256}
+            validationResult={validationResult}
+          />
         </>
       ) : null}
     </div>
