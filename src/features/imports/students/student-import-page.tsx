@@ -38,9 +38,9 @@ import type {
   StudentImportValidationResult,
   StudentImportValidationRow,
 } from "@/features/imports/students/types";
+import { downloadStudentImportTemplate } from "@/features/imports/students/template-browser";
 import {
   parseStudentImportWorkbook,
-  STUDENT_IMPORT_TEMPLATE_FILENAME,
   StudentImportWorkbookError,
 } from "@/features/imports/students/workbook";
 
@@ -205,78 +205,12 @@ export function StudentImportPage({
     setIsTemplateDownloading(true);
 
     try {
-      const response = await fetch(
-        "/imports/students/template",
-        {
-          cache: "no-store",
-          credentials: "same-origin",
-          method: "GET",
-        },
-      );
-
-      if (!response.ok) {
-        const payload = await response
-          .json()
-          .catch(() => null) as {
-            message?: unknown;
-          } | null;
-
-        const serverMessage =
-          typeof payload?.message === "string"
-            ? payload.message
-            : null;
-
-        throw new Error(
-          serverMessage ??
-            `Không thể tải file mẫu (HTTP ${response.status}).`,
-        );
-      }
-
-      const contentType =
-        response.headers.get("content-type") ?? "";
-
-      if (
-        !contentType.includes(
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-      ) {
-        throw new Error(
-          "Máy chủ không trả về đúng định dạng Excel .xlsx.",
-        );
-      }
-
-      const workbookBlob = await response.blob();
-
-      if (workbookBlob.size === 0) {
-        throw new Error(
-          "File mẫu được tạo nhưng không có dữ liệu.",
-        );
-      }
-
-      const objectUrl =
-        URL.createObjectURL(workbookBlob);
-
-      const downloadAnchor =
-        document.createElement("a");
-
-      downloadAnchor.href = objectUrl;
-      downloadAnchor.download =
-        STUDENT_IMPORT_TEMPLATE_FILENAME;
-      downloadAnchor.style.display = "none";
-
-      document.body.append(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-
-      window.setTimeout(
-        () => URL.revokeObjectURL(objectUrl),
-        1_000,
-      );
+      await downloadStudentImportTemplate();
     } catch (error) {
       setTemplateDownloadError(
         error instanceof Error
           ? error.message
-          : "Không thể tải file mẫu import học viên.",
+          : "Không thể tạo file mẫu import học viên.",
       );
     } finally {
       setIsTemplateDownloading(false);
