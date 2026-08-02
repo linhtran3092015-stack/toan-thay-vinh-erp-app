@@ -2,9 +2,9 @@ import Link from "next/link";
 
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreatePaymentRequestDialog } from "@/features/finance/components/create-payment-request-dialog";
+import { PaymentRequestStatusBadge } from "@/features/finance/components/payment-request-status-badge";
 import { getFinanceOverviewResult } from "@/features/finance/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -32,6 +32,9 @@ export default async function FinanceOverviewPage() {
 
   const canCreatePaymentRequests =
     permissionResult.permissions.includes("payments.create_request") ||
+    permissionResult.permissions.includes("payments.manage");
+  const canViewPaymentRequests =
+    permissionResult.permissions.includes("payments.view") ||
     permissionResult.permissions.includes("payments.manage");
 
   const overviewResult = await getFinanceOverviewResult();
@@ -135,6 +138,14 @@ export default async function FinanceOverviewPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Yêu cầu Nạp học phí gần đây (VietQR)</CardTitle>
+          {canViewPaymentRequests ? (
+            <Link
+              className="inline-flex min-h-11 items-center rounded-md px-3 text-sm font-semibold text-primary hover:bg-primary-soft"
+              href="/finance/payment-requests"
+            >
+              Xem tất cả
+            </Link>
+          ) : null}
         </CardHeader>
         <CardContent>
           {overview.recentPaymentRequests.length === 0 ? (
@@ -177,9 +188,7 @@ export default async function FinanceOverviewPage() {
                         ) : null}
                       </td>
                       <td className="py-3 px-4">
-                        <Badge tone={r.status === "paid" ? "success" : "warning"}>
-                          {r.status === "paid" ? "Đã nạp" : "Chờ chuyển khoản"}
-                        </Badge>
+                        <PaymentRequestStatusBadge status={r.status} />
                       </td>
                     </tr>
                   ))}

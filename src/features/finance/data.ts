@@ -255,6 +255,80 @@ export async function getSepayTransactions(): Promise<SepayTransactionReadModel[
   return result.ok ? result.data : [];
 }
 
+export async function getPaymentRequestsResult(): Promise<
+  FinanceReadResult<PaymentRequestReadModel[]>
+> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("student_payment_requests")
+      .select(
+        `
+      id,
+      public_code,
+      transfer_code,
+      expected_amount_vnd,
+      purchased_sessions,
+      bonus_sessions,
+      calculated_unit_price_vnd,
+      topup_type,
+      status,
+      paid_amount_vnd,
+      paid_at,
+      created_at,
+      notes,
+      student_id,
+      student:students(id, public_code, full_name),
+      guardian:guardians(full_name, phone)
+        `,
+      )
+      .order("created_at", { ascending: false })
+      .limit(1000);
+
+    if (error) {
+      return { ok: false };
+    }
+
+    return {
+      data: (data ?? []).map((request) => {
+        const student = request.student as unknown as {
+          full_name: string;
+          id: string;
+          public_code: string;
+        } | null;
+        const guardian = request.guardian as unknown as {
+          full_name: string;
+          phone: string;
+        } | null;
+
+        return {
+          bonusSessions: request.bonus_sessions,
+          calculatedUnitPriceVnd: Number(request.calculated_unit_price_vnd),
+          createdAt: request.created_at,
+          expectedAmountVnd: Number(request.expected_amount_vnd),
+          guardianFullName: guardian?.full_name ?? null,
+          guardianPhone: guardian?.phone ?? null,
+          id: request.id,
+          notes: request.notes,
+          paidAmountVnd: Number(request.paid_amount_vnd),
+          paidAt: request.paid_at,
+          publicCode: request.public_code,
+          purchasedSessions: request.purchased_sessions,
+          status: request.status as PaymentRequestReadModel["status"],
+          studentFullName: student?.full_name ?? "Học viên",
+          studentId: request.student_id ?? "",
+          studentPublicCode: student?.public_code ?? "",
+          topupType: request.topup_type as PaymentRequestReadModel["topupType"],
+          transferCode: request.transfer_code,
+        };
+      }),
+      ok: true,
+    };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export async function getCenterSessionLedgerEntriesResult(): Promise<
   FinanceReadResult<CenterSessionLedgerEntryReadModel[]>
 > {

@@ -84,6 +84,13 @@ export const navigationSections: NavigationSection[] = [
       },
       {
         available: true,
+        href: "/finance/payment-requests",
+        label: "Yêu cầu thanh toán",
+        permission: "payments.view",
+        shortLabel: "YT",
+      },
+      {
+        available: true,
         href: "/finance/sepay",
         label: "Giao dịch SePay",
         permission: "sepay.view",

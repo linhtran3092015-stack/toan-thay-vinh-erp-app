@@ -19,6 +19,14 @@ export interface PaymentRequestReadModel {
   transferCode: string;
 }
 
+export interface PaymentRequestFiltersState {
+  createdFrom: string;
+  createdTo: string;
+  search: string;
+  status: "" | PaymentRequestReadModel["status"];
+  topupType: "" | PaymentRequestReadModel["topupType"];
+}
+
 export interface SepayTransactionReadModel {
   accountNumber: string;
   amountVnd: number;

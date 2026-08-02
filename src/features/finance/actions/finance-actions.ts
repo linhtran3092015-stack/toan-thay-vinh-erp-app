@@ -147,6 +147,7 @@ export async function createPaymentRequestAction(
     }
 
     revalidatePath("/finance");
+    revalidatePath("/finance/payment-requests");
     revalidatePath(`/students/${parsed.data.studentId}`);
 
     return {
