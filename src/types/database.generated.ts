@@ -448,6 +448,7 @@ export type Database = {
         Row: {
           coaching_record_id: string
           created_at: string
+          event_sequence: number
           event_type: string
           id: string
           note: string | null
@@ -459,6 +460,7 @@ export type Database = {
         Insert: {
           coaching_record_id: string
           created_at?: string
+          event_sequence?: never
           event_type: string
           id?: string
           note?: string | null
@@ -470,6 +472,7 @@ export type Database = {
         Update: {
           coaching_record_id?: string
           created_at?: string
+          event_sequence?: never
           event_type?: string
           id?: string
           note?: string | null
@@ -3237,6 +3240,12 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      add_coaching_note: {
+        Args: { p_coaching_record_id: string; p_note: string }
+        Returns: {
+          id: string
+        }[]
+      }
       add_payroll_manual_line: {
         Args: {
           p_amount_vnd: number
@@ -3265,6 +3274,17 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      advance_coaching_status: {
+        Args: {
+          p_coaching_record_id: string
+          p_note?: string
+          p_outcome?: string
+          p_target_status: string
+        }
+        Returns: {
+          id: string
+        }[]
       }
       allocate_payment_to_students: {
         Args: {
@@ -3754,6 +3774,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_coaching_record: {
+        Args: {
+          p_assistant_owner_id: string
+          p_campaign_name: string
+          p_priority: string
+          p_reason: string
+          p_review_at?: string
+          p_student_id: string
+        }
+        Returns: {
+          id: string
+        }[]
+      }
       create_crm_case: {
         Args: {
           p_birth_year: number
@@ -4088,6 +4121,14 @@ export type Database = {
           linked_student_public_code: string
         }[]
       }
+      get_coaching_assignee_options: {
+        Args: never
+        Returns: {
+          display_name: string
+          profile_id: string
+          role_code: string
+        }[]
+      }
       get_coaching_record_detail: {
         Args: { p_coaching_record_id: string }
         Returns: {
@@ -4133,6 +4174,15 @@ export type Database = {
           priority: string
           reason: string
           review_at: string
+          student_full_name: string
+          student_id: string
+          student_public_code: string
+        }[]
+      }
+      get_coaching_student_options: {
+        Args: { p_limit?: number }
+        Returns: {
+          lifecycle_status: string
           student_full_name: string
           student_id: string
           student_public_code: string

@@ -63,5 +63,11 @@ export default async function CoachingDetailRoute({
     );
   }
 
-  return <CoachingDetailPage events={eventsResult.data} record={detailResult.data} />;
+  return (
+    <CoachingDetailPage
+      canManage={permissionResult.permissions.includes("coaching.manage")}
+      events={eventsResult.data}
+      record={detailResult.data}
+    />
+  );
 }

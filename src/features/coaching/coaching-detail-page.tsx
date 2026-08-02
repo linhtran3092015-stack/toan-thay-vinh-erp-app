@@ -4,12 +4,14 @@ import {
   CoachingPriorityBadge,
   CoachingStatusBadge,
 } from "@/features/coaching/coaching-list-page";
+import { CoachingEventActions } from "@/features/coaching/components/coaching-event-actions";
 import type {
   CoachingRecordDashboardEntry,
   CoachingRecordEvent,
 } from "@/features/coaching/read-models";
 
 interface CoachingDetailPageProps {
+  canManage: boolean;
   events: readonly CoachingRecordEvent[];
   record: CoachingRecordDashboardEntry;
 }
@@ -35,7 +37,11 @@ const eventLabels: Record<CoachingRecordEvent["eventType"], string> = {
   status_changed: "Cập nhật trạng thái",
 };
 
-export function CoachingDetailPage({ events, record }: CoachingDetailPageProps) {
+export function CoachingDetailPage({
+  canManage,
+  events,
+  record,
+}: CoachingDetailPageProps) {
   return (
     <div className="grid gap-5">
       <header className="rounded-lg border border-hairline bg-surface-1 p-5 shadow-card">
@@ -56,15 +62,23 @@ export function CoachingDetailPage({ events, record }: CoachingDetailPageProps) 
               {record.studentFullName} · {record.studentPublicCode}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <CoachingPriorityBadge priority={record.priority} />
-            <CoachingStatusBadge status={record.currentStatus} />
+          <div className="grid justify-items-start gap-3 md:justify-items-end">
+            <div className="flex flex-wrap gap-2">
+              <CoachingPriorityBadge priority={record.priority} />
+              <CoachingStatusBadge status={record.currentStatus} />
+            </div>
+            {canManage ? (
+              <CoachingEventActions
+                coachingRecordId={record.id}
+                currentStatus={record.currentStatus}
+              />
+            ) : null}
           </div>
         </div>
       </header>
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Thông tin coaching">
-        <DetailCard label="Trợ lý phụ trách" value={record.assistantOwnerDisplayName} />
+        <DetailCard label="Người phụ trách" value={record.assistantOwnerDisplayName} />
         <DetailCard label="Ngày mở" value={formatDateTime(record.openedAt)} />
         <DetailCard label="Ngày xem lại" value={formatDate(record.reviewAt)} />
         <DetailCard label="Kết quả gần nhất" value={record.latestOutcome ?? "Chưa ghi nhận"} />
@@ -81,7 +95,7 @@ export function CoachingDetailPage({ events, record }: CoachingDetailPageProps) 
         <div className="border-b border-hairline px-5 py-4">
           <h2 className="text-section font-semibold text-ink">Lịch sử phiếu</h2>
           <p className="mt-1 text-sm text-ink-muted">
-            Các sự kiện là append-only; chưa có thao tác cập nhật trong giai đoạn foundation.
+            Mọi thay đổi được ghi thành sự kiện mới; lịch sử cũ không bị ghi đè.
           </p>
         </div>
         {events.length === 0 ? (

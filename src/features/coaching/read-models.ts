@@ -28,6 +28,24 @@ export interface CoachingRecordEvent {
   status: CoachingStatus | null;
 }
 
+export interface CoachingStudentOption {
+  fullName: string;
+  id: string;
+  lifecycleStatus: string;
+  publicCode: string;
+}
+
+export interface CoachingAssigneeOption {
+  displayName: string;
+  id: string;
+  roleCode: "assistant_manager" | "owner";
+}
+
+export interface CoachingManagementOptions {
+  assignees: readonly CoachingAssigneeOption[];
+  students: readonly CoachingStudentOption[];
+}
+
 export type CoachingReadResult<T> =
   | { data: T; ok: true }
   | { ok: false };

@@ -1,11 +1,14 @@
 import "server-only";
 
 import type {
+  CoachingAssigneeOption,
+  CoachingManagementOptions,
   CoachingPriority,
   CoachingReadResult,
   CoachingRecordDashboardEntry,
   CoachingRecordEvent,
   CoachingStatus,
+  CoachingStudentOption,
 } from "@/features/coaching/read-models";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -137,6 +140,47 @@ export async function getCoachingRecordEventsResult(
       })),
       ok: true,
     };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function getCoachingManagementOptionsResult(): Promise<
+  CoachingReadResult<CoachingManagementOptions>
+> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const [studentsResult, assigneesResult] = await Promise.all([
+      supabase.rpc("get_coaching_student_options", { p_limit: 500 }),
+      supabase.rpc("get_coaching_assignee_options"),
+    ]);
+
+    if (
+      studentsResult.error ||
+      !studentsResult.data ||
+      assigneesResult.error ||
+      !assigneesResult.data
+    ) {
+      return { ok: false };
+    }
+
+    const students: CoachingStudentOption[] = studentsResult.data.map((student) => ({
+      fullName: student.student_full_name,
+      id: student.student_id,
+      lifecycleStatus: student.lifecycle_status,
+      publicCode: student.student_public_code,
+    }));
+
+    const assignees: CoachingAssigneeOption[] = assigneesResult.data.map(
+      (assignee) => ({
+        displayName: assignee.display_name,
+        id: assignee.profile_id,
+        roleCode:
+          assignee.role_code === "owner" ? "owner" : "assistant_manager",
+      }),
+    );
+
+    return { data: { assignees, students }, ok: true };
   } catch {
     return { ok: false };
   }

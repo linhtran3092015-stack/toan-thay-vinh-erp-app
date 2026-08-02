@@ -1,14 +1,18 @@
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { CreateCoachingDialog } from "@/features/coaching/components/create-coaching-dialog";
 import type {
+  CoachingManagementOptions,
   CoachingPriority,
   CoachingRecordDashboardEntry,
   CoachingStatus,
 } from "@/features/coaching/read-models";
 
 interface CoachingListPageProps {
+  canManage: boolean;
   entries: readonly CoachingRecordDashboardEntry[];
+  managementOptions: CoachingManagementOptions | null;
 }
 
 const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
@@ -43,7 +47,11 @@ const statusMetadata: Record<
   open: { label: "Mở", tone: "info" },
 };
 
-export function CoachingListPage({ entries }: CoachingListPageProps) {
+export function CoachingListPage({
+  canManage,
+  entries,
+  managementOptions,
+}: CoachingListPageProps) {
   const activeCount = entries.filter((entry) => entry.currentStatus !== "closed").length;
   const overdueCount = entries.filter(
     (entry) =>
@@ -55,13 +63,24 @@ export function CoachingListPage({ entries }: CoachingListPageProps) {
   return (
     <div className="grid gap-5">
       <header className="rounded-lg border border-hairline bg-surface-1 p-5 shadow-card">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
-          Quản lý học tập
-        </p>
-        <h1 className="mt-1 text-page-title font-bold text-ink">Coaching</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">
-          Mỗi đợt theo dõi là một phiếu độc lập. Lịch sử được lưu theo sự kiện, không ghi đè lên thông tin đã ghi nhận.
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
+              Quản lý học tập
+            </p>
+            <h1 className="mt-1 text-page-title font-bold text-ink">Coaching</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">
+              Mỗi đợt theo dõi là một phiếu độc lập. Lịch sử được lưu theo
+              sự kiện, không ghi đè lên thông tin đã ghi nhận.
+            </p>
+          </div>
+          {canManage && managementOptions ? (
+            <CreateCoachingDialog
+              assignees={managementOptions.assignees}
+              students={managementOptions.students}
+            />
+          ) : null}
+        </div>
       </header>
 
       <section aria-label="Tổng quan coaching" className="grid gap-3 sm:grid-cols-3">
@@ -74,7 +93,9 @@ export function CoachingListPage({ entries }: CoachingListPageProps) {
         <section className="rounded-lg border border-dashed border-hairline-strong bg-surface-1 px-6 py-12 text-center shadow-xs">
           <h2 className="text-section font-semibold text-ink">Chưa có phiếu coaching</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-ink-muted">
-            Danh sách sẽ hiển thị các phiếu theo dõi được tạo sau khi quy trình nghiệp vụ tạo phiếu được phê duyệt.
+            {canManage
+              ? "Tạo phiếu đầu tiên để bắt đầu theo dõi một đợt Coaching của học viên."
+              : "Chưa có đợt Coaching nào được ghi nhận trong hệ thống."}
           </p>
         </section>
       ) : (
@@ -93,7 +114,7 @@ export function CoachingListPage({ entries }: CoachingListPageProps) {
                   <th className="px-5 py-3 font-semibold">Học viên</th>
                   <th className="px-5 py-3 font-semibold">Đợt coaching</th>
                   <th className="px-5 py-3 font-semibold">Ưu tiên</th>
-                  <th className="px-5 py-3 font-semibold">Trợ lý phụ trách</th>
+                  <th className="px-5 py-3 font-semibold">Người phụ trách</th>
                   <th className="px-5 py-3 font-semibold">Xem lại</th>
                   <th className="px-5 py-3 font-semibold">Trạng thái</th>
                   <th className="px-5 py-3 font-semibold">Mở phiếu</th>
@@ -179,7 +200,7 @@ function CoachingMobileCard({ entry }: { entry: CoachingRecordDashboardEntry }) 
       <p className="mt-4 font-medium text-primary">{entry.campaignName}</p>
       <dl className="mt-4 grid gap-3 text-sm">
         <MobileField label="Ưu tiên" value={priorityMetadata[entry.priority].label} />
-        <MobileField label="Trợ lý phụ trách" value={entry.assistantOwnerDisplayName} />
+        <MobileField label="Người phụ trách" value={entry.assistantOwnerDisplayName} />
         <MobileField label="Ngày xem lại" value={formatDate(entry.reviewAt)} />
       </dl>
     </Link>
