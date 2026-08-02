@@ -172,6 +172,7 @@ export async function assignStaffRoleAction(
     }
 
     revalidatePath("/staff");
+    revalidatePath("/settings/users");
 
     return {
       message: "Đã cấp vai trò thành công.",
@@ -232,6 +233,7 @@ export async function revokeStaffRoleAction(
     }
 
     revalidatePath("/staff");
+    revalidatePath("/settings/users");
 
     return {
       message: "Đã thu hồi vai trò thành công.",

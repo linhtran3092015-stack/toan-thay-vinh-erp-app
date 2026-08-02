@@ -189,9 +189,10 @@ export const navigationSections: NavigationSection[] = [
         shortLabel: "NK",
       },
       {
-        available: false,
+        available: true,
         href: "/settings",
         label: "Cài đặt hệ thống",
+        permission: "staff.roles.view",
         shortLabel: "CD",
       },
     ],

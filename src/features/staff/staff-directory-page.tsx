@@ -10,8 +10,12 @@ import { cn } from "@/lib/utils";
 interface StaffDirectoryPageProps {
   canManageRoles: boolean;
   canViewRoles: boolean;
+  description?: string;
+  eyebrow?: string;
+  headingLevel?: 1 | 2;
   members: readonly StaffDirectoryMember[];
   roleOptions: readonly StaffRoleOption[];
+  title?: string;
 }
 
 const statusLabels: Record<StaffEmploymentStatus, string> = {
@@ -31,9 +35,14 @@ const statusClasses: Record<StaffEmploymentStatus, string> = {
 export function StaffDirectoryPage({
   canManageRoles,
   canViewRoles,
+  description = "Dữ liệu được đọc trực tiếp từ hồ sơ đăng nhập và phân quyền trên Supabase. Mọi thay đổi vai trò đều yêu cầu lý do và được ghi audit.",
+  eyebrow = "Quản trị nhân sự",
+  headingLevel = 1,
   members,
   roleOptions,
+  title = "Danh sách nhân sự",
 }: StaffDirectoryPageProps) {
+  const Heading = headingLevel === 1 ? "h1" : "h2";
   const activeCount = members.filter(
     (member) => member.employmentStatus === "active",
   ).length;
@@ -51,14 +60,13 @@ export function StaffDirectoryPage({
       <header className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 p-5 shadow-card md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
-            Quản trị nhân sự
+            {eyebrow}
           </p>
-          <h1 className="mt-1 text-page-title font-bold text-ink">
-            Danh sách nhân sự
-          </h1>
+          <Heading className="mt-1 text-page-title font-bold text-ink">
+            {title}
+          </Heading>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">
-            Dữ liệu được đọc trực tiếp từ hồ sơ đăng nhập và phân quyền trên
-            Supabase. Mọi thay đổi vai trò đều yêu cầu lý do và được ghi audit.
+            {description}
           </p>
         </div>
 

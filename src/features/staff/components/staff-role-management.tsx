@@ -54,7 +54,7 @@ export function StaffRoleManagement({
 
   return (
     <details className="mt-3 rounded-lg border border-hairline bg-canvas">
-      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-primary">
+      <summary className="flex min-h-11 cursor-pointer select-none items-center px-3 py-2 text-xs font-semibold text-primary">
         Quản lý vai trò
       </summary>
 
@@ -119,7 +119,7 @@ function AssignRoleForm({
         </label>
 
         <select
-          className="mt-1 h-10 w-full rounded-md border border-hairline bg-white px-3 text-sm text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:bg-neutral-bg disabled:text-ink-subtle"
+          className="mt-1 h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:bg-neutral-bg disabled:text-ink-subtle"
           defaultValue=""
           disabled={pending || availableRoles.length === 0}
           id={roleId}
@@ -151,7 +151,7 @@ function AssignRoleForm({
         </label>
 
         <input
-          className="mt-1 h-10 w-full rounded-md border border-hairline bg-white px-3 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:bg-neutral-bg"
+          className="mt-1 h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:bg-neutral-bg"
           disabled={pending || availableRoles.length === 0}
           id={reasonId}
           maxLength={500}
@@ -168,7 +168,7 @@ function AssignRoleForm({
       <ActionMessage state={state} />
 
       <Button
-        className="w-full"
+        className="min-h-11 w-full"
         disabled={pending || availableRoles.length === 0}
         size="sm"
         type="submit"
@@ -200,7 +200,7 @@ function RevokeRoleForm({
 
   return (
     <details className="rounded-md border border-hairline bg-white">
-      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-danger">
+      <summary className="flex min-h-11 cursor-pointer select-none items-center px-3 py-2 text-xs font-semibold text-danger">
         Thu hồi: {role.name}
       </summary>
 
@@ -224,7 +224,7 @@ function RevokeRoleForm({
           </label>
 
           <input
-            className="mt-1 h-10 w-full rounded-md border border-hairline bg-white px-3 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-danger focus:ring-[3px] focus:ring-danger/15 disabled:bg-neutral-bg"
+            className="mt-1 h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-danger focus:ring-[3px] focus:ring-danger/15 disabled:bg-neutral-bg"
             disabled={pending}
             id={reasonId}
             maxLength={500}
@@ -241,7 +241,7 @@ function RevokeRoleForm({
         <ActionMessage state={state} />
 
         <Button
-          className="w-full border-danger text-danger hover:border-danger hover:bg-danger-bg"
+          className="min-h-11 w-full border-danger text-danger hover:border-danger hover:bg-danger-bg"
           disabled={pending}
           size="sm"
           type="submit"
