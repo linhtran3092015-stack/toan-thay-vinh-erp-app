@@ -11,6 +11,7 @@ export const DATABASE_PERMISSION_CODES = [
   "imports.session_balances",
   "imports.session_balances.approve",
   "imports.classes",
+  "imports.enrollments",
   "students.view",
   "students.create",
   "students.update",

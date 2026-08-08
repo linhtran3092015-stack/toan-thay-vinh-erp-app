@@ -2884,6 +2884,171 @@ export type Database = {
           },
         ]
       }
+      student_enrollment_import_batches: {
+        Row: {
+          academic_year_code: string
+          academic_year_id: string | null
+          committed_at: string | null
+          committed_by: string | null
+          conflict_count: number
+          created_at: string
+          created_by: string | null
+          id: string
+          invalid_count: number
+          matching_count: number
+          metadata: Json
+          new_count: number
+          reason: string
+          row_count: number
+          source_filename: string
+          source_sha256: string
+          status: string
+        }
+        Insert: {
+          academic_year_code: string
+          academic_year_id?: string | null
+          committed_at?: string | null
+          committed_by?: string | null
+          conflict_count?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invalid_count?: number
+          matching_count?: number
+          metadata?: Json
+          new_count?: number
+          reason: string
+          row_count?: number
+          source_filename: string
+          source_sha256: string
+          status?: string
+        }
+        Update: {
+          academic_year_code?: string
+          academic_year_id?: string | null
+          committed_at?: string | null
+          committed_by?: string | null
+          conflict_count?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invalid_count?: number
+          matching_count?: number
+          metadata?: Json
+          new_count?: number
+          reason?: string
+          row_count?: number
+          source_filename?: string
+          source_sha256?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_enrollment_import_batches_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_enrollment_import_batches_committed_by_fkey"
+            columns: ["committed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_enrollment_import_batches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_enrollment_import_rows: {
+        Row: {
+          academic_year_code: string
+          batch_id: string
+          class_code: string
+          classification: string
+          created_at: string
+          effective_from: string
+          id: string
+          registered_mode: string
+          resolved_class_id: string | null
+          resolved_enrollment_id: string | null
+          resolved_student_id: string | null
+          source_row: number
+          student_public_code: string
+          validation_code: string | null
+          validation_message: string | null
+        }
+        Insert: {
+          academic_year_code: string
+          batch_id: string
+          class_code: string
+          classification: string
+          created_at?: string
+          effective_from: string
+          id?: string
+          registered_mode: string
+          resolved_class_id?: string | null
+          resolved_enrollment_id?: string | null
+          resolved_student_id?: string | null
+          source_row: number
+          student_public_code: string
+          validation_code?: string | null
+          validation_message?: string | null
+        }
+        Update: {
+          academic_year_code?: string
+          batch_id?: string
+          class_code?: string
+          classification?: string
+          created_at?: string
+          effective_from?: string
+          id?: string
+          registered_mode?: string
+          resolved_class_id?: string | null
+          resolved_enrollment_id?: string | null
+          resolved_student_id?: string | null
+          source_row?: number
+          student_public_code?: string
+          validation_code?: string | null
+          validation_message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_enrollment_import_rows_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "student_enrollment_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_enrollment_import_rows_resolved_class_id_fkey"
+            columns: ["resolved_class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_enrollment_import_rows_resolved_enrollment_id_fkey"
+            columns: ["resolved_enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "student_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_enrollment_import_rows_resolved_student_id_fkey"
+            columns: ["resolved_student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_enrollments: {
         Row: {
           class_id: string
@@ -4190,6 +4355,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commit_student_enrollment_import_batch: {
+        Args: { p_batch_id: string; p_reason: string }
+        Returns: Json
+      }
       commit_student_import_rows: {
         Args: {
           p_reason: string
@@ -4643,6 +4812,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_student_enrollment_import_batch: {
+        Args: {
+          p_academic_year_code: string
+          p_reason: string
+          p_rows: Json
+          p_source_filename: string
+          p_source_sha256: string
+        }
+        Returns: Json
+      }
       create_student_payment_request: {
         Args: {
           p_bonus_sessions?: number
@@ -4757,6 +4936,10 @@ export type Database = {
       }
       dry_run_session_balance_import_rows: {
         Args: { p_effective_on: string; p_rows: Json }
+        Returns: Json
+      }
+      dry_run_student_enrollment_import: {
+        Args: { p_academic_year_code: string; p_rows: Json }
         Returns: Json
       }
       end_class_schedule_template: {

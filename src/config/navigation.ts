@@ -59,6 +59,13 @@ export const navigationSections: NavigationSection[] = [
       },
       {
         available: true,
+        href: "/imports/enrollments",
+        label: "Import ghi danh",
+        permission: "imports.enrollments",
+        shortLabel: "IE",
+      },
+      {
+        available: true,
         href: "/classes",
         label: "Lớp học & Lịch học",
         permission: "classes.view",
