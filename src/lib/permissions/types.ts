@@ -8,6 +8,8 @@ export const DATABASE_PERMISSION_CODES = [
   "classes.manage_schedule",
   "guardians.view",
   "imports.students",
+  "imports.session_balances",
+  "imports.session_balances.approve",
   "students.view",
   "students.create",
   "students.update",

@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       academic_years: {
@@ -2028,6 +2053,206 @@ export type Database = {
           },
         ]
       }
+      session_balance_import_batches: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          effective_on: string
+          excluded_count: number | null
+          id: string
+          invalid_count: number | null
+          metadata: Json
+          no_change_count: number | null
+          posted_at: string | null
+          posted_by: string | null
+          posted_count: number | null
+          reason: string
+          reconciled_at: string | null
+          reconciled_by: string | null
+          review_count: number | null
+          row_count: number | null
+          source_filename: string
+          source_sha256: string
+          status: string
+          valid_count: number | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          effective_on: string
+          excluded_count?: number | null
+          id?: string
+          invalid_count?: number | null
+          metadata?: Json
+          no_change_count?: number | null
+          posted_at?: string | null
+          posted_by?: string | null
+          posted_count?: number | null
+          reason: string
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          review_count?: number | null
+          row_count?: number | null
+          source_filename: string
+          source_sha256: string
+          status?: string
+          valid_count?: number | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          effective_on?: string
+          excluded_count?: number | null
+          id?: string
+          invalid_count?: number | null
+          metadata?: Json
+          no_change_count?: number | null
+          posted_at?: string | null
+          posted_by?: string | null
+          posted_count?: number | null
+          reason?: string
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          review_count?: number | null
+          row_count?: number | null
+          source_filename?: string
+          source_sha256?: string
+          status?: string
+          valid_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_balance_import_batches_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_balance_import_batches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_balance_import_batches_posted_by_fkey"
+            columns: ["posted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_balance_import_batches_reconciled_by_fkey"
+            columns: ["reconciled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_balance_import_rows: {
+        Row: {
+          batch_id: string
+          created_at: string
+          current_balance_before: number | null
+          delta_sessions: number | null
+          excluded_reason: string | null
+          expected_balance_after: number | null
+          id: string
+          ledger_entry_id: string | null
+          source_balance: number
+          source_row_number: number
+          source_student_name: string | null
+          student_enrollment_id: string | null
+          student_id: string | null
+          student_public_code: string
+          validation_code: string | null
+          validation_message: string | null
+          validation_status: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          current_balance_before?: number | null
+          delta_sessions?: number | null
+          excluded_reason?: string | null
+          expected_balance_after?: number | null
+          id?: string
+          ledger_entry_id?: string | null
+          source_balance: number
+          source_row_number: number
+          source_student_name?: string | null
+          student_enrollment_id?: string | null
+          student_id?: string | null
+          student_public_code: string
+          validation_code?: string | null
+          validation_message?: string | null
+          validation_status: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          current_balance_before?: number | null
+          delta_sessions?: number | null
+          excluded_reason?: string | null
+          expected_balance_after?: number | null
+          id?: string
+          ledger_entry_id?: string | null
+          source_balance?: number
+          source_row_number?: number
+          source_student_name?: string | null
+          student_enrollment_id?: string | null
+          student_id?: string | null
+          student_public_code?: string
+          validation_code?: string | null
+          validation_message?: string | null
+          validation_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_balance_import_rows_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "session_balance_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_balance_import_rows_ledger_entry_id_fkey"
+            columns: ["ledger_entry_id"]
+            isOneToOne: false
+            referencedRelation: "student_session_ledger_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_balance_import_rows_ledger_entry_id_fkey"
+            columns: ["ledger_entry_id"]
+            isOneToOne: false
+            referencedRelation: "student_session_ledger_running_balances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_balance_import_rows_student_enrollment_id_fkey"
+            columns: ["student_enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "student_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_balance_import_rows_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_results: {
         Row: {
           class_session_id: string
@@ -3438,6 +3663,39 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      approve_session_balance_import_batch: {
+        Args: { p_batch_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          effective_on: string
+          excluded_count: number | null
+          id: string
+          invalid_count: number | null
+          metadata: Json
+          no_change_count: number | null
+          posted_at: string | null
+          posted_by: string | null
+          posted_count: number | null
+          reason: string
+          reconciled_at: string | null
+          reconciled_by: string | null
+          review_count: number | null
+          row_count: number | null
+          source_filename: string
+          source_sha256: string
+          status: string
+          valid_count: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "session_balance_import_batches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       assign_user_role: {
         Args: {
           assignment_reason: string
@@ -3958,6 +4216,45 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_session_balance_import_batch: {
+        Args: {
+          p_effective_on: string
+          p_reason: string
+          p_rows: Json
+          p_source_filename: string
+          p_source_sha256: string
+        }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          effective_on: string
+          excluded_count: number | null
+          id: string
+          invalid_count: number | null
+          metadata: Json
+          no_change_count: number | null
+          posted_at: string | null
+          posted_by: string | null
+          posted_count: number | null
+          reason: string
+          reconciled_at: string | null
+          reconciled_by: string | null
+          review_count: number | null
+          row_count: number | null
+          source_filename: string
+          source_sha256: string
+          status: string
+          valid_count: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "session_balance_import_batches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_staff_rate_version: {
         Args: {
           p_effective_from: string
@@ -4110,6 +4407,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      dry_run_session_balance_import_rows: {
+        Args: { p_effective_on: string; p_rows: Json }
+        Returns: Json
+      }
       end_class_schedule_template: {
         Args: {
           p_effective_to: string
@@ -4199,6 +4500,34 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "student_enrollments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      exclude_session_balance_import_row: {
+        Args: { p_excluded_reason: string; p_row_id: string }
+        Returns: {
+          batch_id: string
+          created_at: string
+          current_balance_before: number | null
+          delta_sessions: number | null
+          excluded_reason: string | null
+          expected_balance_after: number | null
+          id: string
+          ledger_entry_id: string | null
+          source_balance: number
+          source_row_number: number
+          source_student_name: string | null
+          student_enrollment_id: string | null
+          student_id: string | null
+          student_public_code: string
+          validation_code: string | null
+          validation_message: string | null
+          validation_status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "session_balance_import_rows"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -4642,6 +4971,39 @@ export type Database = {
         Args: { phone_value: string }
         Returns: string
       }
+      post_session_balance_import_batch: {
+        Args: { p_batch_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          effective_on: string
+          excluded_count: number | null
+          id: string
+          invalid_count: number | null
+          metadata: Json
+          no_change_count: number | null
+          posted_at: string | null
+          posted_by: string | null
+          posted_count: number | null
+          reason: string
+          reconciled_at: string | null
+          reconciled_by: string | null
+          review_count: number | null
+          row_count: number | null
+          source_filename: string
+          source_sha256: string
+          status: string
+          valid_count: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "session_balance_import_batches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       process_sepay_webhook_transaction: {
         Args: {
           p_account_number: string
@@ -4666,6 +5028,39 @@ export type Database = {
           p_student_id: string
         }
         Returns: Json
+      }
+      reconcile_session_balance_import_batch: {
+        Args: { p_batch_id: string; p_reason: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          effective_on: string
+          excluded_count: number | null
+          id: string
+          invalid_count: number | null
+          metadata: Json
+          no_change_count: number | null
+          posted_at: string | null
+          posted_by: string | null
+          posted_count: number | null
+          reason: string
+          reconciled_at: string | null
+          reconciled_by: string | null
+          review_count: number | null
+          row_count: number | null
+          source_filename: string
+          source_sha256: string
+          status: string
+          valid_count: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "session_balance_import_batches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       record_session_result: {
         Args: {
@@ -5449,6 +5844,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

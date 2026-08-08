@@ -45,6 +45,13 @@ export const navigationSections: NavigationSection[] = [
       },
       {
         available: true,
+        href: "/imports/session-balances",
+        label: "Import số dư buổi",
+        permission: "imports.session_balances",
+        shortLabel: "SB",
+      },
+      {
+        available: true,
         href: "/classes",
         label: "Lớp học & Lịch học",
         permission: "classes.view",

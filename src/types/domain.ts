@@ -44,6 +44,8 @@ export type PermissionCode =
   | "grading_credits.view"
   | "grading_credits.view_all"
   | "imports.students"
+  | "imports.session_balances"
+  | "imports.session_balances.approve"
   | "notifications.view"
   | "payroll.view"
   | "payments.create_request"
