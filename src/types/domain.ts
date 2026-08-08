@@ -46,6 +46,7 @@ export type PermissionCode =
   | "imports.students"
   | "imports.session_balances"
   | "imports.session_balances.approve"
+  | "imports.classes"
   | "notifications.view"
   | "payroll.view"
   | "payments.create_request"

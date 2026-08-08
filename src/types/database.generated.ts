@@ -252,6 +252,273 @@ export type Database = {
           },
         ]
       }
+      class_schedule_import_batches: {
+        Row: {
+          academic_year_code: string
+          academic_year_id: string | null
+          class_conflict_count: number
+          class_invalid_count: number
+          class_matching_count: number
+          class_new_count: number
+          class_row_count: number
+          committed_at: string | null
+          committed_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          metadata: Json
+          reason: string
+          schedule_conflict_count: number
+          schedule_invalid_count: number
+          schedule_matching_count: number
+          schedule_new_count: number
+          schedule_row_count: number
+          source_filename: string
+          source_sha256: string
+          status: string
+        }
+        Insert: {
+          academic_year_code: string
+          academic_year_id?: string | null
+          class_conflict_count?: number
+          class_invalid_count?: number
+          class_matching_count?: number
+          class_new_count?: number
+          class_row_count?: number
+          committed_at?: string | null
+          committed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metadata?: Json
+          reason: string
+          schedule_conflict_count?: number
+          schedule_invalid_count?: number
+          schedule_matching_count?: number
+          schedule_new_count?: number
+          schedule_row_count?: number
+          source_filename: string
+          source_sha256: string
+          status?: string
+        }
+        Update: {
+          academic_year_code?: string
+          academic_year_id?: string | null
+          class_conflict_count?: number
+          class_invalid_count?: number
+          class_matching_count?: number
+          class_new_count?: number
+          class_row_count?: number
+          committed_at?: string | null
+          committed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metadata?: Json
+          reason?: string
+          schedule_conflict_count?: number
+          schedule_invalid_count?: number
+          schedule_matching_count?: number
+          schedule_new_count?: number
+          schedule_row_count?: number
+          source_filename?: string
+          source_sha256?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_schedule_import_batches_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_schedule_import_batches_committed_by_fkey"
+            columns: ["committed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_schedule_import_batches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_schedule_import_class_rows: {
+        Row: {
+          academic_year_code: string
+          batch_id: string
+          class_code: string
+          class_name: string
+          classification: string
+          created_at: string
+          default_learning_mode: string
+          grade: number
+          id: string
+          level: string
+          resolved_academic_year_id: string | null
+          resolved_class_id: string | null
+          source_row_number: number
+          status: string
+          validation_code: string | null
+          validation_message: string | null
+          weekly_session_count: number
+        }
+        Insert: {
+          academic_year_code: string
+          batch_id: string
+          class_code: string
+          class_name: string
+          classification: string
+          created_at?: string
+          default_learning_mode?: string
+          grade: number
+          id?: string
+          level: string
+          resolved_academic_year_id?: string | null
+          resolved_class_id?: string | null
+          source_row_number: number
+          status?: string
+          validation_code?: string | null
+          validation_message?: string | null
+          weekly_session_count?: number
+        }
+        Update: {
+          academic_year_code?: string
+          batch_id?: string
+          class_code?: string
+          class_name?: string
+          classification?: string
+          created_at?: string
+          default_learning_mode?: string
+          grade?: number
+          id?: string
+          level?: string
+          resolved_academic_year_id?: string | null
+          resolved_class_id?: string | null
+          source_row_number?: number
+          status?: string
+          validation_code?: string | null
+          validation_message?: string | null
+          weekly_session_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_schedule_import_class_rows_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "class_schedule_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_schedule_import_class_rows_resolved_academic_year_id_fkey"
+            columns: ["resolved_academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_schedule_import_class_rows_resolved_class_id_fkey"
+            columns: ["resolved_class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_schedule_import_schedule_rows: {
+        Row: {
+          batch_id: string
+          class_code: string
+          classification: string
+          component_code: string
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          end_time: string
+          id: string
+          learning_mode: string
+          meeting_url: string | null
+          resolved_class_id: string | null
+          resolved_schedule_template_id: string | null
+          room_name: string | null
+          source_row_number: number
+          start_time: string
+          validation_code: string | null
+          validation_message: string | null
+          weekday: number
+        }
+        Insert: {
+          batch_id: string
+          class_code: string
+          classification: string
+          component_code: string
+          created_at?: string
+          effective_from: string
+          effective_to?: string | null
+          end_time: string
+          id?: string
+          learning_mode?: string
+          meeting_url?: string | null
+          resolved_class_id?: string | null
+          resolved_schedule_template_id?: string | null
+          room_name?: string | null
+          source_row_number: number
+          start_time: string
+          validation_code?: string | null
+          validation_message?: string | null
+          weekday: number
+        }
+        Update: {
+          batch_id?: string
+          class_code?: string
+          classification?: string
+          component_code?: string
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          end_time?: string
+          id?: string
+          learning_mode?: string
+          meeting_url?: string | null
+          resolved_class_id?: string | null
+          resolved_schedule_template_id?: string | null
+          room_name?: string | null
+          source_row_number?: number
+          start_time?: string
+          validation_code?: string | null
+          validation_message?: string | null
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_schedule_import_schedul_resolved_schedule_template_i_fkey"
+            columns: ["resolved_schedule_template_id"]
+            isOneToOne: false
+            referencedRelation: "class_schedule_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_schedule_import_schedule_rows_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "class_schedule_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_schedule_import_schedule_rows_resolved_class_id_fkey"
+            columns: ["resolved_class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       class_schedule_templates: {
         Row: {
           class_id: string
@@ -3890,6 +4157,39 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commit_class_schedule_import_batch: {
+        Args: { p_batch_id: string; p_reason: string }
+        Returns: {
+          academic_year_code: string
+          academic_year_id: string | null
+          class_conflict_count: number
+          class_invalid_count: number
+          class_matching_count: number
+          class_new_count: number
+          class_row_count: number
+          committed_at: string | null
+          committed_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          metadata: Json
+          reason: string
+          schedule_conflict_count: number
+          schedule_invalid_count: number
+          schedule_matching_count: number
+          schedule_new_count: number
+          schedule_row_count: number
+          source_filename: string
+          source_sha256: string
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_schedule_import_batches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       commit_student_import_rows: {
         Args: {
           p_reason: string
@@ -4039,6 +4339,46 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "classes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_class_schedule_import_batch: {
+        Args: {
+          p_academic_year_code: string
+          p_classes: Json
+          p_reason: string
+          p_schedules: Json
+          p_source_filename: string
+          p_source_sha256: string
+        }
+        Returns: {
+          academic_year_code: string
+          academic_year_id: string | null
+          class_conflict_count: number
+          class_invalid_count: number
+          class_matching_count: number
+          class_new_count: number
+          class_row_count: number
+          committed_at: string | null
+          committed_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          metadata: Json
+          reason: string
+          schedule_conflict_count: number
+          schedule_invalid_count: number
+          schedule_matching_count: number
+          schedule_new_count: number
+          schedule_row_count: number
+          source_filename: string
+          source_sha256: string
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_schedule_import_batches"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -4406,6 +4746,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      dry_run_class_schedule_import: {
+        Args: {
+          p_academic_year_code: string
+          p_classes: Json
+          p_schedules: Json
+        }
+        Returns: Json
       }
       dry_run_session_balance_import_rows: {
         Args: { p_effective_on: string; p_rows: Json }

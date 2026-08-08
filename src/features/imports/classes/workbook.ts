@@ -1,0 +1,305 @@
+"use client";
+
+import readExcelFile from "read-excel-file/browser";
+
+import type {
+  ClassScheduleImportCellValue,
+  ClassScheduleImportParsedSheet,
+  ClassScheduleImportParsedWorkbook,
+  ClassScheduleImportWorkbookColumn,
+  ClassScheduleImportWorkbookRow,
+} from "./types";
+
+export const CLASS_SCHEDULE_IMPORT_MAX_FILE_BYTES = 5 * 1024 * 1024;
+export const CLASS_IMPORT_MAX_ROWS = 500;
+export const SCHEDULE_IMPORT_MAX_ROWS = 2000;
+
+export type ClassScheduleWorkbookErrorCode =
+  | "corrupt_workbook"
+  | "empty_file"
+  | "file_too_large"
+  | "invalid_extension"
+  | "missing_classes_sheet"
+  | "missing_schedules_sheet"
+  | "missing_data_rows"
+  | "too_many_class_rows"
+  | "too_many_schedule_rows";
+
+export class ClassScheduleWorkbookError extends Error {
+  readonly code: ClassScheduleWorkbookErrorCode;
+
+  constructor(code: ClassScheduleWorkbookErrorCode, message: string) {
+    super(message);
+    this.name = "ClassScheduleWorkbookError";
+    this.code = code;
+  }
+}
+
+function getExcelColumnKey(columnIndex: number): string {
+  let remaining = columnIndex;
+  let result = "";
+
+  while (remaining > 0) {
+    const remainder = (remaining - 1) % 26;
+    result = String.fromCharCode(65 + remainder) + result;
+    remaining = Math.floor((remaining - 1) / 26);
+  }
+
+  return result;
+}
+
+export function parseWeekdayValue(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+
+  if (typeof value === "number") {
+    const intVal = Math.floor(value);
+    return intVal >= 1 && intVal <= 7 ? intVal : null;
+  }
+
+  if (typeof value === "string") {
+    const str = value.trim().toUpperCase();
+    if (/^[1-7]$/.test(str)) return parseInt(str, 10);
+
+    if (str === "T2" || str.includes("THỨ 2") || str.includes("THỨ HAI") || str.includes("MON")) return 1;
+    if (str === "T3" || str.includes("THỨ 3") || str.includes("THỨ BA") || str.includes("TUE")) return 2;
+    if (str === "T4" || str.includes("THỨ 4") || str.includes("THỨ TƯ") || str.includes("WED")) return 3;
+    if (str === "T5" || str.includes("THỨ 5") || str.includes("THỨ NĂM") || str.includes("THU")) return 4;
+    if (str === "T6" || str.includes("THỨ 6") || str.includes("THỨ SÁU") || str.includes("FRI")) return 5;
+    if (str === "T7" || str.includes("THỨ 7") || str.includes("THỨ BẢY") || str.includes("SAT")) return 6;
+    if (str === "CN" || str.includes("CHỦ NHẬT") || str.includes("SUN")) return 7;
+  }
+
+  return null;
+}
+
+export function parseTimeValue(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+
+  if (typeof value === "string") {
+    const str = value.trim();
+    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(str)) {
+      const parts = str.split(":");
+      const hh = parts[0].padStart(2, "0");
+      const mm = parts[1].padStart(2, "0");
+      const ss = parts[2] ? parts[2].padStart(2, "0") : "00";
+      return `${hh}:${mm}:${ss}`;
+    }
+  }
+
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    const hh = value.getHours().toString().padStart(2, "0");
+    const mm = value.getMinutes().toString().padStart(2, "0");
+    const ss = value.getSeconds().toString().padStart(2, "0");
+    return `${hh}:${mm}:${ss}`;
+  }
+
+  if (typeof value === "number" && value >= 0 && value < 1) {
+    const totalSeconds = Math.round(value * 86400);
+    const hh = Math.floor(totalSeconds / 3600).toString().padStart(2, "0");
+    const mm = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, "0");
+    const ss = (totalSeconds % 60).toString().padStart(2, "0");
+    return `${hh}:${mm}:${ss}`;
+  }
+
+  return null;
+}
+
+export function parseDateValue(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+
+  if (typeof value === "string") {
+    const str = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    const dateObj = new Date(str);
+    if (!isNaN(dateObj.getTime())) {
+      const yyyy = dateObj.getFullYear();
+      const mm = (dateObj.getMonth() + 1).toString().padStart(2, "0");
+      const dd = dateObj.getDate().toString().padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+  }
+
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    const yyyy = value.getFullYear();
+    const mm = (value.getMonth() + 1).toString().padStart(2, "0");
+    const dd = value.getDate().toString().padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return null;
+}
+
+function normalizeCellValue(value: unknown): ClassScheduleImportCellValue {
+  if (value === null || value === undefined) return null;
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (value instanceof Date) {
+    return parseDateValue(value);
+  }
+
+  return String(value);
+}
+
+export async function calculateFileSha256(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function parseSheetRows(
+  rawRows: unknown[][],
+  sheetName: string
+): ClassScheduleImportParsedSheet {
+  if (!rawRows || rawRows.length === 0) {
+    return {
+      columns: [],
+      rowCount: 0,
+      rows: [],
+      sheetName,
+    };
+  }
+
+  const headerRow = rawRows[0] || [];
+  const columns: ClassScheduleImportWorkbookColumn[] = headerRow.map((headerCell, index) => {
+    const columnIndex = index + 1;
+    const rawText = typeof headerCell === "string" ? headerCell.trim() : headerCell ? String(headerCell).trim() : null;
+    return {
+      columnIndex,
+      columnKey: getExcelColumnKey(columnIndex),
+      sourceHeader: rawText && rawText.length > 0 ? rawText : null,
+    };
+  });
+
+  const rows: ClassScheduleImportWorkbookRow[] = [];
+
+  for (let rowIndex = 1; rowIndex < rawRows.length; rowIndex++) {
+    const rawRow = rawRows[rowIndex];
+    if (!rawRow || rawRow.length === 0) continue;
+
+    const values: Record<string, ClassScheduleImportCellValue> = {};
+    let hasNonEmptyCell = false;
+
+    columns.forEach((col, colIdx) => {
+      const cellVal = normalizeCellValue(rawRow[colIdx]);
+      values[col.columnKey] = cellVal;
+      if (cellVal !== null) {
+        hasNonEmptyCell = true;
+      }
+    });
+
+    if (hasNonEmptyCell) {
+      rows.push({
+        rowNumber: rowIndex + 1,
+        values,
+      });
+    }
+  }
+
+  return {
+    columns,
+    rowCount: rows.length,
+    rows,
+    sheetName,
+  };
+}
+
+export async function parseClassScheduleImportWorkbook(
+  file: File
+): Promise<ClassScheduleImportParsedWorkbook> {
+  if (!file) {
+    throw new ClassScheduleWorkbookError("empty_file", "File tải lên không được để trống.");
+  }
+
+  if (file.size > CLASS_SCHEDULE_IMPORT_MAX_FILE_BYTES) {
+    throw new ClassScheduleWorkbookError(
+      "file_too_large",
+      "Kích thước file vượt quá giới hạn tối đa 5 MB."
+    );
+  }
+
+  const lowerFilename = file.name.toLowerCase();
+  if (!lowerFilename.endsWith(".xlsx") && !lowerFilename.endsWith(".xls")) {
+    throw new ClassScheduleWorkbookError(
+      "invalid_extension",
+      "Chỉ hỗ trợ file định dạng Excel (.xlsx hoặc .xls)."
+    );
+  }
+
+  const bytes = await file.arrayBuffer();
+
+  let sheets: { sheet: string; data: unknown[][] }[];
+  try {
+    sheets = (await readExcelFile(bytes)) as unknown as { sheet: string; data: unknown[][] }[];
+  } catch (err) {
+    throw new ClassScheduleWorkbookError(
+      "corrupt_workbook",
+      `Không thể đọc cấu trúc file Excel: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+
+  const classesSheetObj = sheets.find(
+    (s) => s && s.sheet && s.sheet.trim().toLowerCase() === "classes"
+  );
+  const schedulesSheetObj = sheets.find(
+    (s) => s && s.sheet && s.sheet.trim().toLowerCase() === "schedules"
+  );
+
+  if (!classesSheetObj) {
+    throw new ClassScheduleWorkbookError(
+      "missing_classes_sheet",
+      'File Excel thiếu sheet "Classes". File mẫu yêu cầu đúng 2 worksheet: "Classes" và "Schedules".'
+    );
+  }
+
+  if (!schedulesSheetObj) {
+    throw new ClassScheduleWorkbookError(
+      "missing_schedules_sheet",
+      'File Excel thiếu sheet "Schedules". File mẫu yêu cầu đúng 2 worksheet: "Classes" và "Schedules".'
+    );
+  }
+
+  const sha256 = await calculateFileSha256(file);
+  const classesSheet = parseSheetRows(classesSheetObj.data || [], classesSheetObj.sheet);
+  const schedulesSheet = parseSheetRows(schedulesSheetObj.data || [], schedulesSheetObj.sheet);
+
+  if (classesSheet.rowCount === 0) {
+    throw new ClassScheduleWorkbookError(
+      "missing_data_rows",
+      'Sheet "Classes" không có dữ liệu lớp học nào.'
+    );
+  }
+
+  if (classesSheet.rowCount > CLASS_IMPORT_MAX_ROWS) {
+    throw new ClassScheduleWorkbookError(
+      "too_many_class_rows",
+      `Sheet "Classes" chứa ${classesSheet.rowCount} dòng, vượt quá số lượng tối đa ${CLASS_IMPORT_MAX_ROWS} dòng.`
+    );
+  }
+
+  if (schedulesSheet.rowCount > SCHEDULE_IMPORT_MAX_ROWS) {
+    throw new ClassScheduleWorkbookError(
+      "too_many_schedule_rows",
+      `Sheet "Schedules" chứa ${schedulesSheet.rowCount} dòng, vượt quá số lượng tối đa ${SCHEDULE_IMPORT_MAX_ROWS} dòng.`
+    );
+  }
+
+  return {
+    classesSheet,
+    schedulesSheet,
+    sourceFilename: file.name,
+    sourceSha256: sha256,
+  };
+}
