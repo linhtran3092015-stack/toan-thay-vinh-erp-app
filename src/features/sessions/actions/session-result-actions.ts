@@ -125,6 +125,9 @@ function getResultLockRpcErrorMessage(
     NOTEBOOK_STATUS_INVALID:
       "Trạng thái nộp vở không hợp lệ.",
 
+    CLASS_SESSION_NOT_STARTED_YET:
+      "Chưa đến thời gian bắt đầu buổi học.",
+
     ONLY_COMPLETED_SESSION_CAN_BE_LOCKED:
       "Chỉ buổi học đã hoàn thành mới có thể khóa.",
 
@@ -142,6 +145,9 @@ function getResultLockRpcErrorMessage(
 
     SESSION_HAS_NO_ELIGIBLE_ROSTER:
       "Lớp chưa có học viên ghi danh nên không thể khóa buổi học.",
+
+    SESSION_RESET_WINDOW_CLOSED:
+      "Đã qua thời gian bắt đầu buổi học nên không thể đặt lại trạng thái.",
 
     SESSION_LOCK_PERMISSION_DENIED:
       "Tài khoản hiện tại không có quyền khóa buổi học.",
