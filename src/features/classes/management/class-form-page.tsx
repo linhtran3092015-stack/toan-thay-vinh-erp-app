@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/patterns/page-header";
+import { ResultBanner } from "@/components/shared/result-banner";
 import {
   createClassAction,
   updateClassAction,
@@ -23,6 +26,7 @@ import type {
 interface ClassFormPageProps {
   academicYears: AcademicYearManagementItem[];
   classDetail?: ClassDetailReadModel;
+  directoryQuery?: string;
 }
 
 function createInitialValues(
@@ -68,6 +72,7 @@ function createInitialValues(
 export function ClassFormPage({
   academicYears,
   classDetail,
+  directoryQuery = "",
 }: ClassFormPageProps) {
   const router = useRouter();
 
@@ -127,7 +132,7 @@ export function ClassFormPage({
         result.status === "success" &&
         result.redirectTo
       ) {
-        router.push(result.redirectTo);
+        router.push(directoryQuery ? `${result.redirectTo}?${directoryQuery}` : result.redirectTo);
         router.refresh();
       }
     });
@@ -138,46 +143,32 @@ export function ClassFormPage({
 
   return (
     <main className="mx-auto grid max-w-4xl gap-6">
-      <header className="rounded-lg border border-hairline bg-surface-1 p-5 shadow-card">
-        <Link
-          className="text-sm font-semibold text-secondary hover:underline"
-          href={
-            classDetail
-              ? `/classes/${classDetail.id}`
-              : "/classes"
-          }
-        >
-          ← {classDetail
-            ? "Quay lại chi tiết lớp"
-            : "Quay lại danh sách lớp"}
+      <div className="grid gap-3">
+        <Link className="inline-flex w-fit items-center gap-2 text-secondary font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={classDetail ? `/classes/${classDetail.id}${directoryQuery ? `?${directoryQuery}` : ""}` : `/classes${directoryQuery ? `?${directoryQuery}` : ""}`}>
+          <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.8} />
+          {classDetail ? "Quay lại chi tiết lớp" : "Quay lại danh sách lớp"}
         </Link>
-
-        <h1 className="mt-3 text-2xl font-bold text-ink">
-          {classDetail
-            ? "Chỉnh sửa lớp học"
-            : "Tạo lớp học"}
-        </h1>
-
-        <p className="mt-1 text-sm text-ink-muted">
+        <PageHeader title={classDetail ? "Chỉnh sửa lớp học" : "Tạo lớp học"} />
+        <p className="text-secondary text-text-muted">
           {classDetail
             ? "Cập nhật thông tin vận hành của lớp. Database sẽ chặn thay đổi danh tính sau khi lớp đã có lịch hoặc enrollment."
             : "Lớp mới sẽ được tạo ở trạng thái nháp. Sau đó có thể thiết lập lịch và kích hoạt lớp."}
         </p>
-      </header>
+      </div>
 
       {!hasAcademicYears && !classDetail ? (
-        <section className="rounded-lg border border-amber-200 bg-amber-50 p-5">
-          <h2 className="font-semibold text-amber-950">
+        <section className="rounded-lg border border-warning-border bg-warning-bg p-5">
+          <h2 className="font-semibold text-warning">
             Chưa có năm học đang mở
           </h2>
 
-          <p className="mt-1 text-sm text-amber-800">
+          <p className="mt-1 text-sm text-text-strong">
             Cần tạo hoặc kích hoạt năm học trước
             khi tạo lớp.
           </p>
 
           <Link
-            className="mt-4 inline-flex min-h-10 items-center justify-center rounded-md border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-900"
+            className="mt-4 inline-flex min-h-10 items-center justify-center rounded-md border border-warning-border bg-surface-base px-4 text-sm font-semibold text-warning"
             href="/classes/academic-years"
           >
             Đi tới quản lý năm học
@@ -186,7 +177,7 @@ export function ClassFormPage({
       ) : null}
 
       <form
-        className="grid gap-6 rounded-lg border border-hairline bg-surface-1 p-5 shadow-card"
+        className="grid gap-6 rounded-lg border border-border-subtle bg-surface-base p-5"
         onSubmit={handleSubmit}
       >
         <section className="grid gap-4 md:grid-cols-2">
@@ -451,22 +442,11 @@ export function ClassFormPage({
           </FormField>
         ) : null}
 
-        {actionState.message ? (
-          <div
-            aria-live="polite"
-            className={
-              actionState.status === "error"
-                ? "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                : "rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
-            }
-          >
-            {actionState.message}
-          </div>
-        ) : null}
+      {actionState.message ? <ResultBanner title={actionState.message} tone={actionState.status === "error" ? "error" : "success"} /> : null}
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Link
-            className="inline-flex min-h-11 items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink transition hover:bg-surface-2"
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-hairline bg-surface-base px-4 text-sm font-semibold text-ink transition hover:bg-surface-2"
             href={
               classDetail
                 ? `/classes/${classDetail.id}`
@@ -520,7 +500,7 @@ function FormField({
       {children}
 
       {error ? (
-        <span className="text-xs font-medium text-red-600">
+        <span className="text-xs font-medium text-danger">
           {error}
         </span>
       ) : null}
@@ -529,4 +509,4 @@ function FormField({
 }
 
 const inputClassName =
-  "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-slate-100";
+  "min-h-11 w-full rounded-md border border-hairline bg-surface-base px-3 text-sm font-normal text-ink outline-none transition focus:border-action-primary focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";

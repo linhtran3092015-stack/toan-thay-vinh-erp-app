@@ -254,6 +254,40 @@
   }
 }
 
+/* Wave 4 Classes: the directory uses its own, wider safe operational width. */
+.classes-directory {
+  container-type: inline-size;
+}
+
+.classes-filter-bar,
+.classes-directory-table {
+  display: none;
+}
+
+.classes-directory-record-list {
+  display: grid;
+}
+
+.classes-filter-trigger {
+  display: inline-flex;
+}
+
+@container (min-width: 1200px) {
+  .classes-filter-bar,
+  .classes-directory-table {
+    display: block;
+  }
+
+  .classes-filter-trigger,
+  .classes-directory-record-list {
+    display: none;
+  }
+
+  .classes-filter-fields {
+    grid-template-columns: minmax(240px, 1.45fr) repeat(5, minmax(120px, 1fr)) auto;
+  }
+}
+
 .dark, [data-theme="dark"] {
   --background: oklch(0.14 0.02 260);
   --foreground: oklch(0.94 0.01 250);

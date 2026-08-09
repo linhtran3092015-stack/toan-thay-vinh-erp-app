@@ -3,11 +3,13 @@
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import {
+  useRef,
   useState,
   useTransition,
 } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { changeClassStatusAction } from "@/features/classes/actions/class-actions";
 import type {
   ClassManagementActionState,
@@ -33,7 +35,7 @@ interface StatusOperationMeta {
 }
 
 const inputClassName =
-  "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-slate-100";
+  "min-h-11 w-full rounded-md border border-hairline bg-surface-base px-3 text-sm font-normal text-ink outline-none transition focus:border-action-primary focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
 
 function getAvailableOperations(
   status: ClassDetailReadModel["status"],
@@ -112,6 +114,7 @@ export function ClassStatusActions({
 
   const [selectedOperation, setSelectedOperation] =
     useState<StatusOperationMeta | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const [reason, setReason] = useState("");
 
@@ -183,9 +186,10 @@ export function ClassStatusActions({
         {operations.map((operation) => (
           <Button
             key={operation.targetStatus}
-            onClick={() =>
-              openDialog(operation)
-            }
+            onClick={(event) => {
+              triggerRef.current = event.currentTarget;
+              openDialog(operation);
+            }}
             type="button"
             variant={
               operation.targetStatus ===
@@ -199,18 +203,21 @@ export function ClassStatusActions({
         ))}
       </div>
 
-      {selectedOperation ? (
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4"
-          role="dialog"
-        >
+      <Dialog
+        ariaDescribedBy="class-status-action-description"
+        ariaLabelledBy="class-status-action-title"
+        className="max-w-lg p-5"
+        isOpen={selectedOperation !== null}
+        onClose={closeDialog}
+        returnFocusRef={triggerRef}
+      >
+        {selectedOperation ? (
           <form
-            className="w-full max-w-lg space-y-5 rounded-lg border border-hairline bg-white p-5 shadow-xl"
+            className="space-y-5"
             onSubmit={handleSubmit}
           >
             <div>
-              <h2 className="text-lg font-semibold text-ink">
+              <h2 className="text-section-title font-semibold text-text-strong" id="class-status-action-title">
                 {getDialogTitle(
                   selectedOperation.targetStatus,
                 )}
@@ -222,7 +229,7 @@ export function ClassStatusActions({
                 {className}
               </p>
 
-              <p className="mt-3 text-sm text-ink-muted">
+              <p className="mt-3 text-secondary text-text-muted" id="class-status-action-description">
                 {selectedOperation.description}
               </p>
             </div>
@@ -247,7 +254,7 @@ export function ClassStatusActions({
 
               {actionState.fieldErrors
                 ?.reason?.[0] ? (
-                <span className="text-xs font-medium text-red-600">
+                <span className="text-xs font-medium text-danger">
                   {
                     actionState.fieldErrors
                       .reason[0]
@@ -261,8 +268,8 @@ export function ClassStatusActions({
                 aria-live="polite"
                 className={
                   actionState.status === "error"
-                    ? "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                    : "rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
+                    ? "rounded-md border border-danger-border bg-danger-bg p-3 text-sm text-danger"
+                    : "rounded-md border border-success-border bg-success-bg p-3 text-sm text-success"
                 }
               >
                 {actionState.message}
@@ -292,8 +299,8 @@ export function ClassStatusActions({
               </Button>
             </div>
           </form>
-        </div>
-      ) : null}
+        ) : null}
+      </Dialog>
     </>
   );
 }

@@ -2,9 +2,14 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getAcademicYearManagementData } from "@/features/classes/academic-year-data";
 import { ClassFormPage } from "@/features/classes/management/class-form-page";
+import { getClassDirectoryQuery } from "@/features/classes/class-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
-export default async function CreateClassRoute() {
+interface CreateClassRouteProps { searchParams: Promise<Record<string, string | string[] | undefined>>; }
+
+export default async function CreateClassRoute({ searchParams }: CreateClassRouteProps) {
+  const resolvedSearchParams = await searchParams;
+  const directoryQuery = getClassDirectoryQuery(new URLSearchParams(Object.entries(resolvedSearchParams).flatMap(([key, value]) => typeof value === "string" ? [[key, value]] : [])));
   const permissionResult =
     await getCachedDatabasePermissions();
 
@@ -65,6 +70,7 @@ export default async function CreateClassRoute() {
   return (
     <ClassFormPage
       academicYears={openAcademicYears}
+      directoryQuery={directoryQuery}
     />
   );
 }

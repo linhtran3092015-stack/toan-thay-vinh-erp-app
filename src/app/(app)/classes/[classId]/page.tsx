@@ -2,6 +2,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { ClassDetailPage } from "@/features/classes/class-detail-page";
+import { getClassDirectoryQuery } from "@/features/classes/class-directory-url-state";
 import { getClassDetail } from "@/features/classes/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -9,6 +10,7 @@ interface ClassDetailRouteProps {
   params: Promise<{
     classId: string;
   }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 const UUID_PATTERN =
@@ -16,8 +18,13 @@ const UUID_PATTERN =
 
 export default async function ClassDetailRoute({
   params,
+  searchParams,
 }: ClassDetailRouteProps) {
   const { classId } = await params;
+  const resolvedSearchParams = await searchParams;
+  const directoryQuery = getClassDirectoryQuery(new URLSearchParams(
+    Object.entries(resolvedSearchParams).flatMap(([key, value]) => typeof value === "string" ? [[key, value]] : []),
+  ));
   const permissionResult =
     await getCachedDatabasePermissions();
 
@@ -96,6 +103,7 @@ export default async function ClassDetailRoute({
       canEditClass={canEditClass}
       canManageSchedule={canManageSchedule}
       canViewStudentCount={canViewStudentCount}
+      directoryQuery={directoryQuery}
       detail={detailResult.detail}
     />
   );

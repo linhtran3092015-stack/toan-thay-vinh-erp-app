@@ -3,11 +3,13 @@
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import {
+  useRef,
   useState,
   useTransition,
 } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { endClassScheduleAction } from "@/features/classes/actions/class-schedule-actions";
 import type { ClassManagementActionState } from "@/features/classes/forms/class-action-types";
 import { initialClassManagementActionState } from "@/features/classes/forms/class-action-types";
@@ -23,7 +25,7 @@ interface EndScheduleFormValues {
 }
 
 const inputClassName =
-  "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-slate-100";
+  "min-h-11 w-full rounded-md border border-hairline bg-surface-base px-3 text-sm font-normal text-ink outline-none transition focus:border-action-primary focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
 
 function getVietnamBusinessDate(): string {
   const parts = new Intl.DateTimeFormat(
@@ -78,6 +80,7 @@ export function ClassScheduleEndAction({
 
   const [isOpen, setIsOpen] =
     useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const [isPending, startTransition] =
     useTransition();
@@ -148,6 +151,7 @@ export function ClassScheduleEndAction({
         className="w-full"
         disabled={!canEndToday}
         onClick={openDialog}
+        ref={triggerRef}
         type="button"
         variant="ghost"
       >
@@ -157,28 +161,24 @@ export function ClassScheduleEndAction({
       </Button>
 
       {!canEndToday ? (
-        <p className="text-xs text-amber-700">
+        <p className="text-xs text-warning">
           Lịch chưa đến ngày bắt đầu nên chưa
           thể kết thúc.
         </p>
       ) : null}
 
-      {isOpen ? (
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4"
-          role="dialog"
-        >
+      <Dialog ariaDescribedBy="end-schedule-description" ariaLabelledBy="end-schedule-title" className="max-w-lg p-5" isOpen={isOpen} onClose={closeDialog} returnFocusRef={triggerRef}>
+        {isOpen ? (
           <form
-            className="w-full max-w-lg space-y-5 rounded-lg border border-hairline bg-white p-5 shadow-xl"
+            className="space-y-5"
             onSubmit={handleSubmit}
           >
             <div>
-              <h2 className="text-lg font-semibold text-ink">
+              <h2 className="text-section-title font-semibold text-text-strong" id="end-schedule-title">
                 Kết thúc lịch học
               </h2>
 
-              <p className="mt-1 text-sm text-ink-muted">
+              <p className="mt-1 text-secondary text-text-muted" id="end-schedule-description">
                 Lịch sẽ ngừng hiệu lực và được
                 giữ nguyên trong lịch sử. Thao
                 tác này không tạo lịch thay thế.
@@ -214,7 +214,7 @@ export function ClassScheduleEndAction({
 
               {actionState.fieldErrors
                 ?.effectiveTo?.[0] ? (
-                <span className="text-xs font-medium text-red-600">
+                <span className="text-xs font-medium text-danger">
                   {
                     actionState.fieldErrors
                       .effectiveTo[0]
@@ -245,7 +245,7 @@ export function ClassScheduleEndAction({
 
               {actionState.fieldErrors
                 ?.reason?.[0] ? (
-                <span className="text-xs font-medium text-red-600">
+                <span className="text-xs font-medium text-danger">
                   {
                     actionState.fieldErrors
                       .reason[0]
@@ -259,8 +259,8 @@ export function ClassScheduleEndAction({
                 aria-live="polite"
                 className={
                   actionState.status === "error"
-                    ? "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                    : "rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
+                    ? "rounded-md border border-danger-border bg-danger-bg p-3 text-sm text-danger"
+                    : "rounded-md border border-success-border bg-success-bg p-3 text-sm text-success"
                 }
               >
                 {actionState.message}
@@ -291,8 +291,8 @@ export function ClassScheduleEndAction({
               </Button>
             </div>
           </form>
-        </div>
-      ) : null}
+        ) : null}
+      </Dialog>
     </>
   );
 }

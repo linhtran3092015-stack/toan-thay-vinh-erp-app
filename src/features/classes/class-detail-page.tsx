@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/patterns/page-header";
 import {
   Card,
   CardContent,
@@ -23,6 +24,7 @@ interface ClassDetailPageProps {
   canManageSchedule: boolean;
   canViewStudentCount: boolean;
   detail: ClassDetailReadModel;
+  directoryQuery?: string;
 }
 
 export function ClassDetailPage({
@@ -30,6 +32,7 @@ export function ClassDetailPage({
   canManageSchedule,
   canViewStudentCount,
   detail,
+  directoryQuery = "",
 }: ClassDetailPageProps) {
   const activeSchedules = detail.schedules.filter(
     (schedule) => schedule.isActive,
@@ -58,13 +61,13 @@ export function ClassDetailPage({
 
   return (
     <div className="grid min-w-0 gap-4">
-      <section className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card md:p-5">
-        <nav className="mb-4 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+      <section className="grid gap-4">
+        <nav aria-label="Điều hướng lớp học" className="flex flex-wrap items-center gap-2 text-secondary text-text-muted">
           <Link
-            className="font-semibold text-primary hover:underline"
-            href="/classes"
+            className="font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+            href={directoryQuery ? `/classes?${directoryQuery}` : "/classes"}
           >
-            Lớp học &amp; Lịch học
+            Lớp học
           </Link>
           <span>/</span>
           <span className="font-semibold text-ink">
@@ -72,98 +75,19 @@ export function ClassDetailPage({
           </span>
         </nav>
 
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold text-ink md:text-3xl">
-                {detail.name}
-              </h1>
-
-              <Badge tone={classStatus.tone}>
-                {classStatus.label}
-              </Badge>
-            </div>
-
-            <p className="mt-2 font-mono text-sm font-semibold text-ink-muted">
+        <PageHeader
+          context={<Badge tone={classStatus.tone}>{classStatus.label}</Badge>}
+          title={detail.name}
+          actions={canEditClass ? <div className="flex flex-wrap items-center gap-2">
+              {["draft", "active"].includes(detail.status) ? <Link className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-border-subtle bg-surface-base px-4 text-control font-semibold text-text-strong hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={`/classes/${detail.id}/edit${directoryQuery ? `?${directoryQuery}` : ""}`}>Chỉnh sửa lớp</Link> : null}
+              <ClassStatusActions classCode={detail.code} classId={detail.id} className={detail.name} status={detail.status} />
+            </div> : undefined}
+        >
+          <p className="mt-1 font-mono text-secondary font-semibold text-text-muted">
               {detail.code}
             </p>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Badge tone="info">
-                Khối {detail.grade}
-              </Badge>
-
-              <Badge
-                tone={
-                  detail.level === "CLC"
-                    ? "purple"
-                    : "neutral"
-                }
-              >
-                Mức {detail.level}
-              </Badge>
-
-              <ModeBadge mode={detail.defaultLearningMode} />
-
-              {detail.academicYear ? (
-                <Badge tone="neutral">
-                  Năm học {detail.academicYear.code}
-                </Badge>
-              ) : null}
-            </div>
-          </div>
-
-          {canEditClass ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {["draft", "active"].includes(
-                detail.status,
-              ) ? (
-                <Link
-                  className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink transition hover:bg-surface-2"
-                  href={`/classes/${detail.id}/edit`}
-                >
-                  Chỉnh sửa lớp
-                </Link>
-              ) : null}
-
-              <ClassStatusActions
-                classCode={detail.code}
-                classId={detail.id}
-                className={detail.name}
-                status={detail.status}
-              />
-            </div>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          label="Số buổi mỗi tuần"
-          value={String(detail.weeklySessionCount)}
-        />
-
-        <SummaryCard
-          label="Lịch đang hiệu lực"
-          value={String(detail.activeScheduleCount)}
-        />
-
-        <SummaryCard
-          label="Học viên đang học"
-          value={
-            canViewStudentCount
-              ? String(detail.activeStudentCount ?? 0)
-              : "Không có quyền"
-          }
-        />
-
-        <SummaryCard
-          label="Năm học"
-          value={
-            detail.academicYear?.code ??
-            "Chưa xác định"
-          }
-        />
+          <p className="mt-2 text-secondary text-text-muted">Khối {detail.grade} · Mức {detail.level} · {formatMode(detail.defaultLearningMode)}{detail.academicYear ? ` · ${detail.academicYear.code}` : ""}</p>
+        </PageHeader>
       </section>
 
       <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
@@ -253,7 +177,7 @@ export function ClassDetailPage({
                   }
                 />
               ) : canManageSchedule ? (
-                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                <div className="rounded-md border border-warning-border bg-warning-bg p-3 text-sm text-warning">
                   {detail.status !== "active"
                     ? "Cần kích hoạt lớp trước khi thiết lập lịch học."
                     : detail.academicYear?.status !==
@@ -376,12 +300,13 @@ export function ClassDetailPage({
             <CardContent>
               {detail.classinUrl ? (
                 <a
+                  aria-label="Mở lớp trên ClassIn, mở trong thẻ mới"
                   className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-primary transition hover:border-secondary hover:bg-canvas"
                   href={detail.classinUrl}
                   rel="noopener noreferrer"
                   target="_blank"
                 >
-                  Mở lớp trên ClassIn
+                  Mở lớp trên ClassIn (thẻ mới)
                 </a>
               ) : (
                 <NoticeText>
@@ -531,26 +456,6 @@ function ScheduleCard({
         </p>
       ) : null}
     </article>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
-      <p className="text-xl font-bold text-ink">
-        {value}
-      </p>
-
-      <p className="mt-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-subtle">
-        {label}
-      </p>
-    </div>
   );
 }
 

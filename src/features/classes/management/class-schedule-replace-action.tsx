@@ -3,11 +3,13 @@
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import {
+  useRef,
   useState,
   useTransition,
 } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { replaceClassScheduleAction } from "@/features/classes/actions/class-schedule-actions";
 import type { ClassManagementActionState } from "@/features/classes/forms/class-action-types";
 import { initialClassManagementActionState } from "@/features/classes/forms/class-action-types";
@@ -42,7 +44,7 @@ const WEEKDAY_OPTIONS = [
 ] as const;
 
 const inputClassName =
-  "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-slate-100";
+  "min-h-11 w-full rounded-md border border-hairline bg-surface-base px-3 text-sm font-normal text-ink outline-none transition focus:border-action-primary focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
 
 function getVietnamBusinessDate(): string {
   const parts = new Intl.DateTimeFormat(
@@ -104,6 +106,7 @@ export function ClassScheduleReplaceAction({
     schedule.effectiveFrom < businessDate;
 
   const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const [isPending, startTransition] =
     useTransition();
@@ -195,6 +198,7 @@ export function ClassScheduleReplaceAction({
         className="w-full"
         disabled={!canReplaceToday}
         onClick={openDialog}
+        ref={triggerRef}
         type="button"
         variant="outline"
       >
@@ -204,28 +208,24 @@ export function ClassScheduleReplaceAction({
       </Button>
 
       {!canReplaceToday ? (
-        <p className="mt-2 text-xs text-amber-700">
+        <p className="mt-2 text-xs text-warning">
           Lịch bắt đầu hôm nay nên chưa thể thay thế.
           Có thể thực hiện từ ngày mai theo giờ Việt Nam.
         </p>
       ) : null}
 
-      {isOpen ? (
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-4"
-          role="dialog"
-        >
+      <Dialog ariaDescribedBy="replace-schedule-description" ariaLabelledBy="replace-schedule-title" className="max-w-2xl p-5" isOpen={isOpen} onClose={closeDialog} returnFocusRef={triggerRef}>
+        {isOpen ? (
           <form
-            className="my-auto grid w-full max-w-2xl gap-5 rounded-lg border border-hairline bg-white p-5 shadow-xl"
+            className="grid gap-5"
             onSubmit={handleSubmit}
           >
             <div>
-              <h2 className="text-lg font-semibold text-ink">
+              <h2 className="text-section-title font-semibold text-text-strong" id="replace-schedule-title">
                 Thay đổi lịch học
               </h2>
 
-              <p className="mt-1 text-sm text-ink-muted">
+              <p className="mt-1 text-secondary text-text-muted" id="replace-schedule-description">
                 Lịch cũ sẽ được kết thúc và giữ
                 nguyên trong lịch sử. Hệ thống sẽ
                 tạo một lịch mới thay thế.
@@ -446,8 +446,8 @@ export function ClassScheduleReplaceAction({
                 aria-live="polite"
                 className={
                   actionState.status === "error"
-                    ? "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                    : "rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
+                    ? "rounded-md border border-danger-border bg-danger-bg p-3 text-sm text-danger"
+                    : "rounded-md border border-success-border bg-success-bg p-3 text-sm text-success"
                 }
               >
                 {actionState.message}
@@ -477,8 +477,8 @@ export function ClassScheduleReplaceAction({
               </Button>
             </div>
           </form>
-        </div>
-      ) : null}
+        ) : null}
+      </Dialog>
     </>
   );
 }
@@ -511,7 +511,7 @@ function FormField({
       {children}
 
       {error ? (
-        <span className="text-xs font-medium text-red-600">
+        <span className="text-xs font-medium text-danger">
           {error}
         </span>
       ) : null}

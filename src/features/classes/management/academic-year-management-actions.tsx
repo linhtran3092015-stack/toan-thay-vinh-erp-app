@@ -3,11 +3,13 @@
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import {
+  useRef,
   useState,
   useTransition,
 } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import {
   activateAcademicYearAction,
   changeAcademicYearStatusAction,
@@ -36,7 +38,7 @@ type StatusOperation =
   | AcademicYearTargetStatus;
 
 const inputClassName =
-  "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-slate-100";
+  "min-h-11 w-full rounded-md border border-hairline bg-surface-base px-3 text-sm font-normal text-ink outline-none transition focus:border-action-primary focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
 
 export function CreateAcademicYearForm({
   disabled = false,
@@ -210,6 +212,7 @@ export function AcademicYearStatusActions({
 
   const [operation, setOperation] =
     useState<StatusOperation | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const [reason, setReason] = useState("");
 
@@ -290,9 +293,10 @@ export function AcademicYearStatusActions({
             !academicYear.isCurrent)) ? (
           <Button
             disabled={disabled}
-            onClick={() =>
-              openDialog("activate")
-            }
+            onClick={(event) => {
+              triggerRef.current = event.currentTarget;
+              openDialog("activate");
+            }}
             type="button"
             variant="secondary"
           >
@@ -304,9 +308,10 @@ export function AcademicYearStatusActions({
         academicYear.status === "active" ? (
           <Button
             disabled={disabled}
-            onClick={() =>
-              openDialog("closed")
-            }
+            onClick={(event) => {
+              triggerRef.current = event.currentTarget;
+              openDialog("closed");
+            }}
             type="button"
             variant="ghost"
           >
@@ -318,9 +323,10 @@ export function AcademicYearStatusActions({
         academicYear.status === "closed" ? (
           <Button
             disabled={disabled}
-            onClick={() =>
-              openDialog("archived")
-            }
+            onClick={(event) => {
+              triggerRef.current = event.currentTarget;
+              openDialog("archived");
+            }}
             type="button"
             variant="ghost"
           >
@@ -329,18 +335,14 @@ export function AcademicYearStatusActions({
         ) : null}
       </div>
 
-      {operation ? (
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4"
-          role="dialog"
-        >
+      <Dialog ariaDescribedBy="academic-year-status-description" ariaLabelledBy="academic-year-status-title" className="max-w-lg p-5" isOpen={operation !== null} onClose={closeDialog} returnFocusRef={triggerRef}>
+        {operation ? (
           <form
-            className="w-full max-w-lg space-y-5 rounded-lg border border-hairline bg-white p-5 shadow-xl"
+            className="space-y-5"
             onSubmit={handleSubmit}
           >
             <div>
-              <h2 className="text-lg font-semibold text-ink">
+              <h2 className="text-section-title font-semibold text-text-strong" id="academic-year-status-title">
                 {getOperationTitle(operation)}
               </h2>
 
@@ -350,7 +352,7 @@ export function AcademicYearStatusActions({
                 {academicYear.name}
               </p>
 
-              <p className="mt-3 text-sm text-ink-muted">
+              <p className="mt-3 text-secondary text-text-muted" id="academic-year-status-description">
                 {getOperationDescription(
                   operation,
                 )}
@@ -411,8 +413,8 @@ export function AcademicYearStatusActions({
               </Button>
             </div>
           </form>
-        </div>
-      ) : null}
+        ) : null}
+      </Dialog>
     </>
   );
 }
@@ -483,7 +485,7 @@ function FormField({
       {children}
 
       {error ? (
-        <span className="text-xs font-medium text-red-600">
+        <span className="text-xs font-medium text-danger">
           {error}
         </span>
       ) : null}
@@ -501,8 +503,8 @@ function ActionMessage({
       aria-live="polite"
       className={
         state.status === "error"
-          ? "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-          : "rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
+          ? "rounded-md border border-danger-border bg-danger-bg p-3 text-sm text-danger"
+          : "rounded-md border border-success-border bg-success-bg p-3 text-sm text-success"
       }
     >
       {state.message}
