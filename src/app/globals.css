@@ -219,6 +219,41 @@
   --radius-pill: var(--radius-full);
 }
 
+/* Wave 3 Students: the available work area, not a device label, selects the
+   dense filters/table or the filter drawer/record-list presentation. */
+.students-directory {
+  container-type: inline-size;
+}
+
+.students-filter-bar,
+.students-directory-table {
+  display: none;
+}
+
+.students-directory-record-list {
+  display: grid;
+}
+
+.students-filter-trigger {
+  display: inline-flex;
+}
+
+@container (min-width: 1120px) {
+  .students-filter-bar,
+  .students-directory-table {
+    display: block;
+  }
+
+  .students-filter-trigger,
+  .students-directory-record-list {
+    display: none;
+  }
+
+  .students-filter-fields {
+    grid-template-columns: minmax(260px, 1.5fr) repeat(5, minmax(132px, 1fr)) auto;
+  }
+}
+
 .dark, [data-theme="dark"] {
   --background: oklch(0.14 0.02 260);
   --foreground: oklch(0.94 0.01 250);

@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
+import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { Button } from "@/components/ui/button";
 import { StudentFilters } from "./components/student-filters";
 import { StudentListEmptyState } from "./components/student-list-empty-state";
@@ -13,10 +15,19 @@ import type {
   StudentDirectoryItem,
 } from "./read-models";
 import {
-  defaultStudentFilters,
   filterStudents,
+  hasActiveStudentFilters,
+  countActiveStudentFilters,
   paginateStudents,
 } from "./student-filters";
+import {
+  areStudentDirectoryFiltersEqual,
+  getStudentDirectoryHref,
+  getStudentDirectoryQuery,
+  mergePendingStudentDirectoryFilter,
+  parseStudentDirectoryViewState,
+  resetStudentDirectoryViewState,
+} from "./student-directory-url-state";
 
 interface StudentListPageProps {
   canCreateStudent?: boolean;
@@ -27,93 +38,153 @@ export function StudentListPage({
   canCreateStudent = false,
   students,
 }: StudentListPageProps) {
-  const [filters, setFilters] =
-    useState<StudentDirectoryFiltersState>(
-      defaultStudentFilters,
-    );
-  const [page, setPage] = useState(1);
-  const [isMobileFiltersOpen, setIsMobileFiltersOpen] =
-    useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+  const filterTriggerRef = useRef<HTMLButtonElement>(null);
+  const pendingFiltersRef = useRef<StudentDirectoryFiltersState | null>(null);
 
   const classNames = useMemo(
     () =>
       Array.from(
         new Set(
           students
-            .map(
-              (student) =>
-                student.activeEnrollment?.classInfo?.name,
-            )
+            .map((student) => student.activeEnrollment?.classInfo?.name)
             .filter(
               (value): value is string =>
-                typeof value === "string" &&
-                value.length > 0,
+                typeof value === "string" && value.length > 0,
             ),
         ),
-      ).sort((left, right) =>
-        left.localeCompare(right, "vi"),
-      ),
+      ).sort((left, right) => left.localeCompare(right, "vi")),
     [students],
   );
 
+  const viewState = useMemo(
+    () => parseStudentDirectoryViewState(searchParams, classNames),
+    [classNames, searchParams],
+  );
+
+  useEffect(() => {
+    if (
+      pendingFiltersRef.current === null ||
+      areStudentDirectoryFiltersEqual(
+        pendingFiltersRef.current,
+        viewState.filters,
+      )
+    ) {
+      pendingFiltersRef.current = viewState.filters;
+    }
+  }, [viewState.filters]);
+
   const filteredStudents = useMemo(
-    () => filterStudents(students, filters),
-    [filters, students],
+    () => filterStudents(students, viewState.filters),
+    [students, viewState.filters],
   );
 
   const pagination = useMemo(
-    () => paginateStudents(filteredStudents, page),
-    [filteredStudents, page],
+    () => paginateStudents(filteredStudents, viewState.page),
+    [filteredStudents, viewState.page],
   );
 
-  const handleFiltersChange = (
-    nextFilters: StudentDirectoryFiltersState,
+  const updateFilter = (
+    key: keyof StudentDirectoryFiltersState,
+    value: string,
   ) => {
-    setPage(1);
-    setFilters(nextFilters);
+    const filters = mergePendingStudentDirectoryFilter(
+      pendingFiltersRef.current,
+      viewState.filters,
+      key,
+      value,
+    );
+    pendingFiltersRef.current = filters;
+
+    router.replace(
+      getStudentDirectoryHref(searchParams, { filters, page: 1 }),
+      { scroll: false },
+    );
   };
 
+  const resetFilters = () => {
+    const viewState = resetStudentDirectoryViewState();
+    pendingFiltersRef.current = viewState.filters;
+
+    router.replace(getStudentDirectoryHref(searchParams, viewState), {
+      scroll: false,
+    });
+  };
+
+  const updatePage = (page: number) => {
+    router.push(
+      getStudentDirectoryHref(searchParams, {
+        filters: viewState.filters,
+        page,
+      }),
+      { scroll: false },
+    );
+  };
+
+  const directoryQuery = getStudentDirectoryQuery(searchParams);
+  const activeFilterCount = countActiveStudentFilters(viewState.filters);
+  const createHref = directoryQuery
+    ? `/students/new?${directoryQuery}`
+    : "/students/new";
+
   return (
-    <div className="grid gap-4">
+    <div className="students-directory grid gap-6">
       <StudentListToolbar
+        activeFilterCount={activeFilterCount}
         canCreateStudent={canCreateStudent}
-        onOpenFilters={() =>
-          setIsMobileFiltersOpen(true)
-        }
+        createHref={createHref}
+        filterButtonRef={filterTriggerRef}
+        onOpenFilters={() => setIsMobileFiltersOpen(true)}
         resultCount={filteredStudents.length}
         totalCount={students.length}
       />
 
       <StudentFilters
+        activeFilterCount={activeFilterCount}
         classNames={classNames}
-        filters={filters}
+        filters={viewState.filters}
         isMobileOpen={isMobileFiltersOpen}
-        onChange={handleFiltersChange}
-        onCloseMobile={() =>
-          setIsMobileFiltersOpen(false)
-        }
+        onFilterChange={updateFilter}
+        onCloseMobile={() => setIsMobileFiltersOpen(false)}
+        onReset={resetFilters}
+        returnFocusRef={filterTriggerRef}
       />
 
       {filteredStudents.length === 0 ? (
-        <StudentListEmptyState />
+        <StudentListEmptyState
+          hasActiveFilters={hasActiveStudentFilters(viewState.filters)}
+        />
       ) : (
         <>
-          <StudentTable students={pagination.rows} />
-
-          <div className="grid gap-3 lg:hidden">
-            {pagination.rows.map((student) => (
-              <StudentMobileCard
-                key={student.id}
-                student={student}
-              />
-            ))}
+          <div className="students-directory-results">
+            <p aria-live="polite" className="mb-3 text-secondary text-text-muted">
+              Hiển thị {pagination.start}-{pagination.end} của {filteredStudents.length} học viên
+            </p>
+            <StudentTable
+              directoryQuery={directoryQuery}
+              students={pagination.rows}
+            />
+            <ResponsiveRecordList
+              className="students-directory-record-list"
+              label="Danh sách học viên"
+            >
+              {pagination.rows.map((student) => (
+                <StudentMobileCard
+                  directoryQuery={directoryQuery}
+                  key={student.id}
+                  student={student}
+                />
+              ))}
+            </ResponsiveRecordList>
           </div>
 
           <StudentPagination
             end={pagination.end}
+            onPageChange={updatePage}
             page={pagination.page}
             pageCount={pagination.pageCount}
-            setPage={setPage}
             start={pagination.start}
             total={filteredStudents.length}
           />
@@ -125,37 +196,37 @@ export function StudentListPage({
 
 interface StudentPaginationProps {
   end: number;
+  onPageChange: (page: number) => void;
   page: number;
   pageCount: number;
-  setPage: (page: number) => void;
   start: number;
   total: number;
 }
 
 function StudentPagination({
   end,
+  onPageChange,
   page,
   pageCount,
-  setPage,
   start,
   total,
 }: StudentPaginationProps) {
-  const pages = Array.from({
-    length: pageCount,
-  }).map((_, index) => index + 1);
+  const pages = Array.from({ length: pageCount }, (_, index) => index + 1);
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 px-4 py-3 text-sm shadow-card md:flex-row md:items-center md:justify-between">
-      <p className="text-ink-muted">
-        Hiển thị {start}-{end} của {total} học viên ·
-        Trang {page}/{pageCount}
+    <nav
+      aria-label="Phân trang học viên"
+      className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-base px-4 py-3 text-body text-text-muted md:flex-row md:items-center md:justify-between"
+    >
+      <p>
+        Hiển thị {start}-{end} của {total} học viên · Trang {page}/{pageCount}
       </p>
 
       <div className="flex flex-wrap gap-2">
         <Button
           className="min-h-11"
           disabled={page <= 1}
-          onClick={() => setPage(page - 1)}
+          onClick={() => onPageChange(page - 1)}
           variant="outline"
         >
           Trước
@@ -163,12 +234,11 @@ function StudentPagination({
 
         {pages.map((pageNumber) => (
           <Button
+            aria-current={pageNumber === page ? "page" : undefined}
             className="min-h-11 min-w-11"
             key={pageNumber}
-            onClick={() => setPage(pageNumber)}
-            variant={
-              pageNumber === page ? "secondary" : "ghost"
-            }
+            onClick={() => onPageChange(pageNumber)}
+            variant={pageNumber === page ? "secondary" : "ghost"}
           >
             {pageNumber}
           </Button>
@@ -177,12 +247,12 @@ function StudentPagination({
         <Button
           className="min-h-11"
           disabled={page >= pageCount}
-          onClick={() => setPage(page + 1)}
+          onClick={() => onPageChange(page + 1)}
           variant="outline"
         >
           Sau
         </Button>
       </div>
-    </div>
+    </nav>
   );
 }

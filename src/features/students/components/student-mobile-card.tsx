@@ -1,106 +1,48 @@
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
 import { StudentStatusBadge } from "@/features/students/components/student-status-badge";
 import { getStudentDetailHref } from "@/features/students/detail/helpers";
 import type { StudentDirectoryItem } from "@/features/students/read-models";
 
 interface StudentMobileCardProps {
+  directoryQuery: string;
   student: StudentDirectoryItem;
 }
 
-export function StudentMobileCard({
-  student,
-}: StudentMobileCardProps) {
+export function StudentMobileCard({ directoryQuery, student }: StudentMobileCardProps) {
   const classInfo = student.activeEnrollment?.classInfo;
-  const registeredMode =
-    student.activeEnrollment?.registeredMode ??
-    student.registeredMode;
+  const registeredMode = student.activeEnrollment?.registeredMode ?? student.registeredMode;
+  const learningLevel = classInfo?.level ?? student.learningLevel;
+  const detailHref = getStudentDetailHref(student, directoryQuery);
 
   return (
-    <article className="rounded-xl border border-hairline bg-surface-1 p-4 shadow-card transition-all active:scale-[0.99]">
+    <article className="rounded-lg border border-border-subtle bg-surface-base px-4 py-3" role="listitem">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <Link
-            className="block truncate font-display text-base font-bold text-primary hover:underline"
-            href={getStudentDetailHref(student)}
+            className="block text-body font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+            href={detailHref}
           >
             {student.fullName}
           </Link>
-          <p className="mt-0.5 font-mono text-xs font-semibold text-ink-muted">
-            {student.publicCode}
-          </p>
+          <p className="mt-0.5 tabular-nums text-caption text-text-muted">{student.publicCode}</p>
         </div>
-
-        <StudentStatusBadge
-          status={student.lifecycleStatus}
-        />
+        <StudentStatusBadge status={student.lifecycleStatus} />
       </div>
 
-      <div className="mt-4 grid gap-2.5 rounded-lg bg-surface-2 p-3 text-xs">
-        <InfoLine
-          label="Lớp"
-          value={
-            classInfo
-              ? `Khối ${student.currentGrade} · ${classInfo.name}`
-              : `Khối ${student.currentGrade} · Chưa xếp lớp`
-          }
-        />
-
-        <InfoLine
-          label="Phụ huynh"
-          value={
-            student.primaryGuardian
-              ? `${student.primaryGuardian.fullName} (${student.primaryGuardian.phone})`
-              : "Chưa liên kết"
-          }
-        />
-
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-ink-muted">Hình thức</span>
-          {registeredMode ? (
-            <Badge
-              tone={
-                registeredMode === "online"
-                  ? "purple"
-                  : "info"
-              }
-            >
-              {registeredMode === "online"
-                ? "Online"
-                : "Offline"}
-            </Badge>
-          ) : (
-            <span className="font-semibold text-ink">
-              Chưa xác định
-            </span>
-          )}
-        </div>
+      <div className="mt-3 grid gap-1.5 text-secondary text-text-muted">
+        <p>Khối {student.currentGrade}{learningLevel ? ` · Mức ${learningLevel}` : ""}{registeredMode ? ` · ${registeredMode === "online" ? "Online" : "Offline"}` : ""}</p>
+        <p><span className="font-medium text-text-default">Lớp:</span> {classInfo?.name ?? "Chưa xếp lớp"}</p>
+        <p><span className="font-medium text-text-default">Phụ huynh:</span> {student.primaryGuardian ? `${student.primaryGuardian.fullName} · ${student.primaryGuardian.phone}` : "Chưa liên kết"}</p>
       </div>
 
       <Link
-        className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-hairline bg-surface-1 px-4 text-xs font-bold text-ink transition-colors hover:border-hairline-strong hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 active:scale-[0.98]"
-        href={getStudentDetailHref(student)}
+        aria-label={`Mở hồ sơ học viên ${student.fullName}`}
+        className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-border-subtle px-4 text-control font-semibold text-action-link hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+        href={detailHref}
       >
-        Xem hồ sơ học viên ➔
+        Mở hồ sơ học viên
       </Link>
     </article>
-  );
-}
-
-function InfoLine({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <span className="text-ink-muted">{label}</span>
-      <span className="text-right font-semibold text-ink">
-        {value}
-      </span>
-    </div>
   );
 }

@@ -1,48 +1,53 @@
 "use client";
 
-import type { ChangeEvent, ReactNode } from "react";
+import type { ChangeEvent, ReactNode, RefObject } from "react";
+import { X } from "lucide-react";
 
+import { FilterBar } from "@/components/patterns/filter-bar";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { StudentDirectoryFiltersState } from "@/features/students/read-models";
 import {
-  defaultStudentFilters,
   hasActiveStudentFilters,
   studentStatusOptions,
 } from "@/features/students/student-filters";
-import { cn } from "@/lib/utils";
 
 interface StudentFiltersProps {
+  activeFilterCount: number;
   classNames: string[];
   filters: StudentDirectoryFiltersState;
   isMobileOpen: boolean;
-  onChange: (filters: StudentDirectoryFiltersState) => void;
+  onFilterChange: (
+    key: keyof StudentDirectoryFiltersState,
+    value: string,
+  ) => void;
   onCloseMobile: () => void;
+  onReset: () => void;
+  returnFocusRef: RefObject<HTMLElement | null>;
 }
 
 export function StudentFilters({
+  activeFilterCount,
   classNames,
   filters,
   isMobileOpen,
-  onChange,
+  onFilterChange,
   onCloseMobile,
+  onReset,
+  returnFocusRef,
 }: StudentFiltersProps) {
   const updateFilter = (
     key: keyof StudentDirectoryFiltersState,
-    event: ChangeEvent<
-      HTMLInputElement | HTMLSelectElement
-    >,
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    onChange({
-      ...filters,
-      [key]: event.target.value,
-    });
+    onFilterChange(key, event.target.value);
   };
 
   const fields = (scope: "desktop" | "mobile") => (
     <FilterFields
       classNames={classNames}
       filters={filters}
-      onReset={() => onChange(defaultStudentFilters)}
+      onReset={onReset}
       onUpdate={updateFilter}
       scope={scope}
     />
@@ -50,53 +55,39 @@ export function StudentFilters({
 
   return (
     <>
-      <section className="hidden rounded-lg border border-hairline bg-surface-1 p-4 shadow-card lg:block">
-        {fields("desktop")}
-      </section>
+      <FilterBar className="students-filter-bar">{fields("desktop")}</FilterBar>
 
-      <div
-        className={cn(
-          "fixed inset-0 z-50 bg-ink/[0.35] transition-opacity lg:hidden",
-          isMobileOpen
-            ? "pointer-events-auto opacity-100"
-            : "pointer-events-none opacity-0",
-        )}
-        onClick={onCloseMobile}
-      />
-
-      <aside
-        aria-label="Bộ lọc học viên"
-        className={cn(
-          "fixed inset-y-0 right-0 z-50 flex w-full max-w-[360px] transform flex-col bg-surface-1 shadow-drawer transition-transform lg:hidden",
-          isMobileOpen
-            ? "translate-x-0"
-            : "translate-x-full",
-        )}
+      <Dialog
+        ariaLabelledBy="student-filter-drawer-title"
+        className="ml-auto flex h-full max-h-none max-w-[360px] flex-col rounded-none sm:max-h-[92vh] sm:rounded-xl"
+        isOpen={isMobileOpen}
+        onClose={onCloseMobile}
+        returnFocusRef={returnFocusRef}
       >
-        <div className="flex h-16 items-center justify-between border-b border-hairline px-4">
+        <div className="flex h-16 items-center justify-between border-b border-border-subtle px-4">
           <div>
-            <h2 className="text-section font-semibold text-ink">
+            <h2 className="text-section-title font-semibold text-text-strong" id="student-filter-drawer-title">
               Bộ lọc
             </h2>
-            <p className="text-xs text-ink-muted">
-              Lọc trên dữ liệu Supabase
+            <p className="text-caption text-text-muted">
+              {activeFilterCount > 0
+                ? `${activeFilterCount} bộ lọc đang áp dụng`
+                : "Lọc danh sách học viên hiện có"}
             </p>
           </div>
 
           <button
             aria-label="Đóng bộ lọc"
-            className="flex h-11 w-11 items-center justify-center rounded-md text-2xl text-ink-muted hover:bg-canvas hover:text-ink"
+            className="flex h-11 w-11 items-center justify-center rounded-md text-text-muted hover:bg-interactive-hover hover:text-text-strong focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
             onClick={onCloseMobile}
             type="button"
           >
-            ×
+            <X aria-hidden="true" size={20} strokeWidth={1.8} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
-          {fields("mobile")}
-        </div>
-      </aside>
+        <div className="flex-1 overflow-y-auto p-4">{fields("mobile")}</div>
+      </Dialog>
     </>
   );
 }
@@ -107,9 +98,7 @@ interface FilterFieldsProps {
   onReset: () => void;
   onUpdate: (
     key: keyof StudentDirectoryFiltersState,
-    event: ChangeEvent<
-      HTMLInputElement | HTMLSelectElement
-    >,
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => void;
   scope: "desktop" | "mobile";
 }
@@ -122,11 +111,11 @@ function FilterFields({
   scope,
 }: FilterFieldsProps) {
   return (
-    <div className="grid gap-3 xl:grid-cols-[minmax(260px,1.5fr)_repeat(5,minmax(140px,1fr))_auto]">
-      <label className="grid gap-1.5 text-xs font-semibold text-ink-muted">
+    <div className="students-filter-fields grid gap-3">
+      <label className="grid gap-1.5 text-label font-medium text-text-muted">
         Tìm kiếm
         <input
-          className="h-11 rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20"
+          className="h-10 rounded-md border border-border-subtle bg-field-bg px-3 text-body text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring"
           data-testid={`${scope}-student-search`}
           onChange={(event) => onUpdate("search", event)}
           placeholder="Tên, mã, phụ huynh hoặc SĐT"
@@ -136,16 +125,14 @@ function FilterFields({
       </label>
 
       <FilterSelect
-        label="Khối"
-        onChange={(event) => onUpdate("grade", event)}
-        testId={`${scope}-student-grade`}
-        value={filters.grade}
+        label="Trạng thái"
+        onChange={(event) => onUpdate("status", event)}
+        testId={`${scope}-student-status`}
+        value={filters.status}
       >
-        <option value="all">Khối 1–12</option>
-        {Array.from({ length: 12 }).map((_, index) => (
-          <option key={index + 1} value={String(index + 1)}>
-            Khối {index + 1}
-          </option>
+        <option value="all">Tất cả</option>
+        {studentStatusOptions.map((status) => (
+          <option key={status.value} value={status.value}>{status.label}</option>
         ))}
       </FilterSelect>
 
@@ -157,31 +144,25 @@ function FilterFields({
       >
         <option value="all">Tất cả lớp</option>
         {classNames.map((className) => (
-          <option key={className} value={className}>
-            {className}
-          </option>
+          <option key={className} value={className}>{className}</option>
         ))}
       </FilterSelect>
 
       <FilterSelect
-        label="Trạng thái"
-        onChange={(event) => onUpdate("status", event)}
-        testId={`${scope}-student-status`}
-        value={filters.status}
+        label="Khối"
+        onChange={(event) => onUpdate("grade", event)}
+        testId={`${scope}-student-grade`}
+        value={filters.grade}
       >
-        <option value="all">Tất cả</option>
-        {studentStatusOptions.map((status) => (
-          <option key={status.value} value={status.value}>
-            {status.label}
-          </option>
+        <option value="all">Khối 1–12</option>
+        {Array.from({ length: 12 }).map((_, index) => (
+          <option key={index + 1} value={String(index + 1)}>Khối {index + 1}</option>
         ))}
       </FilterSelect>
 
       <FilterSelect
         label="Mức"
-        onChange={(event) =>
-          onUpdate("learningLevel", event)
-        }
+        onChange={(event) => onUpdate("learningLevel", event)}
         testId={`${scope}-student-level`}
         value={filters.learningLevel}
       >
@@ -193,9 +174,7 @@ function FilterFields({
 
       <FilterSelect
         label="Hình thức"
-        onChange={(event) =>
-          onUpdate("registeredMode", event)
-        }
+        onChange={(event) => onUpdate("registeredMode", event)}
         testId={`${scope}-student-mode`}
         value={filters.registeredMode}
       >
@@ -204,17 +183,18 @@ function FilterFields({
         <option value="offline">Offline</option>
       </FilterSelect>
 
-      <div className="flex items-end">
-        <Button
-          className="min-h-11 w-full"
-          data-testid={`${scope}-student-reset-filters`}
-          disabled={!hasActiveStudentFilters(filters)}
-          onClick={onReset}
-          variant="ghost"
-        >
-          Xóa lọc
-        </Button>
-      </div>
+      {hasActiveStudentFilters(filters) ? (
+        <div className="flex items-end">
+          <Button
+            className="min-h-10 w-full"
+            data-testid={`${scope}-student-reset-filters`}
+            onClick={onReset}
+            variant="ghost"
+          >
+            Xóa lọc
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -222,9 +202,7 @@ function FilterFields({
 interface FilterSelectProps {
   children: ReactNode;
   label: string;
-  onChange: (
-    event: ChangeEvent<HTMLSelectElement>,
-  ) => void;
+  onChange: (event: ChangeEvent<HTMLSelectElement>) => void;
   testId: string;
   value: string;
 }
@@ -237,10 +215,10 @@ function FilterSelect({
   value,
 }: FilterSelectProps) {
   return (
-    <label className="grid gap-1.5 text-xs font-semibold text-ink-muted">
+    <label className="grid gap-1.5 text-label font-medium text-text-muted">
       {label}
       <select
-        className="h-11 rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20"
+        className="h-10 rounded-md border border-border-subtle bg-field-bg px-3 text-body text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring"
         data-testid={testId}
         onChange={onChange}
         value={value}

@@ -5,18 +5,30 @@ import { getStudentDetail } from "@/features/students/data";
 import { getStudentEnrollmentUiModel } from "@/features/students/enrollment/student-enrollment-data";
 import { getStudentLedgerSummary } from "@/features/students/ledger-data";
 import { DatabaseStudentDetailPage } from "@/features/students/detail/database-student-detail-page";
+import { withStudentDirectoryQuery } from "@/features/students/student-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 interface StudentDetailRouteProps {
   params: Promise<{
     studentId: string;
   }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export default async function StudentDetailRoute({
   params,
+  searchParams,
 }: StudentDetailRouteProps) {
   const { studentId } = await params;
+  const requestedSearchParams = await searchParams;
+  const directoryParams = new URLSearchParams();
+
+  Object.entries(requestedSearchParams).forEach(([key, value]) => {
+    if (typeof value === "string") directoryParams.set(key, value);
+  });
+
+  const directoryHref = withStudentDirectoryQuery("/students", directoryParams);
+  const editHref = withStudentDirectoryQuery(`/students/${studentId}/edit`, directoryParams);
   const permissionResult =
     await getCachedDatabasePermissions();
 
@@ -113,7 +125,9 @@ export default async function StudentDetailRoute({
       canViewClasses={canViewClasses}
       canViewGuardians={canViewGuardians}
       canViewLedger={canViewLedger}
+      directoryHref={directoryHref}
       detail={detailResult.detail}
+      editHref={editHref}
       enrollmentUiModel={enrollmentUiModel}
       ledgerSummary={ledgerSummary}
     />

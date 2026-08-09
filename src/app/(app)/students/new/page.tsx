@@ -4,11 +4,22 @@ import {
   getStudentProfileFormDefaults,
 } from "@/features/students/form/student-profile-form-helpers";
 import { StudentFormPage } from "@/features/students/form/student-form-page";
+import { getStudentDirectoryQuery, withStudentDirectoryQuery } from "@/features/students/student-directory-url-state";
 import {
   getCachedDatabasePermissions,
 } from "@/lib/permissions/database-permissions";
 
-export default async function NewStudentRoute() {
+interface NewStudentRouteProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function NewStudentRoute({ searchParams }: NewStudentRouteProps) {
+  const requestedSearchParams = await searchParams;
+  const directoryParams = new URLSearchParams();
+  Object.entries(requestedSearchParams).forEach(([key, value]) => {
+    if (typeof value === "string") directoryParams.set(key, value);
+  });
+  const returnQuery = getStudentDirectoryQuery(directoryParams);
   const permissionResult =
     await getCachedDatabasePermissions();
 
@@ -36,11 +47,12 @@ export default async function NewStudentRoute() {
 
   return (
     <StudentFormPage
-      cancelHref="/students"
+      cancelHref={withStudentDirectoryQuery("/students", directoryParams)}
       defaultValues={getStudentProfileFormDefaults(
         "create",
       )}
       mode="create"
+      returnQuery={returnQuery}
     />
   );
 }

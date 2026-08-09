@@ -51,6 +51,7 @@ interface StudentProfileFormProps {
   defaultValues: StudentProfileFormValues;
   lifecycleStatus?: string;
   mode: StudentProfileFormMode;
+  returnQuery?: string;
 }
 
 type SuccessfulDuplicateLookup = Extract<
@@ -71,6 +72,7 @@ export function StudentProfileForm({
   defaultValues,
   lifecycleStatus,
   mode,
+  returnQuery,
 }: StudentProfileFormProps) {
   const router = useRouter();
 
@@ -226,7 +228,7 @@ export function StudentProfileForm({
     form.reset(values);
 
     if (actionState.redirectTo) {
-      router.push(actionState.redirectTo);
+      router.push(withReturnQuery(actionState.redirectTo, returnQuery));
       router.refresh();
       return;
     }
@@ -883,6 +885,10 @@ export function StudentProfileForm({
       ) : null}
     </FormProvider>
   );
+}
+
+function withReturnQuery(pathname: string, query?: string): string {
+  return query ? `${pathname}?${query}` : pathname;
 }
 
 function DuplicateLookupPanel({

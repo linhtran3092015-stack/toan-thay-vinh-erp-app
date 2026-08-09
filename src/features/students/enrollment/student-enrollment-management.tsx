@@ -2,11 +2,15 @@
 
 import {
   useState,
+  useRef,
   type FormEvent,
+  type RefObject,
 } from "react";
+import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import {
   Card,
   CardContent,
@@ -102,6 +106,7 @@ export function StudentEnrollmentManagement({
 
   const [successMessage, setSuccessMessage] =
     useState<string | null>(null);
+  const activeTriggerRef = useRef<HTMLButtonElement>(null);
 
   const visibleOperations = operationOrder.filter(
     (operation) =>
@@ -114,6 +119,7 @@ export function StudentEnrollmentManagement({
 
   function openDialog(
     operation: StudentEnrollmentOperation,
+    trigger: HTMLButtonElement,
   ) {
     if (!model.actions[operation].enabled) {
       return;
@@ -124,6 +130,7 @@ export function StudentEnrollmentManagement({
     );
     setActionState(null);
     setSuccessMessage(null);
+    activeTriggerRef.current = trigger;
     setActiveOperation(operation);
   }
 
@@ -215,8 +222,8 @@ export function StudentEnrollmentManagement({
                         disabled={
                           !availability.enabled
                         }
-                        onClick={() =>
-                          openDialog(operation)
+                        onClick={(event) =>
+                          openDialog(operation, event.currentTarget)
                         }
                         size="sm"
                         type="button"
@@ -260,6 +267,7 @@ export function StudentEnrollmentManagement({
           operation={activeOperation}
           setValues={setValues}
           studentName={studentName}
+          returnFocusRef={activeTriggerRef}
           values={values}
         />
       ) : null}
@@ -280,6 +288,7 @@ interface EnrollmentOperationDialogProps {
     React.SetStateAction<EnrollmentDialogValues>
   >;
   studentName: string;
+  returnFocusRef: RefObject<HTMLElement | null>;
   values: EnrollmentDialogValues;
 }
 
@@ -292,6 +301,7 @@ function EnrollmentOperationDialog({
   operation,
   setValues,
   studentName,
+  returnFocusRef,
   values,
 }: EnrollmentOperationDialogProps) {
   const usesClass =
@@ -336,28 +346,39 @@ function EnrollmentOperationDialog({
       : undefined;
 
   return (
-    <div
-      aria-modal="true"
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
-      role="dialog"
+    <Dialog
+      ariaDescribedBy="enrollment-operation-description"
+      ariaLabelledBy="enrollment-operation-title"
+      className="sm:max-w-[640px]"
+      isOpen
+      onClose={onClose}
+      returnFocusRef={returnFocusRef}
     >
-      <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-xl bg-white shadow-modal sm:max-w-[640px] sm:rounded-xl">
-        <form
-          className="grid gap-5 p-5 md:p-6"
-          onSubmit={onSubmit}
-        >
-          <div>
+      <form className="grid gap-5 p-5 md:p-6" onSubmit={onSubmit}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
             <p className="text-sm font-semibold text-primary">
               {operationLabels[operation]}
             </p>
 
-            <h2 className="mt-1 text-xl font-bold text-ink">
+            <h2 className="mt-1 text-xl font-bold text-ink" id="enrollment-operation-title">
               {studentName}
             </h2>
 
-            <p className="mt-2 text-sm leading-6 text-ink-muted">
+            <p className="mt-2 text-sm leading-6 text-ink-muted" id="enrollment-operation-description">
               {operationDescriptions[operation]}
             </p>
+            </div>
+
+            <button
+              aria-label="Đóng hộp thoại nghiệp vụ xếp lớp"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-interactive-hover hover:text-text-strong focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isPending}
+              onClick={onClose}
+              type="button"
+            >
+              <X aria-hidden="true" size={20} strokeWidth={1.8} />
+            </button>
           </div>
 
           {actionState?.status === "error" ? (
@@ -570,9 +591,8 @@ function EnrollmentOperationDialog({
                   ].toLowerCase()}`}
             </Button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Dialog>
   );
 }
 

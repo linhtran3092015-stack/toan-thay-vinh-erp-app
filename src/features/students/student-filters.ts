@@ -46,12 +46,12 @@ export const studentStatusMeta: Record<
     tone: "warning",
   },
   reserved: { label: "Bảo lưu", tone: "warning" },
-  resumed: { label: "Quay lại học", tone: "purple" },
+  resumed: { label: "Quay lại học", tone: "info" },
   trial_booked: {
     label: "Đã đặt lịch học thử",
-    tone: "purple",
+    tone: "info",
   },
-  trial_completed: { label: "Đã học thử", tone: "purple" },
+  trial_completed: { label: "Đã học thử", tone: "info" },
   waiting_class: { label: "Chờ chọn lớp", tone: "info" },
 };
 
@@ -149,13 +149,20 @@ export function paginateStudents(
 export function hasActiveStudentFilters(
   filters: StudentDirectoryFiltersState,
 ): boolean {
-  return Object.entries(filters).some(([key, value]) => {
+  return countActiveStudentFilters(filters) > 0;
+}
+
+/** Counts only non-default directory filters; pagination is not a filter. */
+export function countActiveStudentFilters(
+  filters: StudentDirectoryFiltersState,
+): number {
+  return Object.entries(filters).filter(([key, value]) => {
     if (key === "search") {
       return value.trim().length > 0;
     }
 
     return value !== "all";
-  });
+  }).length;
 }
 
 function normalize(value: string): string {

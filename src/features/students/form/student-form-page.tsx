@@ -11,6 +11,7 @@ interface StudentFormPageProps {
   defaultValues: StudentProfileFormValues;
   lifecycleStatus?: string;
   mode: StudentProfileFormMode;
+  returnQuery?: string;
 }
 
 export function StudentFormPage({
@@ -18,6 +19,7 @@ export function StudentFormPage({
   defaultValues,
   lifecycleStatus,
   mode,
+  returnQuery,
 }: StudentFormPageProps) {
   return (
     <StudentProfileForm
@@ -25,6 +27,7 @@ export function StudentFormPage({
       defaultValues={defaultValues}
       lifecycleStatus={lifecycleStatus}
       mode={mode}
+      returnQuery={returnQuery}
     />
   );
 }

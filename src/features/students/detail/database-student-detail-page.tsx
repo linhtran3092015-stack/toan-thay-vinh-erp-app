@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
+import { PageHeader } from "@/components/patterns/page-header";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -13,7 +14,6 @@ import { StudentEnrollmentManagement } from "@/features/students/enrollment/stud
 import type { StudentEnrollmentUiModel } from "@/features/students/enrollment/student-enrollment-ui-types";
 import { StudentSessionLedgerCard } from "@/features/students/detail/components/student-session-ledger-card";
 import type { StudentLedgerReadModel } from "@/features/students/ledger-data";
-import { getInitials } from "@/features/students/detail/helpers";
 import type {
   StudentDetailReadModel,
   StudentEnrollmentReadModel,
@@ -25,7 +25,9 @@ interface DatabaseStudentDetailPageProps {
   canViewClasses: boolean;
   canViewGuardians: boolean;
   canViewLedger?: boolean;
+  directoryHref: string;
   detail: StudentDetailReadModel;
+  editHref: string;
   enrollmentUiModel: StudentEnrollmentUiModel;
   ledgerSummary?: StudentLedgerReadModel | null;
 }
@@ -35,7 +37,9 @@ export function DatabaseStudentDetailPage({
   canViewClasses,
   canViewGuardians,
   canViewLedger = false,
+  directoryHref,
   detail,
+  editHref,
   enrollmentUiModel,
   ledgerSummary = null,
 }: DatabaseStudentDetailPageProps) {
@@ -47,94 +51,41 @@ export function DatabaseStudentDetailPage({
     detail.registeredMode;
 
   return (
-    <div className="grid min-w-0 gap-4">
-      <section className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card md:p-5">
-        <nav className="mb-4 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+    <div className="grid min-w-0 gap-6">
+      <section className="rounded-lg border border-border-subtle bg-surface-base p-4 md:p-5">
+        <nav aria-label="Điều hướng hồ sơ học viên" className="mb-4 flex flex-wrap items-center gap-2 text-secondary text-text-muted">
           <Link
-            className="font-semibold text-primary hover:underline"
-            href="/students"
+            className="font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+            href={directoryHref}
           >
             Học viên
           </Link>
           <span>/</span>
-          <span className="font-semibold text-ink">
+          <span className="font-semibold text-text-strong">
             {detail.publicCode}
           </span>
         </nav>
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="flex h-16 w-16 flex-none items-center justify-center rounded-pill bg-primary text-xl font-bold text-white">
-            {getInitials(detail.fullName)}
-          </div>
-
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold text-ink md:text-3xl">
-                {detail.fullName}
-              </h1>
-
-              <StudentStatusBadge
-                status={detail.lifecycleStatus}
-              />
-            </div>
-
-            <p className="mt-1 text-sm text-ink-muted">
-              Tên thường gọi:{" "}
-              <span className="font-semibold text-ink">
-                {detail.nickname ?? "Chưa cập nhật"}
-              </span>
-            </p>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Badge tone="neutral">
-                Mã: {detail.publicCode}
-              </Badge>
-
-              <Badge tone="info">
-                Khối {detail.currentGrade}
-              </Badge>
-
-              {activeClass ? (
-                <Badge tone="info">
-                  Lớp chính: {activeClass.name}
-                </Badge>
-              ) : null}
-
-              {learningLevel ? (
-                <Badge
-                  tone={
-                    learningLevel === "CLC"
-                      ? "purple"
-                      : "neutral"
-                  }
-                >
-                  Mức {learningLevel}
-                </Badge>
-              ) : null}
-
-              {registeredMode ? (
-                <Badge
-                  tone={
-                    registeredMode === "online"
-                      ? "purple"
-                      : "info"
-                  }
-                >
-                  {formatMode(registeredMode)}
-                </Badge>
-              ) : null}
-            </div>
-          </div>
-
-          {canUpdateStudent ? (
+        <PageHeader
+          actions={canUpdateStudent ? (
             <Link
-              className="inline-flex min-h-10 flex-none items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink transition-colors hover:border-secondary hover:bg-canvas focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-secondary/25 sm:ml-auto"
-              href={`/students/${detail.id}/edit`}
+              className="inline-flex h-10 items-center justify-center rounded-md border border-border-subtle bg-surface-base px-4 text-control font-semibold text-text-strong transition-colors hover:border-border-strong hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+              href={editHref}
             >
               Chỉnh sửa hồ sơ
             </Link>
           ) : null}
-        </div>
+          context={<StudentStatusBadge status={detail.lifecycleStatus} />}
+          title={detail.fullName}
+        >
+          <p className="mt-1 text-secondary text-text-muted">
+            Mã {detail.publicCode} · Khối {detail.currentGrade}
+            {activeClass ? ` · ${activeClass.name}` : " · Chưa xếp lớp"}
+            {learningLevel ? ` · Mức ${learningLevel}` : ""}
+            {registeredMode ? ` · ${formatMode(registeredMode)}` : ""}
+          </p>
+          {detail.nickname ? <p className="mt-1 text-secondary text-text-muted">Tên thường gọi: {detail.nickname}</p> : null}
+        </PageHeader>
       </section>
 
       <div className="grid gap-4 xl:grid-cols-[1.3fr_0.7fr]">
@@ -409,13 +360,7 @@ function ScheduleCard({
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <Badge
-          tone={
-            schedule.learningMode === "online"
-              ? "purple"
-              : "info"
-          }
-        >
+        <Badge tone="neutral">
           {formatMode(schedule.learningMode)}
         </Badge>
 
@@ -479,13 +424,7 @@ function EnrollmentHistoryCard({
             enrollment.transitionKind,
           )}
         </Badge>
-        <Badge
-          tone={
-            enrollment.registeredMode === "online"
-              ? "purple"
-              : "info"
-          }
-        >
+        <Badge tone="neutral">
           {formatMode(enrollment.registeredMode)}
         </Badge>
       </div>

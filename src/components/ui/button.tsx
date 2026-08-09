@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -30,7 +30,7 @@ const sizeClasses: Record<ButtonSize, string> = {
   lg: "h-11 rounded-md px-5 text-control",
 };
 
-export function Button({
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
   className,
   size = "md",
   type = "button",
@@ -39,7 +39,7 @@ export function Button({
   disabled,
   children,
   ...props
-}: ButtonProps) {
+}, ref) {
   return (
     <button
       className={cn(
@@ -49,6 +49,7 @@ export function Button({
         className,
       )}
       disabled={disabled || isLoading}
+      ref={ref}
       type={type}
       aria-busy={isLoading || undefined}
       {...props}
@@ -62,4 +63,4 @@ export function Button({
       {children}
     </button>
   );
-}
+});

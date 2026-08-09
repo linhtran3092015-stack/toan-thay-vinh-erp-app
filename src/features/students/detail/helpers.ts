@@ -97,8 +97,10 @@ export function formatShortDate(value: string): string {
 
 export function getStudentDetailHref(
   student: { id: string },
+  directoryQuery?: string,
 ): string {
-  return `/students/${student.id}`;
+  const pathname = `/students/${student.id}`;
+  return directoryQuery ? `${pathname}?${directoryQuery}` : pathname;
 }
 
 export function getInitials(fullName: string): string {

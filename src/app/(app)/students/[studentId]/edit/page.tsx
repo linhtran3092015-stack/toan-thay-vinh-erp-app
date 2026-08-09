@@ -8,6 +8,7 @@ import {
   getStudentProfileFormDefaults,
 } from "@/features/students/form/student-profile-form-helpers";
 import { StudentFormPage } from "@/features/students/form/student-form-page";
+import { getStudentDirectoryQuery, withStudentDirectoryQuery } from "@/features/students/student-directory-url-state";
 import {
   getCachedDatabasePermissions,
 } from "@/lib/permissions/database-permissions";
@@ -16,14 +17,22 @@ interface EditStudentRouteProps {
   params: Promise<{
     studentId: string;
   }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 const studentIdSchema = z.string().uuid();
 
 export default async function EditStudentRoute({
   params,
+  searchParams,
 }: EditStudentRouteProps) {
   const { studentId } = await params;
+  const requestedSearchParams = await searchParams;
+  const directoryParams = new URLSearchParams();
+  Object.entries(requestedSearchParams).forEach(([key, value]) => {
+    if (typeof value === "string") directoryParams.set(key, value);
+  });
+  const returnQuery = getStudentDirectoryQuery(directoryParams);
 
   const permissionResult =
     await getCachedDatabasePermissions();
@@ -88,7 +97,7 @@ export default async function EditStudentRoute({
 
   return (
     <StudentFormPage
-      cancelHref={`/students/${studentId}`}
+      cancelHref={withStudentDirectoryQuery(`/students/${studentId}`, directoryParams)}
       defaultValues={getStudentProfileFormDefaults(
         "edit",
         result.detail,
@@ -97,6 +106,7 @@ export default async function EditStudentRoute({
         result.detail.lifecycleStatus
       }
       mode="edit"
+      returnQuery={returnQuery}
     />
   );
 }
