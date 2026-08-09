@@ -23,6 +23,18 @@ export interface CreateBatchActionResponse {
   };
 }
 
+export interface CommitBatchActionResponse {
+  success: boolean;
+  error?: string;
+  data?: {
+    batch_id: string;
+    status: string;
+    committed_new_count: number;
+    reused_matching_count: number;
+    committed_at: string;
+  };
+}
+
 export async function dryRunStudentEnrollmentImportAction(
   academicYearCode: string,
   rows: EnrollmentImportRawRow[]
@@ -144,6 +156,63 @@ export async function createStudentEnrollmentImportBatchAction(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Đã xảy ra lỗi không xác định khi tạo Batch staging.";
+    return {
+      success: false,
+      error: message,
+    };
+  }
+}
+
+export async function commitStudentEnrollmentImportBatchAction(
+  batchId: string,
+  reason: string
+): Promise<CommitBatchActionResponse> {
+  const supabase = await createSupabaseServerClient();
+
+  // 1. Check Auth
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: "Yêu cầu đăng nhập để thực hiện tính năng này." };
+  }
+
+  // 2. Validation
+  if (!batchId || !batchId.trim()) {
+    return { success: false, error: "Batch ID không được để trống." };
+  }
+
+  if (!reason || !reason.trim()) {
+    return { success: false, error: "Lý do commit ghi danh không được để trống." };
+  }
+
+  // 3. Call Commit RPC EXACTLY ONCE
+  try {
+    const { data, error } = await supabase.rpc("commit_student_enrollment_import_batch", {
+      p_batch_id: batchId.trim(),
+      p_reason: reason.trim(),
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: `Lỗi Commit ghi danh: ${error.message || "Giao dịch commit thất bại."}`,
+      };
+    }
+
+    return {
+      success: true,
+      data: data as unknown as {
+        batch_id: string;
+        status: string;
+        committed_new_count: number;
+        reused_matching_count: number;
+        committed_at: string;
+      },
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Đã xảy ra lỗi không xác định khi commit batch ghi danh.";
     return {
       success: false,
       error: message,

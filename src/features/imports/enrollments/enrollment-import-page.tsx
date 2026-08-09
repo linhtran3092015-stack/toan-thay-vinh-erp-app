@@ -4,7 +4,11 @@ import { useState, useTransition, useMemo } from "react";
 
 import { downloadEnrollmentImportTemplate } from "./template-browser";
 import { parseEnrollmentWorkbook, EnrollmentWorkbookError, type ParsedEnrollmentWorkbook } from "./workbook";
-import { dryRunStudentEnrollmentImportAction, createStudentEnrollmentImportBatchAction } from "./actions";
+import {
+  dryRunStudentEnrollmentImportAction,
+  createStudentEnrollmentImportBatchAction,
+  commitStudentEnrollmentImportBatchAction,
+} from "./actions";
 import type { EnrollmentImportDryRunResult } from "./types";
 
 function DownloadIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -65,6 +69,14 @@ interface BatchResultInfo {
   };
 }
 
+interface CommitResultInfo {
+  batch_id: string;
+  status: string;
+  committed_new_count: number;
+  reused_matching_count: number;
+  committed_at: string;
+}
+
 export function EnrollmentImportPage() {
   const [academicYearCode, setAcademicYearCode] = useState("2026-2027");
   const [file, setFile] = useState<File | null>(null);
@@ -80,6 +92,13 @@ export function EnrollmentImportPage() {
   const [createBatchError, setCreateBatchError] = useState<string | null>(null);
   const [reasonInput, setReasonInput] = useState("Import ghi danh học viên chính thức 2026-2027 - 710 học viên");
 
+  const [commitResult, setCommitResult] = useState<CommitResultInfo | null>(null);
+  const [commitError, setCommitError] = useState<string | null>(null);
+  const [commitConfirmInput, setCommitConfirmInput] = useState("");
+  const [commitReasonInput, setCommitReasonInput] = useState(
+    "Commit ghi danh học viên chính thức 2026-2027 - 702 mới + 8 khớp"
+  );
+
   const [filterClassification, setFilterClassification] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
 
@@ -94,6 +113,8 @@ export function EnrollmentImportPage() {
     setDryRunError(null);
     setCreateBatchResult(null);
     setCreateBatchError(null);
+    setCommitResult(null);
+    setCommitError(null);
     setIsStale(false);
 
     try {
@@ -134,6 +155,8 @@ export function EnrollmentImportPage() {
     setDryRunError(null);
     setCreateBatchResult(null);
     setCreateBatchError(null);
+    setCommitResult(null);
+    setCommitError(null);
     setIsStale(false);
 
     startTransition(async () => {
@@ -175,6 +198,25 @@ export function EnrollmentImportPage() {
     });
   };
 
+  // Run Commit Action
+  const handleCommitBatch = () => {
+    const targetBatchId = createBatchResult?.batch?.id || "36be8c0e-2787-4d88-ab21-61e1a43baccb";
+    if (commitConfirmInput.trim() !== "GHI DANH 702") return;
+    if (!commitReasonInput.trim()) return;
+
+    setCommitError(null);
+
+    startTransition(async () => {
+      const res = await commitStudentEnrollmentImportBatchAction(targetBatchId, commitReasonInput.trim());
+
+      if (res.success && res.data) {
+        setCommitResult(res.data);
+      } else {
+        setCommitError(res.error || "Commit ghi danh thất bại.");
+      }
+    });
+  };
+
   // Filtered Rows for Detail Table
   const filteredRows = useMemo(() => {
     if (!dryRunResult) return [];
@@ -188,6 +230,11 @@ export function EnrollmentImportPage() {
     dryRunResult.conflict_count === 0 &&
     dryRunResult.invalid_count === 0 &&
     !createBatchResult;
+
+  const canCommitBatch =
+    commitConfirmInput.trim() === "GHI DANH 702" &&
+    commitReasonInput.trim().length > 0 &&
+    !commitResult;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6">
@@ -345,7 +392,7 @@ export function EnrollmentImportPage() {
       )}
 
       {/* Created Batch Result Banner */}
-      {createBatchResult && (
+      {createBatchResult && !commitResult && (
         <div className="bg-emerald-50 border border-emerald-300 p-5 rounded-xl text-emerald-900 space-y-2 shadow-sm">
           <div className="flex items-center gap-2">
             <CheckIcon className="w-6 h-6 text-emerald-600 shrink-0" />
@@ -357,9 +404,23 @@ export function EnrollmentImportPage() {
             <p><strong>Tổng số dòng Staging:</strong> {createBatchResult.batch?.row_count}</p>
             <p><strong>Mới (tạo mới):</strong> {createBatchResult.batch?.new_count} | <strong>Khớp (dùng lại):</strong> {createBatchResult.batch?.matching_count}</p>
           </div>
-          <p className="text-xs text-emerald-700 italic">
-            * Thao tác tạo Staging Batch hoàn tất. Chưa có học viên nào được ghi danh vào bảng vận hành student_enrollments.
-          </p>
+        </div>
+      )}
+
+      {/* Commit Executed Banner */}
+      {commitResult && (
+        <div className="bg-blue-50 border border-blue-300 p-5 rounded-xl text-blue-900 space-y-2 shadow-sm">
+          <div className="flex items-center gap-2">
+            <CheckIcon className="w-6 h-6 text-blue-600 shrink-0" />
+            <h3 className="text-lg font-bold">Đã Commit Ghi Danh Học Viên Thành Công!</h3>
+          </div>
+          <div className="text-xs font-mono bg-white p-3 rounded-lg border border-blue-200 space-y-1">
+            <p><strong>Batch ID:</strong> {commitResult.batch_id}</p>
+            <p><strong>Trạng thái:</strong> <span className="text-blue-700 font-bold">{commitResult.status}</span></p>
+            <p><strong>Số ghi danh mới đã tạo:</strong> <strong className="text-emerald-700">{commitResult.committed_new_count}</strong></p>
+            <p><strong>Số ghi danh pilot dùng lại:</strong> <strong className="text-blue-700">{commitResult.reused_matching_count}</strong></p>
+            <p><strong>Thời gian Commit:</strong> {commitResult.committed_at}</p>
+          </div>
         </div>
       )}
 
@@ -367,6 +428,13 @@ export function EnrollmentImportPage() {
       {createBatchError && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 text-sm">
           <strong>Lỗi tạo Batch staging:</strong> {createBatchError}
+        </div>
+      )}
+
+      {/* Commit Execution Error */}
+      {commitError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 text-sm">
+          <strong>Lỗi Commit ghi danh:</strong> {commitError}
         </div>
       )}
 
@@ -397,32 +465,88 @@ export function EnrollmentImportPage() {
             </div>
           </div>
 
-          {/* Action Bar (Enabled Batch Creation) */}
-          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <InfoIcon className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>
-                Năm học: <strong className="font-semibold text-gray-900">{dryRunResult.academic_year_code}</strong> |
-                Kiểm tra: <strong className="font-semibold text-emerald-600">{dryRunResult.new_count} Mới</strong>,
-                <strong className="font-semibold text-blue-600"> {dryRunResult.matching_count} Đã tồn tại & khớp</strong>
-              </span>
+          {/* Action Bar (Create Batch & Commit Paths) */}
+          <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b pb-4">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <InfoIcon className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>
+                  Năm học: <strong className="font-semibold text-gray-900">{dryRunResult.academic_year_code}</strong> |
+                  Kiểm tra: <strong className="font-semibold text-emerald-600">{dryRunResult.new_count} Mới</strong>,
+                  <strong className="font-semibold text-blue-600"> {dryRunResult.matching_count} Đã tồn tại & khớp</strong>
+                </span>
+              </div>
+
+              {/* Step 1: Create Staging Batch */}
+              {!createBatchResult && !commitResult && (
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                  <input
+                    type="text"
+                    value={reasonInput}
+                    onChange={(e) => setReasonInput(e.target.value)}
+                    placeholder="Lý do tạo batch..."
+                    className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-medium w-full sm:w-80"
+                  />
+                  <button
+                    onClick={handleCreateBatch}
+                    disabled={!canCreateBatch || isPending}
+                    className="px-5 py-2 bg-emerald-600 text-white font-medium text-sm rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm whitespace-nowrap"
+                  >
+                    {isPending ? "Đang tạo Batch..." : "Tạo Batch Staging (Review)"}
+                  </button>
+                </div>
+              )}
             </div>
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-              <input
-                type="text"
-                value={reasonInput}
-                onChange={(e) => setReasonInput(e.target.value)}
-                placeholder="Lý do tạo batch..."
-                className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-medium w-full sm:w-80"
-              />
-              <button
-                onClick={handleCreateBatch}
-                disabled={!canCreateBatch || isPending}
-                className="px-5 py-2 bg-emerald-600 text-white font-medium text-sm rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm whitespace-nowrap"
-              >
-                {isPending ? "Đang tạo Batch..." : "Tạo Batch Staging (Review)"}
-              </button>
-            </div>
+
+            {/* Step 2: Atomic Commit Controls */}
+            {!commitResult && (
+              <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                    <AlertIcon className="w-4 h-4 text-amber-700" />
+                    Commit Ghi Danh Học Viên Vào Cơ Sở Dữ Liệu Vận Hành
+                  </h4>
+                  <span className="text-xs font-mono text-amber-800">
+                    Ghi danh mới: <strong>702</strong> | Dùng lại pilot: <strong>8</strong>
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-amber-800 mb-1">
+                      Nhập lý do Commit <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={commitReasonInput}
+                      onChange={(e) => setCommitReasonInput(e.target.value)}
+                      placeholder="Lý do commit..."
+                      className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-amber-800 mb-1">
+                      Nhập mã xác nhận: <code className="bg-amber-200 px-1 py-0.5 rounded text-amber-900 font-bold">GHI DANH 702</code>
+                    </label>
+                    <input
+                      type="text"
+                      value={commitConfirmInput}
+                      onChange={(e) => setCommitConfirmInput(e.target.value)}
+                      placeholder="Nhập chính xác: GHI DANH 702"
+                      className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-mono font-bold"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={handleCommitBatch}
+                    disabled={!canCommitBatch || isPending}
+                    className="px-6 py-2.5 bg-red-600 text-white font-bold text-sm rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+                  >
+                    {isPending ? "Đang Commit Ghi Danh..." : "XÁC NHẬN COMMIT GHI DANH 702 HỌC VIÊN"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Filter Bar & Detailed Results Table */}
