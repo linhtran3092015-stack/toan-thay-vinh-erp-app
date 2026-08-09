@@ -92,19 +92,27 @@ stateDiagram-v2
 
 - Results display/access is data/route dependent on `results.view`; record/update requires `results.manage`.
 - `recordSessionResultAction` and `updateSessionResultAction` call `record_session_result` and `update_session_result`.
-- Eligibility, validation, and conflict behavior remain in the existing action/RPC contract. The redesign must not create results for a learner/session outside that contract.
+- Eligibility, validation, and conflict behavior remain in the existing action/RPC contract. Test score remains optional under that contract. The redesign must not create results for a learner/session outside that contract.
 
 ### Lock
 
-- Locking requires `sessions.lock` and calls `lock_class_session` through `lockClassSessionAction`.
-- Current lock readiness requires a completed, unlocked session; recorded attendance for the required roster; no missing required results; and a non-empty lock reason. The current UI presents the consequence as a permanent lock.
-- Existing conflicts include incomplete attendance/results, invalid lifecycle, already-locked, and timing-related constraints.
-- A locked session is rendered immutable. Neither attendance nor results may be made editable by redesign presentation.
+- Locking requires `sessions.lock` and calls `lock_class_session` through `lockClassSessionAction`. The server-side lock contract is the readiness source of truth.
+- A session may be locked only when the authoritative server-side requirements permit it: the user has `sessions.lock`; the session is completed and not already locked; the lock reason satisfies existing validation; an eligible active roster exists where the RPC requires one; and attendance completeness satisfies the lock RPC.
+- Results and test scores are not lock prerequisites. Missing results or optional test scores must not block Lock, and the redesign must not create fake/default results to satisfy Lock.
+- Client UI must not independently recreate lock-readiness policy. It may present authoritative supplied state and server-returned failures only.
+- `lockedAt` remains the immutable lock marker. Preserve explicit feature-owned confirmation/reason meaning, existing revalidation and audit behavior, and the absence of unlock, reset, reopen, or reversal UI. Neither attendance nor results may be made editable by redesign presentation after lock.
+
+### Ledger consequences
+
+- Regular and makeup session charges remain server/RPC-owned. Existing qualifying attendance produces the current ledger effects; `additional_study` retains its existing different treatment.
+- Grading credits remain based on existing recorded-result behavior. The UI must not calculate, infer, or recreate ledger consequences.
+- `student_session_ledger_entries.delta_sessions` remains integer. The redesign must not introduce fractional-session behavior.
 
 ### Attendance/results/lock regression checks
 
 - Permission-denied UI changes no underlying query/action exposure.
 - Attendance and results follow the existing session roster and lifecycle constraints.
-- Lock remains unavailable until all current readiness conditions are met.
+- Lock presentation reflects only authoritative server-supplied readiness and returned failures. It must not block on missing results or test scores.
 - Lock confirmation remains explicit and descriptive; the feature owns wording and Server Action binding.
 - After a lock, the same read model continues to show locked/immutable state after refresh and navigation.
+- Ledger consequences remain server/RPC-owned; presentation does not calculate session quantities or introduce fractional values.
