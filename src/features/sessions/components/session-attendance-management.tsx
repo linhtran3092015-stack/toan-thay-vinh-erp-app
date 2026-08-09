@@ -1,6 +1,15 @@
 "use client";
 
-import type { ReactNode } from "react";
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+} from "react";
 import {
   useMemo,
   useState,
@@ -9,6 +18,9 @@ import {
 import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
+import { DataTableFrame } from "@/components/patterns/data-table-frame";
+import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
+import { ResultBanner } from "@/components/shared/result-banner";
 import type { AdditionalStudyCandidate } from "@/features/sessions/attendance-data";
 import { Button } from "@/components/ui/button";
 import {
@@ -80,6 +92,8 @@ export function SessionAttendanceManagement({
   const [isPending, startTransition] =
     useTransition();
 
+  const feedbackRef = useRef<HTMLDivElement>(null);
+
   const canEdit =
     canMarkAttendance &&
     lockedAt === null &&
@@ -131,6 +145,12 @@ export function SessionAttendanceManagement({
     actionState?.status === "error"
       ? actionState.fieldErrors ?? {}
       : {};
+
+  useEffect(() => {
+    if (actionState?.status === "success") {
+      feedbackRef.current?.focus();
+    }
+  }, [actionState]);
 
   const openEditor = (
     participant: SessionParticipantReadModel,
@@ -295,13 +315,9 @@ export function SessionAttendanceManagement({
           />
         ) : null}
 
-        {actionState?.status ===
-        "success" ? (
-          <div
-            className="rounded-md border border-green-200 bg-green-50 p-3 text-sm font-medium text-green-700"
-            role="status"
-          >
-            {actionState.message}
+        {actionState?.status === "success" ? (
+          <div ref={feedbackRef} tabIndex={-1}>
+            <ResultBanner title={actionState.message} tone="success" />
           </div>
         ) : null}
 
@@ -321,147 +337,125 @@ export function SessionAttendanceManagement({
         ) : null}
 
         {participants.length === 0 ? (
-          <div className="rounded-md border border-dashed border-hairline p-6 text-center">
-            <p className="font-semibold text-ink">
+          <div className="rounded-md border border-dashed border-border-subtle p-6 text-center">
+            <p className="font-semibold text-text-strong">
               Chưa có học viên trong buổi học
             </p>
 
-            <p className="mt-2 text-sm text-ink-muted">
+            <p className="mt-2 text-body text-text-muted">
               Roster chưa có dữ liệu hoặc tài
               khoản hiện tại không có quyền xem
               học viên.
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border border-hairline">
-            <table className="w-full min-w-[850px] border-collapse text-left text-sm">
-              <thead className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                <tr>
-                  <th className="px-3 py-3">
-                    Học viên
-                  </th>
-
-                  <th className="px-3 py-3">
-                    Hình thức đăng ký
-                  </th>
-
-                  <th className="px-3 py-3">
-                    Trạng thái
-                  </th>
-
-                  <th className="px-3 py-3">
-                    Hình thức thực tế
-                  </th>
-
-                  <th className="px-3 py-3">
-                    Ghi chú
-                  </th>
-
-                  <th className="px-3 py-3 text-right">
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {participants.map(
-                  (participant, index) => (
-                    <tr
-                      className="border-t border-hairline align-top"
-                      key={
-                        participant.studentId
-                      }
-                    >
-                      <td className="px-3 py-4">
-                        <p className="font-semibold text-ink">
-                          {canViewStudents
-                            ? participant
-                                .studentName ??
-                              "Chưa có tên học viên"
-                            : `Học viên ${
-                                index + 1
-                              }`}
-                        </p>
-
-                        {canViewStudents &&
-                        participant.studentCode ? (
-                          <p className="mt-1 font-mono text-xs text-ink-muted">
-                            {
-                              participant
-                                .studentCode
-                            }
-                          </p>
-                        ) : null}
-                      </td>
-
-                      <td className="px-3 py-4">
-                        {formatRegisteredMode(
-                          participant.registeredMode,
-                        )}
-                      </td>
-
-                      <td className="px-3 py-4">
-                        <AttendanceBadge
-                          status={
-                            participant
-                              .attendanceStatus
-                          }
-                        />
-
-                        {participant.isLateUpdate ? (
-                          <p className="mt-2 text-xs font-semibold text-amber-700">
-                            Cập nhật muộn
-                          </p>
-                        ) : null}
-                      </td>
-
-                      <td className="px-3 py-4">
-                        {formatActualMode(
-                          participant
-                            .actualLearningMode,
-                        )}
-                      </td>
-
-                      <td className="max-w-[280px] px-3 py-4 text-ink-muted">
-                        {participant
-                          .attendanceNotes ??
-                          "Chưa có ghi chú"}
-                      </td>
-
-                      <td className="px-3 py-4 text-right">
-                        {canEdit ? (
-                          <Button
-                            disabled={
-                              isPending
-                            }
-                            onClick={() =>
-                              openEditor(
-                                participant,
-                              )
-                            }
-                            type="button"
-                            variant="ghost"
-                          >
-                            {participant.attendanceId
-                              ? "Sửa điểm danh"
-                              : "Điểm danh"}
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-ink-muted">
-                            Chỉ đọc
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ),
-                )}
-              </tbody>
-            </table>
+          <div className="session-attendance-work-area">
+            <DataTableFrame
+              body={participants.map((participant, index) => (
+                <AttendanceTableRow
+                  canEdit={canEdit}
+                  canViewStudents={canViewStudents}
+                  index={index}
+                  isPending={isPending}
+                  key={participant.studentId}
+                  onEdit={openEditor}
+                  participant={participant}
+                />
+              ))}
+              caption="Danh sách điểm danh buổi học"
+              className="session-attendance-table"
+              header={<tr><TableHeader>Học viên</TableHeader><TableHeader>Hình thức đăng ký</TableHeader><TableHeader>Trạng thái</TableHeader><TableHeader>Hình thức thực tế</TableHeader><TableHeader>Ghi chú</TableHeader><TableHeader className="text-right">Thao tác</TableHeader></tr>}
+              tableClassName="min-w-[960px] table-fixed text-table-body text-text-default"
+            />
+            <ResponsiveRecordList className="session-attendance-record-list" label="Danh sách điểm danh buổi học">
+              {participants.map((participant, index) => (
+                <AttendanceRecord
+                  canEdit={canEdit}
+                  canViewStudents={canViewStudents}
+                  index={index}
+                  isPending={isPending}
+                  key={participant.studentId}
+                  onEdit={openEditor}
+                  participant={participant}
+                />
+              ))}
+            </ResponsiveRecordList>
           </div>
         )}
       </CardContent>
     </Card>
   );
+}
+
+function AttendanceTableRow({
+  canEdit,
+  canViewStudents,
+  index,
+  isPending,
+  onEdit,
+  participant,
+}: {
+  canEdit: boolean;
+  canViewStudents: boolean;
+  index: number;
+  isPending: boolean;
+  onEdit: (participant: SessionParticipantReadModel) => void;
+  participant: SessionParticipantReadModel;
+}) {
+  return (
+    <tr className="transition-colors hover:bg-[var(--table-row-hover)]">
+      <TableCell className="w-[190px]">
+        <ParticipantIdentity canViewStudents={canViewStudents} index={index} participant={participant} />
+      </TableCell>
+      <TableCell className="w-[140px] text-secondary text-text-muted">{formatRegisteredMode(participant.registeredMode)}</TableCell>
+      <TableCell className="w-[170px]"><AttendanceBadge status={participant.attendanceStatus} />{participant.isLateUpdate ? <p className="mt-1 text-caption font-semibold text-warning">Cập nhật muộn</p> : null}</TableCell>
+      <TableCell className="w-[145px] text-secondary text-text-muted">{formatActualMode(participant.actualLearningMode)}</TableCell>
+      <TableCell className="max-w-[260px] text-secondary text-text-muted">{participant.attendanceNotes ?? "Chưa có ghi chú"}</TableCell>
+      <TableCell className="w-[132px] text-right"><AttendanceAction canEdit={canEdit} isPending={isPending} onEdit={onEdit} participant={participant} /></TableCell>
+    </tr>
+  );
+}
+
+function AttendanceRecord({
+  canEdit,
+  canViewStudents,
+  index,
+  isPending,
+  onEdit,
+  participant,
+}: {
+  canEdit: boolean;
+  canViewStudents: boolean;
+  index: number;
+  isPending: boolean;
+  onEdit: (participant: SessionParticipantReadModel) => void;
+  participant: SessionParticipantReadModel;
+}) {
+  return (
+    <article className="rounded-lg border border-border-subtle bg-surface-base px-4 py-3" role="listitem">
+      <div className="flex items-start justify-between gap-3"><ParticipantIdentity canViewStudents={canViewStudents} index={index} participant={participant} /><AttendanceBadge status={participant.attendanceStatus} /></div>
+      <div className="mt-3 grid gap-1.5 text-secondary text-text-muted"><p>Đăng ký: {formatRegisteredMode(participant.registeredMode)} · Thực tế: {formatActualMode(participant.actualLearningMode)}</p><p>{participant.attendanceNotes ?? "Chưa có ghi chú"}</p>{participant.isLateUpdate ? <p className="font-semibold text-warning">Cập nhật muộn</p> : null}</div>
+      <div className="mt-3"><AttendanceAction canEdit={canEdit} fullWidth isPending={isPending} onEdit={onEdit} participant={participant} /></div>
+    </article>
+  );
+}
+
+function ParticipantIdentity({ canViewStudents, index, participant }: { canViewStudents: boolean; index: number; participant: SessionParticipantReadModel }) {
+  return <div className="min-w-0"><p className="text-body font-semibold text-text-strong">{canViewStudents ? participant.studentName ?? "Chưa có tên học viên" : `Học viên ${index + 1}`}</p>{canViewStudents && participant.studentCode ? <p className="mt-0.5 font-mono text-caption text-text-muted">{participant.studentCode}</p> : null}</div>;
+}
+
+function AttendanceAction({ canEdit, fullWidth = false, isPending, onEdit, participant }: { canEdit: boolean; fullWidth?: boolean; isPending: boolean; onEdit: (participant: SessionParticipantReadModel) => void; participant: SessionParticipantReadModel }) {
+  if (!canEdit) return <span className="text-caption text-text-muted">Chỉ đọc</span>;
+  const action = participant.attendanceId ? "Sửa điểm danh" : "Điểm danh";
+  return <Button aria-label={`${action} cho học viên`} className={fullWidth ? "min-h-11 w-full" : undefined} disabled={isPending} onClick={() => onEdit(participant)} size={fullWidth ? "md" : "sm"} type="button" variant="ghost">{action}</Button>;
+}
+
+function TableHeader({ children, className }: { children: ReactNode; className?: string }) {
+  return <th className={`h-10 border-b border-border-subtle px-3 text-left font-semibold ${className ?? ""}`} scope="col">{children}</th>;
+}
+
+function TableCell({ children, className }: { children: ReactNode; className?: string }) {
+  return <td className={`h-14 px-3 align-middle text-table-body ${className ?? ""}`}>{children}</td>;
 }
 
 function AdditionalStudyPanel({
@@ -623,13 +617,13 @@ function AdditionalStudyPanel({
 
   if (!isOpen) {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed border-secondary/40 bg-secondary/5 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed border-border-subtle bg-surface-raised p-3">
         <div>
-          <p className="font-semibold text-ink">
+          <p className="font-semibold text-text-strong">
             Học viên học thêm
           </p>
 
-          <p className="mt-1 text-sm text-ink-muted">
+          <p className="mt-1 text-body text-text-muted">
             Thêm học viên chính thức không thuộc
             roster của lớp vào buổi học này.
           </p>
@@ -647,13 +641,13 @@ function AdditionalStudyPanel({
   }
 
   return (
-    <div className="grid gap-4 rounded-md border border-secondary/30 bg-secondary/5 p-4">
+    <div className="grid gap-4 rounded-md border border-border-subtle bg-surface-raised p-4">
       <div>
-        <h3 className="font-semibold text-ink">
+        <h3 className="text-section-title font-semibold text-text-strong">
           Thêm học viên học thêm
         </h3>
 
-        <p className="mt-1 text-sm text-ink-muted">
+        <p className="mt-1 text-body text-text-muted">
           Trạng thái sẽ được ghi cố định là
           “Học thêm”.
         </p>
@@ -795,14 +789,7 @@ function AdditionalStudyPanel({
         </Notice>
       ) : null}
 
-      {actionState?.status === "error" ? (
-        <div
-          className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700"
-          role="alert"
-        >
-          {actionState.message}
-        </div>
-      ) : null}
+      {actionState?.status === "error" ? <ResultBanner title={actionState.message} tone="error" /> : null}
 
       <div className="flex flex-wrap justify-end gap-2">
         <Button
@@ -872,15 +859,15 @@ function AttendanceEditor({
     editor.attendanceId !== null;
 
   return (
-    <div className="grid gap-4 rounded-md border border-secondary/30 bg-secondary/5 p-4">
+    <div className="grid gap-4 rounded-md border border-border-subtle bg-surface-raised p-4">
       <div>
-        <h3 className="font-semibold text-ink">
+        <h3 className="text-section-title font-semibold text-text-strong">
           {isUpdate
             ? "Cập nhật điểm danh"
             : "Ghi điểm danh"}
         </h3>
 
-        <p className="mt-1 text-sm text-ink-muted">
+        <p className="mt-1 text-body text-text-muted">
           {participant.studentName ??
             participant.studentCode ??
             "Học viên được chọn"}
@@ -1001,7 +988,7 @@ function AttendanceEditor({
               value={editor.reason}
             />
 
-            <span className="text-xs font-normal text-ink-muted">
+            <span className="text-caption font-normal text-text-muted">
               {editor.reason.trim().length}
               /500 ký tự
             </span>
@@ -1009,14 +996,7 @@ function AttendanceEditor({
         ) : null}
       </div>
 
-      {actionState?.status === "error" ? (
-        <div
-          className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700"
-          role="alert"
-        >
-          {actionState.message}
-        </div>
-      ) : null}
+      {actionState?.status === "error" ? <ResultBanner title={actionState.message} tone="error" /> : null}
 
       <div className="flex flex-wrap justify-end gap-2">
         <Button
@@ -1171,31 +1151,60 @@ function FormField({
   required?: boolean;
   wide?: boolean;
 }) {
+  const controlId = useId();
+  const errorId = useId();
+  const [firstChild, ...supportingContent] = Children.toArray(children);
+  const controlElement = firstChild as ReactElement<{
+    "aria-describedby"?: string;
+    id?: string;
+  }>;
+  const control = isValidElement(firstChild)
+    ? cloneElement(
+        controlElement,
+        {
+          id: controlId,
+          "aria-describedby": error
+            ? [
+                controlElement.props["aria-describedby"],
+                errorId,
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : controlElement.props["aria-describedby"],
+        },
+      )
+    : firstChild;
+
   return (
-    <label
-      className={`grid gap-1.5 text-sm font-semibold text-ink ${
+    <div
+      className={`grid gap-1.5 ${
         wide ? "md:col-span-2" : ""
       }`}
     >
-      <span>
+      <label
+        className="text-label font-semibold text-text-strong"
+        htmlFor={controlId}
+      >
         {label}
 
         {required ? (
-          <span className="text-red-600">
+          <span className="text-danger">
             {" "}
             *
           </span>
         ) : null}
-      </span>
+      </label>
 
-      {children}
+      {control}
+
+      {supportingContent}
 
       {error ? (
-        <span className="text-xs font-medium text-red-600">
+        <span className="text-caption font-medium text-danger" id={errorId}>
           {error}
         </span>
       ) : null}
-    </label>
+    </div>
   );
 }
 
@@ -1207,17 +1216,14 @@ function Notice({
   tone: "neutral" | "success" | "warning";
 }) {
   const classNames = {
-    neutral:
-      "border-hairline bg-surface-2 text-ink-muted",
-    success:
-      "border-green-200 bg-green-50 text-green-800",
-    warning:
-      "border-amber-200 bg-amber-50 text-amber-800",
+    neutral: "border-border-subtle bg-surface-raised text-text-muted",
+    success: "border-success-border bg-success-bg text-success",
+    warning: "border-warning-border bg-warning-bg text-warning",
   };
 
   return (
     <div
-      className={`rounded-md border p-3 text-sm ${classNames[tone]}`}
+      className={`rounded-md border p-3 text-body ${classNames[tone]}`}
     >
       {children}
     </div>
@@ -1296,7 +1302,7 @@ function firstError(
 }
 
 const inputClassName =
-  "h-11 min-w-0 rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-surface-2";
+  "h-11 min-w-0 rounded-md border border-border-subtle bg-field-bg px-3 text-body font-normal text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
 
 const textareaClassName =
-  "min-h-24 rounded-md border border-hairline bg-white px-3 py-2 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-surface-2";
+  "min-h-24 rounded-md border border-border-subtle bg-field-bg px-3 py-2 text-body font-normal text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";

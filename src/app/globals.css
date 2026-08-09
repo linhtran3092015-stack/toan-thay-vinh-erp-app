@@ -322,6 +322,43 @@
   }
 }
 
+/* Wave 6A: Attendance and Results choose dense operational tables by the
+   available Session-detail work area, not by viewport size. */
+.session-attendance-work-area,
+.session-result-work-area {
+  container-type: inline-size;
+}
+
+.session-attendance-table,
+.session-result-table {
+  display: none;
+}
+
+.session-attendance-record-list,
+.session-result-record-list {
+  display: grid;
+}
+
+@container (min-width: 960px) {
+  .session-attendance-table {
+    display: block;
+  }
+
+  .session-attendance-record-list {
+    display: none;
+  }
+}
+
+@container (min-width: 1120px) {
+  .session-result-table {
+    display: block;
+  }
+
+  .session-result-record-list {
+    display: none;
+  }
+}
+
 .dark, [data-theme="dark"] {
   --background: oklch(0.14 0.02 260);
   --foreground: oklch(0.94 0.01 250);
