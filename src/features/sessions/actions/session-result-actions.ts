@@ -137,6 +137,12 @@ function getResultLockRpcErrorMessage(
     SESSION_ATTENDANCE_NOT_FOUND:
       "Học viên chưa có dữ liệu điểm danh trong buổi học.",
 
+    SESSION_ATTENDANCE_INCOMPLETE_FOR_LOCK:
+      "Chưa điểm danh đầy đủ học viên trong danh sách lớp.",
+
+    SESSION_HAS_NO_ELIGIBLE_ROSTER:
+      "Lớp chưa có học viên ghi danh nên không thể khóa buổi học.",
+
     SESSION_LOCK_PERMISSION_DENIED:
       "Tài khoản hiện tại không có quyền khóa buổi học.",
 
