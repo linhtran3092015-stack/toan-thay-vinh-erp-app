@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { signOutAction } from "@/features/auth/auth-actions";
@@ -38,7 +39,7 @@ export function AuthUserMenu({ user }: AuthUserMenuProps) {
   }, []);
 
   const avatar = (
-    <span className="relative flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-pill bg-primary text-xs font-bold text-white">
+    <span className="relative flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-pill bg-action-primary text-xs font-bold text-text-on-primary">
       {user.initials}
       {user.avatarUrl && !avatarFailed ? (
         // Google profile images are external and intentionally bypass optimization.
@@ -72,14 +73,17 @@ export function AuthUserMenu({ user }: AuthUserMenuProps) {
             Nhân sự trung tâm
           </span>
         </span>
-        <span aria-hidden="true" className="hidden text-ink-muted lg:block">
-          ⌄
-        </span>
+        <ChevronDown
+          aria-hidden="true"
+          className="hidden text-ink-muted lg:block"
+          size={18}
+          strokeWidth={1.8}
+        />
       </button>
 
       {isOpen ? (
         <div
-          className="absolute right-0 top-[calc(100%+8px)] z-50 w-[280px] overflow-hidden rounded-lg border border-hairline bg-white shadow-modal"
+          className="absolute right-0 top-[calc(100%+8px)] z-50 w-[280px] overflow-hidden rounded-lg border border-hairline bg-surface-raised shadow-modal"
           role="menu"
         >
           <div className="flex gap-3 border-b border-hairline p-4">

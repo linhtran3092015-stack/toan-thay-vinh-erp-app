@@ -1,24 +1,13 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Inter, Outfit, Plus_Jakarta_Sans } from "next/font/google";
+import { Be_Vietnam_Pro } from "next/font/google";
 
 import "./globals.css";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ["latin", "vietnamese"],
-  variable: "--font-display",
-  display: "swap",
-});
-
-const outfit = Outfit({
-  subsets: ["latin", "latin-ext"],
-  variable: "--font-sans",
-  display: "swap",
-});
-
-const inter = Inter({
-  subsets: ["latin", "vietnamese"],
-  variable: "--font-body",
+const beVietnamPro = Be_Vietnam_Pro({
+  subsets: ["vietnamese"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-erp",
   display: "swap",
 });
 
@@ -34,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      className={`${plusJakartaSans.variable} ${outfit.variable} ${inter.variable}`}
+      className={beVietnamPro.variable}
       lang="vi"
       suppressHydrationWarning
     >

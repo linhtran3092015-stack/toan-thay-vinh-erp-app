@@ -14,7 +14,7 @@ export function LoadingState({
   return (
     <div
       className={cn(
-        "rounded-lg border border-hairline bg-surface-1 p-5 shadow-card",
+        "rounded-lg border border-border-subtle bg-surface-base p-5",
         className,
       )}
       role="status"

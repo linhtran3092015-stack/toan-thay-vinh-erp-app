@@ -14,12 +14,12 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const tones: Record<BadgeTone, string> = {
-  success: "bg-success-bg text-success border-success-border",
-  warning: "bg-warning-bg text-warning border-warning-border",
-  danger: "bg-danger-bg text-danger border-danger-border",
-  info: "bg-info-bg text-info border-info-border",
-  purple: "bg-purple-bg text-accent-purple border-accent-purple/30",
-  neutral: "bg-neutral-bg text-neutral border-hairline-strong",
+  success: "border-success-border bg-success-bg text-success",
+  warning: "border-warning-border bg-warning-bg text-warning",
+  danger: "border-danger-border bg-danger-bg text-danger",
+  info: "border-info-border bg-info-bg text-info",
+  purple: "border-info-border bg-info-bg text-info",
+  neutral: "border-neutral-border bg-neutral-bg text-neutral",
 };
 
 export function Badge({
@@ -30,7 +30,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-pill border px-2.5 py-1 text-xs font-bold leading-none tracking-wide transition-colors",
+        "inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 text-caption font-semibold leading-none transition-colors",
         tones[tone],
         className,
       )}

@@ -1,13 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 
+import {
+  getActiveNavigationDomain,
+  getVisibleNavigationDomains,
+} from "@/config/navigation";
+import { ModuleNavigation } from "@/components/layout/module-navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import type { AuthUser } from "@/features/auth/types";
 import type { PermissionCode } from "@/lib/permissions/types";
-import { cn } from "@/lib/utils";
 
 interface AppShellProps {
   authUser: AuthUser;
@@ -22,39 +27,36 @@ export function AppShell({
   permissions,
   unreadNotificationCount,
 }: AppShellProps) {
+  const pathname = usePathname();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
+  const mobileMenuTriggerRef = useRef<HTMLButtonElement>(null);
+  const visibleDomains = getVisibleNavigationDomains(permissions);
+  const activeDomain = getActiveNavigationDomain(pathname, visibleDomains);
+
+  const closeMobileNavigation = (restoreFocus = true) => {
+    setIsMobileNavOpen(false);
+    if (restoreFocus) {
+      requestAnimationFrame(() => mobileMenuTriggerRef.current?.focus());
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-canvas text-ink">
+    <div className="min-h-screen bg-surface-canvas text-text-strong">
       <Sidebar
-        academicYear="Năm học 2024 - 2025"
-        isDesktopCollapsed={isDesktopCollapsed}
+        activeDomainKey={activeDomain?.key}
+        domains={visibleDomains}
         isMobileOpen={isMobileNavOpen}
-        onClose={() => setIsMobileNavOpen(false)}
-        onToggleDesktopCollapse={() =>
-          setIsDesktopCollapsed((isCollapsed) => !isCollapsed)
-        }
-        organizationName="TOÁN THẦY VINH"
-        permissions={permissions}
+        onClose={closeMobileNavigation}
       />
 
-      <div
-        className={cn(
-          "min-h-screen md:pl-[72px]",
-          isDesktopCollapsed
-            ? "lg:pl-[72px]"
-            : "lg:pl-[var(--sidebar-width)]",
-        )}
-      >
+      <div className="min-h-screen md:pl-[72px] xl:pl-[var(--sidebar-width)]">
         <Topbar
           onMenuClick={() => setIsMobileNavOpen(true)}
-          onSidebarToggle={() =>
-            setIsDesktopCollapsed((isCollapsed) => !isCollapsed)
-          }
+          mobileMenuTriggerRef={mobileMenuTriggerRef}
           unreadNotificationCount={unreadNotificationCount}
           user={authUser}
         />
+        <ModuleNavigation domain={activeDomain} />
 
         <main className="mx-auto max-w-[1600px] px-4 py-4 sm:px-5 lg:px-6">
           {children}
