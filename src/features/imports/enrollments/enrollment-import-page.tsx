@@ -4,7 +4,7 @@ import { useState, useTransition, useMemo } from "react";
 
 import { downloadEnrollmentImportTemplate } from "./template-browser";
 import { parseEnrollmentWorkbook, EnrollmentWorkbookError, type ParsedEnrollmentWorkbook } from "./workbook";
-import { dryRunStudentEnrollmentImportAction } from "./actions";
+import { dryRunStudentEnrollmentImportAction, createStudentEnrollmentImportBatchAction } from "./actions";
 import type { EnrollmentImportDryRunResult } from "./types";
 
 function DownloadIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -55,6 +55,16 @@ function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+interface BatchResultInfo {
+  batch?: {
+    id?: string;
+    status?: string;
+    row_count?: number;
+    new_count?: number;
+    matching_count?: number;
+  };
+}
+
 export function EnrollmentImportPage() {
   const [academicYearCode, setAcademicYearCode] = useState("2026-2027");
   const [file, setFile] = useState<File | null>(null);
@@ -65,6 +75,10 @@ export function EnrollmentImportPage() {
   const [dryRunResult, setDryRunResult] = useState<EnrollmentImportDryRunResult | null>(null);
   const [dryRunError, setDryRunError] = useState<string | null>(null);
   const [isStale, setIsStale] = useState(false);
+
+  const [createBatchResult, setCreateBatchResult] = useState<BatchResultInfo | null>(null);
+  const [createBatchError, setCreateBatchError] = useState<string | null>(null);
+  const [reasonInput, setReasonInput] = useState("Import ghi danh học viên chính thức 2026-2027 - 710 học viên");
 
   const [filterClassification, setFilterClassification] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
@@ -78,6 +92,8 @@ export function EnrollmentImportPage() {
     setParseError(null);
     setDryRunResult(null);
     setDryRunError(null);
+    setCreateBatchResult(null);
+    setCreateBatchError(null);
     setIsStale(false);
 
     try {
@@ -116,6 +132,8 @@ export function EnrollmentImportPage() {
     if (!parsedWorkbook || !academicYearCode) return;
 
     setDryRunError(null);
+    setCreateBatchResult(null);
+    setCreateBatchError(null);
     setIsStale(false);
 
     startTransition(async () => {
@@ -128,12 +146,48 @@ export function EnrollmentImportPage() {
     });
   };
 
+  // Run Create Batch Action
+  const handleCreateBatch = () => {
+    if (!file || !fileSha256 || !parsedWorkbook || !academicYearCode || !dryRunResult) return;
+    if (dryRunResult.conflict_count > 0 || dryRunResult.invalid_count > 0) return;
+
+    const confirmed = window.confirm(
+      `Xác nhận tạo Staging Batch cho ${dryRunResult.row_count} dòng?\nLưu ý: Thao tác này CHƯA ghi danh học viên vào cơ sở dữ liệu.`
+    );
+    if (!confirmed) return;
+
+    setCreateBatchError(null);
+
+    startTransition(async () => {
+      const res = await createStudentEnrollmentImportBatchAction(
+        file.name,
+        fileSha256,
+        reasonInput,
+        academicYearCode,
+        parsedWorkbook.rows
+      );
+
+      if (res.success && res.data) {
+        setCreateBatchResult(res.data);
+      } else {
+        setCreateBatchError(res.error || "Tạo Batch staging thất bại.");
+      }
+    });
+  };
+
   // Filtered Rows for Detail Table
   const filteredRows = useMemo(() => {
     if (!dryRunResult) return [];
     if (filterClassification === "all") return dryRunResult.rows;
     return dryRunResult.rows.filter((r) => r.classification === filterClassification);
   }, [dryRunResult, filterClassification]);
+
+  const canCreateBatch =
+    dryRunResult &&
+    !isStale &&
+    dryRunResult.conflict_count === 0 &&
+    dryRunResult.invalid_count === 0 &&
+    !createBatchResult;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6">
@@ -290,6 +344,32 @@ export function EnrollmentImportPage() {
         </div>
       )}
 
+      {/* Created Batch Result Banner */}
+      {createBatchResult && (
+        <div className="bg-emerald-50 border border-emerald-300 p-5 rounded-xl text-emerald-900 space-y-2 shadow-sm">
+          <div className="flex items-center gap-2">
+            <CheckIcon className="w-6 h-6 text-emerald-600 shrink-0" />
+            <h3 className="text-lg font-bold">Đã Tạo Batch Staging Thành Công!</h3>
+          </div>
+          <div className="text-xs font-mono bg-white p-3 rounded-lg border border-emerald-200 space-y-1">
+            <p><strong>Batch ID:</strong> {createBatchResult.batch?.id}</p>
+            <p><strong>Trạng thái Batch:</strong> <span className="text-emerald-700 font-bold">{createBatchResult.batch?.status}</span></p>
+            <p><strong>Tổng số dòng Staging:</strong> {createBatchResult.batch?.row_count}</p>
+            <p><strong>Mới (tạo mới):</strong> {createBatchResult.batch?.new_count} | <strong>Khớp (dùng lại):</strong> {createBatchResult.batch?.matching_count}</p>
+          </div>
+          <p className="text-xs text-emerald-700 italic">
+            * Thao tác tạo Staging Batch hoàn tất. Chưa có học viên nào được ghi danh vào bảng vận hành student_enrollments.
+          </p>
+        </div>
+      )}
+
+      {/* Create Batch Execution Error */}
+      {createBatchError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 text-sm">
+          <strong>Lỗi tạo Batch staging:</strong> {createBatchError}
+        </div>
+      )}
+
       {/* Dry-Run Result Summary Cards & Detailed Table */}
       {dryRunResult && (
         <div className="space-y-6">
@@ -317,7 +397,7 @@ export function EnrollmentImportPage() {
             </div>
           </div>
 
-          {/* Action Bar (Disabled Batch Creation) */}
+          {/* Action Bar (Enabled Batch Creation) */}
           <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <InfoIcon className="w-4 h-4 text-blue-600 shrink-0" />
@@ -327,13 +407,20 @@ export function EnrollmentImportPage() {
                 <strong className="font-semibold text-blue-600"> {dryRunResult.matching_count} Đã tồn tại & khớp</strong>
               </span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              <input
+                type="text"
+                value={reasonInput}
+                onChange={(e) => setReasonInput(e.target.value)}
+                placeholder="Lý do tạo batch..."
+                className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-medium w-full sm:w-80"
+              />
               <button
-                disabled
-                className="px-5 py-2.5 bg-gray-200 text-gray-400 font-medium text-sm rounded-lg cursor-not-allowed shadow-none"
-                title="Chức năng tạo batch sẽ được nghiệm thu ở bước tiếp theo."
+                onClick={handleCreateBatch}
+                disabled={!canCreateBatch || isPending}
+                className="px-5 py-2 bg-emerald-600 text-white font-medium text-sm rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm whitespace-nowrap"
               >
-                Tạo Batch Import (Bước Tiếp Theo)
+                {isPending ? "Đang tạo Batch..." : "Tạo Batch Staging (Review)"}
               </button>
             </div>
           </div>

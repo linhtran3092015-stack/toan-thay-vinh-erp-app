@@ -647,12 +647,25 @@ begin
   end loop;
 
   -- Audit log event
-  perform public.log_audit_event(
+  insert into public.audit_logs (
+    actor_user_id,
+    module,
+    action,
+    entity_type,
+    entity_id,
+    old_data,
+    new_data,
+    reason,
+    metadata
+  )
+  values (
+    actor_id,
+    'imports',
     'student_enrollment_import_batch_created',
-    'student_enrollment_import_batches',
-    batch_id,
+    'student_enrollment_import_batch',
+    batch_id::text,
     null,
-    jsonb_build_object(
+    pg_catalog.jsonb_build_object(
       'source_filename', normalized_filename,
       'source_sha256', normalized_sha256,
       'academic_year_code', normalized_year_code,
@@ -661,9 +674,10 @@ begin
       'new_count', batch_row.new_count,
       'matching_count', batch_row.matching_count,
       'conflict_count', batch_row.conflict_count,
-      'invalid_count', batch_row.invalid_count,
-      'reason', normalized_reason
-    )
+      'invalid_count', batch_row.invalid_count
+    ),
+    normalized_reason,
+    '{}'::jsonb
   );
 
   return jsonb_build_object(
@@ -873,19 +887,33 @@ begin
   where id = p_batch_id;
 
   -- Audit log event
-  perform public.log_audit_event(
+  insert into public.audit_logs (
+    actor_user_id,
+    module,
+    action,
+    entity_type,
+    entity_id,
+    old_data,
+    new_data,
+    reason,
+    metadata
+  )
+  values (
+    actor_id,
+    'imports',
     'student_enrollment_import_batch_committed',
-    'student_enrollment_import_batches',
-    p_batch_id,
+    'student_enrollment_import_batch',
+    p_batch_id::text,
     null,
-    jsonb_build_object(
+    pg_catalog.jsonb_build_object(
       'source_filename', v_batch.source_filename,
       'source_sha256', v_batch.source_sha256,
       'academic_year_code', v_batch.academic_year_code,
       'committed_new_count', v_committed_new_cnt,
-      'reused_matching_count', v_reused_matching_cnt,
-      'reason', normalized_reason
-    )
+      'reused_matching_count', v_reused_matching_cnt
+    ),
+    normalized_reason,
+    '{}'::jsonb
   );
 
   return jsonb_build_object(

@@ -14,6 +14,15 @@ export interface DryRunActionResponse {
   data?: EnrollmentImportDryRunResult;
 }
 
+export interface CreateBatchActionResponse {
+  success: boolean;
+  error?: string;
+  data?: {
+    batch: Record<string, unknown>;
+    dry_run: EnrollmentImportDryRunResult;
+  };
+}
+
 export async function dryRunStudentEnrollmentImportAction(
   academicYearCode: string,
   rows: EnrollmentImportRawRow[]
@@ -62,6 +71,79 @@ export async function dryRunStudentEnrollmentImportAction(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Đã xảy ra lỗi không xác định khi thực hiện Dry-Run.";
+    return {
+      success: false,
+      error: message,
+    };
+  }
+}
+
+export async function createStudentEnrollmentImportBatchAction(
+  sourceFilename: string,
+  sourceSha256: string,
+  reason: string,
+  academicYearCode: string,
+  rows: EnrollmentImportRawRow[]
+): Promise<CreateBatchActionResponse> {
+  const supabase = await createSupabaseServerClient();
+
+  // 1. Check Auth
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: "Yêu cầu đăng nhập để thực hiện tính năng này." };
+  }
+
+  // 2. Validation
+  if (!sourceFilename || !sourceFilename.trim()) {
+    return { success: false, error: "Tên file nguồn không được để trống." };
+  }
+
+  if (!sourceSha256 || !sourceSha256.trim()) {
+    return { success: false, error: "Mã SHA-256 không được để trống." };
+  }
+
+  if (!reason || !reason.trim()) {
+    return { success: false, error: "Lý do tạo batch không được để trống." };
+  }
+
+  if (!academicYearCode || !academicYearCode.trim()) {
+    return { success: false, error: "Mã năm học không được để trống." };
+  }
+
+  if (!rows || !Array.isArray(rows) || rows.length === 0) {
+    return { success: false, error: "Danh sách dòng dữ liệu không được để trống." };
+  }
+
+  if (rows.length > 1000) {
+    return { success: false, error: "Số lượng dòng import tối đa là 1000 dòng." };
+  }
+
+  // 3. Call Create Batch RPC ONLY (DO NOT COMMIT)
+  try {
+    const { data, error } = await supabase.rpc("create_student_enrollment_import_batch", {
+      p_source_filename: sourceFilename.trim(),
+      p_source_sha256: sourceSha256.trim().toLowerCase(),
+      p_reason: reason.trim(),
+      p_academic_year_code: academicYearCode.trim(),
+      p_rows: rows as unknown as Json,
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: `Lỗi tạo Batch staging: ${error.message || "Giao dịch tạo batch thất bại."}`,
+      };
+    }
+
+    return {
+      success: true,
+      data: data as unknown as { batch: Record<string, unknown>; dry_run: EnrollmentImportDryRunResult },
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Đã xảy ra lỗi không xác định khi tạo Batch staging.";
     return {
       success: false,
       error: message,
