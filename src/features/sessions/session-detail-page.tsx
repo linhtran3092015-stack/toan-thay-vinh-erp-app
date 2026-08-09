@@ -142,11 +142,7 @@ export function SessionDetailPage({
         <SessionLockActions
           lockedAt={detail.lockedAt}
           lockReason={detail.lockReason}
-          participants={
-            detail.participants
-          }
           sessionId={detail.id}
-          sessionKind={detail.sessionKind}
           sessionStatus={detail.status}
         />
       ) : null}
