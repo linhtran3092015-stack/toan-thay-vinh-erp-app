@@ -4,12 +4,14 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { getAdditionalStudyCandidates } from "@/features/sessions/attendance-data";
 import { getSessionDetail } from "@/features/sessions/detail-data";
 import { SessionDetailPage } from "@/features/sessions/session-detail-page";
+import { getSessionDirectoryQuery } from "@/features/sessions/session-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 interface SessionDetailRouteProps {
   params: Promise<{
     sessionId: string;
   }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 const UUID_PATTERN =
@@ -17,8 +19,13 @@ const UUID_PATTERN =
 
 export default async function SessionDetailRoute({
   params,
+  searchParams,
 }: SessionDetailRouteProps) {
   const { sessionId } = await params;
+  const resolvedSearchParams = await searchParams;
+  const directoryQuery = getSessionDirectoryQuery(new URLSearchParams(
+    Object.entries(resolvedSearchParams).flatMap(([key, value]) => typeof value === "string" ? [[key, value]] : []),
+  ));
 
   const permissionResult =
     await getCachedDatabasePermissions();
@@ -175,6 +182,7 @@ export default async function SessionDetailRoute({
       canViewResults={canViewResults}
       canViewStudents={canViewStudents}
       detail={detailResult.detail}
+      directoryQuery={directoryQuery}
     />
   );
 }

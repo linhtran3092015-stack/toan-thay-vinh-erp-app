@@ -2,12 +2,14 @@
 
 import type { ReactNode } from "react";
 import {
+  useRef,
   useState,
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import {
   Card,
   CardContent,
@@ -58,10 +60,13 @@ export function SessionLifecycleActions({
 
   const [isPending, startTransition] =
     useTransition();
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const openIntent = (
     nextIntent: LifecycleIntent,
+    trigger: HTMLButtonElement,
   ) => {
+    triggerRef.current = trigger;
     setActionState(null);
     setIntent(nextIntent);
 
@@ -194,14 +199,11 @@ export function SessionLifecycleActions({
           </p>
         </div>
 
-        {intent === null ? (
-          <div className="flex flex-wrap gap-2">
+        <div aria-hidden={intent !== null} className="flex flex-wrap gap-2" hidden={intent !== null}>
             {status === "scheduled" ? (
               <Button
                 disabled={isPending}
-                onClick={() =>
-                  openIntent("start")
-                }
+                onClick={(event) => openIntent("start", event.currentTarget)}
                 type="button"
               >
                 Bắt đầu buổi học
@@ -211,9 +213,7 @@ export function SessionLifecycleActions({
             {status === "in_progress" ? (
               <Button
                 disabled={isPending}
-                onClick={() =>
-                  openIntent("complete")
-                }
+                onClick={(event) => openIntent("complete", event.currentTarget)}
                 type="button"
               >
                 Hoàn thành buổi học
@@ -221,20 +221,17 @@ export function SessionLifecycleActions({
             ) : null}
 
             <button
-              className="inline-flex min-h-10 items-center justify-center rounded-md border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-danger-border bg-danger-bg px-4 text-control font-semibold text-danger transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isPending}
-              onClick={() =>
-                openIntent("cancel")
-              }
+              onClick={(event) => openIntent("cancel", event.currentTarget)}
               type="button"
             >
               Hủy buổi học
             </button>
           </div>
-        ) : null}
 
-        {intent === "start" ? (
-          <ConfirmationPanel
+        <Dialog ariaDescribedBy="session-lifecycle-dialog-description" ariaLabelledBy="session-lifecycle-dialog-title" isOpen={intent !== null} onClose={closeIntent} returnFocusRef={triggerRef}>
+          {intent === "start" ? <ConfirmationPanel
             description="Sau khi bắt đầu, trợ giảng có thể nhập điểm danh và kết quả cho học viên."
             isPending={isPending}
             onCancel={closeIntent}
@@ -242,11 +239,9 @@ export function SessionLifecycleActions({
               runLifecycleAction("start")
             }
             title="Xác nhận bắt đầu buổi học?"
-          />
-        ) : null}
+          /> : null}
 
-        {intent === "complete" ? (
-          <ConfirmationPanel
+          {intent === "complete" ? <ConfirmationPanel
             description="Sau khi hoàn thành, buổi học không thể quay lại trạng thái đang diễn ra. Điểm danh và kết quả vẫn có thể được bổ sung trước khi khóa."
             isPending={isPending}
             onCancel={closeIntent}
@@ -254,34 +249,33 @@ export function SessionLifecycleActions({
               runLifecycleAction("complete")
             }
             title="Xác nhận hoàn thành buổi học?"
-          />
-        ) : null}
+          /> : null}
 
-        {intent === "cancel" ? (
-          <div className="grid gap-3 rounded-md border border-red-200 bg-red-50 p-4">
+          {intent === "cancel" ? (
+          <div className="grid gap-3 p-5">
             <div>
-              <h3 className="font-semibold text-red-800">
+              <h3 className="text-section-title font-semibold text-text-strong" id="session-lifecycle-dialog-title">
                 Xác nhận hủy buổi học
               </h3>
 
-              <p className="mt-1 text-sm text-red-700">
+              <p className="mt-1 text-secondary text-text-muted" id="session-lifecycle-dialog-description">
                 Hành động này thay đổi trạng thái
                 buổi học thành đã hủy. Bắt buộc
                 ghi rõ lý do.
               </p>
             </div>
 
-            <label className="grid gap-1.5 text-sm font-semibold text-ink">
+            <label className="grid gap-1.5 text-label font-semibold text-text-strong">
               <span>
                 Lý do hủy
-                <span className="text-red-600">
+                <span className="text-danger">
                   {" "}
                   *
                 </span>
               </span>
 
               <textarea
-                className="min-h-28 rounded-md border border-hairline bg-white px-3 py-2 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-surface-2"
+                className="min-h-28 rounded-md border border-border-subtle bg-field-bg px-3 py-2 text-body font-normal text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:bg-disabled-bg"
                 disabled={isPending}
                 maxLength={500}
                 onChange={(event) => {
@@ -311,7 +305,7 @@ export function SessionLifecycleActions({
               </Button>
 
               <button
-                className="inline-flex min-h-10 items-center justify-center rounded-md bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-danger bg-danger px-4 text-control font-semibold text-text-on-danger transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={
                   isPending ||
                   cancelReason.trim().length < 3
@@ -327,7 +321,8 @@ export function SessionLifecycleActions({
               </button>
             </div>
           </div>
-        ) : null}
+          ) : null}
+        </Dialog>
 
         {actionState ? (
           <ActionMessage
@@ -353,13 +348,13 @@ function ConfirmationPanel({
   title: string;
 }) {
   return (
-    <div className="grid gap-3 rounded-md border border-amber-200 bg-amber-50 p-4">
+    <div className="grid gap-3 p-5">
       <div>
-        <h3 className="font-semibold text-amber-900">
+        <h3 className="text-section-title font-semibold text-text-strong" id="session-lifecycle-dialog-title">
           {title}
         </h3>
 
-        <p className="mt-1 text-sm text-amber-800">
+        <p className="mt-1 text-secondary text-text-muted" id="session-lifecycle-dialog-description">
           {description}
         </p>
       </div>
@@ -396,7 +391,7 @@ function ActionMessage({
   if (state.status === "success") {
     return (
       <div
-        className="rounded-md border border-green-200 bg-green-50 p-3 text-sm font-medium text-green-700"
+        className="rounded-md border border-success-border bg-success-bg p-3 text-body font-medium text-success"
         role="status"
       >
         {state.message}
@@ -406,7 +401,7 @@ function ActionMessage({
 
   return (
     <div
-      className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700"
+      className="rounded-md border border-danger-border bg-danger-bg p-3 text-body font-medium text-danger"
       role="alert"
     >
       {state.message}
@@ -420,7 +415,7 @@ function Notice({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+    <div className="rounded-md border border-warning-border bg-warning-bg p-3 text-body text-warning">
       {children}
     </div>
   );
@@ -432,7 +427,7 @@ function SuccessNotice({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+    <div className="rounded-md border border-success-border bg-success-bg p-3 text-body text-success">
       {children}
     </div>
   );

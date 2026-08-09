@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/patterns/page-header";
 import type { AdditionalStudyCandidate } from "@/features/sessions/attendance-data";
 import {
   Card,
@@ -35,6 +36,7 @@ interface SessionDetailPageProps {
   canViewResults: boolean;
   canViewStudents: boolean;
   detail: SessionDetailReadModel;
+  directoryQuery?: string;
 }
 
 export function SessionDetailPage({
@@ -47,14 +49,15 @@ export function SessionDetailPage({
   canViewResults,
   canViewStudents,
   detail,
+  directoryQuery = "",
 }: SessionDetailPageProps) {
   return (
-    <div className="grid min-w-0 gap-4">
-      <section className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card md:p-5">
-        <nav className="mb-4 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+    <div className="grid min-w-0 gap-6">
+      <section className="grid gap-4">
+        <nav aria-label="Điều hướng buổi học" className="flex flex-wrap items-center gap-2 text-secondary text-text-muted">
           <Link
-            className="font-semibold text-primary hover:underline"
-            href="/sessions"
+            className="font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+            href={directoryQuery ? `/sessions?${directoryQuery}` : "/sessions"}
           >
             Buổi học
           </Link>
@@ -66,21 +69,12 @@ export function SessionDetailPage({
           </span>
         </nav>
 
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold text-ink md:text-3xl">
-                {detail.classCode} –{" "}
-                {detail.className}
-              </h1>
-
-              <SessionStatusBadge
-                lockedAt={detail.lockedAt}
-                status={detail.status}
-              />
-            </div>
-
-            <p className="mt-2 text-sm text-ink-muted">
+        <PageHeader
+          context={<><SessionStatusBadge status={detail.status} />{detail.lockedAt ? <Badge tone="neutral">Đã khóa</Badge> : null}</>}
+          title={`${detail.classCode} – ${detail.className}`}
+          actions={<Link className="inline-flex min-h-10 items-center justify-center rounded-md border border-border-subtle bg-surface-base px-4 text-control font-semibold text-text-strong hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={`/classes/${detail.classId}`}>Xem lớp học</Link>}
+        >
+            <p className="mt-1 text-secondary text-text-muted">
               {formatDate(detail.sessionDate)}
               {" · "}
               {formatTime(detail.startTime)}
@@ -88,62 +82,8 @@ export function SessionDetailPage({
               {formatTime(detail.endTime)}
             </p>
 
-            <div className="mt-3 flex flex-wrap gap-2">
-              <SessionKindBadge
-                kind={detail.sessionKind}
-              />
-
-              <Badge tone="neutral">
-                {formatMode(detail.learningMode)}
-              </Badge>
-
-              {detail.componentCode ? (
-                <Badge tone="info">
-                  Thành phần{" "}
-                  {detail.componentCode}
-                </Badge>
-              ) : null}
-
-              <Badge tone="neutral">
-                Khối {detail.grade} · Mức{" "}
-                {detail.level}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Link
-              className="inline-flex min-h-10 items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink transition hover:bg-surface-2"
-              href={`/classes/${detail.classId}`}
-            >
-              Xem lớp học
-            </Link>
-
-            {canManageSessions ? (
-              <Badge tone="success">
-                Quản lý buổi
-              </Badge>
-            ) : null}
-
-            {canMarkAttendance ? (
-              <Badge tone="success">
-                Nhập điểm danh
-              </Badge>
-            ) : null}
-
-            {canManageResults ? (
-              <Badge tone="success">
-                Nhập kết quả
-              </Badge>
-            ) : null}
-
-            {canLockSession ? (
-              <Badge tone="purple">
-                Khóa buổi
-              </Badge>
-            ) : null}
-          </div>
-        </div>
+            <p className="mt-2 text-secondary text-text-muted">{formatKind(detail.sessionKind)}{detail.componentCode ? ` · ${detail.componentCode}` : ""} · {formatMode(detail.learningMode)} · Khối {detail.grade} · Mức {detail.level}{detail.roomName ? ` · ${detail.roomName}` : ""}</p>
+        </PageHeader>
       </section>
 
       {canManageSessions ? (
@@ -155,46 +95,6 @@ export function SessionDetailPage({
           status={detail.status}
         />
       ) : null}
-
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          label="Roster"
-          value={
-            detail.rosterCount === null
-              ? "Không có quyền"
-              : String(detail.rosterCount)
-          }
-        />
-
-        <SummaryCard
-          label="Đã điểm danh"
-          value={
-            detail.attendanceCount === null
-              ? "Không có quyền"
-              : String(
-                  detail.attendanceCount,
-                )
-          }
-        />
-
-        <SummaryCard
-          label="Đã có kết quả"
-          value={
-            detail.resultCount === null
-              ? "Không có quyền"
-              : String(detail.resultCount)
-          }
-        />
-
-        <SummaryCard
-          label="Dữ liệu"
-          value={
-            detail.lockedAt
-              ? "Đã khóa"
-              : "Chưa khóa"
-          }
-        />
-      </section>
 
       {canViewAttendance ||
       canMarkAttendance ? (
@@ -609,21 +509,7 @@ function AttendanceBadge({
   );
 }
 
-function SessionStatusBadge({
-  lockedAt,
-  status,
-}: {
-  lockedAt: string | null;
-  status: SessionStatus;
-}) {
-  if (lockedAt) {
-    return (
-      <Badge tone="neutral">
-        Đã khóa
-      </Badge>
-    );
-  }
-
+function SessionStatusBadge({ status }: { status: SessionStatus }) {
   const labels: Record<
     SessionStatus,
     string
@@ -636,56 +522,18 @@ function SessionStatusBadge({
 
   const tones: Record<
     SessionStatus,
-    "info" | "neutral" | "purple" | "success"
+    "info" | "neutral" | "success"
   > = {
     cancelled: "neutral",
     completed: "success",
     in_progress: "info",
-    scheduled: "purple",
+    scheduled: "info",
   };
 
   return (
     <Badge tone={tones[status]}>
       {labels[status]}
     </Badge>
-  );
-}
-
-function SessionKindBadge({
-  kind,
-}: {
-  kind: SessionKind;
-}) {
-  return (
-    <Badge
-      tone={
-        kind === "regular"
-          ? "info"
-          : "neutral"
-      }
-    >
-      {formatKind(kind)}
-    </Badge>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <section className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
-      <p className="text-sm font-medium text-ink-muted">
-        {label}
-      </p>
-
-      <p className="mt-2 text-xl font-bold text-ink">
-        {value}
-      </p>
-    </section>
   );
 }
 

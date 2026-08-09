@@ -1,10 +1,17 @@
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { SessionCreateForm } from "@/features/sessions/components/session-create-form";
+import { getSessionDirectoryQuery } from "@/features/sessions/session-directory-url-state";
 import { getSessionCreationOptions } from "@/features/sessions/create-data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
-export default async function NewSessionRoute() {
+interface NewSessionRouteProps { searchParams: Promise<Record<string, string | string[] | undefined>>; }
+
+export default async function NewSessionRoute({ searchParams }: NewSessionRouteProps) {
+  const resolvedSearchParams = await searchParams;
+  const directoryQuery = getSessionDirectoryQuery(new URLSearchParams(
+    Object.entries(resolvedSearchParams).flatMap(([key, value]) => typeof value === "string" ? [[key, value]] : []),
+  ));
   const permissionResult =
     await getCachedDatabasePermissions();
 
@@ -64,6 +71,7 @@ export default async function NewSessionRoute() {
       }
       classes={optionsResult.classes}
       schedules={optionsResult.schedules}
+      directoryQuery={directoryQuery}
     />
   );
 }

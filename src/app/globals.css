@@ -288,6 +288,40 @@
   }
 }
 
+/* Wave 5 Sessions: choose dense filters/table only when the operational work area is safe. */
+.sessions-directory {
+  container-type: inline-size;
+}
+
+.sessions-filter-bar,
+.sessions-directory-table {
+  display: none;
+}
+
+.sessions-directory-record-list {
+  display: grid;
+}
+
+.sessions-filter-trigger {
+  display: inline-flex;
+}
+
+@container (min-width: 1120px) {
+  .sessions-filter-bar,
+  .sessions-directory-table {
+    display: block;
+  }
+
+  .sessions-filter-trigger,
+  .sessions-directory-record-list {
+    display: none;
+  }
+
+  .sessions-filter-fields {
+    grid-template-columns: minmax(220px, 1.45fr) repeat(5, minmax(118px, 1fr)) auto;
+  }
+}
+
 .dark, [data-theme="dark"] {
   --background: oklch(0.14 0.02 260);
   --foreground: oklch(0.94 0.01 250);

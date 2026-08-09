@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/patterns/page-header";
 import {
   Card,
   CardContent,
@@ -35,6 +36,7 @@ interface SessionCreateFormProps {
   cancelledSessions: CancelledSessionOption[];
   classes: SessionCreationClassOption[];
   schedules: SessionScheduleOption[];
+  directoryQuery?: string;
 }
 
 interface FormState {
@@ -71,6 +73,7 @@ export function SessionCreateForm({
   cancelledSessions,
   classes,
   schedules,
+  directoryQuery = "",
 }: SessionCreateFormProps) {
   const router = useRouter();
 
@@ -308,9 +311,13 @@ export function SessionCreateForm({
       setActionState(result);
 
       if (result.status === "success") {
-        router.push(
+        const redirectTo =
           result.redirectTo ??
-            `/sessions/${result.sessionId}`,
+          `/sessions/${result.sessionId}`;
+        router.push(
+          directoryQuery
+            ? `${redirectTo}?${directoryQuery}`
+            : redirectTo,
         );
         router.refresh();
       }
@@ -318,12 +325,12 @@ export function SessionCreateForm({
   };
 
   return (
-    <div className="grid min-w-0 gap-4">
-      <section className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card md:p-5">
-        <nav className="mb-4 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+    <div className="grid min-w-0 gap-6">
+      <section className="grid gap-4">
+        <nav aria-label="Điều hướng tạo buổi học" className="flex flex-wrap items-center gap-2 text-secondary text-text-muted">
           <Link
-            className="font-semibold text-primary hover:underline"
-            href="/sessions"
+            className="font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+            href={directoryQuery ? `/sessions?${directoryQuery}` : "/sessions"}
           >
             Buổi học
           </Link>
@@ -335,15 +342,13 @@ export function SessionCreateForm({
           </span>
         </nav>
 
-        <h1 className="text-2xl font-bold text-ink md:text-3xl">
-          Tạo buổi học
-        </h1>
-
-        <p className="mt-2 text-sm text-ink-muted">
+        <PageHeader title="Tạo buổi học">
+        <p className="mt-1 text-secondary text-text-muted">
           Chọn buổi chính, buổi bù hoặc buổi bổ
           sung. Dữ liệu chỉ được lưu qua workflow
           đã phân quyền.
         </p>
+        </PageHeader>
       </section>
 
       {classes.length === 0 ? (
@@ -803,17 +808,17 @@ export function SessionCreateForm({
             {actionState?.status ===
             "error" ? (
               <div
-                className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700"
+                className="rounded-md border border-danger-border bg-danger-bg p-3 text-body font-medium text-danger"
                 role="alert"
               >
                 {actionState.message}
               </div>
             ) : null}
 
-            <div className="flex flex-wrap justify-end gap-2 rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
+            <div className="flex flex-wrap justify-end gap-2 rounded-lg border border-border-subtle bg-surface-base p-4">
               <Link
-                className="inline-flex min-h-10 items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink transition hover:bg-surface-2"
-                href="/sessions"
+                className="inline-flex min-h-10 items-center justify-center rounded-md border border-border-strong bg-surface-base px-4 text-control font-semibold text-text-strong transition hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+                href={directoryQuery ? `/sessions?${directoryQuery}` : "/sessions"}
               >
                 Hủy
               </Link>
@@ -846,11 +851,11 @@ function FormField({
   required?: boolean;
 }) {
   return (
-    <label className="grid gap-1.5 text-sm font-semibold text-ink">
+    <label className="grid gap-1.5 text-label font-semibold text-text-strong">
       <span>
         {label}
         {required ? (
-          <span className="text-red-600">
+          <span className="text-danger">
             {" "}
             *
           </span>
@@ -860,7 +865,7 @@ function FormField({
       {children}
 
       {error ? (
-        <span className="text-xs font-medium text-red-600">
+        <span className="text-caption font-medium text-danger">
           {error}
         </span>
       ) : null}
@@ -874,7 +879,7 @@ function Notice({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+    <div className="rounded-md border border-warning-border bg-warning-bg p-3 text-body text-warning">
       {children}
     </div>
   );
@@ -970,4 +975,4 @@ function formatKind(
 }
 
 const inputClassName =
-  "h-11 min-w-0 rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-surface-2";
+  "h-11 min-w-0 rounded-md border border-border-subtle bg-field-bg px-3 text-body font-normal text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:bg-disabled-bg";
