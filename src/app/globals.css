@@ -500,6 +500,44 @@
   }
 }
 
+/* Staff 1: query the zero-padding directory work area. The two extra pixels
+   let a 1180px table remain fully visible inside DataTableFrame borders. */
+.staff-directory-work-area,
+.staff-rate-history-work-area {
+  container-type: inline-size;
+}
+
+.staff-directory-table,
+.staff-rate-history-table {
+  display: none;
+}
+
+.staff-directory-record-list,
+.staff-rate-history-record-list {
+  display: grid;
+}
+
+@container (min-width: 1182px) {
+  .staff-directory-table {
+    display: block;
+  }
+
+  .staff-directory-record-list {
+    display: none;
+  }
+}
+
+/* The rate table has a separate 760px readable inner width. */
+@container (min-width: 762px) {
+  .staff-rate-history-table {
+    display: block;
+  }
+
+  .staff-rate-history-record-list {
+    display: none;
+  }
+}
+
 .dark, [data-theme="dark"] {
   --background: oklch(0.14 0.02 260);
   --foreground: oklch(0.94 0.01 250);
