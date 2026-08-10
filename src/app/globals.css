@@ -349,6 +349,30 @@
   }
 }
 
+/* Finance 2: this zero-padding work area is the SePay table/list query container. */
+.sepay-transaction-operational-work-area {
+  container-type: inline-size;
+}
+
+.sepay-transaction-directory-table {
+  display: none;
+}
+
+.sepay-transaction-directory-record-list {
+  display: grid;
+}
+
+/* DataTableFrame owns a one-pixel border on each side of its 1200px table. */
+@container (min-width: 1202px) {
+  .sepay-transaction-directory-table {
+    display: block;
+  }
+
+  .sepay-transaction-directory-record-list {
+    display: none;
+  }
+}
+
 /* Wave 5 Sessions: choose dense filters/table only when the operational work area is safe. */
 .sessions-directory {
   container-type: inline-size;
