@@ -11,6 +11,7 @@ const dependencies = vi.hoisted(() => ({
   getStaffDetail: vi.fn(),
   getStaffDirectory: vi.fn(),
 }));
+const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 
 vi.mock("@/lib/permissions/database-permissions", () => ({
   getCachedDatabasePermissions: dependencies.getCachedDatabasePermissions,
@@ -23,6 +24,8 @@ vi.mock("@/features/staff/data", () => ({
   getStaffDirectory: dependencies.getStaffDirectory,
 }));
 vi.mock("@/features/staff/role-actions", () => ({ assignStaffRoleAction: vi.fn(), revokeStaffRoleAction: vi.fn() }));
+vi.mock("@/features/staff/staff-actions", () => ({ createStaffRateVersionAction: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const selfStaffId = "11111111-1111-4111-8111-111111111111";
 const selfDetail: StaffDetailReadModel = {
@@ -156,6 +159,63 @@ describe("Staff route authority", () => {
     });
     expect(screen.getByRole("heading", { name: "Lịch sử đơn giá theo phiên bản" })).toBeInTheDocument();
     expect(screen.getAllByText(/120\.000/)).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Thêm phiên bản đơn giá" })).not.toBeInTheDocument();
+  });
+
+  it("mounts rate history and the add-rate trigger only for staff.manage_rates", async () => {
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["staff.view", "staff.manage_rates"],
+    });
+    dependencies.getCurrentAuthUser.mockResolvedValueOnce({
+      ok: true,
+      user: {
+        avatarUrl: undefined,
+        displayName: "Quản lý",
+        email: "manager@example.com",
+        id: "44444444-4444-4444-8444-444444444444",
+        initials: "QL",
+      },
+    });
+    dependencies.getStaffDetail.mockResolvedValueOnce({ ok: true, detail: selfDetail });
+
+    render(await StaffDetailRoute({ params: Promise.resolve({ staffId: selfStaffId }) }));
+
+    expect(dependencies.getStaffDetail).toHaveBeenCalledWith(selfStaffId, {
+      includeRateVersions: true,
+      includeRoles: false,
+    });
+    expect(screen.getByRole("heading", { name: "Lịch sử đơn giá theo phiên bản" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Thêm phiên bản đơn giá" })).toBeInTheDocument();
+  });
+
+  it("does not load rate history for another staff member without staff.manage_rates", async () => {
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["staff.view"],
+    });
+    dependencies.getCurrentAuthUser.mockResolvedValueOnce({
+      ok: true,
+      user: {
+        avatarUrl: undefined,
+        displayName: "Người xem",
+        email: "viewer@example.com",
+        id: "55555555-5555-4555-8555-555555555555",
+        initials: "NX",
+      },
+    });
+    dependencies.getStaffDetail.mockResolvedValueOnce({
+      ok: true,
+      detail: { ...selfDetail, rateVersions: null },
+    });
+
+    render(await StaffDetailRoute({ params: Promise.resolve({ staffId: selfStaffId }) }));
+
+    expect(dependencies.getStaffDetail).toHaveBeenCalledWith(selfStaffId, {
+      includeRateVersions: false,
+      includeRoles: false,
+    });
+    expect(screen.queryByRole("heading", { name: "Lịch sử đơn giá theo phiên bản" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Thêm phiên bản đơn giá" })).not.toBeInTheDocument();
   });
 });

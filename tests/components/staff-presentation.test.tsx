@@ -84,6 +84,16 @@ describe("Staff 1 presentation", () => {
     expect(screen.queryByRole("button", { name: "Chỉnh sửa hồ sơ" })).not.toBeInTheDocument();
   });
 
+  it("keeps rate-history rows immutable and separate from payroll interpretation", () => {
+    render(<StaffDetailPage canManageProfile={false} canManageRateVersions={false} canViewRateVersions canViewRoles={false} detail={detail} />);
+
+    expect(screen.getAllByText(/120\.000/)).not.toHaveLength(0);
+    expect(screen.getAllByText(/60\.000/)).not.toHaveLength(0);
+    expect(screen.getAllByText("Mức khởi điểm")).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /chỉnh sửa đơn giá|xóa đơn giá|kích hoạt|chọn đơn giá|tính lương/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/lương tháng|giờ × đơn giá|gross|net/i)).not.toBeInTheDocument();
+  });
+
   it("exposes the existing profile-edit trigger only for the permitted detail presentation", () => {
     render(<StaffDetailPage canManageProfile canManageRateVersions={false} canViewRateVersions={false} canViewRoles detail={detail} />);
 
