@@ -23,6 +23,9 @@ export async function getCrmLeadDirectory(
   filters: CrmDirectoryFilters = {},
 ): Promise<CrmDirectoryResult> {
   const supabase = await createSupabaseServerClient();
+  const leadSourceRelation = filters.leadSourceCode
+    ? "lead_source:crm_lead_sources!inner(name, code)"
+    : "lead_source:crm_lead_sources(name, code)";
 
   let query = supabase
     .from("crm_cases")
@@ -41,7 +44,7 @@ export async function getCrmLeadDirectory(
       created_at,
       sale_owner_id,
       student_id,
-      lead_source:crm_lead_sources(name, code),
+      ${leadSourceRelation},
       sale_owner:profiles!crm_cases_sale_owner_id_fkey(display_name)
     `,
       { count: "exact" },
@@ -57,6 +60,10 @@ export async function getCrmLeadDirectory(
 
   if (filters.saleOwnerId) {
     query = query.eq("sale_owner_id", filters.saleOwnerId);
+  }
+
+  if (filters.leadSourceCode) {
+    query = query.eq("lead_source.code", filters.leadSourceCode);
   }
 
   if (filters.search) {
