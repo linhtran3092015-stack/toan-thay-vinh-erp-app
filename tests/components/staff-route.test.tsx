@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import StaffDetailRoute from "@/app/(app)/staff/[staffId]/page";
 import StaffRoute from "@/app/(app)/staff/page";
-import type { StaffDetailReadModel } from "@/features/staff/types";
+import type { StaffDetailReadModel, StaffDirectoryMember, StaffRoleOption } from "@/features/staff/types";
 
 const dependencies = vi.hoisted(() => ({
   getCurrentAuthUser: vi.fn(),
@@ -48,6 +48,25 @@ const selfDetail: StaffDetailReadModel = {
   roles: null,
 };
 
+const directoryMember: StaffDirectoryMember = {
+  ...selfDetail,
+  roles: [{
+    assignedAt: "2025-08-01T00:00:00Z",
+    assignmentId: "22222222-2222-4222-8222-222222222222",
+    code: "teacher",
+    id: "33333333-3333-4333-8333-333333333333",
+    name: "Giáo viên",
+  }],
+};
+
+const roleOptions: StaffRoleOption[] = [{
+  code: "teacher",
+  description: "Giảng dạy",
+  id: "33333333-3333-4333-8333-333333333333",
+  isSystem: false,
+  name: "Giáo viên",
+}];
+
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("Staff route authority", () => {
@@ -58,6 +77,58 @@ describe("Staff route authority", () => {
 
     expect(screen.getByRole("heading", { name: "Không có quyền xem danh sách nhân sự" })).toBeInTheDocument();
     expect(dependencies.getStaffDirectory).not.toHaveBeenCalled();
+  });
+
+  it("requires the existing staff.roles.view plus staff.roles.manage composition before mounting role mutation", async () => {
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["staff.view", "staff.roles.manage"],
+    });
+    dependencies.getStaffDirectory.mockResolvedValueOnce({
+      members: [directoryMember],
+      ok: true,
+      roleOptions,
+    });
+
+    const noRoleView = render(await StaffRoute());
+
+    expect(dependencies.getStaffDirectory).toHaveBeenCalledWith({ includeRoles: false });
+    expect(screen.queryByRole("heading", { name: "Quản lý vai trò" })).not.toBeInTheDocument();
+    noRoleView.unmount();
+
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["staff.view", "staff.roles.view"],
+    });
+    dependencies.getStaffDirectory.mockResolvedValueOnce({
+      members: [directoryMember],
+      ok: true,
+      roleOptions,
+    });
+
+    const roleViewer = render(await StaffRoute());
+
+    expect(dependencies.getStaffDirectory).toHaveBeenLastCalledWith({ includeRoles: true });
+    expect(screen.getAllByText("Giáo viên")).not.toHaveLength(0);
+    expect(screen.queryByRole("heading", { name: "Quản lý vai trò" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Mở quản lý vai trò")).not.toBeInTheDocument();
+    expect(screen.queryByText("Thu hồi: Giáo viên")).not.toBeInTheDocument();
+    roleViewer.unmount();
+
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["staff.view", "staff.roles.view", "staff.roles.manage"],
+    });
+    dependencies.getStaffDirectory.mockResolvedValueOnce({
+      members: [directoryMember],
+      ok: true,
+      roleOptions,
+    });
+
+    render(await StaffRoute());
+
+    expect(dependencies.getStaffDirectory).toHaveBeenLastCalledWith({ includeRoles: true });
+    expect(screen.getAllByRole("heading", { name: "Quản lý vai trò" })).not.toHaveLength(0);
   });
 
   it("allows a staff member to view their own rate history without granting rate mutation", async () => {

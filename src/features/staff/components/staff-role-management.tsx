@@ -2,11 +2,14 @@
 
 import {
   useActionState,
+  useCallback,
   useEffect,
   useId,
   useRef,
+  useState,
 } from "react";
 
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
 import {
   assignStaffRoleAction,
@@ -21,7 +24,6 @@ import type {
   StaffRoleOption,
   StaffRoleSummary,
 } from "@/features/staff/types";
-import { cn } from "@/lib/utils";
 
 interface StaffRoleManagementProps {
   member: StaffDirectoryMember;
@@ -32,13 +34,25 @@ export function StaffRoleManagement({
   member,
   roleOptions,
 }: StaffRoleManagementProps) {
+  const headingId = useId();
+  const [pendingActionId, setPendingActionId] = useState<string | null>(null);
+  const onPendingChange = useCallback((actionId: string, pending: boolean) => {
+    setPendingActionId((current) => {
+      if (pending) {
+        return actionId;
+      }
+
+      return current === actionId ? null : current;
+    });
+  }, []);
+
   if (member.roles === null) {
     return null;
   }
 
   if (member.employmentStatus !== "active") {
     return (
-      <p className="mt-2 text-xs leading-5 text-ink-muted">
+      <p className="mt-2 text-secondary text-text-muted">
         Chỉ có thể cấp vai trò cho nhân sự đang hoạt động.
       </p>
     );
@@ -53,43 +67,66 @@ export function StaffRoleManagement({
   );
 
   return (
-    <details className="mt-3 rounded-lg border border-hairline bg-canvas">
-      <summary className="flex min-h-11 cursor-pointer select-none items-center px-3 py-2 text-xs font-semibold text-primary">
+    <section aria-busy={Boolean(pendingActionId) || undefined} aria-labelledby={headingId} className="mt-3 grid gap-2">
+      <h3 className="text-label text-text-muted" id={headingId}>
         Quản lý vai trò
-      </summary>
+      </h3>
 
-      <div className="grid gap-4 border-t border-hairline p-3">
-        <AssignRoleForm
-          availableRoles={availableRoles}
-          member={member}
-        />
+      <details className="rounded-lg border border-border-subtle bg-surface-base">
+        <summary
+          aria-disabled={pendingActionId ? true : undefined}
+          className="flex min-h-11 cursor-pointer select-none items-center px-3 py-2 text-control font-semibold text-action-link focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+          onClick={(event) => {
+            if (pendingActionId) {
+              event.preventDefault();
+            }
+          }}
+        >
+          Mở quản lý vai trò
+        </summary>
 
-        {member.roles.length > 0 ? (
-          <div className="grid gap-2 border-t border-hairline pt-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-              Thu hồi vai trò đang có
-            </p>
+        <div className="grid gap-4 border-t border-border-subtle p-3">
+          <AssignRoleForm
+            availableRoles={availableRoles}
+            member={member}
+            onPendingChange={onPendingChange}
+          />
 
-            {member.roles.map((role) => (
-              <RevokeRoleForm key={role.assignmentId} role={role} />
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </details>
+          {member.roles.length > 0 ? (
+            <section aria-labelledby={`${headingId}-revoke`} className="grid gap-2 border-t border-border-subtle pt-3">
+              <h4 className="text-label text-text-muted" id={`${headingId}-revoke`}>
+                Thu hồi vai trò đang có
+              </h4>
+
+              {member.roles.map((role) => (
+                <RevokeRoleForm
+                  key={role.assignmentId}
+                  onPendingChange={onPendingChange}
+                  role={role}
+                />
+              ))}
+            </section>
+          ) : null}
+        </div>
+      </details>
+    </section>
   );
 }
 
 function AssignRoleForm({
   availableRoles,
   member,
+  onPendingChange,
 }: {
   availableRoles: readonly StaffRoleOption[];
   member: StaffDirectoryMember;
+  onPendingChange: (actionId: string, pending: boolean) => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const roleId = useId();
+  const roleErrorId = useId();
   const reasonId = useId();
+  const reasonErrorId = useId();
 
   const [state, formAction, pending] = useActionState(
     assignStaffRoleAction,
@@ -102,6 +139,12 @@ function AssignRoleForm({
     }
   }, [state.status]);
 
+  useEffect(() => {
+    onPendingChange("assign", pending);
+
+    return () => onPendingChange("assign", false);
+  }, [onPendingChange, pending]);
+
   return (
     <form
       action={formAction}
@@ -112,14 +155,16 @@ function AssignRoleForm({
 
       <div>
         <label
-          className="text-xs font-semibold text-ink"
+          className="text-label text-text-muted"
           htmlFor={roleId}
         >
-          Vai trò cần cấp
+          Vai trò cần cấp <span aria-hidden="true" className="text-danger">*</span>
         </label>
 
         <select
-          className="mt-1 h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:bg-neutral-bg disabled:text-ink-subtle"
+          aria-describedby={state.fieldErrors?.roleCode?.length ? roleErrorId : undefined}
+          aria-invalid={Boolean(state.fieldErrors?.roleCode?.length)}
+          className="mt-1 h-11 w-full rounded-md border border-border-subtle bg-field-bg px-3 text-control text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled"
           defaultValue=""
           disabled={pending || availableRoles.length === 0}
           id={roleId}
@@ -139,19 +184,21 @@ function AssignRoleForm({
           ))}
         </select>
 
-        <FieldErrors errors={state.fieldErrors?.roleCode} />
+        <FieldErrors errors={state.fieldErrors?.roleCode} id={roleErrorId} />
       </div>
 
       <div>
         <label
-          className="text-xs font-semibold text-ink"
+          className="text-label text-text-muted"
           htmlFor={reasonId}
         >
-          Lý do cấp vai trò
+          Lý do cấp vai trò <span aria-hidden="true" className="text-danger">*</span>
         </label>
 
         <input
-          className="mt-1 h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:bg-neutral-bg"
+          aria-describedby={state.fieldErrors?.reason?.length ? reasonErrorId : undefined}
+          aria-invalid={Boolean(state.fieldErrors?.reason?.length)}
+          className="mt-1 h-11 w-full rounded-md border border-border-subtle bg-field-bg px-3 text-control text-text-strong outline-none transition placeholder:text-text-muted focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled"
           disabled={pending || availableRoles.length === 0}
           id={reasonId}
           maxLength={500}
@@ -161,7 +208,7 @@ function AssignRoleForm({
           type="text"
         />
 
-        <FieldErrors errors={state.fieldErrors?.reason} />
+        <FieldErrors errors={state.fieldErrors?.reason} id={reasonErrorId} />
         <FieldErrors errors={state.fieldErrors?.userId} />
       </div>
 
@@ -180,12 +227,15 @@ function AssignRoleForm({
 }
 
 function RevokeRoleForm({
+  onPendingChange,
   role,
 }: {
+  onPendingChange: (actionId: string, pending: boolean) => void;
   role: StaffRoleSummary;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const reasonId = useId();
+  const reasonErrorId = useId();
 
   const [state, formAction, pending] = useActionState(
     revokeStaffRoleAction,
@@ -198,15 +248,29 @@ function RevokeRoleForm({
     }
   }, [state.status]);
 
+  useEffect(() => {
+    onPendingChange(role.assignmentId, pending);
+
+    return () => onPendingChange(role.assignmentId, false);
+  }, [onPendingChange, pending, role.assignmentId]);
+
   return (
-    <details className="rounded-md border border-hairline bg-white">
-      <summary className="flex min-h-11 cursor-pointer select-none items-center px-3 py-2 text-xs font-semibold text-danger">
+    <details className="rounded-md border border-border-subtle bg-surface-base">
+      <summary
+        aria-disabled={pending || undefined}
+        className="flex min-h-11 cursor-pointer select-none items-center px-3 py-2 text-control font-semibold text-danger focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+        onClick={(event) => {
+          if (pending) {
+            event.preventDefault();
+          }
+        }}
+      >
         Thu hồi: {role.name}
       </summary>
 
       <form
         action={formAction}
-        className="grid gap-3 border-t border-hairline p-3"
+        className="grid gap-3 border-t border-border-subtle p-3"
         ref={formRef}
       >
         <input
@@ -217,14 +281,16 @@ function RevokeRoleForm({
 
         <div>
           <label
-            className="text-xs font-semibold text-ink"
+            className="text-label text-text-muted"
             htmlFor={reasonId}
           >
-            Lý do thu hồi
+            Lý do thu hồi <span aria-hidden="true" className="text-danger">*</span>
           </label>
 
           <input
-            className="mt-1 h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-danger focus:ring-[3px] focus:ring-danger/15 disabled:bg-neutral-bg"
+            aria-describedby={state.fieldErrors?.reason?.length ? reasonErrorId : undefined}
+            aria-invalid={Boolean(state.fieldErrors?.reason?.length)}
+            className="mt-1 h-11 w-full rounded-md border border-border-subtle bg-field-bg px-3 text-control text-text-strong outline-none transition placeholder:text-text-muted focus:border-danger focus:ring-[3px] focus:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled"
             disabled={pending}
             id={reasonId}
             maxLength={500}
@@ -234,7 +300,7 @@ function RevokeRoleForm({
             type="text"
           />
 
-          <FieldErrors errors={state.fieldErrors?.reason} />
+          <FieldErrors errors={state.fieldErrors?.reason} id={reasonErrorId} />
           <FieldErrors errors={state.fieldErrors?.assignmentId} />
         </div>
 
@@ -256,17 +322,19 @@ function RevokeRoleForm({
 
 function FieldErrors({
   errors,
+  id,
 }: {
   errors: string[] | undefined;
+  id?: string;
 }) {
   if (!errors?.length) {
     return null;
   }
 
   return (
-    <div className="mt-1 grid gap-1">
+    <div className="mt-1 grid gap-1" id={id}>
       {errors.map((error) => (
-        <p className="text-xs text-danger" key={error}>
+        <p className="text-caption text-danger" key={error}>
           {error}
         </p>
       ))}
@@ -284,17 +352,9 @@ function ActionMessage({
   }
 
   return (
-    <p
-      aria-live="polite"
-      className={cn(
-        "rounded-md border px-3 py-2 text-xs font-medium leading-5",
-        state.status === "success"
-          ? "border-success-border bg-success-bg text-success"
-          : "border-danger-border bg-danger-bg text-danger",
-      )}
-      role="status"
-    >
-      {state.message}
-    </p>
+    <ResultBanner
+      title={state.message}
+      tone={state.status === "success" ? "success" : "error"}
+    />
   );
 }
