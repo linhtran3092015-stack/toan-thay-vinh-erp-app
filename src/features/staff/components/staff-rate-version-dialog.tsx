@@ -48,10 +48,11 @@ export function StaffRateVersionDialog({
     initialStaffManagementActionState,
   );
   const [isPending, startTransition] = useTransition();
+  const isInteractionLocked = isPending && actionState.status !== "error";
   const fieldErrors = actionState.status === "error" ? actionState.fieldErrors ?? {} : {};
 
   const closeDialog = (): void => {
-    if (isPending) {
+    if (isInteractionLocked) {
       return;
     }
 
@@ -69,10 +70,11 @@ export function StaffRateVersionDialog({
   };
 
   const handleSubmit = (): void => {
-    if (isPending) {
+    if (isInteractionLocked) {
       return;
     }
 
+    setActionState(initialStaffManagementActionState);
     startTransition(async () => {
       const result = await createStaffRateVersionAction({
         effectiveFrom,
@@ -131,7 +133,7 @@ export function StaffRateVersionDialog({
             }}
           >
             <InputField
-              disabled={isPending}
+              disabled={isInteractionLocked}
               error={fieldErrors.effectiveFrom?.[0]}
               id={effectiveFromId}
               inputRef={effectiveFromRef}
@@ -142,7 +144,7 @@ export function StaffRateVersionDialog({
               value={effectiveFrom}
             />
             <InputField
-              disabled={isPending}
+              disabled={isInteractionLocked}
               error={fieldErrors.offlineHourlyRateVnd?.[0]}
               helpId={offlineRateHintId}
               helpText="Nhập số nguyên VND không âm và là số chẵn để xem trước mức online 50%."
@@ -162,7 +164,7 @@ export function StaffRateVersionDialog({
               </p>
             </div>
             <TextAreaField
-              disabled={isPending}
+              disabled={isInteractionLocked}
               error={fieldErrors.note?.[0]}
               id={noteId}
               label="Ghi chú"
@@ -171,7 +173,7 @@ export function StaffRateVersionDialog({
               value={note}
             />
             <TextAreaField
-              disabled={isPending}
+              disabled={isInteractionLocked}
               error={fieldErrors.reason?.[0]}
               id={reasonId}
               label="Lý do thêm phiên bản"
@@ -192,15 +194,15 @@ export function StaffRateVersionDialog({
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 className="min-h-11"
-                disabled={isPending}
+                disabled={isInteractionLocked}
                 onClick={closeDialog}
                 type="button"
                 variant="ghost"
               >
                 Hủy
               </Button>
-              <Button className="min-h-11" disabled={isPending} isLoading={isPending} type="submit">
-                {isPending ? "Đang lưu..." : "Thêm phiên bản"}
+              <Button className="min-h-11" disabled={isInteractionLocked} isLoading={isInteractionLocked} type="submit">
+                {isInteractionLocked ? "Đang lưu..." : "Thêm phiên bản"}
               </Button>
             </div>
           </form>

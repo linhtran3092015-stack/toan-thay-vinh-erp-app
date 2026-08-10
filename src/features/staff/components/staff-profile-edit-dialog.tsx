@@ -45,6 +45,7 @@ export function StaffProfileEditDialog({ detail }: StaffProfileEditDialogProps) 
   const [reason, setReason] = useState("");
   const [actionState, setActionState] = useState<StaffManagementActionState>(initialStaffManagementActionState);
   const [isPending, startTransition] = useTransition();
+  const isInteractionLocked = isPending && actionState.status !== "error";
   const fieldErrors = actionState.status === "error" ? actionState.fieldErrors ?? {} : {};
 
   const openDialog = (): void => {
@@ -60,14 +61,15 @@ export function StaffProfileEditDialog({ detail }: StaffProfileEditDialogProps) 
   };
 
   const closeDialog = (): void => {
-    if (isPending) return;
+    if (isInteractionLocked) return;
     setIsOpen(false);
     setReason("");
     setActionState(initialStaffManagementActionState);
   };
 
   const handleSubmit = (): void => {
-    if (isPending) return;
+    if (isInteractionLocked) return;
+    setActionState(initialStaffManagementActionState);
     startTransition(async () => {
       const result = await updateStaffProfileAction({
         displayName,
@@ -107,25 +109,25 @@ export function StaffProfileEditDialog({ detail }: StaffProfileEditDialogProps) 
 
           <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); handleSubmit(); }}>
             <ReadOnlyField label="Email" value={detail.email} />
-            <InputField disabled={isPending} error={fieldErrors.displayName?.[0]} id={displayNameId} inputRef={displayNameRef} label="Tên hiển thị" onChange={setDisplayName} value={displayName} />
-            <InputField disabled={isPending} error={fieldErrors.employeeCode?.[0]} id={employeeCodeId} label="Mã nhân sự" onChange={setEmployeeCode} value={employeeCode} />
-            <InputField disabled={isPending} error={fieldErrors.phone?.[0]} id={phoneId} label="Số điện thoại" onChange={setPhone} value={phone} />
+            <InputField disabled={isInteractionLocked} error={fieldErrors.displayName?.[0]} id={displayNameId} inputRef={displayNameRef} label="Tên hiển thị" onChange={setDisplayName} value={displayName} />
+            <InputField disabled={isInteractionLocked} error={fieldErrors.employeeCode?.[0]} id={employeeCodeId} label="Mã nhân sự" onChange={setEmployeeCode} value={employeeCode} />
+            <InputField disabled={isInteractionLocked} error={fieldErrors.phone?.[0]} id={phoneId} label="Số điện thoại" onChange={setPhone} value={phone} />
             <ControlField error={fieldErrors.employmentStatus?.[0]} id={statusId} label="Trạng thái làm việc">
-              <select className={inputClassName} disabled={isPending} id={statusId} onChange={(event) => { const value = event.target.value as "active" | "inactive" | "suspended"; setEmploymentStatus(value); if (value !== "inactive") setLeftAt(""); }} value={employmentStatus}>
+              <select className={inputClassName} disabled={isInteractionLocked} id={statusId} onChange={(event) => { const value = event.target.value as "active" | "inactive" | "suspended"; setEmploymentStatus(value); if (value !== "inactive") setLeftAt(""); }} value={employmentStatus}>
                 <option value="active">Đang làm việc</option><option value="suspended">Tạm khóa</option><option value="inactive">Đã nghỉ</option>
               </select>
             </ControlField>
-            <InputField disabled={isPending} error={fieldErrors.joinedAt?.[0]} id={joinedAtId} label="Ngày vào làm" onChange={setJoinedAt} type="date" value={joinedAt} />
-            {employmentStatus === "inactive" ? <InputField disabled={isPending} error={fieldErrors.leftAt?.[0]} id={leftAtId} label="Ngày nghỉ" onChange={setLeftAt} required type="date" value={leftAt} /> : null}
+            <InputField disabled={isInteractionLocked} error={fieldErrors.joinedAt?.[0]} id={joinedAtId} label="Ngày vào làm" onChange={setJoinedAt} type="date" value={joinedAt} />
+            {employmentStatus === "inactive" ? <InputField disabled={isInteractionLocked} error={fieldErrors.leftAt?.[0]} id={leftAtId} label="Ngày nghỉ" onChange={setLeftAt} required type="date" value={leftAt} /> : null}
             <ControlField className="sm:col-span-2" error={fieldErrors.reason?.[0]} id={reasonId} label="Lý do cập nhật">
-              <textarea className={`${inputClassName} min-h-24 resize-y py-3`} disabled={isPending} id={reasonId} maxLength={2000} onChange={(event) => setReason(event.target.value)} required value={reason} />
+              <textarea className={`${inputClassName} min-h-24 resize-y py-3`} disabled={isInteractionLocked} id={reasonId} maxLength={2000} onChange={(event) => setReason(event.target.value)} required value={reason} />
             </ControlField>
 
             {actionState.status === "error" ? <ResultBanner className="sm:col-span-2" description={actionState.message} title="Không thể cập nhật hồ sơ" tone="error" /> : null}
 
             <div className="flex flex-col-reverse gap-2 sm:col-span-2 sm:flex-row sm:justify-end">
-              <Button className="min-h-11" disabled={isPending} onClick={closeDialog} type="button" variant="ghost">Hủy</Button>
-              <Button className="min-h-11" disabled={isPending} isLoading={isPending} type="submit">{isPending ? "Đang lưu..." : "Lưu hồ sơ"}</Button>
+              <Button className="min-h-11" disabled={isInteractionLocked} onClick={closeDialog} type="button" variant="ghost">Hủy</Button>
+              <Button className="min-h-11" disabled={isInteractionLocked} isLoading={isInteractionLocked} type="submit">{isInteractionLocked ? "Đang lưu..." : "Lưu hồ sơ"}</Button>
             </div>
           </form>
         </div>
