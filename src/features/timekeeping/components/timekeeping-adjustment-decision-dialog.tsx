@@ -2,9 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import type {
   TimekeepingAdjustmentActionState,
   TimekeepingAdjustmentDecisionInput,
@@ -23,7 +25,9 @@ interface TimekeepingAdjustmentDecisionDialogProps {
   request: TimekeepingAdjustmentApprovalQueueEntry;
 }
 
-function getInitialValues(requestId: string): TimekeepingAdjustmentDecisionInput {
+function getInitialValues(
+  requestId: string,
+): TimekeepingAdjustmentDecisionInput {
   return {
     decision: "approved",
     decisionReason: "",
@@ -35,14 +39,23 @@ export function TimekeepingAdjustmentDecisionDialog({
   request,
 }: TimekeepingAdjustmentDecisionDialogProps) {
   const router = useRouter();
+  const openButtonRef = useRef<HTMLButtonElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [values, setValues] = useState<TimekeepingAdjustmentDecisionInput>(() =>
-    getInitialValues(request.id),
+  const [values, setValues] = useState<TimekeepingAdjustmentDecisionInput>(
+    () => getInitialValues(request.id),
   );
-  const [actionState, setActionState] = useState<TimekeepingAdjustmentActionState>(
-    initialTimekeepingAdjustmentActionState,
-  );
+  const [actionState, setActionState] =
+    useState<TimekeepingAdjustmentActionState>(
+      initialTimekeepingAdjustmentActionState,
+    );
+
+  // Stable IDs scoped to request.id — safe when multiple dialogs are mounted.
+  const titleId = `adj-decision-title-${request.id}`;
+  const descId = `adj-decision-desc-${request.id}`;
+  const decisionId = `adj-decision-decision-${request.id}`;
+  const reasonId = `adj-decision-reason-${request.id}`;
+  const reasonErrorId = `adj-decision-reason-error-${request.id}`;
 
   const openDialog = (): void => {
     setValues(getInitialValues(request.id));
@@ -70,166 +83,214 @@ export function TimekeepingAdjustmentDecisionDialog({
     });
   };
 
+  const reasonError = actionState.fieldErrors?.decisionReason?.[0];
+  const isRejection = values.decision === "rejected";
+
   return (
     <>
-      <Button onClick={openDialog} size="sm" variant="outline">
+      <Button
+        className="min-h-[44px]"
+        onClick={openDialog}
+        ref={openButtonRef}
+        size="sm"
+        variant="outline"
+      >
         Xử lý
       </Button>
 
-      {isOpen ? (
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-4"
-          role="dialog"
-        >
-          <form
-            className="my-auto grid w-full max-w-xl gap-5 rounded-lg border border-hairline bg-white p-5 shadow-xl"
-            onSubmit={handleSubmit}
-          >
+      <Dialog
+        ariaDescribedBy={descId}
+        ariaLabelledBy={titleId}
+        className="sm:max-w-xl"
+        isOpen={isOpen}
+        onClose={closeDialog}
+        returnFocusRef={openButtonRef}
+      >
+        <form className="grid gap-5 p-5" onSubmit={handleSubmit}>
+          <div>
+            <h2
+              className="text-section-title font-semibold text-text-strong"
+              id={titleId}
+            >
+              Xử lý yêu cầu điều chỉnh
+            </h2>
+            <p className="mt-1 text-secondary text-text-muted" id={descId}>
+              {request.requesterDisplayName ||
+                request.requesterEmployeeCode ||
+                "Nhân sự"}{" "}
+              · {formatVietnamDate(request.workDate)}
+            </p>
+          </div>
+
+          {/* Original vs. requested data — presentation only, no business semantics. */}
+          <dl className="grid gap-3 rounded-md border border-border-subtle bg-surface-raised p-4">
             <div>
-              <h2 className="text-lg font-semibold text-ink">Xử lý yêu cầu điều chỉnh</h2>
-              <p className="mt-1 text-sm leading-6 text-ink-muted">
-                {request.requesterDisplayName || request.requesterEmployeeCode || "Nhân sự"} · {formatVietnamDate(request.workDate)}
-              </p>
+              <dt className="text-label font-semibold uppercase tracking-[0.04em] text-text-muted">
+                Check-in
+              </dt>
+              <dd className="mt-1 grid gap-0.5 text-secondary text-text-muted">
+                <p>
+                  Gốc: {formatVietnamDateTime(request.originalCheckInAt)} ·{" "}
+                  {getTimeEntryModeLabel(request.originalCheckInMode)}
+                </p>
+                <p className="font-medium text-text-strong">
+                  Đề xuất: {formatVietnamDateTime(request.requestedCheckInAt)}{" "}
+                  · {getTimeEntryModeLabel(request.requestedCheckInMode)}
+                </p>
+              </dd>
             </div>
-
-            <dl className="grid gap-3 rounded-md border border-hairline bg-surface-2 p-4 text-sm">
-              <ChangeField
-                label="Check-in"
-                original={`${formatVietnamDateTime(request.originalCheckInAt)} · ${getTimeEntryModeLabel(request.originalCheckInMode)}`}
-                proposed={`${formatVietnamDateTime(request.requestedCheckInAt)} · ${getTimeEntryModeLabel(request.requestedCheckInMode)}`}
-              />
-              <ChangeField
-                label="Check-out"
-                original={`${formatVietnamDateTime(request.originalCheckOutAt)} · ${getTimeEntryModeLabel(request.originalCheckOutMode)}`}
-                proposed={`${formatVietnamDateTime(request.requestedCheckOutAt)} · ${getTimeEntryModeLabel(request.requestedCheckOutMode)}`}
-              />
-              <ChangeField label="Lý do" original={request.requestReason} />
-            </dl>
-
-            <div className="grid gap-4">
-              <FormField error={actionState.fieldErrors?.decision?.[0]} label="Quyết định">
-                <select
-                  className={formInputClassName}
-                  disabled={isPending}
-                  onChange={(event) =>
-                    setValues((current) => ({
-                      ...current,
-                      decision: event.target.value as TimekeepingAdjustmentDecisionInput["decision"],
-                    }))
-                  }
-                  value={values.decision}
-                >
-                  <option value="approved">Duyệt</option>
-                  <option value="rejected">Từ chối</option>
-                </select>
-              </FormField>
-              <FormField
-                error={actionState.fieldErrors?.decisionReason?.[0]}
-                label={values.decision === "rejected" ? "Lý do từ chối" : "Ghi chú duyệt"}
-              >
-                <textarea
-                  className={`${formInputClassName} min-h-28 py-3`}
-                  disabled={isPending}
-                  maxLength={2000}
-                  onChange={(event) =>
-                    setValues((current) => ({
-                      ...current,
-                      decisionReason: event.target.value,
-                    }))
-                  }
-                  placeholder={
-                    values.decision === "rejected"
-                      ? "Nêu rõ lý do từ chối"
-                      : "Không bắt buộc"
-                  }
-                  required={values.decision === "rejected"}
-                  value={values.decisionReason}
-                />
-              </FormField>
+            <div>
+              <dt className="text-label font-semibold uppercase tracking-[0.04em] text-text-muted">
+                Check-out
+              </dt>
+              <dd className="mt-1 grid gap-0.5 text-secondary text-text-muted">
+                <p>
+                  Gốc: {formatVietnamDateTime(request.originalCheckOutAt)} ·{" "}
+                  {getTimeEntryModeLabel(request.originalCheckOutMode)}
+                </p>
+                <p className="font-medium text-text-strong">
+                  Đề xuất: {formatVietnamDateTime(request.requestedCheckOutAt)}{" "}
+                  · {getTimeEntryModeLabel(request.requestedCheckOutMode)}
+                </p>
+              </dd>
             </div>
+            <div>
+              <dt className="text-label font-semibold uppercase tracking-[0.04em] text-text-muted">
+                Lý do yêu cầu
+              </dt>
+              <dd className="mt-1 text-secondary text-text-muted">
+                {request.requestReason}
+              </dd>
+            </div>
+          </dl>
 
-            <ActionMessage actionState={actionState} />
-
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button disabled={isPending} onClick={closeDialog} size="lg" variant="ghost">
-                Hủy
-              </Button>
-              <Button
+          <div className="grid gap-4">
+            <FormField
+              error={actionState.fieldErrors?.decision?.[0]}
+              errorId={`adj-decision-decision-error-${request.id}`}
+              id={decisionId}
+              label="Quyết định"
+            >
+              <select
+                aria-describedby={
+                  actionState.fieldErrors?.decision?.[0]
+                    ? `adj-decision-decision-error-${request.id}`
+                    : undefined
+                }
+                aria-invalid={
+                  actionState.fieldErrors?.decision?.[0] ? true : undefined
+                }
+                className={formInputClassName}
                 disabled={isPending}
-                size="lg"
-                type="submit"
-                variant={values.decision === "rejected" ? "danger" : "primary"}
+                id={decisionId}
+                onChange={(event) =>
+                  setValues((current) => ({
+                    ...current,
+                    decision: event.target
+                      .value as TimekeepingAdjustmentDecisionInput["decision"],
+                  }))
+                }
+                value={values.decision}
               >
-                {isPending
-                  ? "Đang xử lý..."
-                  : values.decision === "approved"
-                    ? "Duyệt yêu cầu"
-                    : "Từ chối yêu cầu"}
-              </Button>
-            </div>
-          </form>
-        </div>
-      ) : null}
-    </>
-  );
-}
+                <option value="approved">Duyệt</option>
+                <option value="rejected">Từ chối</option>
+              </select>
+            </FormField>
 
-function ChangeField({
-  label,
-  original,
-  proposed,
-}: {
-  label: string;
-  original: string;
-  proposed?: string;
-}) {
-  return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">{label}</dt>
-      <dd className="mt-1 text-ink-muted">Gốc: {original}</dd>
-      {proposed ? <dd className="mt-1 font-medium text-ink">Đề xuất: {proposed}</dd> : null}
-    </div>
+            <FormField
+              error={reasonError}
+              errorId={reasonErrorId}
+              id={reasonId}
+              label={isRejection ? "Lý do từ chối" : "Ghi chú duyệt"}
+              required={isRejection}
+            >
+              <textarea
+                aria-describedby={reasonError ? reasonErrorId : undefined}
+                aria-invalid={reasonError ? true : undefined}
+                aria-required={isRejection ? "true" : undefined}
+                className={`${formInputClassName} min-h-28 py-3`}
+                disabled={isPending}
+                id={reasonId}
+                maxLength={2000}
+                onChange={(event) =>
+                  setValues((current) => ({
+                    ...current,
+                    decisionReason: event.target.value,
+                  }))
+                }
+                placeholder={
+                  isRejection ? "Nêu rõ lý do từ chối" : "Không bắt buộc"
+                }
+                required={isRejection}
+                value={values.decisionReason}
+              />
+            </FormField>
+          </div>
+
+          {actionState.status === "error" && actionState.message ? (
+            <ResultBanner title={actionState.message} tone="error" />
+          ) : null}
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              disabled={isPending}
+              onClick={closeDialog}
+              size="lg"
+              type="button"
+              variant="ghost"
+            >
+              Hủy
+            </Button>
+            <Button
+              isLoading={isPending}
+              size="lg"
+              type="submit"
+              variant={isRejection ? "danger" : "primary"}
+            >
+              {isPending
+                ? "Đang xử lý..."
+                : isRejection
+                  ? "Từ chối yêu cầu"
+                  : "Duyệt yêu cầu"}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+    </>
   );
 }
 
 function FormField({
   children,
   error,
+  errorId,
+  id,
   label,
+  required,
 }: {
   children: ReactNode;
   error?: string;
+  errorId: string;
+  id: string;
   label: string;
+  required?: boolean;
 }) {
   return (
-    <label className="grid gap-2 text-sm font-semibold text-ink">
-      {label}
+    <div className="grid gap-2">
+      <label className="text-sm font-semibold text-text-strong" htmlFor={id}>
+        {label}
+        {required ? (
+          <span aria-hidden="true" className="ml-1 text-danger">
+            *
+          </span>
+        ) : null}
+      </label>
       {children}
-      {error ? <span className="text-xs font-medium text-danger">{error}</span> : null}
-    </label>
-  );
-}
-
-function ActionMessage({
-  actionState,
-}: {
-  actionState: TimekeepingAdjustmentActionState;
-}) {
-  if (actionState.status === "idle" || !actionState.message) {
-    return null;
-  }
-
-  return (
-    <p
-      aria-live="polite"
-      className={
-        actionState.status === "error"
-          ? "rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-sm text-danger"
-          : "rounded-md border border-success-border bg-success-bg px-3 py-2 text-sm text-success"
-      }
-    >
-      {actionState.message}
-    </p>
+      {error ? (
+        <span className="text-xs font-medium text-danger" id={errorId}>
+          {error}
+        </span>
+      ) : null}
+    </div>
   );
 }

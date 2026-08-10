@@ -20,9 +20,20 @@ vi.mock("@/lib/permissions/database-permissions", () => ({
 }));
 vi.mock("@/features/timekeeping/data", () => dependencies);
 vi.mock("@/features/timekeeping/timekeeping-page", () => ({
-  TimekeepingPage: ({ canCheck, dayEntries, myEntries }: { canCheck: boolean; dayEntries: readonly { id: string }[]; myEntries: readonly { id: string }[] }) => (
+  TimekeepingPage: ({
+    canApproveAdjustments,
+    canCheck,
+    dayEntries,
+    myEntries,
+  }: {
+    canApproveAdjustments: boolean;
+    canCheck: boolean;
+    dayEntries: readonly { id: string }[];
+    myEntries: readonly { id: string }[];
+  }) => (
     <div>
       <p>canCheck:{String(canCheck)}</p>
+      <p>canApproveAdjustments:{String(canApproveAdjustments)}</p>
       <p>dayEntries:{dayEntries.length}</p>
       <p>myEntries:{myEntries.length}</p>
     </div>
@@ -41,20 +52,28 @@ afterEach(() => {
 });
 
 describe("Timekeeping route authority", () => {
-  it("keeps timekeeping.view-only users on the current-day audit without loading personal timekeeping data", async () => {
+  it("keeps timekeeping.view-only users on current-day audit without loading adjustment readers or approval queue", async () => {
     setSharedReadResults();
-    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({ ok: true, permissions: ["timekeeping.view"] });
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["timekeeping.view"],
+    });
 
     render(await TimekeepingRoute());
 
     expect(screen.getByText("canCheck:false")).toBeInTheDocument();
+    expect(screen.getByText("canApproveAdjustments:false")).toBeInTheDocument();
     expect(screen.getByText("dayEntries:1")).toBeInTheDocument();
     expect(screen.getByText("myEntries:0")).toBeInTheDocument();
+
     expect(dependencies.getTimekeepingDayEntries).toHaveBeenCalledOnce();
     expect(dependencies.getMyTimekeepingEntries).not.toHaveBeenCalled();
+    expect(dependencies.getMyTimekeepingAdjustableEntries).not.toHaveBeenCalled();
+    expect(dependencies.getMyTimeEntryAdjustmentRequests).not.toHaveBeenCalled();
+    expect(dependencies.getTimeEntryAdjustmentApprovalQueue).not.toHaveBeenCalled();
   });
 
-  it("retains timekeeping.check as the route composition that loads personal entries for check-in/out presentation", async () => {
+  it("retains timekeeping.check as the composition that loads personal entries and adjustment readers without loading approval queue", async () => {
     setSharedReadResults();
     dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
       ok: true,
@@ -67,7 +86,30 @@ describe("Timekeeping route authority", () => {
     render(await TimekeepingRoute());
 
     expect(screen.getByText("canCheck:true")).toBeInTheDocument();
+    expect(screen.getByText("canApproveAdjustments:false")).toBeInTheDocument();
     expect(screen.getByText("myEntries:1")).toBeInTheDocument();
+
     expect(dependencies.getMyTimekeepingEntries).toHaveBeenCalledOnce();
+    expect(dependencies.getMyTimekeepingAdjustableEntries).toHaveBeenCalledOnce();
+    expect(dependencies.getMyTimeEntryAdjustmentRequests).toHaveBeenCalledOnce();
+    expect(dependencies.getTimeEntryAdjustmentApprovalQueue).not.toHaveBeenCalled();
+  });
+
+  it("loads the adjustment approval queue when timekeeping.approve_adjustment permission is present", async () => {
+    setSharedReadResults();
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["timekeeping.view", "timekeeping.approve_adjustment"],
+    });
+    dependencies.getTimeEntryAdjustmentApprovalQueue.mockResolvedValueOnce({ ok: true, requests: [] });
+
+    render(await TimekeepingRoute());
+
+    expect(screen.getByText("canCheck:false")).toBeInTheDocument();
+    expect(screen.getByText("canApproveAdjustments:true")).toBeInTheDocument();
+
+    expect(dependencies.getTimeEntryAdjustmentApprovalQueue).toHaveBeenCalledOnce();
+    expect(dependencies.getMyTimekeepingAdjustableEntries).not.toHaveBeenCalled();
+    expect(dependencies.getMyTimeEntryAdjustmentRequests).not.toHaveBeenCalled();
   });
 });

@@ -530,6 +530,54 @@
   }
 }
 
+/* Timekeeping 2: adjustment history table needs 1040px inside DataTableFrame;
+   its two borders require +2px on the zero-padding work area container. */
+.adj-history-work-area {
+  container-type: inline-size;
+}
+
+.adj-history-table {
+  display: none;
+}
+
+.adj-history-record-list {
+  display: grid;
+}
+
+@container (min-width: 1042px) {
+  .adj-history-table {
+    display: block;
+  }
+
+  .adj-history-record-list {
+    display: none;
+  }
+}
+
+/* Timekeeping 2: approval queue table needs 1080px inside DataTableFrame;
+   its two borders require +2px on the zero-padding work area container. */
+.adj-queue-work-area {
+  container-type: inline-size;
+}
+
+.adj-queue-table {
+  display: none;
+}
+
+.adj-queue-record-list {
+  display: grid;
+}
+
+@container (min-width: 1082px) {
+  .adj-queue-table {
+    display: block;
+  }
+
+  .adj-queue-record-list {
+    display: none;
+  }
+}
+
 .staff-directory-table,
 .staff-rate-history-table {
   display: none;

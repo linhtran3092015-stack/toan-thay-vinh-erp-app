@@ -2,9 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
-import { useMemo, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import type {
   TimekeepingAdjustmentActionState,
   TimekeepingAdjustmentRequestInput,
@@ -49,30 +51,31 @@ export function TimekeepingAdjustmentRequestDialog({
   entries,
 }: TimekeepingAdjustmentRequestDialogProps) {
   const router = useRouter();
+  const openButtonRef = useRef<HTMLButtonElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [values, setValues] = useState<AdjustmentFormValues>(() => getInitialValues());
+  const [values, setValues] = useState<AdjustmentFormValues>(() =>
+    getInitialValues(),
+  );
   const [actionState, setActionState] = useState<TimekeepingAdjustmentActionState>(
     initialTimekeepingAdjustmentActionState,
   );
-  const eligibleEntries = useMemo(
-    () =>
-      entries.filter(
-        (entry) =>
-          entry.adjustmentStatus !== "pending" && entry.adjustmentStatus !== "approved",
-      ),
-    [entries],
+
+  // Authoritative entry selection uses server-returned entries directly (no client eligibility filtering).
+  const selectedEntry = entries.find(
+    (entry) => entry.id === values.timeEntryId,
   );
-  const selectedEntry = eligibleEntries.find((entry) => entry.id === values.timeEntryId);
 
   const openDialog = (): void => {
-    setValues(getInitialValues(eligibleEntries[0]));
+    setValues(getInitialValues(entries[0]));
     setActionState(initialTimekeepingAdjustmentActionState);
     setIsOpen(true);
   };
 
   const selectEntry = (timeEntryId: string): void => {
-    const entry = eligibleEntries.find((candidate) => candidate.id === timeEntryId);
+    const entry = entries.find(
+      (candidate) => candidate.id === timeEntryId,
+    );
 
     setValues(getInitialValues(entry));
     setActionState(initialTimekeepingAdjustmentActionState);
@@ -102,11 +105,28 @@ export function TimekeepingAdjustmentRequestDialog({
       return;
     }
 
+    const isoIn = vietnamDatetimeInputToIso(values.requestedCheckInAt);
+    const isoOut = vietnamDatetimeInputToIso(values.requestedCheckOutAt);
+
+    // Simple input chronology validation: check-out must not precede check-in (<, not <=).
+    if (isoOut < isoIn) {
+      setActionState({
+        fieldErrors: {
+          requestedCheckOutAt: [
+            "Check-out đề xuất không được trước check-in đề xuất.",
+          ],
+        },
+        message: "Vui lòng kiểm tra lại thời gian check-in và check-out đề xuất.",
+        status: "error",
+      });
+      return;
+    }
+
     const input: TimekeepingAdjustmentRequestInput = {
       requestReason: values.requestReason,
-      requestedCheckInAt: vietnamDatetimeInputToIso(values.requestedCheckInAt),
+      requestedCheckInAt: isoIn,
       requestedCheckInMode: values.requestedCheckInMode,
-      requestedCheckOutAt: vietnamDatetimeInputToIso(values.requestedCheckOutAt),
+      requestedCheckOutAt: isoOut,
       requestedCheckOutMode: values.requestedCheckOutMode,
       timeEntryId: values.timeEntryId,
     };
@@ -124,147 +144,279 @@ export function TimekeepingAdjustmentRequestDialog({
 
   return (
     <>
-      <Button disabled={eligibleEntries.length === 0} onClick={openDialog} size="lg">
+      <Button
+        disabled={entries.length === 0}
+        onClick={openDialog}
+        ref={openButtonRef}
+        size="lg"
+      >
         Yêu cầu điều chỉnh
       </Button>
 
-      {isOpen ? (
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-4"
-          role="dialog"
-        >
-          <form
-            className="my-auto grid w-full max-w-2xl gap-5 rounded-lg border border-hairline bg-white p-5 shadow-xl"
-            onSubmit={handleSubmit}
-          >
-            <div>
-              <h2 className="text-lg font-semibold text-ink">Yêu cầu điều chỉnh công</h2>
-              <p className="mt-1 text-sm leading-6 text-ink-muted">
-                Dữ liệu chấm công gốc được giữ nguyên. Thời điểm đề xuất hiển thị theo giờ Việt Nam.
-              </p>
-            </div>
+      <Dialog
+        ariaDescribedBy="adj-request-dialog-desc"
+        ariaLabelledBy="adj-request-dialog-title"
+        className="sm:max-w-2xl"
+        isOpen={isOpen}
+        onClose={closeDialog}
+        returnFocusRef={openButtonRef}
+      >
+        <form className="grid gap-5 p-5" onSubmit={handleSubmit}>
+          <div>
+            <h2
+              className="text-section-title font-semibold text-text-strong"
+              id="adj-request-dialog-title"
+            >
+              Yêu cầu điều chỉnh công
+            </h2>
+            <p
+              className="mt-1 text-secondary text-text-muted"
+              id="adj-request-dialog-desc"
+            >
+              Dữ liệu chấm công gốc được giữ nguyên. Thời điểm đề xuất hiển
+              thị theo giờ Việt Nam.
+            </p>
+          </div>
 
-            <div className="grid gap-4">
-              <FormField
-                error={actionState.fieldErrors?.timeEntryId?.[0]}
-                label="Lượt chấm công cần điều chỉnh"
+          <div className="grid gap-4">
+            <FormField
+              error={actionState.fieldErrors?.timeEntryId?.[0]}
+              errorId="adj-request-entry-id-error"
+              id="adj-request-entry-id"
+              label="Lượt chấm công cần điều chỉnh"
+            >
+              <select
+                aria-describedby={
+                  actionState.fieldErrors?.timeEntryId?.[0]
+                    ? "adj-request-entry-id-error"
+                    : undefined
+                }
+                aria-invalid={
+                  actionState.fieldErrors?.timeEntryId?.[0] ? true : undefined
+                }
+                className={formInputClassName}
+                disabled={isPending}
+                id="adj-request-entry-id"
+                onChange={(event) => selectEntry(event.target.value)}
+                value={values.timeEntryId}
               >
-                <select
+                {entries.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {formatVietnamDate(entry.workDate)} · {entry.workShiftCode}{" "}
+                    · {entry.workShiftName}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            {selectedEntry ? (
+              <div
+                className="rounded-md border border-border-subtle bg-surface-raised p-4 text-sm"
+                role="note"
+              >
+                <p className="font-semibold text-text-strong">Dữ liệu gốc</p>
+                <p className="mt-1 leading-6 text-text-muted">
+                  Check-in{" "}
+                  {formatVietnamDateTimeInput(selectedEntry.checkInAt).replace(
+                    "T",
+                    " ",
+                  )}{" "}
+                  · {getTimeEntryModeLabel(selectedEntry.checkInMode)}
+                  <br />
+                  Check-out{" "}
+                  {formatVietnamDateTimeInput(selectedEntry.checkOutAt).replace(
+                    "T",
+                    " ",
+                  )}{" "}
+                  · {getTimeEntryModeLabel(selectedEntry.checkOutMode)}
+                </p>
+              </div>
+            ) : null}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                error={actionState.fieldErrors?.requestedCheckInAt?.[0]}
+                errorId="adj-request-checkin-at-error"
+                id="adj-request-checkin-at"
+                label="Check-in đề xuất"
+              >
+                <input
+                  aria-describedby={
+                    actionState.fieldErrors?.requestedCheckInAt?.[0]
+                      ? "adj-request-checkin-at-error"
+                      : undefined
+                  }
+                  aria-invalid={
+                    actionState.fieldErrors?.requestedCheckInAt?.[0]
+                      ? true
+                      : undefined
+                  }
                   className={formInputClassName}
                   disabled={isPending}
-                  onChange={(event) => selectEntry(event.target.value)}
-                  value={values.timeEntryId}
+                  id="adj-request-checkin-at"
+                  onChange={(event) =>
+                    updateValue("requestedCheckInAt", event.target.value)
+                  }
+                  type="datetime-local"
+                  value={values.requestedCheckInAt}
+                />
+              </FormField>
+
+              <FormField
+                error={actionState.fieldErrors?.requestedCheckInMode?.[0]}
+                errorId="adj-request-checkin-mode-error"
+                id="adj-request-checkin-mode"
+                label="Hình thức check-in"
+              >
+                <select
+                  aria-describedby={
+                    actionState.fieldErrors?.requestedCheckInMode?.[0]
+                      ? "adj-request-checkin-mode-error"
+                      : undefined
+                  }
+                  aria-invalid={
+                    actionState.fieldErrors?.requestedCheckInMode?.[0]
+                      ? true
+                      : undefined
+                  }
+                  className={formInputClassName}
+                  disabled={isPending}
+                  id="adj-request-checkin-mode"
+                  onChange={(event) =>
+                    updateValue(
+                      "requestedCheckInMode",
+                      event.target
+                        .value as AdjustmentFormValues["requestedCheckInMode"],
+                    )
+                  }
+                  value={values.requestedCheckInMode}
                 >
-                  {eligibleEntries.map((entry) => (
-                    <option key={entry.id} value={entry.id}>
-                      {formatVietnamDate(entry.workDate)} · {entry.workShiftCode} · {entry.workShiftName}
-                    </option>
-                  ))}
+                  <option value="offline">Tại trung tâm</option>
+                  <option value="online">Trực tuyến</option>
                 </select>
               </FormField>
 
-              {selectedEntry ? (
-                <div className="rounded-md border border-hairline bg-surface-2 p-4 text-sm">
-                  <p className="font-semibold text-ink">Dữ liệu gốc</p>
-                  <p className="mt-1 leading-6 text-ink-muted">
-                    Check-in {formatVietnamDateTimeInput(selectedEntry.checkInAt).replace("T", " ")} · {getTimeEntryModeLabel(selectedEntry.checkInMode)}
-                    <br />
-                    Check-out {formatVietnamDateTimeInput(selectedEntry.checkOutAt).replace("T", " ")} · {getTimeEntryModeLabel(selectedEntry.checkOutMode)}
-                  </p>
-                </div>
-              ) : null}
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  error={actionState.fieldErrors?.requestedCheckInAt?.[0]}
-                  label="Check-in đề xuất"
-                >
-                  <input
-                    className={formInputClassName}
-                    disabled={isPending}
-                    onChange={(event) => updateValue("requestedCheckInAt", event.target.value)}
-                    type="datetime-local"
-                    value={values.requestedCheckInAt}
-                  />
-                </FormField>
-                <FormField
-                  error={actionState.fieldErrors?.requestedCheckInMode?.[0]}
-                  label="Hình thức check-in"
-                >
-                  <select
-                    className={formInputClassName}
-                    disabled={isPending}
-                    onChange={(event) =>
-                      updateValue(
-                        "requestedCheckInMode",
-                        event.target.value as AdjustmentFormValues["requestedCheckInMode"],
-                      )
-                    }
-                    value={values.requestedCheckInMode}
-                  >
-                    <option value="offline">Tại trung tâm</option>
-                    <option value="online">Trực tuyến</option>
-                  </select>
-                </FormField>
-                <FormField
-                  error={actionState.fieldErrors?.requestedCheckOutAt?.[0]}
-                  label="Check-out đề xuất"
-                >
-                  <input
-                    className={formInputClassName}
-                    disabled={isPending}
-                    onChange={(event) => updateValue("requestedCheckOutAt", event.target.value)}
-                    type="datetime-local"
-                    value={values.requestedCheckOutAt}
-                  />
-                </FormField>
-                <FormField
-                  error={actionState.fieldErrors?.requestedCheckOutMode?.[0]}
-                  label="Hình thức check-out"
-                >
-                  <select
-                    className={formInputClassName}
-                    disabled={isPending}
-                    onChange={(event) =>
-                      updateValue(
-                        "requestedCheckOutMode",
-                        event.target.value as AdjustmentFormValues["requestedCheckOutMode"],
-                      )
-                    }
-                    value={values.requestedCheckOutMode}
-                  >
-                    <option value="offline">Tại trung tâm</option>
-                    <option value="online">Trực tuyến</option>
-                  </select>
-                </FormField>
-              </div>
-
-              <FormField error={actionState.fieldErrors?.requestReason?.[0]} label="Lý do điều chỉnh">
-                <textarea
-                  className={`${formInputClassName} min-h-28 py-3`}
+              <FormField
+                error={actionState.fieldErrors?.requestedCheckOutAt?.[0]}
+                errorId="adj-request-checkout-at-error"
+                id="adj-request-checkout-at"
+                label="Check-out đề xuất"
+              >
+                <input
+                  aria-describedby={
+                    actionState.fieldErrors?.requestedCheckOutAt?.[0]
+                      ? "adj-request-checkout-at-error"
+                      : undefined
+                  }
+                  aria-invalid={
+                    actionState.fieldErrors?.requestedCheckOutAt?.[0]
+                      ? true
+                      : undefined
+                  }
+                  className={formInputClassName}
                   disabled={isPending}
-                  maxLength={2000}
-                  onChange={(event) => updateValue("requestReason", event.target.value)}
-                  placeholder="Nêu rõ lý do và thời điểm cần điều chỉnh"
-                  value={values.requestReason}
+                  id="adj-request-checkout-at"
+                  onChange={(event) =>
+                    updateValue("requestedCheckOutAt", event.target.value)
+                  }
+                  type="datetime-local"
+                  value={values.requestedCheckOutAt}
                 />
+              </FormField>
+
+              <FormField
+                error={actionState.fieldErrors?.requestedCheckOutMode?.[0]}
+                errorId="adj-request-checkout-mode-error"
+                id="adj-request-checkout-mode"
+                label="Hình thức check-out"
+              >
+                <select
+                  aria-describedby={
+                    actionState.fieldErrors?.requestedCheckOutMode?.[0]
+                      ? "adj-request-checkout-mode-error"
+                      : undefined
+                  }
+                  aria-invalid={
+                    actionState.fieldErrors?.requestedCheckOutMode?.[0]
+                      ? true
+                      : undefined
+                  }
+                  className={formInputClassName}
+                  disabled={isPending}
+                  id="adj-request-checkout-mode"
+                  onChange={(event) =>
+                    updateValue(
+                      "requestedCheckOutMode",
+                      event.target
+                        .value as AdjustmentFormValues["requestedCheckOutMode"],
+                    )
+                  }
+                  value={values.requestedCheckOutMode}
+                >
+                  <option value="offline">Tại trung tâm</option>
+                  <option value="online">Trực tuyến</option>
+                </select>
               </FormField>
             </div>
 
-            <ActionMessage actionState={actionState} />
+            <FormField
+              error={actionState.fieldErrors?.requestReason?.[0]}
+              errorId="adj-request-reason-error"
+              id="adj-request-reason"
+              label="Lý do điều chỉnh"
+              required
+            >
+              <textarea
+                aria-describedby={
+                  actionState.fieldErrors?.requestReason?.[0]
+                    ? "adj-request-reason-error"
+                    : undefined
+                }
+                aria-invalid={
+                  actionState.fieldErrors?.requestReason?.[0]
+                    ? true
+                    : undefined
+                }
+                aria-required="true"
+                className={`${formInputClassName} min-h-28 py-3`}
+                disabled={isPending}
+                id="adj-request-reason"
+                maxLength={2000}
+                onChange={(event) =>
+                  updateValue("requestReason", event.target.value)
+                }
+                placeholder="Nêu rõ lý do và thời điểm cần điều chỉnh"
+                required
+                value={values.requestReason}
+              />
+            </FormField>
+          </div>
 
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button disabled={isPending} onClick={closeDialog} size="lg" variant="ghost">
-                Hủy
-              </Button>
-              <Button disabled={isPending || !selectedEntry} size="lg" type="submit">
-                {isPending ? "Đang gửi..." : "Gửi yêu cầu"}
-              </Button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+          {actionState.status === "error" && actionState.message ? (
+            <ResultBanner title={actionState.message} tone="error" />
+          ) : null}
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              disabled={isPending}
+              onClick={closeDialog}
+              size="lg"
+              type="button"
+              variant="ghost"
+            >
+              Hủy
+            </Button>
+            <Button
+              disabled={!selectedEntry}
+              isLoading={isPending}
+              size="lg"
+              type="submit"
+            >
+              {isPending ? "Đang gửi yêu cầu..." : "Gửi yêu cầu"}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
     </>
   );
 }
@@ -272,40 +424,34 @@ export function TimekeepingAdjustmentRequestDialog({
 function FormField({
   children,
   error,
+  errorId,
+  id,
   label,
+  required,
 }: {
   children: ReactNode;
   error?: string;
+  errorId: string;
+  id: string;
   label: string;
+  required?: boolean;
 }) {
   return (
-    <label className="grid gap-2 text-sm font-semibold text-ink">
-      {label}
+    <div className="grid gap-2">
+      <label className="text-sm font-semibold text-text-strong" htmlFor={id}>
+        {label}
+        {required ? (
+          <span aria-hidden="true" className="ml-1 text-danger">
+            *
+          </span>
+        ) : null}
+      </label>
       {children}
-      {error ? <span className="text-xs font-medium text-danger">{error}</span> : null}
-    </label>
-  );
-}
-
-function ActionMessage({
-  actionState,
-}: {
-  actionState: TimekeepingAdjustmentActionState;
-}) {
-  if (actionState.status === "idle" || !actionState.message) {
-    return null;
-  }
-
-  return (
-    <p
-      aria-live="polite"
-      className={
-        actionState.status === "error"
-          ? "rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-sm text-danger"
-          : "rounded-md border border-success-border bg-success-bg px-3 py-2 text-sm text-success"
-      }
-    >
-      {actionState.message}
-    </p>
+      {error ? (
+        <span className="text-xs font-medium text-danger" id={errorId}>
+          {error}
+        </span>
+      ) : null}
+    </div>
   );
 }
