@@ -1,10 +1,18 @@
 "use client";
 
+import {
+  useId,
+  useRef,
+  useState,
+  useTransition,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
-import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ResultBanner } from "@/components/shared/result-banner";
+import { Dialog } from "@/components/ui/dialog";
 import type {
   TimeEntryActionInput,
   TimekeepingEntryActionState,
@@ -14,13 +22,15 @@ import {
   checkInTimeEntryAction,
   checkOutTimeEntryAction,
 } from "@/features/timekeeping/time-entry-actions";
-import { formInputClassName } from "@/features/timekeeping/timekeeping-client-utils";
 
 type TimekeepingEntryOperation = "check-in" | "check-out";
 
 interface TimekeepingEntryDialogProps {
   operation: TimekeepingEntryOperation;
 }
+
+const inputClassName =
+  "min-h-11 w-full rounded-md border border-border-subtle bg-surface-base px-3 text-control text-text-default outline-none transition focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
 
 function createInitialValues(): TimeEntryActionInput {
   return {
@@ -33,10 +43,21 @@ function createInitialValues(): TimeEntryActionInput {
   };
 }
 
+/** Presentation for the existing check-in/out mutation; eligibility remains server-owned. */
 export function TimekeepingEntryDialog({
   operation,
 }: TimekeepingEntryDialogProps) {
   const router = useRouter();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const modeRef = useRef<HTMLSelectElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const modeId = useId();
+  const gpsHelpId = useId();
+  const wifiHelpId = useId();
+  const wifiSsidId = useId();
+  const wifiBssidId = useId();
+  const gpsErrorId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isLocating, setIsLocating] = useState(false);
@@ -46,6 +67,13 @@ export function TimekeepingEntryDialog({
     initialTimekeepingEntryActionState,
   );
   const isCheckIn = operation === "check-in";
+  const fieldErrors = actionState.status === "error" ? actionState.fieldErrors ?? {} : {};
+  const gpsErrors = [
+    fieldErrors.gpsLatitude?.[0],
+    fieldErrors.gpsLongitude?.[0],
+    fieldErrors.gpsAccuracyMeters?.[0],
+  ].filter((error): error is string => Boolean(error));
+  const isBusy = isPending || isLocating;
 
   const openDialog = (): void => {
     setValues(createInitialValues());
@@ -55,9 +83,12 @@ export function TimekeepingEntryDialog({
   };
 
   const closeDialog = (): void => {
-    if (!isPending && !isLocating) {
-      setIsOpen(false);
+    if (isBusy) {
+      return;
     }
+
+    setIsOpen(false);
+    setActionState(initialTimekeepingEntryActionState);
   };
 
   const updateValue = <Key extends keyof TimeEntryActionInput>(
@@ -84,11 +115,11 @@ export function TimekeepingEntryDialog({
           gpsLatitude: position.coords.latitude,
           gpsLongitude: position.coords.longitude,
         }));
-        setLocationMessage("Đã cập nhật vị trí hiện tại.");
+        setLocationMessage("Đã lấy dữ liệu vị trí từ thiết bị.");
         setIsLocating(false);
       },
       () => {
-        setLocationMessage("Không lấy được vị trí. Bạn có thể tiếp tục không kèm GPS.");
+        setLocationMessage("Không lấy được vị trí. Bạn vẫn có thể ghi nhận không kèm GPS.");
         setIsLocating(false);
       },
       {
@@ -112,6 +143,10 @@ export function TimekeepingEntryDialog({
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
 
+    if (isBusy) {
+      return;
+    }
+
     startTransition(async () => {
       const result = isCheckIn
         ? await checkInTimeEntryAction(values)
@@ -126,143 +161,151 @@ export function TimekeepingEntryDialog({
     });
   };
 
-  const hasLocation =
-    values.gpsLatitude !== null && values.gpsLongitude !== null;
+  const hasLocation = values.gpsLatitude !== null && values.gpsLongitude !== null;
   const title = isCheckIn ? "Xác nhận check-in" : "Xác nhận check-out";
   const triggerLabel = isCheckIn ? "Check-in" : "Check-out";
-  const submitLabel = isPending
-    ? "Đang ghi nhận..."
+  const pendingLabel = isLocating
+    ? "Đang lấy vị trí…"
     : isCheckIn
-      ? "Xác nhận check-in"
-      : "Xác nhận check-out";
+      ? "Đang check-in…"
+      : "Đang check-out…";
 
   return (
     <>
-      <Button onClick={openDialog} size="lg" type="button" variant={isCheckIn ? "primary" : "secondary"}>
+      <Button
+        className="min-h-11"
+        onClick={openDialog}
+        ref={triggerRef}
+        size="lg"
+        type="button"
+        variant={isCheckIn ? "primary" : "secondary"}
+      >
         {triggerLabel}
       </Button>
 
-      {isOpen ? (
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-4"
-          role="dialog"
-        >
-          <form
-            className="my-auto grid w-full max-w-xl gap-5 rounded-lg border border-hairline bg-white p-5 shadow-xl"
-            onSubmit={handleSubmit}
-          >
-            <div>
-              <h2 className="text-lg font-semibold text-ink">{title}</h2>
-              <p className="mt-1 text-sm leading-6 text-ink-muted">
-                Thời điểm chấm công được ghi nhận theo giờ hệ thống.
-              </p>
-            </div>
+      <Dialog
+        ariaDescribedBy={descriptionId}
+        ariaLabelledBy={titleId}
+        className="max-w-xl"
+        initialFocusRef={modeRef}
+        isOpen={isOpen}
+        onClose={closeDialog}
+        returnFocusRef={triggerRef}
+      >
+        <div className="p-4 sm:p-5">
+          <div>
+            <h2 className="text-section-title font-semibold text-text-strong" id={titleId}>{title}</h2>
+            <p className="mt-1 text-secondary text-text-muted" id={descriptionId}>
+              Thời điểm chấm công được ghi nhận theo giờ hệ thống.
+            </p>
+          </div>
 
-            <div className="grid gap-4">
-              <FormField error={actionState.fieldErrors?.mode?.[0]} label="Hình thức">
-                <select
-                  className={formInputClassName}
-                  disabled={isPending}
-                  onChange={(event) =>
-                    updateValue("mode", event.target.value as TimeEntryActionInput["mode"])
-                  }
-                  value={values.mode}
-                >
-                  <option value="offline">Tại trung tâm</option>
-                  <option value="online">Trực tuyến</option>
-                </select>
-              </FormField>
-
-              <fieldset className="grid gap-3 rounded-md border border-hairline p-4">
-                <legend className="px-1 text-sm font-semibold text-ink">Vị trí GPS</legend>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <Button
-                    disabled={isPending || isLocating}
-                    onClick={captureLocation}
-                    size="lg"
-                    type="button"
-                    variant="outline"
-                  >
-                    {isLocating ? "Đang lấy vị trí..." : "Lấy vị trí hiện tại"}
-                  </Button>
-                  {hasLocation ? (
-                    <Button
-                      disabled={isPending || isLocating}
-                      onClick={clearLocation}
-                      size="lg"
-                      type="button"
-                      variant="ghost"
-                    >
-                      Bỏ vị trí
-                    </Button>
-                  ) : null}
-                </div>
-                {hasLocation ? (
-                  <p className="text-sm text-ink-muted">
-                    Vị trí đã sẵn sàng
-                    {values.gpsAccuracyMeters !== null
-                      ? `, sai số khoảng ${values.gpsAccuracyMeters} m`
-                      : ""}.
-                  </p>
-                ) : null}
-                {locationMessage ? (
-                  <p aria-live="polite" className="text-sm text-ink-muted">
-                    {locationMessage}
-                  </p>
-                ) : null}
-                <FieldError error={actionState.fieldErrors?.gpsLatitude?.[0]} />
-                <FieldError error={actionState.fieldErrors?.gpsLongitude?.[0]} />
-                <FieldError error={actionState.fieldErrors?.gpsAccuracyMeters?.[0]} />
-              </fieldset>
-
-              <fieldset className="grid gap-4 rounded-md border border-hairline p-4">
-                <legend className="px-1 text-sm font-semibold text-ink">Thông tin Wi-Fi</legend>
-                <FormField error={actionState.fieldErrors?.wifiSsid?.[0]} label="Tên mạng Wi-Fi">
-                  <input
-                    autoComplete="off"
-                    className={formInputClassName}
-                    disabled={isPending}
-                    maxLength={128}
-                    onChange={(event) => updateValue("wifiSsid", event.target.value)}
-                    placeholder="Không bắt buộc"
-                    value={values.wifiSsid}
-                  />
-                </FormField>
-                <FormField error={actionState.fieldErrors?.wifiBssid?.[0]} label="BSSID">
-                  <input
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    className={formInputClassName}
-                    disabled={isPending}
-                    maxLength={17}
-                    onChange={(event) => updateValue("wifiBssid", event.target.value)}
-                    placeholder="AA:BB:CC:DD:EE:FF"
-                    value={values.wifiBssid}
-                  />
-                </FormField>
-              </fieldset>
-            </div>
-
-            <ActionMessage actionState={actionState} />
-
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button
-                disabled={isPending || isLocating}
-                onClick={closeDialog}
-                size="lg"
-                type="button"
-                variant="ghost"
+          <form className="mt-5 grid gap-4" onSubmit={handleSubmit}>
+            <FormField error={fieldErrors.mode?.[0]} id={modeId} label="Hình thức">
+              <select
+                aria-describedby={fieldErrors.mode?.[0] ? `${modeId}-error` : undefined}
+                aria-invalid={Boolean(fieldErrors.mode?.[0])}
+                className={inputClassName}
+                disabled={isBusy}
+                id={modeId}
+                onChange={(event) => updateValue("mode", event.target.value as TimeEntryActionInput["mode"])}
+                ref={modeRef}
+                value={values.mode}
               >
+                <option value="offline">Tại trung tâm</option>
+                <option value="online">Trực tuyến</option>
+              </select>
+            </FormField>
+
+            <fieldset
+              aria-describedby={[gpsHelpId, gpsErrors.length > 0 ? gpsErrorId : undefined].filter(Boolean).join(" ") || undefined}
+              className="grid gap-3 rounded-md border border-border-subtle p-4"
+            >
+              <legend className="px-1 text-label text-text-default">Dữ liệu vị trí GPS</legend>
+              <p className="text-secondary text-text-muted" id={gpsHelpId}>
+                Dữ liệu vị trí chỉ được gửi kèm khi bạn chọn lấy vị trí từ thiết bị.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Button
+                  disabled={isBusy}
+                  onClick={captureLocation}
+                  size="lg"
+                  type="button"
+                  variant="outline"
+                >
+                  {isLocating ? "Đang lấy vị trí…" : "Lấy vị trí hiện tại"}
+                </Button>
+                {hasLocation ? (
+                  <Button disabled={isBusy} onClick={clearLocation} size="lg" type="button" variant="ghost">
+                    Bỏ dữ liệu vị trí
+                  </Button>
+                ) : null}
+              </div>
+              {hasLocation ? (
+                <p className="text-secondary text-text-muted">
+                  Đã có dữ liệu vị trí
+                  {values.gpsAccuracyMeters !== null ? `, sai số khoảng ${values.gpsAccuracyMeters} m` : ""}.
+                </p>
+              ) : null}
+              {locationMessage ? <p aria-live="polite" className="text-secondary text-text-muted">{locationMessage}</p> : null}
+              {gpsErrors.length > 0 ? <p className="text-caption text-danger" id={gpsErrorId}>{gpsErrors.join(" ")}</p> : null}
+            </fieldset>
+
+            <fieldset aria-describedby={wifiHelpId} className="grid gap-4 rounded-md border border-border-subtle p-4">
+              <legend className="px-1 text-label text-text-default">Thông tin Wi-Fi</legend>
+              <p className="text-secondary text-text-muted" id={wifiHelpId}>
+                Thông tin Wi-Fi là dữ liệu bổ sung, không bắt buộc.
+              </p>
+              <FormField error={fieldErrors.wifiSsid?.[0]} id={wifiSsidId} label="Tên mạng Wi-Fi">
+                <input
+                  aria-describedby={[wifiHelpId, fieldErrors.wifiSsid?.[0] ? `${wifiSsidId}-error` : undefined].filter(Boolean).join(" ") || undefined}
+                  aria-invalid={Boolean(fieldErrors.wifiSsid?.[0])}
+                  autoComplete="off"
+                  className={inputClassName}
+                  disabled={isBusy}
+                  id={wifiSsidId}
+                  maxLength={128}
+                  onChange={(event) => updateValue("wifiSsid", event.target.value)}
+                  placeholder="Không bắt buộc"
+                  value={values.wifiSsid}
+                />
+              </FormField>
+              <FormField error={fieldErrors.wifiBssid?.[0]} id={wifiBssidId} label="BSSID">
+                <input
+                  aria-describedby={[wifiHelpId, fieldErrors.wifiBssid?.[0] ? `${wifiBssidId}-error` : undefined].filter(Boolean).join(" ") || undefined}
+                  aria-invalid={Boolean(fieldErrors.wifiBssid?.[0])}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  className={inputClassName}
+                  disabled={isBusy}
+                  id={wifiBssidId}
+                  maxLength={17}
+                  onChange={(event) => updateValue("wifiBssid", event.target.value)}
+                  placeholder="AA:BB:CC:DD:EE:FF"
+                  value={values.wifiBssid}
+                />
+              </FormField>
+            </fieldset>
+
+            {actionState.status === "error" ? (
+              <ResultBanner
+                description={actionState.message}
+                title={isCheckIn ? "Không thể ghi nhận check-in" : "Không thể ghi nhận check-out"}
+                tone="error"
+              />
+            ) : null}
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button className="min-h-11" disabled={isBusy} onClick={closeDialog} type="button" variant="ghost">
                 Hủy
               </Button>
-              <Button disabled={isPending || isLocating} size="lg" type="submit">
-                {submitLabel}
+              <Button className="min-h-11" disabled={isBusy} isLoading={isPending} type="submit">
+                {isBusy ? pendingLabel : title}
               </Button>
             </div>
           </form>
         </div>
-      ) : null}
+      </Dialog>
     </>
   );
 }
@@ -270,44 +313,23 @@ export function TimekeepingEntryDialog({
 function FormField({
   children,
   error,
+  id,
   label,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   error?: string;
+  id: string;
   label: string;
 }) {
   return (
-    <label className="grid gap-2 text-sm font-semibold text-ink">
-      <span>{label}</span>
+    <div className="grid gap-1.5">
+      <label className="text-label text-text-default" htmlFor={id}>{label}</label>
       {children}
-      <FieldError error={error} />
-    </label>
-  );
-}
-
-function FieldError({ error }: { error?: string }) {
-  return error ? <span className="text-xs font-medium text-red-600">{error}</span> : null;
-}
-
-function ActionMessage({
-  actionState,
-}: {
-  actionState: TimekeepingEntryActionState;
-}) {
-  if (!actionState.message) {
-    return null;
-  }
-
-  return (
-    <div
-      aria-live="polite"
-      className={
-        actionState.status === "error"
-          ? "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-          : "rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
-      }
-    >
-      {actionState.message}
+      <FieldError error={error} id={`${id}-error`} />
     </div>
   );
+}
+
+function FieldError({ error, id }: { error?: string; id: string }) {
+  return error ? <p className="text-caption text-danger" id={id}>{error}</p> : null;
 }

@@ -1,4 +1,15 @@
-import type { TimeEntryStatus, TimekeepingDayEntry } from "@/features/timekeeping/types";
+import type { ReactNode } from "react";
+
+import { DataTableFrame } from "@/components/patterns/data-table-frame";
+import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Badge } from "@/components/ui/badge";
+import {
+  getEvidencePresenceLabel,
+  getTimekeepingEntryStatusPresentation,
+  getTimekeepingModeLabel,
+} from "@/features/timekeeping/components/my-timekeeping-panel";
+import type { TimekeepingDayEntry } from "@/features/timekeeping/types";
 
 interface TimekeepingDayEntriesProps {
   entries: readonly TimekeepingDayEntry[];
@@ -16,155 +27,160 @@ function formatTime(value: string | null): string {
   }).format(new Date(value));
 }
 
-function getStatusLabel(status: TimeEntryStatus): string {
-  const labels: Record<TimeEntryStatus, string> = {
-    auto_ended: "Tự động kết thúc",
-    checked_out: "Đã check-out",
-    open: "Đang trong ca",
-  };
-
-  return labels[status];
-}
-
-function getStatusClassName(status: TimeEntryStatus): string {
-  const classNames: Record<TimeEntryStatus, string> = {
-    auto_ended: "border-amber-200 bg-amber-50 text-amber-800",
-    checked_out: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    open: "border-sky-200 bg-sky-50 text-sky-800",
-  };
-
-  return classNames[status];
-}
-
-function getEvidenceLabel(hasGps: boolean, hasWifi: boolean): string {
-  const labels = [hasGps ? "GPS" : null, hasWifi ? "Wi-Fi" : null].filter(Boolean);
-
-  return labels.length > 0 ? labels.join(" · ") : "Không kèm";
-}
-
 function getStaffLabel(entry: TimekeepingDayEntry): string {
   return entry.staffDisplayName?.trim() || entry.staffEmployeeCode || "Nhân sự trung tâm";
 }
 
+/** Read-only current-day audit presentation; raw evidence remains outside this read model. */
 export function TimekeepingDayEntries({ entries }: TimekeepingDayEntriesProps) {
   return (
-    <section className="overflow-hidden rounded-lg border border-hairline bg-surface-1 shadow-card">
-      <div className="border-b border-hairline px-5 py-4">
-        <h2 className="text-section font-semibold text-ink">Chấm công trong ngày</h2>
-        <p className="mt-1 text-sm text-ink-muted">{entries.length} lượt đã ghi nhận hôm nay</p>
+    <section
+      aria-labelledby="timekeeping-day-audit-heading"
+      className="timekeeping-day-audit-work-area grid min-w-0 gap-4"
+    >
+      <div>
+        <h2 className="text-section-title font-semibold text-text-strong" id="timekeeping-day-audit-heading">
+          Chấm công trong ngày
+        </h2>
+        <p className="mt-1 text-secondary text-text-muted">
+          Các lượt chấm công ghi nhận trong ngày hôm nay theo giờ Việt Nam.
+        </p>
       </div>
 
-      <div className="hidden overflow-x-auto lg:block">
-        <table className="min-w-[980px] border-collapse text-left text-sm">
-          <thead className="bg-canvas text-xs uppercase tracking-[0.04em] text-ink-muted">
-            <tr>
-              <th className="px-5 py-3 font-semibold">Nhân sự</th>
-              <th className="px-5 py-3 font-semibold">Ca làm</th>
-              <th className="px-5 py-3 font-semibold">Check-in</th>
-              <th className="px-5 py-3 font-semibold">Check-out</th>
-              <th className="px-5 py-3 font-semibold">Bằng chứng</th>
-              <th className="px-5 py-3 font-semibold">Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-hairline">
-            {entries.length === 0 ? (
-              <tr>
-                <td className="px-5 py-8 text-sm text-ink-muted" colSpan={6}>
-                  Chưa có lượt chấm công nào hôm nay.
-                </td>
-              </tr>
-            ) : (
-              entries.map((entry) => (
-                <tr className="align-top hover:bg-canvas/70" key={entry.id}>
-                  <td className="px-5 py-4">
-                    <p className="font-medium text-ink">{getStaffLabel(entry)}</p>
-                    {entry.staffEmployeeCode ? (
-                      <p className="mt-1 text-xs text-ink-muted">{entry.staffEmployeeCode}</p>
-                    ) : null}
-                  </td>
-                  <td className="px-5 py-4">
-                    <p className="font-medium text-ink">{entry.workShiftName}</p>
-                    <p className="mt-1 text-xs text-ink-muted">{entry.workShiftCode}</p>
-                  </td>
-                  <td className="px-5 py-4 text-ink-muted">
-                    <p>{formatTime(entry.checkInAt)}</p>
-                    <p className="mt-1 text-xs">{entry.checkInMode === "online" ? "Trực tuyến" : "Tại trung tâm"}</p>
-                  </td>
-                  <td className="px-5 py-4 text-ink-muted">
-                    <p>{formatTime(entry.checkOutAt)}</p>
-                    {entry.checkOutMode ? (
-                      <p className="mt-1 text-xs">
-                        {entry.checkOutMode === "auto_end"
-                          ? "Tự động"
-                          : entry.checkOutMode === "online"
-                            ? "Trực tuyến"
-                            : "Tại trung tâm"}
-                      </p>
-                    ) : null}
-                  </td>
-                  <td className="px-5 py-4 text-xs leading-5 text-ink-muted">
-                    <p>Vào: {getEvidenceLabel(entry.hasCheckInGpsEvidence, entry.hasCheckInWifiEvidence)}</p>
-                    <p className="mt-1">Ra: {getEvidenceLabel(entry.hasCheckOutGpsEvidence, entry.hasCheckOutWifiEvidence)}</p>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className={`inline-flex rounded-pill border px-2 py-1 text-xs font-semibold ${getStatusClassName(entry.status)}`}>
-                      {getStatusLabel(entry.status)}
-                    </span>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <p aria-live="polite" className="text-secondary text-text-muted">
+        Hiển thị {entries.length} lượt chấm công trong ngày.
+      </p>
 
-      <div className="grid gap-3 p-4 lg:hidden">
-        {entries.length === 0 ? (
-          <p className="rounded-md border border-dashed border-hairline p-4 text-sm leading-6 text-ink-muted">
-            Chưa có lượt chấm công nào hôm nay.
-          </p>
-        ) : (
-          entries.map((entry) => (
-            <article className="rounded-lg border border-hairline bg-white p-4" key={entry.id}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="font-semibold text-ink">{getStaffLabel(entry)}</h3>
-                  {entry.staffEmployeeCode ? (
-                    <p className="mt-1 text-xs text-ink-muted">{entry.staffEmployeeCode}</p>
-                  ) : null}
-                </div>
-                <span className={`rounded-pill border px-2 py-1 text-xs font-semibold ${getStatusClassName(entry.status)}`}>
-                  {getStatusLabel(entry.status)}
-                </span>
-              </div>
-              <dl className="mt-4 grid gap-3 text-sm">
-                <MobileField label="Ca làm" value={`${entry.workShiftCode} · ${entry.workShiftName}`} />
-                <MobileField
-                  label="Check-in"
-                  value={`${formatTime(entry.checkInAt)} · ${entry.checkInMode === "online" ? "Trực tuyến" : "Tại trung tâm"}`}
-                />
-                <MobileField
-                  label="Check-out"
-                  value={`${formatTime(entry.checkOutAt)}${entry.checkOutMode ? ` · ${entry.checkOutMode === "auto_end" ? "Tự động" : entry.checkOutMode === "online" ? "Trực tuyến" : "Tại trung tâm"}` : ""}`}
-                />
-                <MobileField
-                  label="Bằng chứng"
-                  value={`Vào: ${getEvidenceLabel(entry.hasCheckInGpsEvidence, entry.hasCheckInWifiEvidence)}; Ra: ${getEvidenceLabel(entry.hasCheckOutGpsEvidence, entry.hasCheckOutWifiEvidence)}`}
-                />
-              </dl>
-            </article>
-          ))
-        )}
-      </div>
+      {entries.length === 0 ? (
+        <EmptyState
+          description="Chưa có lượt chấm công nào được ghi nhận trong ngày hôm nay."
+          title="Chưa có lượt chấm công"
+        />
+      ) : (
+        <TimekeepingDayEntryList entries={entries} />
+      )}
     </section>
   );
 }
 
-function MobileField({ label, value }: { label: string; value: string }) {
+function TimekeepingDayEntryList({ entries }: TimekeepingDayEntriesProps) {
   return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">{label}</dt>
-      <dd className="mt-1 text-ink">{value}</dd>
+    <div className="timekeeping-day-audit-results-work-area">
+      <DataTableFrame
+        body={entries.map((entry) => <DayEntryTableRow entry={entry} key={entry.id} />)}
+        caption="Danh sách lượt chấm công trong ngày"
+        className="timekeeping-day-audit-table"
+        header={(
+          <tr>
+            <TableHeader>Nhân sự</TableHeader>
+            <TableHeader>Ca làm</TableHeader>
+            <TableHeader>Check-in</TableHeader>
+            <TableHeader>Check-out</TableHeader>
+            <TableHeader>Bằng chứng</TableHeader>
+            <TableHeader>Trạng thái</TableHeader>
+          </tr>
+        )}
+        tableClassName="min-w-[980px] table-fixed text-table-body text-text-default"
+      />
+
+      <ResponsiveRecordList
+        className="timekeeping-day-audit-record-list"
+        label="Danh sách lượt chấm công trong ngày"
+      >
+        {entries.map((entry) => <DayEntryRecord entry={entry} key={entry.id} />)}
+      </ResponsiveRecordList>
     </div>
   );
+}
+
+function DayEntryTableRow({ entry }: { entry: TimekeepingDayEntry }) {
+  const status = getTimekeepingEntryStatusPresentation(entry.status);
+
+  return (
+    <tr className="hover:bg-[var(--table-row-hover)]">
+      <TableCell className="w-[176px]"><StaffIdentity entry={entry} /></TableCell>
+      <TableCell className="w-[156px]">
+        <p className="font-medium text-text-default">{entry.workShiftName}</p>
+        <p className="mt-0.5 font-mono text-caption text-text-muted">{entry.workShiftCode}</p>
+      </TableCell>
+      <TableCell className="w-[134px] tabular-nums">
+        <p>{formatTime(entry.checkInAt)}</p>
+        <p className="mt-0.5 text-caption text-text-muted">{getTimekeepingModeLabel(entry.checkInMode)}</p>
+      </TableCell>
+      <TableCell className="w-[134px] tabular-nums">
+        <p>{formatTime(entry.checkOutAt)}</p>
+        {entry.checkOutMode ? (
+          <p className="mt-0.5 text-caption text-text-muted">
+            {entry.checkOutMode === "auto_end" ? "Tự động" : getTimekeepingModeLabel(entry.checkOutMode)}
+          </p>
+        ) : null}
+      </TableCell>
+      <TableCell className="w-[210px] text-secondary text-text-muted">
+        <EvidencePresence entry={entry} />
+      </TableCell>
+      <TableCell className="w-[150px]"><Badge tone={status.tone}>{status.label}</Badge></TableCell>
+    </tr>
+  );
+}
+
+function DayEntryRecord({ entry }: { entry: TimekeepingDayEntry }) {
+  const status = getTimekeepingEntryStatusPresentation(entry.status);
+
+  return (
+    <article className="rounded-lg border border-border-subtle bg-surface-base px-4 py-3" role="listitem">
+      <div className="flex items-start justify-between gap-3">
+        <StaffIdentity entry={entry} />
+        <Badge className="shrink-0" tone={status.tone}>{status.label}</Badge>
+      </div>
+      <dl className="mt-3 grid gap-2.5 text-secondary text-text-muted">
+        <RecordField label="Check-in" value={`${formatTime(entry.checkInAt)} · ${getTimekeepingModeLabel(entry.checkInMode)}`} />
+        <RecordField
+          label="Check-out"
+          value={`${formatTime(entry.checkOutAt)}${entry.checkOutMode ? ` · ${entry.checkOutMode === "auto_end" ? "Tự động" : getTimekeepingModeLabel(entry.checkOutMode)}` : ""}`}
+        />
+        <RecordField label="Ca làm" value={`${entry.workShiftCode} · ${entry.workShiftName}`} />
+        <div>
+          <dt className="text-label text-text-muted">Bằng chứng</dt>
+          <dd className="mt-1"><EvidencePresence entry={entry} /></dd>
+        </div>
+      </dl>
+    </article>
+  );
+}
+
+function StaffIdentity({ entry }: { entry: TimekeepingDayEntry }) {
+  return (
+    <div className="min-w-0">
+      <p className="font-semibold text-text-strong">{getStaffLabel(entry)}</p>
+      {entry.staffEmployeeCode ? (
+        <p className="mt-0.5 font-mono text-caption text-text-muted">{entry.staffEmployeeCode}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function EvidencePresence({ entry }: { entry: TimekeepingDayEntry }) {
+  return (
+    <div className="grid gap-0.5">
+      <p>Vào: GPS {getEvidencePresenceLabel(entry.hasCheckInGpsEvidence)} · Wi-Fi {getEvidencePresenceLabel(entry.hasCheckInWifiEvidence)}</p>
+      <p>Ra: GPS {getEvidencePresenceLabel(entry.hasCheckOutGpsEvidence)} · Wi-Fi {getEvidencePresenceLabel(entry.hasCheckOutWifiEvidence)}</p>
+    </div>
+  );
+}
+
+function RecordField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-label text-text-muted">{label}</dt>
+      <dd className="mt-0.5 text-text-default">{value}</dd>
+    </div>
+  );
+}
+
+function TableHeader({ children }: { children: ReactNode }) {
+  return <th className="h-10 border-b border-border-subtle px-3 text-left font-semibold" scope="col">{children}</th>;
+}
+
+function TableCell({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <td className={`min-h-14 px-3 py-3 align-top text-table-body ${className}`}>{children}</td>;
 }
