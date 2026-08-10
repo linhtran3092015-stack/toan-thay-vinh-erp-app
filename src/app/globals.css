@@ -288,6 +288,67 @@
   }
 }
 
+/* Finance 1: the payment-request work area is deliberately the query
+   container so the 1280px table threshold excludes surrounding page/card padding. */
+.payment-request-operational-work-area {
+  container-type: inline-size;
+}
+
+.payment-request-filter-bar,
+.payment-request-directory-table {
+  display: none;
+}
+
+.payment-request-directory-record-list,
+.payment-request-filter-trigger {
+  display: grid;
+}
+
+.payment-request-filter-trigger {
+  display: inline-flex;
+}
+
+/* The shared DataTableFrame owns one border pixel on each side. Keep its
+   1280px operational table fully inside the zero-padding work area. */
+@container (min-width: 1282px) {
+  .payment-request-filter-bar,
+  .payment-request-directory-table {
+    display: block;
+  }
+
+  .payment-request-directory-record-list,
+  .payment-request-filter-trigger {
+    display: none;
+  }
+
+  .payment-request-filter-grid {
+    grid-template-columns: minmax(260px, 1.6fr) repeat(4, minmax(138px, 1fr)) minmax(118px, auto);
+  }
+}
+
+.finance-overview-recent {
+  container-type: inline-size;
+}
+
+.finance-overview-recent-table {
+  display: none;
+}
+
+.finance-overview-recent-record-list {
+  display: grid;
+}
+
+/* Same two-pixel frame-border allowance for the 960px overview table. */
+@container (min-width: 962px) {
+  .finance-overview-recent-table {
+    display: block;
+  }
+
+  .finance-overview-recent-record-list {
+    display: none;
+  }
+}
+
 /* Wave 5 Sessions: choose dense filters/table only when the operational work area is safe. */
 .sessions-directory {
   container-type: inline-size;

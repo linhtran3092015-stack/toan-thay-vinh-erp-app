@@ -1,181 +1,69 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
+import { DataTableFrame } from "@/components/patterns/data-table-frame";
+import { PageHeader } from "@/components/patterns/page-header";
+import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PaymentRequestStatusBadge } from "@/features/finance/components/payment-request-status-badge";
 import { getFinanceOverviewResult } from "@/features/finance/data";
+import type { PaymentRequestReadModel } from "@/features/finance/read-models";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 export default async function FinanceOverviewPage() {
   const permissionResult = await getCachedDatabasePermissions();
+  if (!permissionResult.ok) return <ErrorState description="Hệ thống chưa tải được quyền truy cập Tài chính." title="Không tải được quyền truy cập" />;
+  if (!permissionResult.permissions.includes("finance.view")) return <PermissionDeniedState description="Tài khoản hiện tại không có quyền finance.view." title="Không có quyền xem Tổng quan Tài chính" />;
 
-  if (!permissionResult.ok) {
-    return (
-      <ErrorState
-        description="Hệ thống chưa tải được quyền truy cập Tài chính."
-        title="Không tải được quyền truy cập"
-      />
-    );
-  }
-
-  if (!permissionResult.permissions.includes("finance.view")) {
-    return (
-      <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền finance.view."
-        title="Không có quyền xem Tổng quan Tài chính"
-      />
-    );
-  }
-
-  const canCreatePaymentRequests =
-    permissionResult.permissions.includes("payments.create_request") ||
-    permissionResult.permissions.includes("payments.manage");
-  const canViewPaymentRequests =
-    permissionResult.permissions.includes("payments.view") ||
-    permissionResult.permissions.includes("payments.manage");
-
+  const canCreatePaymentRequests = permissionResult.permissions.includes("payments.create_request") || permissionResult.permissions.includes("payments.manage");
+  const canViewPaymentRequests = permissionResult.permissions.includes("payments.view") || permissionResult.permissions.includes("payments.manage");
   const overviewResult = await getFinanceOverviewResult();
-  if (!overviewResult.ok) {
-    return (
-      <ErrorState
-        description="Hệ thống chưa tải được dữ liệu học phí và công nợ. Vui lòng thử lại sau."
-        title="Không tải được dữ liệu tài chính"
-      />
-    );
-  }
-
+  if (!overviewResult.ok) return <ErrorState description="Hệ thống chưa tải được dữ liệu học phí. Vui lòng thử lại sau." title="Không tải được dữ liệu tài chính" />;
   const overview = overviewResult.data;
 
   return (
-    <div className="grid min-w-0 gap-4">
-      {/* Header */}
-      <section className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card md:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-ink md:text-3xl">Học phí & Tài chính</h1>
-            <p className="mt-1 text-sm text-ink-muted">
-              Quản lý Yêu cầu nạp học phí, Khớp giao dịch SePay, Phân bổ cho nhiều con và Báo cáo Thu/Chi.
-            </p>
-          </div>
+    <div className="grid min-w-0 gap-5">
+      <PageHeader
+        actions={canCreatePaymentRequests ? <Link className="inline-flex min-h-11 items-center justify-center rounded-md bg-action-primary px-4 text-control font-semibold text-text-on-primary hover:bg-action-primary-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href="/finance/payment-requests/new">Tạo yêu cầu thanh toán</Link> : undefined}
+        title="Học phí & Tài chính"
+      >
+        <p className="mt-1 text-secondary text-text-muted">Theo dõi số liệu học phí hiện có và các yêu cầu thanh toán gần đây.</p>
+      </PageHeader>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {canCreatePaymentRequests ? (
-              <Link
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-primary bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-strong"
-                href="/finance/payment-requests/new"
-              >
-                Tạo yêu cầu thanh toán
-              </Link>
-            ) : null}
-          </div>
-        </div>
+      <section aria-label="Tóm tắt tài chính hiện có" className="grid gap-px overflow-hidden rounded-lg border border-border-subtle bg-border-subtle sm:grid-cols-3">
+        <OverviewMetric label="Tổng thu học phí thực tế" value={formatCurrency(overview.cashflowSummary.receiptVnd)} />
+        <OverviewMetric label="Tổng chi hoàn phí" value={formatCurrency(overview.cashflowSummary.refundVnd)} />
+        <OverviewMetric label="Số yêu cầu nạp tiền" value={String(overview.totalPaymentRequestsCount)} />
       </section>
 
-      {/* Summary KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xs uppercase tracking-wider text-ink-subtle">
-              Tổng Thu Học phí (Thực tế)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-success">
-              {overview.cashflowSummary.receiptVnd.toLocaleString("vi-VN")} đ
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xs uppercase tracking-wider text-ink-subtle">
-              Tổng Chi Hoàn phí
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-warning">
-              {overview.cashflowSummary.refundVnd.toLocaleString("vi-VN")} đ
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xs uppercase tracking-wider text-ink-subtle">
-              Số Yêu cầu Nạp tiền
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-ink">{overview.totalPaymentRequestsCount}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Payment Requests Table */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Yêu cầu Nạp học phí gần đây (VietQR)</CardTitle>
-          {canViewPaymentRequests ? (
-            <Link
-              className="inline-flex min-h-11 items-center rounded-md px-3 text-sm font-semibold text-primary hover:bg-primary-soft"
-              href="/finance/payment-requests"
-            >
-              Xem tất cả
-            </Link>
-          ) : null}
-        </CardHeader>
-        <CardContent>
-          {overview.recentPaymentRequests.length === 0 ? (
-            <p className="text-sm text-ink-muted">Chưa có yêu cầu nạp tiền nào được khởi tạo.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-hairline text-xs font-semibold uppercase text-ink-subtle">
-                    <th className="py-3 px-4">Mã yêu cầu</th>
-                    <th className="py-3 px-4">Học viên</th>
-                    <th className="py-3 px-4">Cú pháp SePay</th>
-                    <th className="py-3 px-4">Số tiền dự kiến</th>
-                    <th className="py-3 px-4">Số buổi mua/tặng</th>
-                    <th className="py-3 px-4">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-hairline">
-                  {overview.recentPaymentRequests.map((r) => (
-                    <tr className="hover:bg-canvas/50" key={r.id}>
-                      <td className="py-3 px-4 font-mono text-xs font-semibold text-ink-muted">
-                        {r.publicCode}
-                      </td>
-                      <td className="py-3 px-4 font-semibold text-ink">
-                        <Link className="hover:underline hover:text-primary" href={`/students/${r.studentId}`}>
-                          {r.studentFullName}
-                        </Link>
-                        <span className="ml-1 text-xs font-normal text-ink-muted">({r.studentPublicCode})</span>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-xs font-bold text-primary">
-                        {r.transferCode}
-                      </td>
-                      <td className="py-3 px-4 font-semibold text-ink">
-                        {r.expectedAmountVnd.toLocaleString("vi-VN")} đ
-                      </td>
-                      <td className="py-3 px-4 text-ink">
-                        <span className="font-bold">{r.purchasedSessions} buổi</span>
-                        {r.bonusSessions > 0 ? (
-                          <span className="ml-1 text-xs text-success">(+{r.bonusSessions} tặng)</span>
-                        ) : null}
-                      </td>
-                      <td className="py-3 px-4">
-                        <PaymentRequestStatusBadge status={r.status} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <section className="finance-overview-recent grid min-w-0 gap-3" aria-labelledby="recent-payment-requests-title">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="text-section-title font-semibold text-text-strong" id="recent-payment-requests-title">Yêu cầu thanh toán gần đây</h2><p className="mt-1 text-secondary text-text-muted">Danh sách yêu cầu VietQR mới nhất đang có trong hệ thống.</p></div>
+          {canViewPaymentRequests ? <Link className="inline-flex min-h-11 items-center justify-center rounded-md px-3 text-control font-semibold text-action-link hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href="/finance/payment-requests">Xem tất cả</Link> : null}
+        </div>
+        {overview.recentPaymentRequests.length === 0 ? <p className="rounded-lg border border-border-subtle bg-surface-base px-4 py-5 text-secondary text-text-muted">Chưa có yêu cầu nạp tiền nào được khởi tạo.</p> : <RecentPaymentRequests items={overview.recentPaymentRequests} />}
+      </section>
     </div>
   );
 }
+
+function RecentPaymentRequests({ items }: { items: PaymentRequestReadModel[] }) {
+  return <>
+    <DataTableFrame
+      body={items.map((item) => <tr className="hover:bg-[var(--table-row-hover)]" key={item.id}><td className="h-14 px-3 font-mono text-caption font-semibold text-text-muted">{item.publicCode}</td><td className="h-14 px-3"><Link className="font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={`/students/${item.studentId}`}>{item.studentFullName}</Link><p className="mt-0.5 font-mono text-caption text-text-muted">{item.studentPublicCode}</p></td><td className="h-14 px-3 break-all font-mono text-caption font-semibold text-action-link">{item.transferCode}</td><td className="h-14 px-3 text-right tabular-nums font-semibold text-text-strong">{formatCurrency(item.expectedAmountVnd)}</td><td className="h-14 px-3 text-secondary text-text-muted"><span className="tabular-nums font-semibold text-text-default">{item.purchasedSessions}</span> buổi{item.bonusSessions > 0 ? ` · +${item.bonusSessions} tặng` : ""}</td><td className="h-14 px-3"><PaymentRequestStatusBadge status={item.status} /></td></tr>)}
+      caption="Yêu cầu thanh toán gần đây"
+      className="finance-overview-recent-table"
+      header={<tr><Header>Mã yêu cầu</Header><Header>Học viên</Header><Header>Nội dung chuyển khoản</Header><Header className="text-right">Số tiền dự kiến</Header><Header>Buổi học</Header><Header>Trạng thái</Header></tr>}
+      tableClassName="min-w-[960px] text-table-body text-text-default"
+    />
+    <ResponsiveRecordList className="finance-overview-recent-record-list" label="Yêu cầu thanh toán gần đây">
+      {items.map((item) => <article className="rounded-lg border border-border-subtle bg-surface-base px-4 py-3" key={item.id} role="listitem"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><Link className="font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={`/students/${item.studentId}`}>{item.studentFullName}</Link><p className="mt-0.5 font-mono text-caption text-text-muted">{item.publicCode} · {item.studentPublicCode}</p></div><PaymentRequestStatusBadge status={item.status} /></div><p className="mt-3 tabular-nums font-semibold text-text-strong">{formatCurrency(item.expectedAmountVnd)}</p><p className="mt-1 break-all font-mono text-caption text-action-link">{item.transferCode}</p><p className="mt-1 text-secondary text-text-muted">{item.purchasedSessions} buổi mua{item.bonusSessions > 0 ? ` · +${item.bonusSessions} buổi tặng` : ""}</p></article>)}
+    </ResponsiveRecordList>
+  </>;
+}
+
+function OverviewMetric({ label, value }: { label: string; value: string }) { return <div className="bg-surface-base px-4 py-3"><p className="text-label text-text-muted">{label}</p><p className="mt-1 tabular-nums text-kpi text-text-strong">{value}</p></div>; }
+function Header({ children, className = "" }: { children: ReactNode; className?: string }) { return <th className={`h-10 border-b border-border-subtle px-3 text-left font-semibold ${className}`} scope="col">{children}</th>; }
+const currencyFormatter = new Intl.NumberFormat("vi-VN", { currency: "VND", maximumFractionDigits: 0, style: "currency" });
+function formatCurrency(value: number) { return currencyFormatter.format(value); }
