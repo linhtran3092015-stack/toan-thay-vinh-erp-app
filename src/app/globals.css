@@ -373,6 +373,30 @@
   }
 }
 
+/* Finance 3: query the zero-padding ledger work area, not an outer card. */
+.session-ledger-operational-work-area {
+  container-type: inline-size;
+}
+
+.session-ledger-directory-table {
+  display: none;
+}
+
+.session-ledger-directory-record-list {
+  display: grid;
+}
+
+/* DataTableFrame owns a one-pixel border on each side of its 1080px table. */
+@container (min-width: 1082px) {
+  .session-ledger-directory-table {
+    display: block;
+  }
+
+  .session-ledger-directory-record-list {
+    display: none;
+  }
+}
+
 /* Wave 5 Sessions: choose dense filters/table only when the operational work area is safe. */
 .sessions-directory {
   container-type: inline-size;
