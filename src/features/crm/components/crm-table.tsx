@@ -1,132 +1,66 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
+import { DataTableFrame } from "@/components/patterns/data-table-frame";
+import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
+import { EmptyState } from "@/components/shared/empty-state";
 import { CrmStatusBadge } from "@/features/crm/components/crm-status-badge";
 import type { CrmLeadItemReadModel } from "@/features/crm/read-models";
 
 interface CrmTableProps {
+  directoryQuery: string;
   items: CrmLeadItemReadModel[];
 }
 
-export function CrmTable({ items }: CrmTableProps) {
+/** CRM owns its server-filtered rows; this component only frames their operational presentation. */
+export function CrmTable({ directoryQuery, items }: CrmTableProps) {
   if (items.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-hairline bg-surface-1 p-8 text-center text-sm text-ink-muted">
-        Không tìm thấy lead / học viên tiềm năng nào phù hợp.
-      </div>
-    );
+    return <EmptyState description="Không tìm thấy lead phù hợp với bộ lọc hiện tại." title="Không có hồ sơ CRM phù hợp" />;
   }
 
   return (
-    <div className="grid gap-4">
-      {/* Desktop Table View */}
-      <div className="hidden overflow-x-auto rounded-lg border border-hairline bg-surface-1 shadow-card md:block">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-hairline text-xs font-semibold uppercase text-ink-subtle">
-              <th className="py-3 px-4">Mã Lead</th>
-              <th className="py-3 px-4">Họ và tên học viên</th>
-              <th className="py-3 px-4">Khối / Mức</th>
-              <th className="py-3 px-4">Phụ huynh & SĐT</th>
-              <th className="py-3 px-4">Nguồn Lead</th>
-              <th className="py-3 px-4">Sale phụ trách</th>
-              <th className="py-3 px-4">Trạng thái</th>
-              <th className="py-3 px-4 text-right">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-hairline">
-            {items.map((item) => (
-              <tr className="hover:bg-canvas/50" key={item.id}>
-                <td className="py-3 px-4 font-mono text-xs font-semibold text-ink-muted">
-                  {item.publicCode}
-                </td>
-                <td className="py-3 px-4 font-semibold text-ink">
-                  <Link className="hover:underline hover:text-primary" href={`/crm/${item.id}`}>
-                    {item.fullName}
-                  </Link>
-                  {item.birthYear ? (
-                    <span className="ml-2 text-xs font-normal text-ink-muted">({item.birthYear})</span>
-                  ) : null}
-                </td>
-                <td className="py-3 px-4">
-                  <div className="flex flex-wrap gap-1">
-                    <Badge tone="info">Khối {item.expectedGrade}</Badge>
-                    {item.expectedLevel ? <Badge tone="purple">Mức {item.expectedLevel}</Badge> : null}
-                  </div>
-                </td>
-                <td className="py-3 px-4">
-                  <p className="font-medium text-ink">{item.guardianFullName}</p>
-                  <p className="text-xs font-mono text-ink-muted">{item.guardianPhone}</p>
-                </td>
-                <td className="py-3 px-4 text-xs font-medium text-ink-muted">
-                  {item.leadSourceName}
-                </td>
-                <td className="py-3 px-4 font-medium text-ink">
-                  {item.saleOwnerName ?? "Chưa phân công"}
-                </td>
-                <td className="py-3 px-4">
-                  <CrmStatusBadge status={item.status} />
-                </td>
-                <td className="py-3 px-4 text-right">
-                  <Link
-                    className="inline-flex min-h-8 items-center justify-center rounded-md border border-hairline bg-white px-3 text-xs font-semibold text-ink transition-colors hover:border-secondary hover:bg-canvas"
-                    href={`/crm/${item.id}`}
-                  >
-                    Chi tiết
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile Card List View */}
-      <div className="grid gap-3 md:hidden">
-        {items.map((item) => (
-          <div className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card" key={item.id}>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <span className="font-mono text-xs font-semibold text-ink-muted">{item.publicCode}</span>
-                <h3 className="mt-0.5 text-base font-bold text-ink">
-                  <Link href={`/crm/${item.id}`}>{item.fullName}</Link>
-                </h3>
-              </div>
-              <CrmStatusBadge status={item.status} />
-            </div>
-
-            <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
-              <Badge tone="info">Khối {item.expectedGrade}</Badge>
-              {item.expectedLevel ? <Badge tone="purple">Mức {item.expectedLevel}</Badge> : null}
-              {item.expectedMode ? <Badge tone="neutral">{item.expectedMode}</Badge> : null}
-            </div>
-
-            <div className="mt-3 grid gap-1 border-t border-hairline pt-3 text-xs">
-              <div className="flex justify-between">
-                <span className="text-ink-muted">Phụ huynh:</span>
-                <span className="font-medium text-ink">{item.guardianFullName} ({item.guardianPhone})</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-ink-muted">Nguồn:</span>
-                <span className="text-ink">{item.leadSourceName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-ink-muted">Sale:</span>
-                <span className="font-semibold text-ink">{item.saleOwnerName ?? "Chưa phân công"}</span>
-              </div>
-            </div>
-
-            <div className="mt-3 flex justify-end">
-              <Link
-                className="inline-flex min-h-8 w-full items-center justify-center rounded-md border border-hairline bg-white px-3 text-xs font-semibold text-ink transition-colors hover:border-secondary"
-                href={`/crm/${item.id}`}
-              >
-                Xem hồ sơ CRM
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="crm-directory-results">
+      <DataTableFrame
+        body={items.map((item) => <CrmTableRow directoryQuery={directoryQuery} item={item} key={item.id} />)}
+        caption="Danh sách hồ sơ CRM và tuyển sinh"
+        className="crm-directory-table"
+        header={<tr><TableHeader>Lead</TableHeader><TableHeader>Phụ huynh</TableHeader><TableHeader>Khối · mức · hình thức dự kiến</TableHeader><TableHeader>Nguồn</TableHeader><TableHeader>Sale phụ trách</TableHeader><TableHeader>Trạng thái CRM</TableHeader><TableHeader className="text-right">Thao tác</TableHeader></tr>}
+        tableClassName="min-w-[1200px] table-fixed text-table-body text-text-default"
+      />
+      <ResponsiveRecordList className="crm-directory-record-list" label="Danh sách hồ sơ CRM và tuyển sinh">
+        {items.map((item) => <CrmRecord directoryQuery={directoryQuery} item={item} key={item.id} />)}
+      </ResponsiveRecordList>
     </div>
   );
 }
+
+function CrmTableRow({ directoryQuery, item }: { directoryQuery: string; item: CrmLeadItemReadModel }) {
+  const href = crmCaseHref(item.id, directoryQuery);
+  return (
+    <tr className="transition-colors hover:bg-[var(--table-row-hover)]">
+      <TableCell className="w-[210px]"><Link className="font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={href}>{item.fullName}</Link><p className="mt-0.5 tabular-nums text-caption text-text-muted">{item.publicCode} · {item.birthYear}</p></TableCell>
+      <TableCell className="w-[190px]"><p className="font-medium text-text-default">{item.guardianFullName}</p><p className="mt-0.5 tabular-nums text-caption text-text-muted">{item.guardianPhone}</p></TableCell>
+      <TableCell className="w-[210px] text-secondary text-text-muted">Khối {item.expectedGrade} · {item.expectedLevel ?? "Chưa xác định"} · {formatMode(item.expectedMode)}</TableCell>
+      <TableCell className="w-[145px] text-secondary text-text-muted">{item.leadSourceName}</TableCell>
+      <TableCell className="w-[150px] text-secondary text-text-default">{item.saleOwnerName ?? "Chưa phân công"}</TableCell>
+      <TableCell className="w-[165px]"><CrmStatusBadge status={item.status} /></TableCell>
+      <TableCell className="w-[130px] text-right"><Link aria-label={`Mở hồ sơ CRM ${item.fullName}`} className="inline-flex h-8 items-center justify-center rounded-md px-2 text-control font-semibold text-action-link hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={href}>Mở hồ sơ</Link></TableCell>
+    </tr>
+  );
+}
+
+function CrmRecord({ directoryQuery, item }: { directoryQuery: string; item: CrmLeadItemReadModel }) {
+  const href = crmCaseHref(item.id, directoryQuery);
+  return (
+    <article className="rounded-lg border border-border-subtle bg-surface-base px-4 py-3" role="listitem">
+      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><Link className="block text-body font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={href}>{item.fullName}</Link><p className="mt-0.5 tabular-nums text-caption text-text-muted">{item.publicCode} · {item.birthYear}</p></div><CrmStatusBadge status={item.status} /></div>
+      <div className="mt-3 grid gap-1.5 text-secondary text-text-muted"><p><span className="font-medium text-text-default">Phụ huynh:</span> {item.guardianFullName} · {item.guardianPhone}</p><p>Khối {item.expectedGrade} · {item.expectedLevel ?? "Chưa xác định"} · {formatMode(item.expectedMode)}</p><p>Nguồn: {item.leadSourceName} · Sale: {item.saleOwnerName ?? "Chưa phân công"}</p></div>
+      <Link aria-label={`Mở hồ sơ CRM ${item.fullName}`} className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-border-subtle px-4 text-control font-semibold text-action-link hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={href}>Mở hồ sơ CRM</Link>
+    </article>
+  );
+}
+
+function TableHeader({ children, className }: { children: ReactNode; className?: string }) { return <th className={`h-10 border-b border-border-subtle px-3 text-left font-semibold ${className ?? ""}`} scope="col">{children}</th>; }
+function TableCell({ children, className }: { children: ReactNode; className?: string }) { return <td className={`h-14 px-3 align-middle text-table-body ${className ?? ""}`}>{children}</td>; }
+function crmCaseHref(id: string, query: string) { return query ? `/crm/${id}?${query}` : `/crm/${id}`; }
+function formatMode(mode: string | null) { return mode === "online" ? "Online" : mode === "offline" ? "Offline" : mode === "hybrid" ? "Kết hợp" : "Chưa xác định"; }

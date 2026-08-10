@@ -2,10 +2,12 @@ import Link from "next/link";
 
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
+import { PageHeader } from "@/components/patterns/page-header";
 import { Button } from "@/components/ui/button";
 import { CrmFilters } from "@/features/crm/components/crm-filters";
 import { CrmTable } from "@/features/crm/components/crm-table";
 import { getCrmLeadDirectory, getLeadSources, getSaleOwners } from "@/features/crm/data";
+import { getCrmDirectoryQuery } from "@/features/crm/crm-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 interface CrmDirectoryPageProps {
@@ -53,37 +55,21 @@ export default async function CrmDirectoryPage({ searchParams }: CrmDirectoryPag
     getLeadSources(),
     getSaleOwners(),
   ]);
+  const directoryQuery = getCrmDirectoryQuery(new URLSearchParams(params));
+  const createHref = directoryQuery ? `/crm/new?${directoryQuery}` : "/crm/new";
 
   return (
-    <div className="grid min-w-0 gap-4">
-      {/* Header */}
-      <section className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card md:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-ink md:text-3xl">CRM & Tuyển sinh</h1>
-            <p className="mt-1 text-sm text-ink-muted">
-              Quản lý danh sách Lead, Phân công Sale, Đặt lịch học thử & Chuyển đổi thành Học viên Chính thức.
-            </p>
-          </div>
-
-          {canCreateLead ? (
-            <Link className="inline-flex flex-none" href="/crm/new">
-              <Button>+ Thêm Lead mới</Button>
-            </Link>
-          ) : null}
-        </div>
-      </section>
-
-      {/* Filters Toolbar */}
+    <div className="crm-directory grid min-w-0 gap-6">
+      <PageHeader
+        actions={canCreateLead ? <Link className="inline-flex" href={createHref}><Button>Thêm Lead mới</Button></Link> : undefined}
+        context={<span className="text-secondary text-text-muted">{directoryResult.items.length}/{directoryResult.totalCount} kết quả</span>}
+        title="CRM & Tuyển sinh"
+      >
+        <p className="mt-1 text-secondary text-text-muted">Quản lý lead, phân công sale, học thử và chuyển đổi học viên chính thức.</p>
+      </PageHeader>
       <CrmFilters leadSources={leadSources} saleOwners={saleOwners} />
-
-      {/* Summary stats */}
-      <div className="flex items-center justify-between text-xs text-ink-muted px-1">
-        <span>Hiển thị {directoryResult.items.length} / {directoryResult.totalCount} lead</span>
-      </div>
-
-      {/* Lead Directory Table */}
-      <CrmTable items={directoryResult.items} />
+      <div aria-live="polite" className="text-secondary text-text-muted">Hiển thị {directoryResult.items.length} / {directoryResult.totalCount} lead</div>
+      <CrmTable directoryQuery={directoryQuery} items={directoryResult.items} />
     </div>
   );
 }

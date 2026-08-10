@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
 
+import { PageHeader } from "@/components/patterns/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
@@ -11,6 +13,7 @@ import { CrmLeadTransferDialog } from "@/features/crm/components/crm-lead-transf
 import { CrmStatusBadge } from "@/features/crm/components/crm-status-badge";
 import { CrmTrialBookingDialog } from "@/features/crm/components/crm-trial-booking-dialog";
 import { getCrmCaseDetail, getSaleOwners } from "@/features/crm/data";
+import { getCrmDirectoryHref } from "@/features/crm/crm-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -18,10 +21,19 @@ interface CrmCaseDetailPageProps {
   params: Promise<{
     caseId: string;
   }>;
+  searchParams: Promise<{
+    grade?: string;
+    sale?: string;
+    search?: string;
+    source?: string;
+    status?: string;
+  }>;
 }
 
-export default async function CrmCaseDetailPage({ params }: CrmCaseDetailPageProps) {
+export default async function CrmCaseDetailPage({ params, searchParams }: CrmCaseDetailPageProps) {
   const { caseId } = await params;
+  const returnParams = await searchParams;
+  const directoryHref = getCrmDirectoryHref(new URLSearchParams(returnParams));
   const permissionResult = await getCachedDatabasePermissions();
 
   if (!permissionResult.ok) {
@@ -76,35 +88,13 @@ export default async function CrmCaseDetailPage({ params }: CrmCaseDetailPagePro
   }));
 
   return (
-    <div className="grid min-w-0 gap-4">
-      {/* Header */}
-      <section className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card md:p-5">
-        <nav className="mb-3 flex items-center gap-2 text-sm text-ink-muted">
-          <Link className="font-semibold text-primary hover:underline" href="/crm">
-            CRM & Tuyển sinh
-          </Link>
-          <span>/</span>
-          <span className="font-semibold text-ink">{detail.publicCode}</span>
-        </nav>
-
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold text-ink md:text-3xl">{detail.fullName}</h1>
-              <CrmStatusBadge status={detail.status} />
-            </div>
-
-            <div className="mt-2 flex flex-wrap gap-2 text-xs">
-              <Badge tone="info">Mã: {detail.publicCode}</Badge>
-              <Badge tone="info">Khối {detail.expectedGrade}</Badge>
-              {detail.expectedLevel ? <Badge tone="purple">Mức {detail.expectedLevel}</Badge> : null}
-              {detail.expectedMode ? <Badge tone="neutral">{detail.expectedMode}</Badge> : null}
-              <Badge tone="neutral">Sale: {detail.saleOwnerName ?? "Chưa phân công"}</Badge>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-wrap items-center gap-2">
+    <div className="grid min-w-0 gap-6">
+      <div className="grid gap-3">
+        <Link className="inline-flex w-fit items-center gap-2 text-control font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={directoryHref}>
+          <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.8} /> Quay lại CRM & Tuyển sinh
+        </Link>
+        <PageHeader
+          actions={<div className="flex flex-wrap items-center gap-2">
             {canTransfer && detail.status !== "converted" ? (
               <CrmLeadTransferDialog
                 crmCaseId={detail.id}
@@ -128,17 +118,20 @@ export default async function CrmCaseDetailPage({ params }: CrmCaseDetailPagePro
 
             {detail.studentId ? (
               <Link href={`/students/${detail.studentId}`}>
-                <Button variant="outline">Xem Hồ sơ Học viên Chính thức ➔</Button>
+                <Button variant="outline">Xem hồ sơ học viên <ExternalLink aria-hidden="true" size={16} strokeWidth={1.8} /></Button>
               </Link>
             ) : null}
-          </div>
-        </div>
-      </section>
+          </div>}
+          context={<CrmStatusBadge status={detail.status} />}
+          title={detail.fullName}
+        >
+          <p className="mt-1 tabular-nums text-secondary text-text-muted">{detail.publicCode} · Khối {detail.expectedGrade}{detail.expectedLevel ? ` · Mức ${detail.expectedLevel}` : ""}{detail.expectedMode ? ` · ${formatMode(detail.expectedMode)}` : ""} · Sale: {detail.saleOwnerName ?? "Chưa phân công"}</p>
+        </PageHeader>
+      </div>
 
       {/* Main Grid Details */}
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="grid content-start gap-4">
-          {/* Lead & Guardian Info */}
           <Card>
             <CardHeader>
               <CardTitle>Thông tin Lead & Phụ huynh</CardTitle>
@@ -156,24 +149,23 @@ export default async function CrmCaseDetailPage({ params }: CrmCaseDetailPagePro
             </CardContent>
           </Card>
 
-          {/* Trial Bookings */}
           <Card>
             <CardHeader>
               <CardTitle>Lịch sử Học thử (Trial Bookings)</CardTitle>
             </CardHeader>
             <CardContent>
               {detail.trialBookings.length === 0 ? (
-                <p className="text-sm text-ink-muted">Chưa có lịch học thử nào được đặt.</p>
+                <p className="text-body text-text-muted">Chưa có lịch học thử nào được đặt.</p>
               ) : (
                 <div className="grid gap-3">
                   {detail.trialBookings.map((t) => (
-                    <div className="rounded-md border border-hairline bg-canvas p-3 text-sm" key={t.id}>
+                    <div className="rounded-md border border-border-subtle bg-surface-sunken p-3 text-body" key={t.id}>
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-ink">Ngày thử: {formatDate(t.trialDate)}</span>
+                        <span className="font-semibold text-text-strong">Ngày thử: {formatDate(t.trialDate)}</span>
                         <Badge tone={t.status === "attended" ? "success" : "warning"}>{t.status}</Badge>
                       </div>
-                      <p className="mt-1 text-xs text-ink-muted">Hình thức: {t.learningMode}</p>
-                      {t.saleNotes ? <p className="mt-1 text-xs text-ink">Ghi chú sale: {t.saleNotes}</p> : null}
+                      <p className="mt-1 text-caption text-text-muted">Hình thức: {t.learningMode}</p>
+                      {t.saleNotes ? <p className="mt-1 text-caption text-text-default">Ghi chú sale: {t.saleNotes}</p> : null}
                     </div>
                   ))}
                 </div>
@@ -183,7 +175,6 @@ export default async function CrmCaseDetailPage({ params }: CrmCaseDetailPagePro
         </div>
 
         <div className="grid content-start gap-4">
-          {/* 10 Checklist Status Summary */}
           <Card>
             <CardHeader>
               <CardTitle>Checklist Nhập học 10 bước</CardTitle>
@@ -203,29 +194,28 @@ export default async function CrmCaseDetailPage({ params }: CrmCaseDetailPagePro
                   <ChecklistSummaryRow label="10. Sổ liên lạc / Zalo sẵn sàng" value={detail.checklist.item10CommunicationGroupReady} />
                 </>
               ) : (
-                <p className="text-sm text-ink-muted">Chưa khởi tạo checklist.</p>
+                <p className="text-body text-text-muted">Chưa khởi tạo checklist.</p>
               )}
             </CardContent>
           </Card>
 
-          {/* Lead Assignment History */}
           <Card>
             <CardHeader>
               <CardTitle>Lịch sử phân công Lead</CardTitle>
             </CardHeader>
             <CardContent>
               {detail.assignmentHistory.length === 0 ? (
-                <p className="text-sm text-ink-muted">Chưa có lịch sử chuyển giao.</p>
+                <p className="text-body text-text-muted">Chưa có lịch sử chuyển giao.</p>
               ) : (
                 <div className="grid gap-3">
                   {detail.assignmentHistory.map((h) => (
-                    <div className="rounded-md border border-hairline bg-canvas p-3 text-xs" key={h.id}>
-                      <div className="flex items-center justify-between font-semibold text-ink">
-                        <span>{h.previousSaleOwnerName ? `${h.previousSaleOwnerName} ➔ ${h.newSaleOwnerName}` : `Gán ban đầu: ${h.newSaleOwnerName}`}</span>
-                        <span className="text-[10px] text-ink-muted">{formatDate(h.createdAt)}</span>
+                    <div className="rounded-md border border-border-subtle bg-surface-sunken p-3 text-caption" key={h.id}>
+                      <div className="flex items-center justify-between gap-3 font-semibold text-text-strong">
+                        <span className="inline-flex items-center gap-1">{h.previousSaleOwnerName ? <>{h.previousSaleOwnerName}<ArrowRight aria-hidden="true" size={14} strokeWidth={1.8} />{h.newSaleOwnerName}</> : `Gán ban đầu: ${h.newSaleOwnerName}`}</span>
+                        <span className="tabular-nums text-text-muted">{formatDate(h.createdAt)}</span>
                       </div>
-                      <p className="mt-1 text-ink-muted">Phương thức: {h.assignmentMethod}</p>
-                      <p className="mt-0.5 text-ink">Lý do: {h.reason}</p>
+                      <p className="mt-1 text-text-muted">Phương thức: {h.assignmentMethod}</p>
+                      <p className="mt-0.5 text-text-default">Lý do: {h.reason}</p>
                     </div>
                   ))}
                 </div>
@@ -240,20 +230,24 @@ export default async function CrmCaseDetailPage({ params }: CrmCaseDetailPagePro
 
 function InfoTile({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
   return (
-    <div className={`rounded-md border border-hairline bg-canvas p-3 ${wide ? "md:col-span-2" : ""}`}>
-      <p className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-ink whitespace-pre-wrap">{value}</p>
+    <div className={`rounded-md border border-border-subtle bg-surface-sunken p-3 ${wide ? "md:col-span-2" : ""}`}>
+      <p className="text-label font-semibold text-text-subtle">{label}</p>
+      <p className="mt-1 whitespace-pre-wrap text-body font-semibold text-text-strong">{value}</p>
     </div>
   );
 }
 
 function ChecklistSummaryRow({ label, value }: { label: string; value: boolean }) {
   return (
-    <div className="flex items-center justify-between rounded border border-hairline px-3 py-2 bg-canvas">
-      <span className="text-ink">{label}</span>
+    <div className="flex items-center justify-between rounded-md border border-border-subtle bg-surface-sunken px-3 py-2">
+      <span className="text-text-default">{label}</span>
       <Badge tone={value ? "success" : "neutral"}>{value ? "Đã duyệt" : "Chưa"}</Badge>
     </div>
   );
+}
+
+function formatMode(mode: string): string {
+  return mode === "online" ? "Online" : mode === "offline" ? "Offline" : mode === "hybrid" ? "Kết hợp" : mode;
 }
 
 function formatDate(value: string | null): string {

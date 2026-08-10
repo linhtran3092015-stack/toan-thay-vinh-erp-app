@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { bookTrialAction } from "@/features/crm/actions/crm-actions";
 import type { CrmActionResultState } from "@/features/crm/forms/crm-action-types";
 
-interface CrmTrialBookingDialogProps {
-  crmCaseId: string;
-}
+interface CrmTrialBookingDialogProps { crmCaseId: string; }
+const fieldClassName = "h-10 w-full rounded-md border border-border-subtle bg-field-bg px-3 text-body text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring";
 
 export function CrmTrialBookingDialog({ crmCaseId }: CrmTrialBookingDialogProps) {
   const router = useRouter();
@@ -19,103 +20,26 @@ export function CrmTrialBookingDialog({ crmCaseId }: CrmTrialBookingDialogProps)
   const [saleNotes, setSaleNotes] = useState("");
   const [actionState, setActionState] = useState<CrmActionResultState | null>(null);
   const [isPending, startTransition] = useTransition();
-
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const trialDateError = actionState?.status === "error" ? actionState.fieldErrors?.trialDate?.[0] : undefined;
+  const close = () => { if (!isPending) setIsOpen(false); };
   const handleBookTrial = () => {
+    if (isPending) return;
     setActionState(null);
     startTransition(async () => {
-      const result = await bookTrialAction({
-        crmCaseId,
-        learningMode,
-        saleNotes,
-        trialDate,
-      });
+      const result = await bookTrialAction({ crmCaseId, learningMode, saleNotes, trialDate });
       setActionState(result);
-      if (result.status === "success") {
-        setIsOpen(false);
-        setTrialDate("");
-        setSaleNotes("");
-        router.refresh();
-      }
+      if (result.status === "success") { setIsOpen(false); setTrialDate(""); setSaleNotes(""); router.refresh(); }
     });
   };
-
-  return (
-    <>
-      <Button onClick={() => setIsOpen(true)} size="sm" variant="outline">
-        Đặt lịch Học thử
-      </Button>
-
-      {isOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
-          <div className="w-full max-w-md rounded-lg border border-hairline bg-surface-1 p-6 shadow-popover">
-            <h2 className="text-lg font-bold text-ink">Đặt lịch Học thử (Miễn phí 1 buổi)</h2>
-            <p className="mt-1 text-xs text-ink-muted">
-              Lịch học thử không ảnh hưởng tới bảng điểm danh chính thức của lớp.
-            </p>
-
-            {actionState?.status === "error" ? (
-              <div className="mt-3 rounded-md bg-danger/10 p-3 text-xs font-semibold text-danger">
-                {actionState.message}
-              </div>
-            ) : null}
-
-            <div className="mt-4 grid gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-ink-subtle">
-                  Ngày học thử dự kiến <span className="text-danger">*</span>
-                </label>
-                <input
-                  className="mt-1 w-full rounded-md border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                  onChange={(e) => setTrialDate(e.target.value)}
-                  type="date"
-                  value={trialDate}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-ink-subtle">
-                  Hình thức học thử <span className="text-danger">*</span>
-                </label>
-                <select
-                  className="mt-1 w-full rounded-md border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                  onChange={(e) => setLearningMode(e.target.value as "online" | "offline")}
-                  value={learningMode}
-                >
-                  <option value="offline">Offline (Tại trung tâm)</option>
-                  <option value="online">Online (Trực tuyến)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-ink-subtle">
-                  Ghi chú cho buổi học thử
-                </label>
-                <textarea
-                  className="mt-1 w-full rounded-md border border-hairline bg-canvas p-3 text-sm text-ink placeholder:text-ink-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                  onChange={(e) => setSaleNotes(e.target.value)}
-                  placeholder="Ghi chú về trình độ, mong muốn của phụ huynh..."
-                  rows={3}
-                  value={saleNotes}
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <Button
-                disabled={isPending}
-                onClick={() => setIsOpen(false)}
-                type="button"
-                variant="outline"
-              >
-                Hủy
-              </Button>
-              <Button disabled={isPending || !trialDate} onClick={handleBookTrial}>
-                {isPending ? "Đang lưu..." : "Xác nhận đặt lịch"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </>
-  );
+  return <>
+    <Button onClick={() => { setActionState(null); setIsOpen(true); }} ref={triggerRef} size="sm" variant="outline">Đặt lịch học thử</Button>
+    <Dialog ariaDescribedBy="crm-trial-dialog-description" ariaLabelledBy="crm-trial-dialog-title" className="max-w-md" isOpen={isOpen} onClose={close} returnFocusRef={triggerRef}>
+      <div className="grid gap-5 p-5 sm:p-6"><div><h2 className="text-section-title font-semibold text-text-strong" id="crm-trial-dialog-title">Đặt lịch học thử</h2><p className="mt-1 text-secondary text-text-muted" id="crm-trial-dialog-description">Lịch học thử không ảnh hưởng tới bảng điểm danh chính thức của lớp.</p></div>
+        {actionState?.status === "error" ? <ResultBanner title={actionState.message} tone="error" /> : null}
+        <div className="grid gap-4"><div className="grid gap-1.5"><label className="text-label font-medium text-text-muted" htmlFor="crm-trial-date">Ngày học thử dự kiến <span aria-hidden="true" className="text-danger">*</span></label><input aria-describedby={trialDateError ? "crm-trial-date-error" : undefined} aria-invalid={Boolean(trialDateError)} className={fieldClassName} disabled={isPending} id="crm-trial-date" onChange={(event) => setTrialDate(event.target.value)} type="date" value={trialDate} />{trialDateError ? <p className="text-caption text-danger" id="crm-trial-date-error">{trialDateError}</p> : null}</div><div className="grid gap-1.5"><label className="text-label font-medium text-text-muted" htmlFor="crm-trial-mode">Hình thức học thử <span aria-hidden="true" className="text-danger">*</span></label><select className={fieldClassName} disabled={isPending} id="crm-trial-mode" onChange={(event) => setLearningMode(event.target.value as "online" | "offline")} value={learningMode}><option value="offline">Offline (Tại trung tâm)</option><option value="online">Online (Trực tuyến)</option></select></div><div className="grid gap-1.5"><label className="text-label font-medium text-text-muted" htmlFor="crm-trial-notes">Ghi chú cho buổi học thử</label><textarea className="min-h-28 rounded-md border border-border-subtle bg-field-bg p-3 text-body text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring" disabled={isPending} id="crm-trial-notes" onChange={(event) => setSaleNotes(event.target.value)} placeholder="Ghi chú về trình độ, mong muốn của phụ huynh…" value={saleNotes} /></div></div>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button disabled={isPending} onClick={close} variant="outline">Hủy</Button><Button disabled={isPending || !trialDate} onClick={handleBookTrial}>{isPending ? "Đang lưu…" : "Xác nhận đặt lịch"}</Button></div>
+      </div>
+    </Dialog>
+  </>;
 }

@@ -322,6 +322,38 @@
   }
 }
 
+/* CRM remains server-filtered, but its dense directory still follows usable
+   operational width rather than a viewport/device label. */
+.crm-directory {
+  container-type: inline-size;
+}
+
+.crm-filter-bar,
+.crm-directory-table {
+  display: none;
+}
+
+.crm-directory-record-list,
+.crm-filter-trigger-row {
+  display: grid;
+}
+
+@container (min-width: 1200px) {
+  .crm-filter-bar,
+  .crm-directory-table {
+    display: block;
+  }
+
+  .crm-directory-record-list,
+  .crm-filter-trigger-row {
+    display: none;
+  }
+
+  .crm-filter-fields {
+    grid-template-columns: minmax(230px, 1.5fr) repeat(4, minmax(130px, 1fr)) auto;
+  }
+}
+
 /* Wave 6A: Attendance and Results choose dense operational tables by the
    available Session-detail work area, not by viewport size. */
 .session-attendance-work-area,
