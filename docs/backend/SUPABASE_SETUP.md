@@ -111,6 +111,26 @@ Nếu không có dòng kết quả, dừng deployment để bật `pg_cron`; kh�
 
 Nếu `20260728155000_timekeeping_auto_end_cron.sql` dừng với `PG_CRON_EXTENSION_REQUIRED_FOR_TIMEKEEPING_AUTO_END`, không mark/repair migration là applied, không skip migration, không sửa history và không tiếp tục migrations thủ công. Hãy bật/cài `pg_cron`, khôi phục hoặc dựng lại migration state nhất quán, rồi chạy lại workflow canonical.
 
+## Kiểm thử database và CI
+
+Với local Supabase stack đang chạy, chạy pgTAP không phá dữ liệu bằng:
+
+```bash
+npm run test:db
+```
+
+Lệnh này chỉ chạy `supabase test db` trên database local hiện có; nó không chứng minh một migration chain mới dựng được.
+
+Để kiểm tra toàn bộ bootstrap/migration chain, chạy:
+
+```bash
+npm run test:db:fresh
+```
+
+Lệnh `test:db:fresh` **phá hủy và dựng lại** local Supabase development database: khởi động Supabase, áp dụng `roles.sql`, áp dụng toàn bộ migrations, rồi chạy pgTAP. Không dùng lệnh này nếu cần giữ dữ liệu local chưa backup.
+
+GitHub Actions chạy trên pull request và push vào `main` với lint, typecheck, unit/component tests, production build, và `test:db:fresh`. Database gate xác nhận fresh local migration chain, `pg_cron`, Timekeeping scheduler contract, và toàn bộ pgTAP suite. Authenticated staging Playwright không thuộc CI gate này; C2B vẫn chờ tài khoản non-production, quyền thực, Google OAuth storage state có thể làm mới, fixture IDs, và staging deployment integration.
+
 ## Quy tắc migration
 
 - `supabase/migrations` là nguồn sự thật duy nhất cho thay đổi schema.

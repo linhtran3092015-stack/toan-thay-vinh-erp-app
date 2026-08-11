@@ -13,6 +13,8 @@
     "test:unit": "vitest run tests/unit",
     "test:rtl": "vitest run tests/components",
     "test:e2e": "playwright test",
+    "test:db": "supabase test db",
+    "test:db:fresh": "supabase start && supabase db reset --local && supabase test db",
     "supabase:status": "supabase status",
     "supabase:link": "supabase link",
     "supabase:db:pull": "supabase db pull --linked",
