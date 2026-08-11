@@ -2,6 +2,8 @@ import type { StaffRoleOption } from "@/features/staff/types";
 import { cn } from "@/lib/utils";
 
 interface RoleSelectionListProps {
+  errorId?: string;
+  hasError?: boolean;
   disabled?: boolean;
   onToggle: (roleId: string) => void;
   roles: readonly StaffRoleOption[];
@@ -10,6 +12,8 @@ interface RoleSelectionListProps {
 
 export function RoleSelectionList({
   disabled = false,
+  errorId,
+  hasError = false,
   onToggle,
   roles,
   selectedRoleIds,
@@ -28,6 +32,8 @@ export function RoleSelectionList({
             key={role.id}
           >
             <input
+              aria-describedby={hasError ? errorId : undefined}
+              aria-invalid={hasError}
               checked={checked}
               className="mt-1 h-5 w-5 flex-none accent-primary"
               disabled={disabled}

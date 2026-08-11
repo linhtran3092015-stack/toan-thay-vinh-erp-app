@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useId, useRef, useState, useTransition, type FormEvent } from "react";
 
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import {
   initialSettingsActionState,
   type SettingsActionState,
 } from "@/features/settings/action-types";
 import { revokeInvitationAction } from "@/features/settings/actions";
-import { SettingsActionMessage } from "@/features/settings/components/settings-action-message";
 import type {
   SettingsAccountInvitation,
   SettingsRole,
@@ -23,18 +24,50 @@ export function PendingInvitationCard({
   rolesById: ReadonlyMap<string, SettingsRole>;
 }) {
   const router = useRouter();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const reasonId = useId();
+  const reasonErrorId = `${reasonId}-error`;
   const [isOpen, setIsOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [actionState, setActionState] = useState<SettingsActionState>(
     initialSettingsActionState,
   );
   const [isPending, startTransition] = useTransition();
+  const isInteractionLocked = isPending && actionState.status !== "error";
+  const reasonError = actionState.status === "error"
+    ? actionState.fieldErrors?.reason?.[0]
+    : undefined;
 
   if (invitation.status !== "pending") {
     return null;
   }
 
-  const handleRevoke = (): void => {
+  const openDialog = (): void => {
+    setReason("");
+    setActionState(initialSettingsActionState);
+    setIsOpen(true);
+  };
+
+  const closeDialog = (): void => {
+    if (isInteractionLocked) {
+      return;
+    }
+
+    setIsOpen(false);
+    setActionState(initialSettingsActionState);
+  };
+
+  const handleRevoke = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+
+    if (isInteractionLocked) {
+      return;
+    }
+
+    setActionState(initialSettingsActionState);
     startTransition(async () => {
       const result = await revokeInvitationAction({
         invitationId: invitation.id,
@@ -77,12 +110,9 @@ export function PendingInvitationCard({
       </div>
 
       <Button
-        className="min-h-11 sm:min-h-8"
-        onClick={() => {
-          setReason("");
-          setActionState(initialSettingsActionState);
-          setIsOpen(true);
-        }}
+        className="min-h-11"
+        onClick={openDialog}
+        ref={triggerRef}
         size="sm"
         type="button"
         variant="outline"
@@ -90,63 +120,62 @@ export function PendingInvitationCard({
         Thu hồi
       </Button>
 
-      {isOpen ? (
-        <div
-          aria-labelledby={`revoke-invitation-${invitation.id}`}
-          aria-modal="true"
-          className="fixed inset-0 z-50 overflow-y-auto bg-ink/50 p-4"
-          role="dialog"
-        >
-          <div className="mx-auto my-6 w-full max-w-lg rounded-lg border border-hairline bg-surface-1 p-5 shadow-xl">
-            <h2
-              className="text-lg font-bold text-ink"
-              id={`revoke-invitation-${invitation.id}`}
-            >
-              Thu hồi lời mời
-            </h2>
-            <p className="mt-1 break-all text-sm text-ink-muted">
-              {invitation.email} sẽ không thể nhận vai trò từ lời mời này.
-            </p>
+      <Dialog
+        ariaDescribedBy={descriptionId}
+        ariaLabelledBy={titleId}
+        className="max-w-lg"
+        initialFocusRef={reasonRef}
+        isOpen={isOpen}
+        onClose={closeDialog}
+        returnFocusRef={triggerRef}
+      >
+        <div className="p-4 sm:p-5">
+          <h2 className="text-section-title text-text-strong" id={titleId}>
+            Thu hồi lời mời
+          </h2>
+          <p className="mt-1 break-all text-secondary text-text-muted" id={descriptionId}>
+            {invitation.email} sẽ không thể nhận vai trò từ lời mời này.
+          </p>
 
-            <form
-              className="mt-5 grid gap-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                handleRevoke();
-              }}
-            >
-              <label className="grid gap-2 text-sm font-semibold text-ink">
-                <span>Lý do thu hồi</span>
-                <textarea
-                  className="min-h-24 w-full resize-y rounded-md border border-hairline bg-white px-3 py-3 text-sm text-ink outline-none focus:border-danger focus:ring-[3px] focus:ring-danger/15"
-                  disabled={isPending}
-                  maxLength={2000}
-                  onChange={(event) => setReason(event.target.value)}
-                  required
-                  value={reason}
-                />
+          <form className="mt-5 grid gap-4" onSubmit={handleRevoke}>
+            <div className="grid gap-1.5">
+              <label className="text-label text-text-default" htmlFor={reasonId}>
+                Lý do thu hồi
               </label>
+              <textarea
+                aria-describedby={reasonError ? reasonErrorId : undefined}
+                aria-invalid={Boolean(reasonError)}
+                className="min-h-24 w-full resize-y rounded-md border border-border-subtle bg-surface-base px-3 py-3 text-control text-text-default outline-none transition focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled"
+                disabled={isInteractionLocked}
+                id={reasonId}
+                maxLength={2000}
+                onChange={(event) => setReason(event.target.value)}
+                ref={reasonRef}
+                required
+                value={reason}
+              />
+              {reasonError ? <p className="text-caption font-medium text-danger" id={reasonErrorId}>{reasonError}</p> : null}
+            </div>
 
-              <SettingsActionMessage state={actionState} />
+            {actionState.status === "error" ? (
+              <ResultBanner
+                description={actionState.message}
+                title="Không thể thu hồi lời mời"
+                tone="error"
+              />
+            ) : null}
 
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                  disabled={isPending}
-                  onClick={() => setIsOpen(false)}
-                  size="lg"
-                  type="button"
-                  variant="ghost"
-                >
-                  Hủy
-                </Button>
-                <Button disabled={isPending} isLoading={isPending} size="lg" type="submit" variant="danger">
-                  Thu hồi lời mời
-                </Button>
-              </div>
-            </form>
-          </div>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button className="min-h-11" disabled={isInteractionLocked} onClick={closeDialog} size="lg" type="button" variant="ghost">
+                Hủy
+              </Button>
+              <Button className="min-h-11" disabled={isInteractionLocked} isLoading={isInteractionLocked} size="lg" type="submit" variant="danger">
+                {isInteractionLocked ? "Đang thu hồi…" : "Thu hồi lời mời"}
+              </Button>
+            </div>
+          </form>
         </div>
-      ) : null}
+      </Dialog>
     </article>
   );
 }

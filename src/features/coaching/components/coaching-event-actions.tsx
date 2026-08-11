@@ -1,18 +1,28 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import {
+  cloneElement,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+  type FormEvent,
+  type ReactElement,
+} from "react";
 
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import {
   addCoachingNoteAction,
   advanceCoachingStatusAction,
 } from "@/features/coaching/actions/coaching-actions";
-import { CoachingActionMessage } from "@/features/coaching/components/coaching-action-message";
 import {
   initialCoachingManagementActionState,
   type CoachingManagementActionState,
 } from "@/features/coaching/forms/coaching-action-types";
+
 interface CoachingEventActionsProps {
   coachingRecordId: string;
   currentStatus: string;
@@ -28,6 +38,13 @@ export function CoachingEventActions({
   currentStatus,
 }: CoachingEventActionsProps) {
   const router = useRouter();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+  const outcomeRef = useRef<HTMLTextAreaElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const noteId = useId();
+  const outcomeId = useId();
   const [dialogMode, setDialogMode] = useState<DialogMode | null>(null);
   const [note, setNote] = useState("");
   const [outcome, setOutcome] = useState("");
@@ -35,12 +52,15 @@ export function CoachingEventActions({
     initialCoachingManagementActionState,
   );
   const [isPending, startTransition] = useTransition();
+  const isInteractionLocked = isPending && actionState.status !== "error";
+  const fieldErrors = actionState.status === "error" ? actionState.fieldErrors ?? {} : {};
 
   if (currentStatus !== "open" && currentStatus !== "in_progress") {
     return null;
   }
 
-  const openDialog = (mode: DialogMode): void => {
+  const openDialog = (mode: DialogMode, trigger: HTMLButtonElement): void => {
+    triggerRef.current = trigger;
     setDialogMode(mode);
     setNote("");
     setOutcome("");
@@ -48,16 +68,22 @@ export function CoachingEventActions({
   };
 
   const closeDialog = (): void => {
-    if (!isPending) {
-      setDialogMode(null);
-    }
-  };
-
-  const handleSubmit = (): void => {
-    if (!dialogMode) {
+    if (isInteractionLocked) {
       return;
     }
 
+    setDialogMode(null);
+    setActionState(initialCoachingManagementActionState);
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+
+    if (!dialogMode || isInteractionLocked) {
+      return;
+    }
+
+    setActionState(initialCoachingManagementActionState);
     startTransition(async () => {
       const result =
         dialogMode === "note"
@@ -78,11 +104,16 @@ export function CoachingEventActions({
     });
   };
 
+  const isOpen = dialogMode !== null;
+  const title = dialogMode ? getDialogTitle(dialogMode) : "";
+  const initialFocusRef = dialogMode === "close" ? outcomeRef : noteRef;
+
   return (
     <>
       <div className="flex flex-wrap gap-2">
         <Button
-          onClick={() => openDialog("note")}
+          className="min-h-11"
+          onClick={(event) => openDialog("note", event.currentTarget)}
           size="lg"
           type="button"
           variant="outline"
@@ -91,7 +122,8 @@ export function CoachingEventActions({
         </Button>
         {currentStatus === "open" ? (
           <Button
-            onClick={() => openDialog("start")}
+            className="min-h-11"
+            onClick={(event) => openDialog("start", event.currentTarget)}
             size="lg"
             type="button"
           >
@@ -99,7 +131,8 @@ export function CoachingEventActions({
           </Button>
         ) : (
           <Button
-            onClick={() => openDialog("close")}
+            className="min-h-11"
+            onClick={(event) => openDialog("close", event.currentTarget)}
             size="lg"
             type="button"
             variant="secondary"
@@ -109,93 +142,112 @@ export function CoachingEventActions({
         )}
       </div>
 
-      {dialogMode ? (
-        <div
-          aria-labelledby="coaching-event-dialog-title"
-          aria-modal="true"
-          className="fixed inset-0 z-50 overflow-y-auto bg-ink/50 p-4"
-          role="dialog"
-        >
-          <div className="mx-auto my-10 w-full max-w-xl rounded-lg border border-hairline bg-surface-1 p-5 shadow-xl">
-            <h2
-              className="text-lg font-bold text-ink"
-              id="coaching-event-dialog-title"
-            >
-              {getDialogTitle(dialogMode)}
-            </h2>
+      <Dialog
+        ariaDescribedBy={descriptionId}
+        ariaLabelledBy={titleId}
+        className="max-w-xl"
+        initialFocusRef={initialFocusRef}
+        isOpen={isOpen}
+        onClose={closeDialog}
+        returnFocusRef={triggerRef}
+      >
+        <div className="p-4 sm:p-5">
+          <h2 className="text-section-title text-text-strong" id={titleId}>
+            {title}
+          </h2>
+          <p className="mt-1 text-secondary text-text-muted" id={descriptionId}>
+            {dialogMode ? getDialogDescription(dialogMode) : ""}
+          </p>
 
-            <form
-              className="mt-5 grid gap-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                handleSubmit();
-              }}
-            >
-              {dialogMode === "close" ? (
-                <label className="grid gap-2 text-sm font-semibold text-ink">
-                  <span>Kết quả Coaching</span>
-                  <textarea
-                    className={textAreaClassName}
-                    disabled={isPending}
-                    maxLength={4000}
-                    onChange={(event) => setOutcome(event.target.value)}
-                    required
-                    value={outcome}
-                  />
-                  {actionState.fieldErrors?.outcome?.[0] ? (
-                    <span className="text-xs font-medium text-danger">
-                      {actionState.fieldErrors.outcome[0]}
-                    </span>
-                  ) : null}
-                </label>
-              ) : null}
-
-              <label className="grid gap-2 text-sm font-semibold text-ink">
-                <span>
-                  {dialogMode === "close" ? "Ghi chú bổ sung" : "Nội dung"}
-                </span>
+          <form className="mt-5 grid gap-4" onSubmit={handleSubmit}>
+            {dialogMode === "close" ? (
+              <TextAreaField error={fieldErrors.outcome?.[0]} id={outcomeId} label="Kết quả Coaching">
                 <textarea
                   className={textAreaClassName}
-                  disabled={isPending}
+                  disabled={isInteractionLocked}
+                  id={outcomeId}
                   maxLength={4000}
-                  onChange={(event) => setNote(event.target.value)}
-                  required={dialogMode !== "close"}
-                  value={note}
+                  onChange={(event) => setOutcome(event.target.value)}
+                  ref={outcomeRef}
+                  required
+                  value={outcome}
                 />
-                {actionState.fieldErrors?.note?.[0] ? (
-                  <span className="text-xs font-medium text-danger">
-                    {actionState.fieldErrors.note[0]}
-                  </span>
-                ) : null}
-              </label>
+              </TextAreaField>
+            ) : null}
 
-              <CoachingActionMessage actionState={actionState} />
+            <TextAreaField error={fieldErrors.note?.[0]} id={noteId} label={dialogMode === "close" ? "Ghi chú bổ sung" : "Nội dung"}>
+              <textarea
+                className={textAreaClassName}
+                disabled={isInteractionLocked}
+                id={noteId}
+                maxLength={4000}
+                onChange={(event) => setNote(event.target.value)}
+                ref={noteRef}
+                required={dialogMode !== "close"}
+                value={note}
+              />
+            </TextAreaField>
 
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                  disabled={isPending}
-                  onClick={closeDialog}
-                  size="lg"
-                  type="button"
-                  variant="ghost"
-                >
-                  Hủy
-                </Button>
-                <Button
-                  disabled={isPending}
-                  isLoading={isPending}
-                  size="lg"
-                  type="submit"
-                >
-                  {getSubmitLabel(dialogMode)}
-                </Button>
-              </div>
-            </form>
-          </div>
+            {actionState.status === "error" ? (
+              <ResultBanner
+                description={actionState.message}
+                title="Không thể cập nhật Coaching"
+                tone="error"
+              />
+            ) : null}
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button className="min-h-11" disabled={isInteractionLocked} onClick={closeDialog} size="lg" type="button" variant="ghost">
+                Hủy
+              </Button>
+              <Button className="min-h-11" disabled={isInteractionLocked} isLoading={isInteractionLocked} size="lg" type="submit">
+                {isInteractionLocked ? "Đang lưu…" : dialogMode ? getSubmitLabel(dialogMode) : "Lưu"}
+              </Button>
+            </div>
+          </form>
         </div>
-      ) : null}
+      </Dialog>
     </>
   );
+}
+
+function TextAreaField({
+  children,
+  error,
+  id,
+  label,
+}: {
+  children: ReactElement<{
+    "aria-describedby"?: string;
+    "aria-invalid"?: boolean;
+  }>;
+  error?: string;
+  id: string;
+  label: string;
+}) {
+  const errorId = `${id}-error`;
+  return (
+    <div className="grid gap-1.5">
+      <label className="text-label text-text-default" htmlFor={id}>{label}</label>
+      {cloneElement(children, {
+        "aria-describedby": error ? errorId : undefined,
+        "aria-invalid": Boolean(error),
+      })}
+      {error ? <p className="text-caption font-medium text-danger" id={errorId}>{error}</p> : null}
+    </div>
+  );
+}
+
+function getDialogDescription(mode: DialogMode): string {
+  if (mode === "start") {
+    return "Phiếu Coaching sẽ chuyển từ trạng thái Mở sang Đang xử lý sau khi hệ thống xác minh thao tác.";
+  }
+
+  if (mode === "close") {
+    return "Ghi nhận kết quả trước khi yêu cầu hệ thống đóng phiếu Coaching.";
+  }
+
+  return "Ghi chú được bổ sung vào lịch sử phiếu Coaching.";
 }
 
 function getDialogTitle(mode: DialogMode): string {
