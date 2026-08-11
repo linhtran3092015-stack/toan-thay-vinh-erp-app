@@ -22,7 +22,9 @@ export function AcademicYearManagementPage({ academicYears, canManageAcademicYea
 }
 
 function AcademicYearRow({ academicYear, canManage }: { academicYear: AcademicYearManagementItem; canManage: boolean }) {
-  const status = statusMeta[academicYear.status] ?? { label: academicYear.status, tone: "neutral" as const };
+  const status = Object.hasOwn(statusMeta, academicYear.status)
+    ? statusMeta[academicYear.status]
+    : { label: `Trạng thái chưa hỗ trợ: ${academicYear.status}`, tone: "neutral" as const };
   const counts = academicYear.classCounts;
   return <article className="rounded-lg border border-border-subtle bg-surface-base p-4"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="text-body font-semibold text-text-strong">{academicYear.code}</h3><Badge tone={status.tone}>{status.label}</Badge>{academicYear.isCurrent ? <span className="text-caption font-semibold text-text-muted">Năm học hiện tại</span> : null}</div><p className="mt-1 text-secondary text-text-muted">{academicYear.name}</p><p className="mt-2 text-secondary text-text-muted">{formatDate(academicYear.startsOn)} – {formatDate(academicYear.endsOn)}</p></div><dl className="grid grid-cols-2 gap-x-5 gap-y-2 text-secondary sm:grid-cols-5"><Count label="Tổng lớp" value={counts.total} /><Count label="Nháp" value={counts.draft} /><Count label="Hoạt động" value={counts.active} /><Count label="Đã đóng" value={counts.closed} /><Count label="Lưu trữ" value={counts.archived} /></dl></div>{canManage ? <div className="mt-4 flex flex-col gap-3 border-t border-border-subtle pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-caption text-text-muted">Mọi thay đổi trạng thái đều yêu cầu nhập lý do.</p><AcademicYearStatusActions academicYear={academicYear} /></div> : null}</article>;
 }

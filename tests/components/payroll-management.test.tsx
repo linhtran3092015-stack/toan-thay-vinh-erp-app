@@ -116,6 +116,25 @@ describe("Payroll 1 presentation", () => {
     expect(screen.queryByRole("button", { name: "Điều chỉnh" })).not.toBeInTheDocument();
   });
 
+  it("keeps prototype-property status and line type values visibly unsupported and actionless", () => {
+    render(<PayrollPage canApprove canManage canReconcile periods={[
+      period({
+        id: "prototype-period",
+        statements: [{
+          ...period().statements[0],
+          lines: [line({ lineType: "constructor" })],
+        }],
+        status: "constructor",
+      }),
+    ]} />);
+
+    expect(screen.getByText("Trạng thái chưa hỗ trợ: constructor")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /gửi đối soát|duyệt|điều chỉnh/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByText("Xem 1 khoản chi tiết")[0]);
+    expect(screen.getAllByText("Loại khoản chưa hỗ trợ: constructor")).not.toHaveLength(0);
+    expect(screen.queryByText(/^function constructor/)).not.toBeInTheDocument();
+  });
+
   it("uses the reader-provided draft/review/approved labels and limits manual controls to draft", () => {
     render(<PayrollPage canApprove={false} canManage canReconcile={false} periods={[
       period({ id: "draft", status: "draft" }),

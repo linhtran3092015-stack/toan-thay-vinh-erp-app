@@ -62,14 +62,20 @@ function getPeriodStatus(status: string): {
   label: string;
   tone: "info" | "neutral" | "success" | "warning";
 } {
-  return periodStatusMetadata[status] ?? {
+  if (Object.hasOwn(periodStatusMetadata, status)) {
+    return periodStatusMetadata[status];
+  }
+
+  return {
     label: `Trạng thái chưa hỗ trợ: ${status}`,
     tone: "neutral",
   };
 }
 
 function getLineTypeLabel(lineType: string): string {
-  return lineTypeLabels[lineType] ?? `Loại khoản chưa hỗ trợ: ${lineType}`;
+  return Object.hasOwn(lineTypeLabels, lineType)
+    ? lineTypeLabels[lineType]
+    : `Loại khoản chưa hỗ trợ: ${lineType}`;
 }
 
 function getLineDirectionLabel(direction: string): string {

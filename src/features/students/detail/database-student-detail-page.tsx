@@ -554,7 +554,9 @@ function formatTransitionKind(value: string): string {
     transfer: "Chuyển lớp",
   };
 
-  return labels[value] ?? value;
+  return Object.hasOwn(labels, value)
+    ? labels[value]
+    : `Loại chuyển tiếp chưa hỗ trợ: ${value}`;
 }
 
 function formatEnrollmentStatus(value: string): string {
@@ -565,7 +567,9 @@ function formatEnrollmentStatus(value: string): string {
     transferred: "Đã chuyển lớp",
   };
 
-  return labels[value] ?? value;
+  return Object.hasOwn(labels, value)
+    ? labels[value]
+    : `Trạng thái ghi danh chưa hỗ trợ: ${value}`;
 }
 
 function formatLifecycleStatus(value: string): string {
@@ -582,5 +586,7 @@ function formatLifecycleStatus(value: string): string {
     waiting_class: "Chờ chọn lớp",
   };
 
-  return labels[value] ?? value;
+  return Object.hasOwn(labels, value)
+    ? labels[value]
+    : `Trạng thái chưa hỗ trợ: ${value}`;
 }

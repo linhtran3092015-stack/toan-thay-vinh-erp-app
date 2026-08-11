@@ -25,7 +25,9 @@ const entryTypeLabels: Record<string, string> = {
 
 /** Finance-local event wording. A ledger event is not a balance or lifecycle status. */
 export function getLedgerEntryLabel(entryType: string): string {
-  return entryTypeLabels[entryType] ?? entryType;
+  return Object.hasOwn(entryTypeLabels, entryType)
+    ? entryTypeLabels[entryType]
+    : `Loại phát sinh chưa hỗ trợ: ${entryType}`;
 }
 
 /** Read-only audit presentation for the existing latest-100 ledger-entry read. */

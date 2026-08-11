@@ -49,6 +49,14 @@ describe("Session ledger audit presentation", () => {
     expect(getLedgerEntryLabel("annual_carryover")).toBe("Kết chuyển năm");
   });
 
+  it("keeps a prototype-property event type visibly unsupported", () => {
+    render(<SessionLedgerHistory entries={[{ ...entry, entryType: "constructor" }]} />);
+
+    expect(getLedgerEntryLabel("constructor")).toBe("Loại phát sinh chưa hỗ trợ: constructor");
+    expect(screen.getAllByText("Loại phát sinh chưa hỗ trợ: constructor")).toHaveLength(2);
+    expect(screen.queryByText(/^function constructor/)).not.toBeInTheDocument();
+  });
+
   it("renders a session reversal as immutable history without exposing a reversal capability", () => {
     render(
       <SessionLedgerHistory

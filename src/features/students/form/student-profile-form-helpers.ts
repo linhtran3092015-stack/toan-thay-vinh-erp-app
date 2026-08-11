@@ -117,5 +117,7 @@ export function getStudentLifecycleStatusLabel(
     waiting_class: "Chờ chọn lớp",
   };
 
-  return labels[status as StudentLifecycleStatus] ?? status;
+  return Object.hasOwn(labels, status)
+    ? labels[status as StudentLifecycleStatus]
+    : `Trạng thái chưa hỗ trợ: ${status}`;
 }

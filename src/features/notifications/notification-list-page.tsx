@@ -55,7 +55,13 @@ function getEventLabel(eventCode: string): string {
     review: "Chờ duyệt",
   };
 
-  return eventName ? labels[eventName] ?? eventName : eventCode;
+  if (!eventName) {
+    return eventCode;
+  }
+
+  return Object.hasOwn(labels, eventName)
+    ? labels[eventName]
+    : `Sự kiện chưa hỗ trợ: ${eventName}`;
 }
 
 function getEventTone(eventCode: string): NotificationTone {

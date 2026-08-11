@@ -43,7 +43,9 @@ export const DB_LEDGER_ENTRY_TYPE_LABELS: Record<string, string> = {
 };
 
 export function formatLedgerEntryType(entryType: string): string {
-  return DB_LEDGER_ENTRY_TYPE_LABELS[entryType] ?? entryType;
+  return Object.hasOwn(DB_LEDGER_ENTRY_TYPE_LABELS, entryType)
+    ? DB_LEDGER_ENTRY_TYPE_LABELS[entryType]
+    : `Loại phát sinh chưa hỗ trợ: ${entryType}`;
 }
 
 export async function getStudentLedgerSummary(

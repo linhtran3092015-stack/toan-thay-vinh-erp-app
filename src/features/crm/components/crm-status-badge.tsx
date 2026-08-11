@@ -18,6 +18,9 @@ interface CrmStatusBadgeProps {
 }
 
 export function CrmStatusBadge({ status }: CrmStatusBadgeProps) {
-  const meta = crmStatusMeta[status] ?? { label: status, tone: "neutral" };
+  const meta = Object.hasOwn(crmStatusMeta, status)
+    ? crmStatusMeta[status]
+    : { label: `Trạng thái chưa hỗ trợ: ${status}`, tone: "neutral" as const };
+
   return <Badge tone={meta.tone}>{meta.label}</Badge>;
 }

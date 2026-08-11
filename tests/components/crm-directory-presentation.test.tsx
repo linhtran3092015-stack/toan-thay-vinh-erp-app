@@ -30,6 +30,13 @@ describe("CRM directory presentation", () => {
     expect(screen.getByText("Chờ xác nhận nhập học")).toBeInTheDocument();
   });
 
+  it("fails closed for a prototype-property status", () => {
+    render(<CrmStatusBadge status={"constructor" as typeof item.status} />);
+
+    expect(screen.getByText("Trạng thái chưa hỗ trợ: constructor")).toBeInTheDocument();
+    expect(screen.queryByText(/đã nhập học|đã đặt học thử/i)).not.toBeInTheDocument();
+  });
+
   it("uses the shared table frame plus the labelled responsive record list without pagination", () => {
     render(<CrmTable directoryQuery="source=mma_fanpage" items={[item]} />);
     expect(screen.getByRole("table", { name: "Danh sách hồ sơ CRM và tuyển sinh" })).toBeInTheDocument();
