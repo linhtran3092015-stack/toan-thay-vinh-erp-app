@@ -574,12 +574,14 @@ function getClassStatusMeta(status: string): {
     },
   };
 
-  return (
-    metadata[status] ?? {
-      label: status,
+  if (!Object.hasOwn(metadata, status)) {
+    return {
+      label: `Trạng thái chưa hỗ trợ: ${status}`,
       tone: "neutral",
-    }
-  );
+    };
+  }
+
+  return metadata[status];
 }
 
 function formatMode(value: string): string {
@@ -608,7 +610,9 @@ function formatAcademicYearStatus(
     draft: "Nháp",
   };
 
-  return labels[value] ?? value;
+  return Object.hasOwn(labels, value)
+    ? labels[value]
+    : `Trạng thái chưa hỗ trợ: ${value}`;
 }
 
 function formatWeekday(value: number): string {

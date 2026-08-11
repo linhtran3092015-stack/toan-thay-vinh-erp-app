@@ -35,6 +35,12 @@ export function AccountManagementPage({
   const pendingInvitations = invitations.filter(
     (invitation) => invitation.status === "pending",
   );
+  const unsupportedInvitations = invitations.filter(
+    (invitation) =>
+      invitation.status !== "accepted" &&
+      invitation.status !== "pending" &&
+      invitation.status !== "revoked",
+  );
   const rolesById = useMemo(
     () => new Map(roles.map((role) => [role.id, role])),
     [roles],
@@ -92,6 +98,16 @@ export function AccountManagementPage({
               />
             ))}
           </div>
+        </section>
+      ) : null}
+
+      {canManage && unsupportedInvitations.length > 0 ? (
+        <section aria-label="Lời mời có trạng thái chưa hỗ trợ" className="grid gap-2 rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
+          {unsupportedInvitations.map((invitation) => (
+            <p className="break-all text-sm text-ink-muted" key={invitation.id}>
+              Trạng thái lời mời chưa hỗ trợ: {invitation.status} · {invitation.email}
+            </p>
+          ))}
         </section>
       ) : null}
 

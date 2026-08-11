@@ -213,7 +213,8 @@ async function loadCoachingSummary(
     highPriorityCount: entries.filter(
       (entry) =>
         entry.priority === "high" &&
-        entry.currentStatus !== "closed",
+        (entry.currentStatus === "open" ||
+          entry.currentStatus === "in_progress"),
     ).length,
     inProgressCount: entries.filter(
       (entry) =>

@@ -8,7 +8,9 @@ export interface PayrollDashboardEntry {
   payrollPeriodId: string;
   payrollStatementId: string;
   periodMonth: string;
-  periodStatus: PayrollPeriodStatus;
+  // The legacy dashboard reader must preserve unknown stored states instead
+  // of fabricating a mutable lifecycle value.
+  periodStatus: string;
   staffDisplayName: string;
   staffEmployeeCode: string | null;
   staffId: string;

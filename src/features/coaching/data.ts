@@ -7,7 +7,6 @@ import type {
   CoachingReadResult,
   CoachingRecordDashboardEntry,
   CoachingRecordEvent,
-  CoachingStatus,
   CoachingStudentOption,
 } from "@/features/coaching/read-models";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -18,14 +17,6 @@ function normalizePriority(value: string): CoachingPriority {
   }
 
   return "medium";
-}
-
-function normalizeStatus(value: string): CoachingStatus {
-  if (value === "closed" || value === "in_progress" || value === "open") {
-    return value;
-  }
-
-  return "open";
 }
 
 function normalizeEventType(
@@ -63,7 +54,7 @@ function toDashboardEntry(entry: {
     assistantOwnerDisplayName: entry.assistant_owner_display_name,
     assistantOwnerId: entry.assistant_owner_id,
     campaignName: entry.campaign_name,
-    currentStatus: normalizeStatus(entry.current_status),
+    currentStatus: entry.current_status,
     id: entry.coaching_record_id,
     latestEventAt: entry.latest_event_at,
     latestOutcome: entry.latest_outcome,
@@ -136,7 +127,7 @@ export async function getCoachingRecordEventsResult(
         occurredAt: entry.occurred_at,
         occurredByDisplayName: entry.occurred_by_display_name,
         outcome: entry.outcome,
-        status: entry.status ? normalizeStatus(entry.status) : null,
+        status: entry.status,
       })),
       ok: true,
     };

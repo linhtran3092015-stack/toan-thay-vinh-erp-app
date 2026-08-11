@@ -13,11 +13,9 @@ import {
   initialCoachingManagementActionState,
   type CoachingManagementActionState,
 } from "@/features/coaching/forms/coaching-action-types";
-import type { CoachingStatus } from "@/features/coaching/read-models";
-
 interface CoachingEventActionsProps {
   coachingRecordId: string;
-  currentStatus: CoachingStatus;
+  currentStatus: string;
 }
 
 type DialogMode = "close" | "note" | "start";
@@ -38,7 +36,7 @@ export function CoachingEventActions({
   );
   const [isPending, startTransition] = useTransition();
 
-  if (currentStatus === "closed") {
+  if (currentStatus !== "open" && currentStatus !== "in_progress") {
     return null;
   }
 

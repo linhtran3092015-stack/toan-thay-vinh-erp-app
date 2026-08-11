@@ -37,7 +37,9 @@ export interface SettingsAccountInvitation {
   invitationReason: string;
   revokedAt: string | null;
   roleIds: readonly string[];
-  status: SettingsInvitationStatus;
+  // Reader values are transport-exact so an unknown status cannot become a
+  // pending invitation in client composition.
+  status: string;
 }
 
 export type SettingsOwnerStatusResult =

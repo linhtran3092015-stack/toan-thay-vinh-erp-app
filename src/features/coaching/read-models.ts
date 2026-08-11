@@ -5,7 +5,9 @@ export interface CoachingRecordDashboardEntry {
   assistantOwnerDisplayName: string;
   assistantOwnerId: string;
   campaignName: string;
-  currentStatus: CoachingStatus;
+  // Transport the stored state exactly. Presentation decides whether it is a
+  // known lifecycle state before offering actions.
+  currentStatus: string;
   id: string;
   latestEventAt: string | null;
   latestOutcome: string | null;
@@ -25,7 +27,7 @@ export interface CoachingRecordEvent {
   occurredAt: string;
   occurredByDisplayName: string;
   outcome: string | null;
-  status: CoachingStatus | null;
+  status: string | null;
 }
 
 export interface CoachingStudentOption {

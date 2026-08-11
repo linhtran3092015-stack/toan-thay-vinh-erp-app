@@ -4,7 +4,6 @@ import type {
   SettingsAccountInvitation,
   SettingsDataResult,
   SettingsInvitationDataResult,
-  SettingsInvitationStatus,
   SettingsOwnerStatusResult,
   SettingsPermission,
   SettingsRole,
@@ -162,17 +161,9 @@ export async function getSettingsAccountInvitations(): Promise<SettingsInvitatio
       invitationReason: invitation.invitation_reason,
       revokedAt: invitation.revoked_at,
       roleIds: roleIdsByInvitationId.get(invitation.id) ?? [],
-      status: normalizeInvitationStatus(invitation.status),
+      status: invitation.status,
     }),
   );
 
   return { invitations, ok: true };
-}
-
-function normalizeInvitationStatus(value: string): SettingsInvitationStatus {
-  if (value === "accepted" || value === "revoked") {
-    return value;
-  }
-
-  return "pending";
 }

@@ -3,19 +3,10 @@ import "server-only";
 import type {
   PayrollDashboardEntry,
   PayrollPeriodRead,
-  PayrollPeriodStatus,
   PayrollReadResult,
 } from "@/features/payroll/read-models";
 import { normalizePayrollPeriodsWithDetailsRows } from "@/features/payroll/read-models";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-function normalizePeriodStatus(value: string): PayrollPeriodStatus {
-  if (value === "draft" || value === "review" || value === "approved") {
-    return value;
-  }
-
-  return "draft";
-}
 
 export async function getPayrollDashboardResult(): Promise<
   PayrollReadResult<readonly PayrollDashboardEntry[]>
@@ -35,7 +26,7 @@ export async function getPayrollDashboardResult(): Promise<
         payrollPeriodId: entry.payroll_period_id,
         payrollStatementId: entry.payroll_statement_id,
         periodMonth: entry.period_month,
-        periodStatus: normalizePeriodStatus(entry.period_status),
+        periodStatus: entry.period_status,
         staffDisplayName: entry.staff_display_name,
         staffEmployeeCode: entry.staff_employee_code || null,
         staffId: entry.staff_id,

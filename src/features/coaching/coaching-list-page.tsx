@@ -6,7 +6,6 @@ import type {
   CoachingManagementOptions,
   CoachingPriority,
   CoachingRecordDashboardEntry,
-  CoachingStatus,
 } from "@/features/coaching/read-models";
 
 interface CoachingListPageProps {
@@ -39,7 +38,7 @@ const priorityMetadata: Record<
 };
 
 const statusMetadata: Record<
-  CoachingStatus,
+  "closed" | "in_progress" | "open",
   { label: string; tone: "info" | "neutral" | "success" | "warning" }
 > = {
   closed: { label: "Đã đóng", tone: "success" },
@@ -52,10 +51,15 @@ export function CoachingListPage({
   entries,
   managementOptions,
 }: CoachingListPageProps) {
-  const activeCount = entries.filter((entry) => entry.currentStatus !== "closed").length;
+  const activeCount = entries.filter(
+    (entry) =>
+      entry.currentStatus === "open" ||
+      entry.currentStatus === "in_progress",
+  ).length;
   const overdueCount = entries.filter(
     (entry) =>
-      entry.currentStatus !== "closed" &&
+      (entry.currentStatus === "open" ||
+        entry.currentStatus === "in_progress") &&
       entry.reviewAt !== null &&
       new Date(`${entry.reviewAt}T23:59:59`) < new Date(),
   ).length;
@@ -139,8 +143,12 @@ export function CoachingListPage({
   );
 }
 
-export function CoachingStatusBadge({ status }: { status: CoachingStatus }) {
-  const metadata = statusMetadata[status];
+export function CoachingStatusBadge({ status }: { status: string }) {
+  if (!Object.hasOwn(statusMetadata, status)) {
+    return <Badge tone="neutral">Trạng thái chưa hỗ trợ: {status}</Badge>;
+  }
+
+  const metadata = statusMetadata[status as keyof typeof statusMetadata];
   return <Badge tone={metadata.tone}>{metadata.label}</Badge>;
 }
 

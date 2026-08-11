@@ -30,6 +30,10 @@ export function PendingInvitationCard({
   );
   const [isPending, startTransition] = useTransition();
 
+  if (invitation.status !== "pending") {
+    return null;
+  }
+
   const handleRevoke = (): void => {
     startTransition(async () => {
       const result = await revokeInvitationAction({
