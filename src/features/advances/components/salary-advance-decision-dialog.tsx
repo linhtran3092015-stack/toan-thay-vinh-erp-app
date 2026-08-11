@@ -1,109 +1,133 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
-import { useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import {
   approveSalaryAdvanceAction,
   reviewSalaryAdvanceAction,
 } from "@/features/advances/actions/advance-actions";
 import { AdvanceActionMessage } from "@/features/advances/components/advance-action-message";
-import { AdvanceModal } from "@/features/advances/components/advance-modal";
 import type { AdvanceActionState } from "@/features/advances/forms/advance-action-types";
 import type { SalaryAdvanceDashboardEntry } from "@/features/advances/read-models";
 
 const formInputClassName =
-  "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-slate-100";
+  "min-h-11 w-full rounded-md border border-border-subtle bg-surface-base px-3 text-control text-text-default outline-none transition focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
 
 type AdvanceDecisionStage = "approve" | "review";
+type AdvanceDecision = "approved" | "rejected" | "review";
 
 interface SalaryAdvanceDecisionDialogProps {
   advance: SalaryAdvanceDashboardEntry;
   stage: AdvanceDecisionStage;
-  triggerClassName?: string;
 }
 
 function formatCurrency(value: number): string {
   return `${new Intl.NumberFormat("vi-VN").format(value)} VND`;
 }
 
+function formatMonth(value: string): string {
+  return new Intl.DateTimeFormat("vi-VN", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${value}T00:00:00`));
+}
+
 const contentByStage: Record<
   AdvanceDecisionStage,
   {
-    approvedDecision: "approved" | "review";
-    approvedLabel: string;
+    confirmedDecision: "approved" | "review";
+    confirmedLabel: string;
     description: string;
+    pendingLabel: string;
     rejectedLabel: string;
     title: string;
     triggerLabel: string;
   }
 > = {
   approve: {
-    approvedDecision: "approved",
-    approvedLabel: "Duyệt tạm ứng",
+    confirmedDecision: "approved",
+    confirmedLabel: "Phê duyệt tạm ứng",
     description:
-      "Khoản được duyệt sẽ tự khấu trừ một lần trong bảng lương của kỳ đã chọn.",
-    rejectedLabel: "Từ chối duyệt",
-    title: "Duyệt yêu cầu tạm ứng",
-    triggerLabel: "Duyệt",
+      "Khoản được phê duyệt sẽ chờ hệ thống Payroll khấu trừ tại kỳ đã chọn.",
+    pendingLabel: "Đang xử lý phê duyệt…",
+    rejectedLabel: "Từ chối yêu cầu",
+    title: "Phê duyệt yêu cầu tạm ứng",
+    triggerLabel: "Phê duyệt",
   },
   review: {
-    approvedDecision: "review",
-    approvedLabel: "Chuyển chủ trung tâm duyệt",
+    confirmedDecision: "review",
+    confirmedLabel: "Chuyển bước phê duyệt",
     description:
-      "Yêu cầu sau khi đối soát sẽ chờ chủ trung tâm duyệt cuối cùng.",
+      "Yêu cầu được đối soát sẽ chuyển sang bước phê duyệt cuối cùng.",
+    pendingLabel: "Đang xử lý đối soát…",
     rejectedLabel: "Từ chối yêu cầu",
     title: "Đối soát yêu cầu tạm ứng",
     triggerLabel: "Đối soát",
   },
 };
 
+/** Confirms one explicit, server-owned Salary Advance review or approval outcome. */
 export function SalaryAdvanceDecisionDialog({
   advance,
   stage,
-  triggerClassName,
 }: SalaryAdvanceDecisionDialogProps) {
   const router = useRouter();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const decisionRef = useRef<HTMLSelectElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const decisionId = useId();
+  const noteId = useId();
+  const noteErrorId = `${noteId}-error`;
+  const content = contentByStage[stage];
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const content = contentByStage[stage];
-  const [decision, setDecision] = useState<"approved" | "rejected" | "review">(
-    content.approvedDecision,
-  );
+  const [decision, setDecision] = useState<AdvanceDecision>(content.confirmedDecision);
   const [note, setNote] = useState("");
   const [actionState, setActionState] = useState<AdvanceActionState | null>(null);
+  const isInteractionLocked = isPending && actionState?.status !== "error";
+  const noteError = actionState?.status === "error" ? actionState.fieldErrors?.note?.[0] : undefined;
+  const isRejected = decision === "rejected";
 
   const openDialog = (): void => {
-    setDecision(content.approvedDecision);
+    setDecision(content.confirmedDecision);
     setNote("");
     setActionState(null);
     setIsOpen(true);
   };
 
   const closeDialog = (): void => {
-    if (!isPending) {
-      setIsOpen(false);
+    if (isInteractionLocked) {
+      return;
     }
+
+    setIsOpen(false);
+    setActionState(null);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
 
+    if (isInteractionLocked) {
+      return;
+    }
+
+    setActionState(null);
     startTransition(async () => {
-      const result =
-        stage === "review"
-          ? await reviewSalaryAdvanceAction({
-              decision: decision as "rejected" | "review",
-              note,
-              salaryAdvanceId: advance.id,
-            })
-          : await approveSalaryAdvanceAction({
-              decision: decision as "approved" | "rejected",
-              note,
-              salaryAdvanceId: advance.id,
-            });
+      const result = stage === "review"
+        ? await reviewSalaryAdvanceAction({
+            decision: decision as "rejected" | "review",
+            note,
+            salaryAdvanceId: advance.id,
+          })
+        : await approveSalaryAdvanceAction({
+            decision: decision as "approved" | "rejected",
+            note,
+            salaryAdvanceId: advance.id,
+          });
 
       setActionState(result);
 
@@ -114,83 +138,117 @@ export function SalaryAdvanceDecisionDialog({
     });
   };
 
-  const isRejected = decision === "rejected";
-
   return (
     <>
       <Button
-        className={triggerClassName}
+        className="min-h-11"
         onClick={openDialog}
-        size="sm"
+        ref={triggerRef}
         type="button"
         variant="outline"
       >
         {content.triggerLabel}
       </Button>
 
-      {isOpen ? (
-        <AdvanceModal description={content.description} title={content.title}>
-          <form className="mt-5 grid gap-4" onSubmit={handleSubmit}>
-            <dl className="grid gap-2 rounded-md border border-hairline bg-surface-2 p-4 text-sm">
-              <div>
-                <dt className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">Nhân sự</dt>
-                <dd className="mt-1 font-medium text-ink">{advance.staffDisplayName}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">Số tiền</dt>
-                <dd className="mt-1 font-medium text-ink">{formatCurrency(advance.amountVnd)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">Lý do</dt>
-                <dd className="mt-1 text-ink-muted">{advance.requestNote}</dd>
-              </div>
+      <Dialog
+        ariaDescribedBy={descriptionId}
+        ariaLabelledBy={titleId}
+        className="max-w-lg"
+        initialFocusRef={decisionRef}
+        isOpen={isOpen}
+        onClose={closeDialog}
+        returnFocusRef={triggerRef}
+      >
+        <div className="p-4 sm:p-5">
+          <h2 className="text-section-title text-text-strong" id={titleId}>
+            {content.title}
+          </h2>
+          <p className="mt-1 text-secondary text-text-muted" id={descriptionId}>
+            {content.description}
+          </p>
+
+          <form className="mt-5 grid gap-5" onSubmit={handleSubmit}>
+            <dl className="grid gap-3 rounded-lg border border-border-subtle bg-surface-sunken p-4 text-secondary text-text-default">
+              <DecisionDetail label="Nhân sự" value={advance.staffDisplayName} />
+              <DecisionDetail label="Số tiền" value={formatCurrency(advance.amountVnd)} />
+              <DecisionDetail label="Kỳ khấu trừ" value={formatMonth(advance.deductionPeriodMonth)} />
+              <DecisionDetail label="Lý do" value={advance.requestNote} />
             </dl>
 
-            <label className="grid gap-2 text-sm font-semibold text-ink">
-              Quyết định
+            <div className="grid gap-1.5">
+              <label className="text-label text-text-default" htmlFor={decisionId}>
+                Quyết định
+              </label>
               <select
                 className={formInputClassName}
-                disabled={isPending}
-                onChange={(event) =>
-                  setDecision(event.target.value as "approved" | "rejected" | "review")
-                }
+                disabled={isInteractionLocked}
+                id={decisionId}
+                onChange={(event) => setDecision(event.target.value as AdvanceDecision)}
+                ref={decisionRef}
                 value={decision}
               >
-                <option value={content.approvedDecision}>{content.approvedLabel}</option>
+                <option value={content.confirmedDecision}>{content.confirmedLabel}</option>
                 <option value="rejected">{content.rejectedLabel}</option>
               </select>
-            </label>
+            </div>
 
-            <label className="grid gap-2 text-sm font-semibold text-ink">
-              {isRejected ? "Lý do từ chối" : "Ghi chú"}
+            <div className="grid gap-1.5">
+              <label className="text-label text-text-default" htmlFor={noteId}>
+                {isRejected ? "Lý do từ chối" : "Ghi chú"}
+              </label>
               <textarea
+                aria-describedby={noteError ? noteErrorId : undefined}
+                aria-invalid={Boolean(noteError)}
                 className={`${formInputClassName} min-h-28 resize-y py-3`}
-                disabled={isPending}
+                disabled={isInteractionLocked}
+                id={noteId}
                 maxLength={2000}
                 onChange={(event) => setNote(event.target.value)}
                 required={isRejected}
                 value={note}
               />
-              {actionState?.fieldErrors?.note?.[0] ? (
-                <span className="text-xs font-medium text-danger">
-                  {actionState.fieldErrors.note[0]}
-                </span>
-              ) : null}
-            </label>
+              {noteError ? <FieldError id={noteErrorId}>{noteError}</FieldError> : null}
+            </div>
 
-            <AdvanceActionMessage actionState={actionState} />
+            {actionState?.status === "error" ? (
+              <AdvanceActionMessage actionState={actionState} />
+            ) : null}
 
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button disabled={isPending} onClick={closeDialog} size="lg" type="button" variant="ghost">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button className="min-h-11" disabled={isInteractionLocked} onClick={closeDialog} size="lg" type="button" variant="ghost">
                 Hủy
               </Button>
-              <Button disabled={isPending} size="lg" type="submit" variant={isRejected ? "danger" : "primary"}>
-                {isPending ? "Đang xử lý..." : isRejected ? content.rejectedLabel : content.approvedLabel}
+              <Button
+                className="min-h-11"
+                disabled={isInteractionLocked}
+                isLoading={isInteractionLocked}
+                size="lg"
+                type="submit"
+                variant={isRejected ? "danger" : "primary"}
+              >
+                {isInteractionLocked
+                  ? content.pendingLabel
+                  : isRejected
+                    ? content.rejectedLabel
+                    : content.confirmedLabel}
               </Button>
             </div>
           </form>
-        </AdvanceModal>
-      ) : null}
+        </div>
+      </Dialog>
     </>
   );
+}
+
+function DecisionDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-caption font-semibold text-text-muted">{label}</dt>
+      <dd className="mt-1 break-words text-text-strong">{value}</dd>
+    </div>
+  );
+}
+
+function FieldError({ children, id }: { children: string; id: string }) {
+  return <p className="text-caption font-medium text-danger" id={id}>{children}</p>;
 }

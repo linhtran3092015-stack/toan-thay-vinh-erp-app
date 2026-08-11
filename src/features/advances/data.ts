@@ -3,23 +3,8 @@ import "server-only";
 import type {
   SalaryAdvanceDashboardEntry,
   SalaryAdvanceReadResult,
-  SalaryAdvanceStatus,
 } from "@/features/advances/read-models";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-function normalizeStatus(value: string): SalaryAdvanceStatus {
-  if (
-    value === "requested" ||
-    value === "review" ||
-    value === "approved" ||
-    value === "rejected" ||
-    value === "deducted"
-  ) {
-    return value;
-  }
-
-  return "requested";
-}
 
 export async function getSalaryAdvancesDashboardResult(): Promise<
   SalaryAdvanceReadResult<readonly SalaryAdvanceDashboardEntry[]>
@@ -53,7 +38,7 @@ export async function getSalaryAdvancesDashboardResult(): Promise<
         staffDisplayName: entry.staff_display_name,
         staffEmployeeCode: entry.staff_employee_code,
         staffId: entry.staff_id,
-        status: normalizeStatus(entry.advance_status),
+        status: entry.advance_status,
       })),
       ok: true,
     };

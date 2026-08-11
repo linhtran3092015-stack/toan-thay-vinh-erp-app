@@ -1,3 +1,4 @@
+import { ResultBanner } from "@/components/shared/result-banner";
 import type { AdvanceActionState } from "@/features/advances/forms/advance-action-types";
 
 export function AdvanceActionMessage({
@@ -10,15 +11,10 @@ export function AdvanceActionMessage({
   }
 
   return (
-    <p
-      aria-live="polite"
-      className={
-        actionState.status === "error"
-          ? "rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-sm text-danger"
-          : "rounded-md border border-success-border bg-success-bg px-3 py-2 text-sm text-success"
-      }
-    >
-      {actionState.message}
-    </p>
+    <ResultBanner
+      description={actionState.message}
+      title={actionState.status === "error" ? "Không thể cập nhật tạm ứng" : "Đã cập nhật tạm ứng"}
+      tone={actionState.status === "error" ? "error" : "success"}
+    />
   );
 }

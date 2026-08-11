@@ -1,4 +1,4 @@
-export type SalaryAdvanceStatus =
+export type KnownSalaryAdvanceStatus =
   | "approved"
   | "deducted"
   | "rejected"
@@ -25,7 +25,11 @@ export interface SalaryAdvanceDashboardEntry {
   staffDisplayName: string;
   staffEmployeeCode: string | null;
   staffId: string;
-  status: SalaryAdvanceStatus;
+  /**
+   * Transport the server value exactly. Presentation handles unsupported
+   * statuses read-only rather than fabricating a known lifecycle state.
+   */
+  status: string;
 }
 
 export type SalaryAdvanceReadResult<T> =

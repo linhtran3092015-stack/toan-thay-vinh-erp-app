@@ -639,6 +639,30 @@
   }
 }
 
+/* Advances: seven operational columns need 1200px inside DataTableFrame;
+   its two borders require +2px on this zero-padding work area. */
+.salary-advance-directory-work-area {
+  container-type: inline-size;
+}
+
+.salary-advance-directory-table {
+  display: none;
+}
+
+.salary-advance-directory-record-list {
+  display: grid;
+}
+
+@container (min-width: 1202px) {
+  .salary-advance-directory-table {
+    display: block;
+  }
+
+  .salary-advance-directory-record-list {
+    display: none;
+  }
+}
+
 .staff-directory-table,
 .staff-rate-history-table {
   display: none;

@@ -1,10 +1,14 @@
+import { DataTableFrame } from "@/components/patterns/data-table-frame";
+import { PageHeader } from "@/components/patterns/page-header";
+import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { Badge } from "@/components/ui/badge";
 import { RequestSalaryAdvanceDialog } from "@/features/advances/components/request-salary-advance-dialog";
 import { SalaryAdvanceDecisionDialog } from "@/features/advances/components/salary-advance-decision-dialog";
 import type {
+  KnownSalaryAdvanceStatus,
   SalaryAdvanceDashboardEntry,
-  SalaryAdvanceStatus,
 } from "@/features/advances/read-models";
+import type { ReactNode } from "react";
 
 interface AdvanceListPageProps {
   canApprove: boolean;
@@ -13,15 +17,17 @@ interface AdvanceListPageProps {
   entries: readonly SalaryAdvanceDashboardEntry[];
 }
 
-const statusMetadata: Record<
-  SalaryAdvanceStatus,
-  { label: string; tone: "danger" | "info" | "success" | "warning" }
-> = {
-  approved: { label: "Đã duyệt", tone: "success" },
+type AdvanceStatusPresentation = {
+  label: string;
+  tone: "danger" | "info" | "neutral" | "success" | "warning";
+};
+
+const statusMetadata: Record<KnownSalaryAdvanceStatus, AdvanceStatusPresentation> = {
+  approved: { label: "Đã phê duyệt", tone: "success" },
   deducted: { label: "Đã khấu trừ", tone: "info" },
   rejected: { label: "Đã từ chối", tone: "danger" },
   requested: { label: "Chờ đối soát", tone: "warning" },
-  review: { label: "Chờ duyệt", tone: "warning" },
+  review: { label: "Chờ phê duyệt", tone: "warning" },
 };
 
 function formatCurrency(value: number): string {
@@ -49,92 +55,118 @@ function formatMonth(value: string): string {
   }).format(new Date(`${value}T00:00:00`));
 }
 
+function getStatusPresentation(status: string): AdvanceStatusPresentation {
+  if (Object.hasOwn(statusMetadata, status)) {
+    return statusMetadata[status as KnownSalaryAdvanceStatus];
+  }
+
+  return {
+    label: `Trạng thái chưa hỗ trợ: ${status}`,
+    tone: "neutral",
+  };
+}
+
+/** Presents the server-provided Salary Advance directory without deriving financial state. */
 export function AdvanceListPage({
   canApprove,
   canRequest,
   canReview,
   entries,
 }: AdvanceListPageProps) {
-  const pendingCount = entries.filter(
-    (entry) => entry.status === "requested" || entry.status === "review",
-  ).length;
-  const approvedAmount = entries
-    .filter((entry) => entry.status === "approved")
-    .reduce((total, entry) => total + entry.amountVnd, 0);
+  const canManageLifecycle = canReview || canApprove;
 
   return (
-    <div className="grid gap-5">
-      <header className="flex flex-col gap-4 rounded-lg border border-hairline bg-surface-1 p-5 shadow-card md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
-            Quản lý nhân sự
-          </p>
-          <h1 className="mt-1 text-page-title font-bold text-ink">Tạm ứng lương</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">
-            Khoản tạm ứng đã duyệt được khấu trừ một lần trong bảng lương của kỳ tháng đã chọn.
-          </p>
-        </div>
-        {canRequest ? <RequestSalaryAdvanceDialog /> : null}
-      </header>
-
-      <section className="grid gap-3 sm:grid-cols-3" aria-label="Tổng quan tạm ứng">
-        <SummaryCard label="Yêu cầu đang hiển thị" value={entries.length} />
-        <SummaryCard label="Chờ xử lý" value={pendingCount} />
-        <SummaryCard label="Chờ khấu trừ" value={formatCurrency(approvedAmount)} />
-      </section>
+    <div className="grid min-w-0 gap-6">
+      <PageHeader
+        actions={canRequest ? <RequestSalaryAdvanceDialog /> : undefined}
+        title="Tạm ứng lương"
+      >
+        <p className="mt-1 max-w-3xl text-secondary text-text-muted">
+          Theo dõi yêu cầu tạm ứng và trạng thái khấu trừ do hệ thống Payroll ghi nhận.
+        </p>
+      </PageHeader>
 
       {entries.length === 0 ? (
-        <section className="rounded-lg border border-dashed border-hairline-strong bg-surface-1 px-6 py-12 text-center shadow-xs">
-          <h2 className="text-section font-semibold text-ink">Chưa có yêu cầu tạm ứng</h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-ink-muted">
-            Các yêu cầu của bạn sẽ xuất hiện tại đây sau khi gửi. Người được phân quyền đối soát và duyệt sẽ xem toàn bộ yêu cầu.
+        <section className="rounded-lg border border-dashed border-border-strong bg-surface-base px-6 py-12 text-center">
+          <h2 className="text-section-title text-text-strong">Chưa có yêu cầu tạm ứng</h2>
+          <p className="mx-auto mt-2 max-w-lg text-secondary leading-6 text-text-muted">
+            Các yêu cầu trong phạm vi dữ liệu của tài khoản hiện tại sẽ xuất hiện tại đây.
           </p>
         </section>
       ) : (
-        <section className="overflow-hidden rounded-lg border border-hairline bg-surface-1 shadow-card">
-          <div className="border-b border-hairline px-5 py-4">
-            <h2 className="text-section font-semibold text-ink">Danh sách yêu cầu</h2>
-            <p className="mt-1 text-sm text-ink-muted">Hiển thị {entries.length} yêu cầu tạm ứng</p>
+        <section aria-labelledby="salary-advance-directory-heading" className="grid gap-4">
+          <div>
+            <h2 className="text-section-title text-text-strong" id="salary-advance-directory-heading">
+              Danh sách yêu cầu tạm ứng
+            </h2>
+            <p className="mt-1 text-secondary text-text-muted">
+              Trạng thái và thông tin theo dõi được cung cấp bởi hệ thống.
+            </p>
           </div>
 
-          <div className="hidden overflow-x-auto lg:block">
-            <table className="min-w-[1120px] border-collapse text-left text-sm">
-              <thead className="bg-canvas text-xs uppercase tracking-[0.04em] text-ink-muted">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Nhân sự</th>
-                  <th className="px-5 py-3 font-semibold">Số tiền</th>
-                  <th className="px-5 py-3 font-semibold">Kỳ khấu trừ</th>
-                  <th className="px-5 py-3 font-semibold">Trạng thái</th>
-                  <th className="px-5 py-3 font-semibold">Yêu cầu</th>
-                  <th className="px-5 py-3 font-semibold">Theo dõi</th>
-                  {(canReview || canApprove) ? <th className="px-5 py-3 font-semibold">Thao tác</th> : null}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline">
-                {entries.map((entry) => (
-                  <AdvanceTableRow
-                    canApprove={canApprove}
-                    canReview={canReview}
-                    entry={entry}
-                    key={entry.id}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="grid gap-3 p-4 lg:hidden">
-            {entries.map((entry) => (
-              <AdvanceMobileCard
-                canApprove={canApprove}
-                canReview={canReview}
-                entry={entry}
-                key={entry.id}
-              />
-            ))}
-          </div>
+          <AdvanceDirectory
+            canApprove={canApprove}
+            canManageLifecycle={canManageLifecycle}
+            canReview={canReview}
+            entries={entries}
+          />
         </section>
       )}
+    </div>
+  );
+}
+
+function AdvanceDirectory({
+  canApprove,
+  canManageLifecycle,
+  canReview,
+  entries,
+}: {
+  canApprove: boolean;
+  canManageLifecycle: boolean;
+  canReview: boolean;
+  entries: readonly SalaryAdvanceDashboardEntry[];
+}) {
+  return (
+    <div className="salary-advance-directory-work-area min-w-0">
+      <DataTableFrame
+        body={entries.map((entry) => (
+          <AdvanceTableRow
+            canApprove={canApprove}
+            canReview={canReview}
+            entry={entry}
+            key={entry.id}
+          />
+        ))}
+        caption="Danh sách yêu cầu tạm ứng lương"
+        className="salary-advance-directory-table"
+        header={
+          <tr>
+            <TableHeader>Nhân sự</TableHeader>
+            <TableHeader className="text-right">Số tiền</TableHeader>
+            <TableHeader>Kỳ khấu trừ</TableHeader>
+            <TableHeader>Trạng thái</TableHeader>
+            <TableHeader>Yêu cầu</TableHeader>
+            <TableHeader>Theo dõi</TableHeader>
+            {canManageLifecycle ? <TableHeader>Thao tác</TableHeader> : null}
+          </tr>
+        }
+        tableClassName="min-w-[1200px] table-fixed text-table-body text-text-default"
+      />
+
+      <ResponsiveRecordList
+        className="salary-advance-directory-record-list p-4"
+        label="Danh sách yêu cầu tạm ứng lương"
+      >
+        {entries.map((entry) => (
+          <AdvanceRecord
+            canApprove={canApprove}
+            canReview={canReview}
+            entry={entry}
+            key={entry.id}
+          />
+        ))}
+      </ResponsiveRecordList>
     </div>
   );
 }
@@ -148,34 +180,36 @@ function AdvanceTableRow({
   canReview: boolean;
   entry: SalaryAdvanceDashboardEntry;
 }) {
-  const status = statusMetadata[entry.status];
+  const status = getStatusPresentation(entry.status);
 
   return (
-    <tr className="align-top hover:bg-canvas/70">
-      <td className="px-5 py-4">
-        <p className="font-medium text-ink">{entry.staffDisplayName}</p>
-        {entry.staffEmployeeCode ? (
-          <p className="mt-1 font-mono text-xs font-semibold text-ink-subtle">
-            {entry.staffEmployeeCode}
-          </p>
-        ) : null}
-      </td>
-      <td className="px-5 py-4 font-medium text-ink">{formatCurrency(entry.amountVnd)}</td>
-      <td className="px-5 py-4 text-ink-muted">{formatMonth(entry.deductionPeriodMonth)}</td>
-      <td className="px-5 py-4"><Badge tone={status.tone}>{status.label}</Badge></td>
-      <td className="px-5 py-4">
-        <p className="max-w-64 text-ink">{entry.requestNote}</p>
-        <p className="mt-1 text-xs text-ink-muted">{formatDateTime(entry.requestedAt)}</p>
-      </td>
-      <td className="px-5 py-4 text-sm text-ink-muted"><AdvanceLifecycle entry={entry} /></td>
-      {(canReview || canApprove) ? (
-        <td className="px-5 py-4"><AdvanceAction canApprove={canApprove} canReview={canReview} entry={entry} /></td>
+    <tr className="align-top hover:bg-[var(--table-row-hover)]">
+      <TableCell className="w-[190px]">
+        <StaffIdentity entry={entry} />
+      </TableCell>
+      <TableCell className="w-[144px] text-right tabular-nums font-semibold text-text-strong">
+        {formatCurrency(entry.amountVnd)}
+      </TableCell>
+      <TableCell className="w-[154px] tabular-nums">{formatMonth(entry.deductionPeriodMonth)}</TableCell>
+      <TableCell className="w-[150px]">
+        <Badge tone={status.tone}>{status.label}</Badge>
+      </TableCell>
+      <TableCell className="w-[242px]">
+        <RequestContext entry={entry} />
+      </TableCell>
+      <TableCell className="w-[250px]">
+        <AdvanceLifecycle entry={entry} />
+      </TableCell>
+      {canReview || canApprove ? (
+        <TableCell className="w-[150px]">
+          <AdvanceAction canApprove={canApprove} canReview={canReview} entry={entry} />
+        </TableCell>
       ) : null}
     </tr>
   );
 }
 
-function AdvanceMobileCard({
+function AdvanceRecord({
   canApprove,
   canReview,
   entry,
@@ -184,38 +218,55 @@ function AdvanceMobileCard({
   canReview: boolean;
   entry: SalaryAdvanceDashboardEntry;
 }) {
-  const status = statusMetadata[entry.status];
+  const status = getStatusPresentation(entry.status);
 
   return (
-    <article className="rounded-lg border border-hairline bg-white p-4">
+    <article className="rounded-lg border border-border-subtle bg-surface-base p-4" role="listitem">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold text-ink">{entry.staffDisplayName}</h3>
-          <p className="mt-1 text-sm text-ink-muted">{formatCurrency(entry.amountVnd)}</p>
-        </div>
+        <StaffIdentity entry={entry} />
         <Badge tone={status.tone}>{status.label}</Badge>
       </div>
 
-      <dl className="mt-4 grid gap-3 text-sm">
-        <MobileField label="Kỳ khấu trừ" value={formatMonth(entry.deductionPeriodMonth)} />
-        <MobileField label="Lý do" value={entry.requestNote} />
-        <div>
-          <dt className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">Theo dõi</dt>
-          <dd className="mt-1 text-ink-muted"><AdvanceLifecycle entry={entry} /></dd>
-        </div>
+      <p className="mt-3 text-lg font-semibold tabular-nums text-text-strong">
+        {formatCurrency(entry.amountVnd)}
+      </p>
+
+      <dl className="mt-4 grid gap-3 text-secondary text-text-default">
+        <RecordField label="Kỳ khấu trừ" value={formatMonth(entry.deductionPeriodMonth)} />
+        <RecordField content={<RequestContext entry={entry} />} label="Yêu cầu" />
+        <RecordField content={<AdvanceLifecycle entry={entry} />} label="Theo dõi" />
       </dl>
 
       {canReview || canApprove ? (
-        <div className="mt-4 border-t border-hairline pt-4">
-          <AdvanceAction
-            canApprove={canApprove}
-            canReview={canReview}
-            entry={entry}
-            isMobile
-          />
+        <div className="mt-4 border-t border-border-subtle pt-4">
+          <AdvanceAction canApprove={canApprove} canReview={canReview} entry={entry} />
         </div>
       ) : null}
     </article>
+  );
+}
+
+function StaffIdentity({ entry }: { entry: SalaryAdvanceDashboardEntry }) {
+  return (
+    <div>
+      <p className="font-semibold text-text-strong">{entry.staffDisplayName}</p>
+      {entry.staffEmployeeCode ? (
+        <p className="mt-0.5 text-caption font-medium tabular-nums text-text-muted">
+          {entry.staffEmployeeCode}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function RequestContext({ entry }: { entry: SalaryAdvanceDashboardEntry }) {
+  return (
+    <div className="grid gap-1.5">
+      <p className="break-words text-text-default">{entry.requestNote}</p>
+      <p className="text-caption tabular-nums text-text-muted">
+        {formatDateTime(entry.requestedAt)}
+      </p>
+    </div>
   );
 }
 
@@ -223,45 +274,47 @@ function AdvanceAction({
   canApprove,
   canReview,
   entry,
-  isMobile = false,
 }: {
   canApprove: boolean;
   canReview: boolean;
   entry: SalaryAdvanceDashboardEntry;
-  isMobile?: boolean;
 }) {
-  const triggerClassName = isMobile ? "min-h-11" : undefined;
-
   if (entry.status === "requested" && canReview) {
-    return (
-      <SalaryAdvanceDecisionDialog
-        advance={entry}
-        stage="review"
-        triggerClassName={triggerClassName}
-      />
-    );
+    return <SalaryAdvanceDecisionDialog advance={entry} stage="review" />;
   }
 
   if (entry.status === "review" && canApprove) {
+    return <SalaryAdvanceDecisionDialog advance={entry} stage="approve" />;
+  }
+
+  return <span className="text-secondary text-text-muted">Không có thao tác</span>;
+}
+
+function AdvanceLifecycle({ entry }: { entry: SalaryAdvanceDashboardEntry }) {
+  if (entry.status === "requested") {
+    return <p>Đang chờ đối soát.</p>;
+  }
+
+  if (entry.status === "review") {
     return (
-      <SalaryAdvanceDecisionDialog
-        advance={entry}
-        stage="approve"
-        triggerClassName={triggerClassName}
+      <LifecycleDetail
+        actor={entry.reviewedByDisplayName}
+        note={entry.reviewNote}
+        timestamp={entry.reviewedAt}
+        verb="Đã đối soát"
       />
     );
   }
 
-  return <span className="text-sm text-ink-subtle">Không có thao tác</span>;
-}
-
-function AdvanceLifecycle({ entry }: { entry: SalaryAdvanceDashboardEntry }) {
-  if (entry.status === "review") {
-    return <p>Đã đối soát {formatDateTime(entry.reviewedAt)}.</p>;
-  }
-
   if (entry.status === "approved") {
-    return <p>Đã duyệt {formatDateTime(entry.approvedAt)}.</p>;
+    return (
+      <LifecycleDetail
+        actor={entry.approvedByDisplayName}
+        note={entry.approvalNote}
+        timestamp={entry.approvedAt}
+        verb="Đã phê duyệt"
+      />
+    );
   }
 
   if (entry.status === "deducted") {
@@ -269,26 +322,61 @@ function AdvanceLifecycle({ entry }: { entry: SalaryAdvanceDashboardEntry }) {
   }
 
   if (entry.status === "rejected") {
-    return <p>{entry.rejectionReason || "Yêu cầu đã bị từ chối."}</p>;
+    return (
+      <LifecycleDetail
+        actor={entry.rejectedByDisplayName}
+        note={entry.rejectionReason}
+        timestamp={entry.rejectedAt}
+        verb="Đã từ chối"
+      />
+    );
   }
 
-  return <p>Chờ kế toán hoặc owner đối soát.</p>;
+  return <p>Không thể diễn giải trạng thái này.</p>;
 }
 
-function MobileField({ label, value }: { label: string; value: string }) {
+function LifecycleDetail({
+  actor,
+  note,
+  timestamp,
+  verb,
+}: {
+  actor: string | null;
+  note: string | null;
+  timestamp: string | null;
+  verb: string;
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <p>
+        {verb} {actor ? `bởi ${actor} ` : ""}{formatDateTime(timestamp)}.
+      </p>
+      {note ? <p className="break-words text-caption text-text-muted">{note}</p> : null}
+    </div>
+  );
+}
+
+function RecordField({
+  content,
+  label,
+  value,
+}: {
+  content?: ReactNode;
+  label: string;
+  value?: string;
+}) {
   return (
     <div>
-      <dt className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">{label}</dt>
-      <dd className="mt-1 text-ink">{value}</dd>
+      <dt className="text-caption font-semibold text-text-muted">{label}</dt>
+      <dd className="mt-1">{content ?? value}</dd>
     </div>
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
-      <p className="text-sm text-ink-muted">{label}</p>
-      <p className="mt-2 text-xl font-bold text-ink">{value}</p>
-    </div>
-  );
+function TableCell({ children, className }: { children: ReactNode; className?: string }) {
+  return <td className={`px-4 py-3 ${className ?? ""}`}>{children}</td>;
+}
+
+function TableHeader({ children, className }: { children: ReactNode; className?: string }) {
+  return <th className={`px-4 py-3 font-semibold ${className ?? ""}`} scope="col">{children}</th>;
 }
