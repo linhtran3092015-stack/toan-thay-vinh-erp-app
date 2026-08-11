@@ -68,7 +68,7 @@ afterEach(() => {
 });
 
 describe("Payroll 1 presentation", () => {
-  it("presents Payroll 0 totals and immutable line facts without Payroll 2 controls", () => {
+  it("presents Payroll 0 totals and immutable line facts without unauthorized Payroll 2 controls", () => {
     const allLineTypes = [
       "hourly_wage", "revenue_bonus", "kpi_bonus", "grading_bonus",
       "commission", "manual_reward", "manual_deduction", "advance_deduction",
@@ -81,7 +81,7 @@ describe("Payroll 1 presentation", () => {
     }));
     const renderedPeriod = period({ statements: [{ ...period().statements[0], lines: allLineTypes }] });
 
-    render(<PayrollPage canManage periods={[renderedPeriod]} />);
+    render(<PayrollPage canApprove={false} canManage canReconcile={false} periods={[renderedPeriod]} />);
 
     expect(screen.getByRole("table", { name: "Danh sách bảng lương nhân sự" })).toHaveTextContent("777 VND");
     expect(screen.getAllByText("888 VND")).not.toHaveLength(0);
@@ -105,7 +105,7 @@ describe("Payroll 1 presentation", () => {
   });
 
   it("keeps a real zero-statement period distinct and fails closed for unknown status", () => {
-    render(<PayrollPage canManage periods={[
+    render(<PayrollPage canApprove={false} canManage canReconcile={false} periods={[
       period({ id: "empty-period", periodMonth: "2026-05-01", statements: [], status: "review" }),
       period({ id: "unknown-period", periodMonth: "2026-03-01", status: "archived" }),
     ]} />);
@@ -117,7 +117,7 @@ describe("Payroll 1 presentation", () => {
   });
 
   it("uses the reader-provided draft/review/approved labels and limits manual controls to draft", () => {
-    render(<PayrollPage canManage periods={[
+    render(<PayrollPage canApprove={false} canManage canReconcile={false} periods={[
       period({ id: "draft", status: "draft" }),
       period({ id: "review", status: "review" }),
       period({ id: "approved", status: "approved" }),
@@ -130,7 +130,7 @@ describe("Payroll 1 presentation", () => {
   });
 
   it("keeps view-only presentation read-only and preserves the 980/982 container contract", () => {
-    render(<PayrollPage canManage={false} periods={[period()]} />);
+    render(<PayrollPage canApprove={false} canManage={false} canReconcile={false} periods={[period()]} />);
 
     expect(screen.queryByRole("button", { name: "Lập bảng lương" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Điều chỉnh" })).not.toBeInTheDocument();
@@ -141,7 +141,7 @@ describe("Payroll 1 presentation", () => {
     expect(globals).toMatch(/\.payroll-statement-work-area\s*\{\s*container-type: inline-size/);
     expect(globals).toMatch(/@container \(min-width: 982px\)[\s\S]*\.payroll-statement-table/);
     expect(source).toContain('min-w-[980px]');
-    expect(source).not.toMatch(/PayrollPeriodTransitionAction|\.reduce\(/);
+    expect(source).not.toMatch(/\.reduce\(/);
   });
 });
 

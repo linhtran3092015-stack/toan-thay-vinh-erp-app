@@ -17,9 +17,21 @@ vi.mock("@/features/payroll/data", () => ({
   getPayrollPeriodsWithDetailsResult: dependencies.getPayrollPeriodsWithDetailsResult,
 }));
 vi.mock("@/features/payroll/payroll-page", () => ({
-  PayrollPage: ({ canManage, periods }: { canManage: boolean; periods: readonly { id: string }[] }) => (
+  PayrollPage: ({
+    canApprove,
+    canManage,
+    canReconcile,
+    periods,
+  }: {
+    canApprove: boolean;
+    canManage: boolean;
+    canReconcile: boolean;
+    periods: readonly { id: string }[];
+  }) => (
     <div>
+      <p>canApprove:{String(canApprove)}</p>
       <p>canManage:{String(canManage)}</p>
+      <p>canReconcile:{String(canReconcile)}</p>
       <p>periods:{periods.length}</p>
     </div>
   ),
@@ -43,7 +55,9 @@ describe("Payroll route authority", () => {
 
     render(await PayrollRoute());
 
+    expect(screen.getByText("canApprove:false")).toBeInTheDocument();
     expect(screen.getByText("canManage:false")).toBeInTheDocument();
+    expect(screen.getByText("canReconcile:false")).toBeInTheDocument();
     expect(screen.getByText("periods:1")).toBeInTheDocument();
     expect(dependencies.getPayrollPeriodsWithDetailsResult).toHaveBeenCalledOnce();
     expect(dependencies.getPayrollDashboardResult).not.toHaveBeenCalled();
@@ -62,10 +76,30 @@ describe("Payroll route authority", () => {
     expect(dependencies.getPayrollDashboardResult).not.toHaveBeenCalled();
   });
 
-  it("passes payroll.manage to Payroll 1 composition while retaining the same detail reader", async () => {
+  it("passes payroll.accountant_reconcile independently to Payroll 2 composition", async () => {
     dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
       ok: true,
-      permissions: ["payroll.view", "payroll.manage"],
+      permissions: ["payroll.view", "payroll.accountant_reconcile"],
+    });
+    dependencies.getPayrollPeriodsWithDetailsResult.mockResolvedValueOnce({
+      data: [{ id: "period-1" }],
+      ok: true,
+    });
+
+    render(await PayrollRoute());
+
+    expect(screen.getByText("canApprove:false")).toBeInTheDocument();
+    expect(screen.getByText("canManage:false")).toBeInTheDocument();
+    expect(screen.getByText("canReconcile:true")).toBeInTheDocument();
+    expect(screen.getByText("periods:1")).toBeInTheDocument();
+    expect(dependencies.getPayrollPeriodsWithDetailsResult).toHaveBeenCalledOnce();
+    expect(dependencies.getPayrollDashboardResult).not.toHaveBeenCalled();
+  });
+
+  it("passes payroll.owner_approve independently without treating payroll.manage as transition authority", async () => {
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["payroll.view", "payroll.manage", "payroll.owner_approve"],
     });
     dependencies.getPayrollPeriodsWithDetailsResult.mockResolvedValueOnce({
       data: [],
@@ -74,8 +108,9 @@ describe("Payroll route authority", () => {
 
     render(await PayrollRoute());
 
+    expect(screen.getByText("canApprove:true")).toBeInTheDocument();
     expect(screen.getByText("canManage:true")).toBeInTheDocument();
-    expect(screen.getByText("periods:0")).toBeInTheDocument();
+    expect(screen.getByText("canReconcile:false")).toBeInTheDocument();
     expect(dependencies.getPayrollPeriodsWithDetailsResult).toHaveBeenCalledOnce();
     expect(dependencies.getPayrollDashboardResult).not.toHaveBeenCalled();
   });

@@ -4,6 +4,7 @@ import { ResponsiveRecordList } from "@/components/patterns/responsive-record-li
 import { Badge } from "@/components/ui/badge";
 import { CreatePayrollDraftDialog } from "@/features/payroll/components/create-payroll-draft-dialog";
 import { PayrollManualLineDialog } from "@/features/payroll/components/payroll-manual-line-dialog";
+import { PayrollPeriodTransitionAction } from "@/features/payroll/components/payroll-period-transition-action";
 import type {
   PayrollLineRead,
   PayrollPeriodRead,
@@ -12,7 +13,9 @@ import type {
 import type { ReactNode } from "react";
 
 interface PayrollPageProps {
+  canApprove: boolean;
   canManage: boolean;
+  canReconcile: boolean;
   periods: readonly PayrollPeriodRead[];
 }
 
@@ -82,7 +85,12 @@ function getLineDirectionLabel(direction: string): string {
 }
 
 /** Payroll 1 presents the authoritative Payroll 0 period/detail snapshot. */
-export function PayrollPage({ canManage, periods }: PayrollPageProps) {
+export function PayrollPage({
+  canApprove,
+  canManage,
+  canReconcile,
+  periods,
+}: PayrollPageProps) {
   return (
     <div className="grid min-w-0 gap-6">
       <PageHeader
@@ -104,7 +112,9 @@ export function PayrollPage({ canManage, periods }: PayrollPageProps) {
       ) : (
         periods.map((period) => (
           <PayrollPeriodSection
+            canApprove={canApprove}
             canManage={canManage}
+            canReconcile={canReconcile}
             key={period.id}
             period={period}
           />
@@ -115,10 +125,14 @@ export function PayrollPage({ canManage, periods }: PayrollPageProps) {
 }
 
 function PayrollPeriodSection({
+  canApprove,
   canManage,
+  canReconcile,
   period,
 }: {
+  canApprove: boolean;
   canManage: boolean;
+  canReconcile: boolean;
   period: PayrollPeriodRead;
 }) {
   const status = getPeriodStatus(period.status);
@@ -130,15 +144,35 @@ function PayrollPeriodSection({
       className="overflow-hidden rounded-lg border border-border-subtle bg-surface-base"
     >
       <div className="border-b border-border-subtle px-4 py-4 sm:px-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-section-title text-text-strong" id={`payroll-period-${period.id}`}>
-            {formatMonth(period.periodMonth)}
-          </h2>
-          <Badge tone={status.tone}>{status.label}</Badge>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-section-title text-text-strong" id={`payroll-period-${period.id}`}>
+                {formatMonth(period.periodMonth)}
+              </h2>
+              <Badge tone={status.tone}>{status.label}</Badge>
+            </div>
+            <p className="mt-1 text-secondary text-text-muted">
+              Ngày trả lương: <span className="tabular-nums">{formatDate(period.payDate)}</span>
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {period.status === "draft" && canReconcile ? (
+              <PayrollPeriodTransitionAction
+                payrollPeriodId={period.id}
+                periodMonth={period.periodMonth}
+                transition="review"
+              />
+            ) : null}
+            {period.status === "review" && canApprove ? (
+              <PayrollPeriodTransitionAction
+                payrollPeriodId={period.id}
+                periodMonth={period.periodMonth}
+                transition="approve"
+              />
+            ) : null}
+          </div>
         </div>
-        <p className="mt-1 text-secondary text-text-muted">
-          Ngày trả lương: <span className="tabular-nums">{formatDate(period.payDate)}</span>
-        </p>
       </div>
 
       {period.statements.length === 0 ? (

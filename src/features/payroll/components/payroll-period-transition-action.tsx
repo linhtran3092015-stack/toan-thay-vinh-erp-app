@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
-import { PayrollActionMessage } from "@/features/payroll/components/payroll-action-message";
-import { PayrollModal } from "@/features/payroll/components/payroll-modal";
+import { Dialog } from "@/components/ui/dialog";
 import {
   approvePayrollPeriodAction,
   submitPayrollForReviewAction,
@@ -16,45 +16,90 @@ type PayrollPeriodTransition = "approve" | "review";
 
 interface PayrollPeriodTransitionActionProps {
   payrollPeriodId: string;
+  periodMonth: string;
   transition: PayrollPeriodTransition;
 }
 
 const contentByTransition: Record<
   PayrollPeriodTransition,
-  { confirmLabel: string; description: string; title: string; triggerLabel: string }
+  {
+    confirmLabel: string;
+    errorTitle: string;
+    pendingLabel: string;
+    resultStatus: string;
+    sourceStatus: string;
+    title: string;
+    triggerLabel: string;
+  }
 > = {
   approve: {
     confirmLabel: "Duyệt và khóa",
-    description:
-      "Bảng lương đã duyệt sẽ bị khóa vĩnh viễn. Hãy chắc chắn các khoản thưởng và khấu trừ đã được đối soát.",
-    title: "Duyệt bảng lương",
-    triggerLabel: "Duyệt",
+    errorTitle: "Không thể duyệt bảng lương",
+    pendingLabel: "Đang duyệt và khóa…",
+    resultStatus: "Đã duyệt & khóa",
+    sourceStatus: "Chờ đối soát",
+    title: "Duyệt và khóa bảng lương",
+    triggerLabel: "Duyệt & khóa",
   },
   review: {
-    confirmLabel: "Chuyển đối soát",
-    description:
-      "Sau khi chuyển đối soát, bảng lương không còn nhận thêm khoản thưởng hoặc khấu trừ thủ công.",
-    title: "Chuyển bảng lương sang đối soát",
+    confirmLabel: "Gửi đối soát",
+    errorTitle: "Không thể gửi đối soát",
+    pendingLabel: "Đang gửi đối soát…",
+    resultStatus: "Chờ đối soát",
+    sourceStatus: "Nháp",
+    title: "Gửi bảng lương đối soát",
     triggerLabel: "Gửi đối soát",
   },
 };
 
+function formatMonth(value: string): string {
+  return new Intl.DateTimeFormat("vi-VN", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${value}T00:00:00`));
+}
+
+/** Confirms one of the two server-owned Payroll period transitions. */
 export function PayrollPeriodTransitionAction({
   payrollPeriodId,
+  periodMonth,
   transition,
 }: PayrollPeriodTransitionActionProps) {
   const router = useRouter();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [actionState, setActionState] = useState<PayrollActionState | null>(null);
   const content = contentByTransition[transition];
+  const isInteractionLocked = isPending && actionState?.status !== "error";
+
+  const openDialog = (): void => {
+    setActionState(null);
+    setIsOpen(true);
+  };
+
+  const closeDialog = (): void => {
+    if (isInteractionLocked) {
+      return;
+    }
+
+    setIsOpen(false);
+    setActionState(null);
+  };
 
   const submitTransition = (): void => {
+    if (isInteractionLocked) {
+      return;
+    }
+
+    setActionState(null);
     startTransition(async () => {
-      const result =
-        transition === "review"
-          ? await submitPayrollForReviewAction({ payrollPeriodId })
-          : await approvePayrollPeriodAction({ payrollPeriodId });
+      const result = transition === "review"
+        ? await submitPayrollForReviewAction({ payrollPeriodId })
+        : await approvePayrollPeriodAction({ payrollPeriodId });
       setActionState(result);
 
       if (result.status === "success") {
@@ -66,25 +111,72 @@ export function PayrollPeriodTransitionAction({
 
   return (
     <>
-      <Button onClick={() => setIsOpen(true)} size="sm" type="button" variant={transition === "approve" ? "primary" : "outline"}>
+      <Button
+        className="min-h-11"
+        onClick={openDialog}
+        ref={triggerRef}
+        type="button"
+        variant={transition === "approve" ? "primary" : "outline"}
+      >
         {content.triggerLabel}
       </Button>
 
-      {isOpen ? (
-        <PayrollModal description={content.description} title={content.title}>
+      <Dialog
+        ariaDescribedBy={descriptionId}
+        ariaLabelledBy={titleId}
+        className="max-w-lg"
+        initialFocusRef={cancelRef}
+        isOpen={isOpen}
+        onClose={closeDialog}
+        returnFocusRef={triggerRef}
+      >
+        <div className="p-4 sm:p-5">
+          <h2 className="text-section-title text-text-strong" id={titleId}>
+            {content.title}
+          </h2>
+          <p className="mt-1 text-secondary text-text-muted" id={descriptionId}>
+            Kỳ lương {formatMonth(periodMonth)} sẽ chuyển từ {content.sourceStatus} sang {content.resultStatus}.
+            {transition === "review"
+              ? " Sau đó, hệ thống không nhận thêm điều chỉnh thủ công chỉ dành cho kỳ nháp."
+              : " Đây là trạng thái cuối cùng của kỳ lương; điều chỉnh thủ công chỉ dành cho kỳ nháp."}
+          </p>
+
           <div className="mt-5 grid gap-5">
-            <PayrollActionMessage actionState={actionState} />
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button disabled={isPending} onClick={() => setIsOpen(false)} size="lg" type="button" variant="ghost">
+            {actionState?.status === "error" ? (
+              <ResultBanner
+                description={actionState.message}
+                title={content.errorTitle}
+                tone="error"
+              />
+            ) : null}
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                className="min-h-11"
+                disabled={isInteractionLocked}
+                onClick={closeDialog}
+                ref={cancelRef}
+                size="lg"
+                type="button"
+                variant="ghost"
+              >
                 Hủy
               </Button>
-              <Button disabled={isPending} onClick={submitTransition} size="lg" type="button" variant={transition === "approve" ? "primary" : "secondary"}>
-                {isPending ? "Đang xử lý..." : content.confirmLabel}
+              <Button
+                className="min-h-11"
+                disabled={isInteractionLocked}
+                isLoading={isInteractionLocked}
+                onClick={submitTransition}
+                size="lg"
+                type="button"
+                variant={transition === "approve" ? "primary" : "secondary"}
+              >
+                {isInteractionLocked ? content.pendingLabel : content.confirmLabel}
               </Button>
             </div>
           </div>
-        </PayrollModal>
-      ) : null}
+        </div>
+      </Dialog>
     </>
   );
 }

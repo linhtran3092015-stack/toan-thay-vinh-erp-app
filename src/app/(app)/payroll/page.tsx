@@ -38,6 +38,12 @@ export default async function PayrollRoute() {
   }
 
   const canManage = permissionResult.permissions.includes("payroll.manage");
+  const canReconcile = permissionResult.permissions.includes(
+    "payroll.accountant_reconcile",
+  );
+  const canApprove = permissionResult.permissions.includes(
+    "payroll.owner_approve",
+  );
   if (payrollResult.data.length === 0 && !canManage) {
     return (
       <EmptyState
@@ -49,7 +55,9 @@ export default async function PayrollRoute() {
 
   return (
     <PayrollPage
+      canApprove={canApprove}
       canManage={canManage}
+      canReconcile={canReconcile}
       periods={payrollResult.data}
     />
   );
