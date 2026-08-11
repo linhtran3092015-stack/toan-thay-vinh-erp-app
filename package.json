@@ -15,6 +15,7 @@
     "test:e2e": "playwright test",
     "test:db": "supabase test db",
     "test:db:fresh": "supabase start && supabase db reset --local && supabase test db",
+    "staging:preflight": "node scripts/verify-staging-target.mjs",
     "supabase:status": "supabase status",
     "supabase:link": "supabase link",
     "supabase:db:pull": "supabase db pull --linked",
