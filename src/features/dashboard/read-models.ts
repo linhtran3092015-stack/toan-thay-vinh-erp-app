@@ -42,14 +42,6 @@ export interface DashboardGradingCreditSummary {
   totalCreditUnits: number;
 }
 
-export interface DashboardCommissionSummary {
-  accrualCount: number;
-  latestRecognizedAt: string | null;
-  mmaAccrualCount: number;
-  recognizedRevenueVnd: number;
-  sandboxAccrualCount: number;
-}
-
 export interface DashboardCoachingSummary {
   closedCount: number;
   highPriorityCount: number;
@@ -61,7 +53,6 @@ export interface DashboardCoachingSummary {
 export interface RoleAwareDashboardReadModel {
   advances: DashboardSectionState<DashboardAdvanceSummary>;
   coaching: DashboardSectionState<DashboardCoachingSummary>;
-  commissions: DashboardSectionState<DashboardCommissionSummary>;
   finance: DashboardSectionState<DashboardFinanceSummary>;
   gradingCredits: DashboardSectionState<DashboardGradingCreditSummary>;
   payroll: DashboardSectionState<DashboardPayrollSummary>;

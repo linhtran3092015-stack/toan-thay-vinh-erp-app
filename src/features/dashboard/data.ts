@@ -2,11 +2,9 @@ import "server-only";
 
 import { getSalaryAdvancesDashboardResult } from "@/features/advances/data";
 import { getCoachingRecordsDashboardResult } from "@/features/coaching/data";
-import { getSalesCommissionAccrualsDashboardResult } from "@/features/commissions/data";
 import type {
   DashboardAdvanceSummary,
   DashboardCoachingSummary,
-  DashboardCommissionSummary,
   DashboardFinanceSummary,
   DashboardGradingCreditSummary,
   DashboardPayrollSummary,
@@ -192,55 +190,6 @@ async function loadGradingCreditSummary(
   });
 }
 
-async function loadCommissionSummary(
-  permissions: readonly PermissionCode[],
-): Promise<
-  DashboardSectionState<DashboardCommissionSummary>
-> {
-  if (
-    !hasPermission(
-      permissions,
-      "commissions.view",
-    )
-  ) {
-    return hiddenSection();
-  }
-
-  const result =
-    await getSalesCommissionAccrualsDashboardResult();
-
-  if (!result.ok) {
-    return errorSection();
-  }
-
-  const entries = result.data;
-
-  const latestRecognizedAt = entries.reduce<string | null>(
-    (latest, entry) =>
-      latest === null || entry.recognizedAt > latest
-        ? entry.recognizedAt
-        : latest,
-    null,
-  );
-
-  return readySection({
-    accrualCount: entries.length,
-    latestRecognizedAt,
-    mmaAccrualCount: entries.filter(
-      (entry) => entry.leadSourceGroup === "mma",
-    ).length,
-    recognizedRevenueVnd: entries.reduce(
-      (total, entry) =>
-        total + entry.recognizedRevenueVnd,
-      0,
-    ),
-    sandboxAccrualCount: entries.filter(
-      (entry) =>
-        entry.leadSourceGroup === "sandbox",
-    ).length,
-  });
-}
-
 async function loadCoachingSummary(
   permissions: readonly PermissionCode[],
 ): Promise<DashboardSectionState<DashboardCoachingSummary>> {
@@ -285,21 +234,18 @@ export async function getRoleAwareDashboardReadModel(
     payroll,
     advances,
     gradingCredits,
-    commissions,
     coaching,
   ] = await Promise.all([
     loadFinanceSummary(permissions),
     loadPayrollSummary(permissions),
     loadAdvanceSummary(permissions),
     loadGradingCreditSummary(permissions),
-    loadCommissionSummary(permissions),
     loadCoachingSummary(permissions),
   ]);
 
   return {
     advances,
     coaching,
-    commissions,
     finance,
     gradingCredits,
     payroll,

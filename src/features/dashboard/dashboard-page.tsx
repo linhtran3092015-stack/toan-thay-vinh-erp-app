@@ -41,7 +41,6 @@ export function DashboardPage({
     dashboard.payroll,
     dashboard.advances,
     dashboard.gradingCredits,
-    dashboard.commissions,
     dashboard.coaching,
   ];
 
@@ -290,52 +289,6 @@ export function DashboardPage({
                 label="Cập nhật gần nhất"
                 value={formatDateTime(
                   data.latestCreditedAt,
-                )}
-              />
-            </DashboardMetricGrid>
-          )}
-        </DashboardSectionCard>
-
-        <DashboardSectionCard
-          badge="Hoa hồng"
-          description="Doanh thu đủ điều kiện ghi nhận hoa hồng."
-          href="/commissions"
-          section={dashboard.commissions}
-          title="Doanh thu hoa hồng"
-        >
-          {(data) => (
-            <DashboardMetricGrid>
-              <DashboardMetric
-                helper="Số bản ghi doanh thu đủ điều kiện"
-                label="Bản ghi"
-                value={formatInteger(data.accrualCount)}
-              />
-              <DashboardMetric
-                helper="Chưa áp dụng công thức tính tiền hoa hồng"
-                label="Doanh thu ghi nhận"
-                value={formatCurrency(
-                  data.recognizedRevenueVnd,
-                )}
-              />
-              <DashboardMetric
-                helper="Nguồn tuyển sinh MMA"
-                label="MMA"
-                value={formatInteger(
-                  data.mmaAccrualCount,
-                )}
-              />
-              <DashboardMetric
-                helper="Nguồn đối tác Sandbox"
-                label="Sandbox"
-                value={formatInteger(
-                  data.sandboxAccrualCount,
-                )}
-              />
-              <DashboardMetric
-                helper="Thời điểm ghi nhận gần nhất"
-                label="Cập nhật gần nhất"
-                value={formatDateTime(
-                  data.latestRecognizedAt,
                 )}
               />
             </DashboardMetricGrid>
