@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       academic_years: {
@@ -4934,6 +4909,14 @@ export type Database = {
         }
         Returns: Json
       }
+      dry_run_class_session_generation: {
+        Args: {
+          p_academic_year_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
       dry_run_session_balance_import_rows: {
         Args: { p_effective_on: string; p_rows: Json }
         Returns: Json
@@ -5496,6 +5479,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      materialize_class_sessions: {
+        Args: {
+          p_academic_year_id: string
+          p_allow_backfill?: boolean
+          p_end_date: string
+          p_reason?: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
       next_student_public_code: { Args: never; Returns: string }
       normalize_student_name: { Args: { name_value: string }; Returns: string }
       normalize_vietnam_phone: {
@@ -5787,6 +5780,44 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "student_enrollments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reset_unlocked_class_session_before_start: {
+        Args: { p_class_session_id: string; p_reason: string }
+        Returns: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          class_id: string
+          completed_at: string | null
+          completed_by: string | null
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          learning_mode: string
+          lock_reason: string | null
+          locked_at: string | null
+          locked_by: string | null
+          makeup_for_session_id: string | null
+          meeting_url: string | null
+          notes: string | null
+          room_name: string | null
+          schedule_template_id: string | null
+          session_date: string
+          session_kind: string
+          start_time: string
+          started_at: string | null
+          started_by: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_sessions"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -6375,9 +6406,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
