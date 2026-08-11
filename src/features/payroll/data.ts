@@ -2,9 +2,11 @@ import "server-only";
 
 import type {
   PayrollDashboardEntry,
+  PayrollPeriodRead,
   PayrollPeriodStatus,
   PayrollReadResult,
 } from "@/features/payroll/read-models";
+import { normalizePayrollPeriodsWithDetailsRows } from "@/features/payroll/read-models";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function normalizePeriodStatus(value: string): PayrollPeriodStatus {
@@ -42,6 +44,28 @@ export async function getPayrollDashboardResult(): Promise<
         workHours: entry.work_hours,
         workUnits: entry.work_units,
       })),
+      ok: true,
+    };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function getPayrollPeriodsWithDetailsResult(): Promise<
+  PayrollReadResult<readonly PayrollPeriodRead[]>
+> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.rpc(
+      "get_payroll_periods_with_details",
+    );
+
+    if (error) {
+      return { ok: false };
+    }
+
+    return {
+      data: normalizePayrollPeriodsWithDetailsRows(data),
       ok: true,
     };
   } catch {

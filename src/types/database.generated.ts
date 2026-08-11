@@ -5264,6 +5264,16 @@ export type Database = {
           work_units: number
         }[]
       }
+      get_payroll_periods_with_details: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["payroll_periods_with_details_row"][]
+        SetofOptions: {
+          from: "*"
+          to: "payroll_periods_with_details_row"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_salary_advances_dashboard: {
         Args: never
         Returns: {
@@ -6283,7 +6293,28 @@ export type Database = {
       [_ in never]: never
     }
     CompositeTypes: {
-      [_ in never]: never
+      payroll_periods_with_details_row: {
+        payroll_period_id: string | null
+        period_month: string | null
+        pay_date: string | null
+        period_status: string | null
+        payroll_statement_id: string | null
+        staff_id: string | null
+        staff_display_name: string | null
+        staff_employee_code: string | null
+        work_units: number | null
+        work_hours: number | null
+        total_earnings_vnd: number | null
+        total_deductions_vnd: number | null
+        payable_amount_vnd: number | null
+        payroll_line_item_id: string | null
+        line_type: string | null
+        line_direction: string | null
+        line_amount_vnd: number | null
+        unit_count: number | null
+        unit_rate_vnd: number | null
+        note: string | null
+      }
     }
   }
 }
