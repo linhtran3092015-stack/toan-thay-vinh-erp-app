@@ -50,6 +50,67 @@ npm run supabase:types
 
 Project ref nằm trong URL Dashboard (`https://supabase.com/dashboard/project/<project-ref>`) hoặc màn hình Project Settings. Ở bước sau, đăng nhập CLI bằng personal access token an toàn, sau đó chạy `npm run supabase:link -- --project-ref <project-ref>`. Không commit token hoặc file trong `supabase/.temp`.
 
+## pg_cron và Timekeeping auto-end
+
+Timekeeping auto-end là một phụ thuộc bắt buộc của chuỗi migration. Cần có Docker và dùng Supabase CLI được khai báo trong repository:
+
+```bash
+npx supabase start
+npx supabase db reset --local
+```
+
+`npx supabase db reset --local` **xóa và dựng lại** database local. Không chạy lệnh này trên database có dữ liệu local cần giữ lại nếu chưa có backup và chấp thuận của người vận hành.
+
+Trong workflow local này, `supabase/roles.sql` chạy trước migrations và cài `pg_cron`. Nhờ đó migration `20260728155000_timekeeping_auto_end_cron.sql` có thể fail-fast đúng nghĩa nếu scheduler không sẵn sàng; `seed.sql` không phải cơ chế để đáp ứng tiền điều kiện này.
+
+Sau một local reset thành công, kiểm tra trực tiếp:
+
+```sql
+select extname, extversion
+from pg_extension
+where extname = 'pg_cron';
+
+select to_regclass('cron.job');
+
+select
+  jobid,
+  jobname,
+  schedule,
+  command,
+  database,
+  username,
+  active
+from cron.job
+where jobname = 'timekeeping-auto-end-teaching-assistants';
+
+select count(*)
+from cron.job
+where jobname = 'timekeeping-auto-end-teaching-assistants';
+
+select to_regprocedure(
+  'public.auto_end_stale_teaching_assistant_time_entries()'
+);
+
+select version
+from supabase_migrations.schema_migrations
+where version in ('20260728155000', '20260729085000')
+order by version;
+```
+
+Kết quả yêu cầu: `pg_cron` và `cron.job` tồn tại; có đúng một job active tên `timekeeping-auto-end-teaching-assistants`; schedule là `30 16 * * *`; command là `select public.auto_end_stale_teaching_assistant_time_entries();` (cho phép khác biệt whitespace không đáng kể); function và cả hai migration đều tồn tại. Migration history đơn thuần không đủ chứng minh extension hoặc job tồn tại.
+
+Trước khi triển khai vào một Supabase hosted environment mới, bật `pg_cron`/Cron Postgres Module bằng cơ chế Supabase được hỗ trợ và xác nhận:
+
+```sql
+select extname, extversion
+from pg_extension
+where extname = 'pg_cron';
+```
+
+Nếu không có dòng kết quả, dừng deployment để bật `pg_cron`; không đánh dấu, repair, skip hoặc tự sửa migration history cho migration Timekeeping. Sau deployment, chạy lại truy vấn job và migration history ở trên để xác nhận một job active đúng lịch/command. Cần kiểm tra lại extension và job sau PostgreSQL platform upgrade hoặc hạ tầng có thể tái tạo extensions.
+
+Nếu `20260728155000_timekeeping_auto_end_cron.sql` dừng với `PG_CRON_EXTENSION_REQUIRED_FOR_TIMEKEEPING_AUTO_END`, không mark/repair migration là applied, không skip migration, không sửa history và không tiếp tục migrations thủ công. Hãy bật/cài `pg_cron`, khôi phục hoặc dựng lại migration state nhất quán, rồi chạy lại workflow canonical.
+
 ## Quy tắc migration
 
 - `supabase/migrations` là nguồn sự thật duy nhất cho thay đổi schema.
