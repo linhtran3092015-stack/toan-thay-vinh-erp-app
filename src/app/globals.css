@@ -615,6 +615,30 @@
   }
 }
 
+/* Payroll 1: the statement directory needs 980px inside DataTableFrame;
+   its two borders require +2px on this zero-padding work area. */
+.payroll-statement-work-area {
+  container-type: inline-size;
+}
+
+.payroll-statement-table {
+  display: none;
+}
+
+.payroll-statement-record-list {
+  display: grid;
+}
+
+@container (min-width: 982px) {
+  .payroll-statement-table {
+    display: block;
+  }
+
+  .payroll-statement-record-list {
+    display: none;
+  }
+}
+
 .staff-directory-table,
 .staff-rate-history-table {
   display: none;

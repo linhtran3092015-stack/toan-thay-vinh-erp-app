@@ -1,7 +1,7 @@
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
-import { getPayrollDashboardResult } from "@/features/payroll/data";
+import { getPayrollPeriodsWithDetailsResult } from "@/features/payroll/data";
 import { PayrollPage } from "@/features/payroll/payroll-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -26,7 +26,7 @@ export default async function PayrollRoute() {
     );
   }
 
-  const payrollResult = await getPayrollDashboardResult();
+  const payrollResult = await getPayrollPeriodsWithDetailsResult();
 
   if (!payrollResult.ok) {
     return (
@@ -38,13 +38,6 @@ export default async function PayrollRoute() {
   }
 
   const canManage = permissionResult.permissions.includes("payroll.manage");
-  const canReconcile = permissionResult.permissions.includes(
-    "payroll.accountant_reconcile",
-  );
-  const canApprove = permissionResult.permissions.includes(
-    "payroll.owner_approve",
-  );
-
   if (payrollResult.data.length === 0 && !canManage) {
     return (
       <EmptyState
@@ -56,10 +49,8 @@ export default async function PayrollRoute() {
 
   return (
     <PayrollPage
-      canApprove={canApprove}
       canManage={canManage}
-      canReconcile={canReconcile}
-      entries={payrollResult.data}
+      periods={payrollResult.data}
     />
   );
 }
