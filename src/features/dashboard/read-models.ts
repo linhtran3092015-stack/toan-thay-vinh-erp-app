@@ -24,7 +24,6 @@ export interface DashboardPayrollSummary {
   latestPeriodMonth: string | null;
   reviewStatementCount: number;
   statementCount: number;
-  totalPayableVnd: number;
 }
 
 export interface DashboardAdvanceSummary {

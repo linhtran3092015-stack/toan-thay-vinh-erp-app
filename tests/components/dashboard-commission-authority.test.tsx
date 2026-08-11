@@ -60,7 +60,6 @@ describe("Global dashboard Commission aggregate authority", () => {
           latestPeriodMonth: null,
           reviewStatementCount: 0,
           statementCount: 0,
-          totalPayableVnd: 0,
         },
         status: "ready",
       },
@@ -71,6 +70,7 @@ describe("Global dashboard Commission aggregate authority", () => {
     expect(screen.getByText("5 khối dữ liệu")).toBeInTheDocument();
     expect(screen.getByText("Tổng quan tài chính")).toBeInTheDocument();
     expect(screen.getByText("Bảng lương")).toBeInTheDocument();
+    expect(screen.queryByText("Thực lĩnh")).not.toBeInTheDocument();
     expect(screen.queryByText("Doanh thu hoa hồng")).not.toBeInTheDocument();
     expect(screen.queryByText("Doanh thu ghi nhận")).not.toBeInTheDocument();
     expect(screen.queryByText("MMA", { exact: true })).not.toBeInTheDocument();

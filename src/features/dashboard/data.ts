@@ -103,10 +103,6 @@ async function loadPayrollSummary(
       (entry) => entry.periodStatus === "review",
     ).length,
     statementCount: entries.length,
-    totalPayableVnd: entries.reduce(
-      (total, entry) => total + entry.payableAmountVnd,
-      0,
-    ),
   });
 }
 

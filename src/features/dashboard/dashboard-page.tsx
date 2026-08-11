@@ -172,13 +172,6 @@ export function DashboardPage({
                 )}
               />
               <DashboardMetric
-                helper="Tổng số tiền cần thanh toán"
-                label="Thực lĩnh"
-                value={formatCurrency(
-                  data.totalPayableVnd,
-                )}
-              />
-              <DashboardMetric
                 helper="Bảng lương chưa gửi đối soát"
                 label="Bản nháp"
                 value={formatInteger(
