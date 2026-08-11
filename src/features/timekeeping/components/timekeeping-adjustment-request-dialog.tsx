@@ -60,6 +60,8 @@ export function TimekeepingAdjustmentRequestDialog({
   const [actionState, setActionState] = useState<TimekeepingAdjustmentActionState>(
     initialTimekeepingAdjustmentActionState,
   );
+  const isInteractionLocked =
+    isPending && actionState.status !== "error";
 
   // Authoritative entry selection uses server-returned entries directly (no client eligibility filtering).
   const selectedEntry = entries.find(
@@ -89,13 +91,17 @@ export function TimekeepingAdjustmentRequestDialog({
   };
 
   const closeDialog = (): void => {
-    if (!isPending) {
+    if (!isInteractionLocked) {
       setIsOpen(false);
     }
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
+
+    if (isInteractionLocked) {
+      return;
+    }
 
     if (!values.requestedCheckInAt || !values.requestedCheckOutAt) {
       setActionState({
@@ -130,6 +136,8 @@ export function TimekeepingAdjustmentRequestDialog({
       requestedCheckOutMode: values.requestedCheckOutMode,
       timeEntryId: values.timeEntryId,
     };
+
+    setActionState(initialTimekeepingAdjustmentActionState);
 
     startTransition(async () => {
       const result = await requestTimeEntryAdjustmentAction(input);
@@ -195,7 +203,7 @@ export function TimekeepingAdjustmentRequestDialog({
                   actionState.fieldErrors?.timeEntryId?.[0] ? true : undefined
                 }
                 className={formInputClassName}
-                disabled={isPending}
+                disabled={isInteractionLocked}
                 id="adj-request-entry-id"
                 onChange={(event) => selectEntry(event.target.value)}
                 value={values.timeEntryId}
@@ -252,7 +260,7 @@ export function TimekeepingAdjustmentRequestDialog({
                       : undefined
                   }
                   className={formInputClassName}
-                  disabled={isPending}
+                  disabled={isInteractionLocked}
                   id="adj-request-checkin-at"
                   onChange={(event) =>
                     updateValue("requestedCheckInAt", event.target.value)
@@ -280,7 +288,7 @@ export function TimekeepingAdjustmentRequestDialog({
                       : undefined
                   }
                   className={formInputClassName}
-                  disabled={isPending}
+                  disabled={isInteractionLocked}
                   id="adj-request-checkin-mode"
                   onChange={(event) =>
                     updateValue(
@@ -314,7 +322,7 @@ export function TimekeepingAdjustmentRequestDialog({
                       : undefined
                   }
                   className={formInputClassName}
-                  disabled={isPending}
+                  disabled={isInteractionLocked}
                   id="adj-request-checkout-at"
                   onChange={(event) =>
                     updateValue("requestedCheckOutAt", event.target.value)
@@ -342,7 +350,7 @@ export function TimekeepingAdjustmentRequestDialog({
                       : undefined
                   }
                   className={formInputClassName}
-                  disabled={isPending}
+                  disabled={isInteractionLocked}
                   id="adj-request-checkout-mode"
                   onChange={(event) =>
                     updateValue(
@@ -379,7 +387,7 @@ export function TimekeepingAdjustmentRequestDialog({
                 }
                 aria-required="true"
                 className={`${formInputClassName} min-h-28 py-3`}
-                disabled={isPending}
+                disabled={isInteractionLocked}
                 id="adj-request-reason"
                 maxLength={2000}
                 onChange={(event) =>
@@ -398,7 +406,7 @@ export function TimekeepingAdjustmentRequestDialog({
 
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button
-              disabled={isPending}
+              disabled={isInteractionLocked}
               onClick={closeDialog}
               size="lg"
               type="button"
@@ -408,11 +416,11 @@ export function TimekeepingAdjustmentRequestDialog({
             </Button>
             <Button
               disabled={!selectedEntry}
-              isLoading={isPending}
+              isLoading={isInteractionLocked}
               size="lg"
               type="submit"
             >
-              {isPending ? "Đang gửi yêu cầu..." : "Gửi yêu cầu"}
+              {isInteractionLocked ? "Đang gửi yêu cầu..." : "Gửi yêu cầu"}
             </Button>
           </div>
         </form>

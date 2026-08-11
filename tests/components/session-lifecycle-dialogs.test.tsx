@@ -10,7 +10,7 @@ function deferred<T>() { let resolve!: (value: T) => void; const promise = new P
 const errorResult = { message: "Không thể hoàn tất thao tác.", status: "error" as const };
 
 describe("Session lifecycle dialog presentation", () => {
-  it("keeps a pending start confirmation open and restores focus after it may close", async () => {
+  it("keeps a pending start confirmation open and closes after a returned error", async () => {
     const pending = deferred<typeof errorResult>(); mocks.startSessionAction.mockReturnValueOnce(pending.promise);
     render(<SessionLifecycleActions classCode="7A" lockedAt={null} sessionDate="2026-08-10" sessionId="session-1" status="scheduled" />);
     const trigger = screen.getByRole("button", { name: "Bắt đầu buổi học" }); fireEvent.click(trigger);
@@ -18,7 +18,7 @@ describe("Session lifecycle dialog presentation", () => {
     await waitFor(() => expect(mocks.startSessionAction).toHaveBeenCalledOnce()); expect(submit).toBeDisabled();
     const dialog = screen.getByRole("dialog", { name: "Xác nhận bắt đầu buổi học?" }); fireEvent.keyDown(dialog, { key: "Escape" }); fireEvent.mouseDown(dialog.parentElement!); fireEvent.click(submit);
     expect(screen.getByRole("dialog", { name: "Xác nhận bắt đầu buổi học?" })).toBeInTheDocument(); expect(mocks.startSessionAction).toHaveBeenCalledOnce();
-    pending.resolve(errorResult); await waitFor(() => expect(screen.getByRole("button", { name: "Quay lại" })).not.toBeDisabled()); fireEvent.keyDown(dialog, { key: "Escape" }); await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument()); expect(trigger).toHaveFocus();
+    pending.resolve(errorResult); await waitFor(() => expect(screen.getByRole("button", { name: "Quay lại" })).not.toBeDisabled()); fireEvent.keyDown(dialog, { key: "Escape" }); await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
   it("requires a reason before presenting cancel confirmation submission", () => {

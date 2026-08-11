@@ -73,7 +73,9 @@ export function TimekeepingEntryDialog({
     fieldErrors.gpsLongitude?.[0],
     fieldErrors.gpsAccuracyMeters?.[0],
   ].filter((error): error is string => Boolean(error));
-  const isBusy = isPending || isLocating;
+  const isMutationInteractionLocked =
+    isPending && actionState.status !== "error";
+  const isInteractionLocked = isLocating || isMutationInteractionLocked;
 
   const openDialog = (): void => {
     setValues(createInitialValues());
@@ -83,7 +85,7 @@ export function TimekeepingEntryDialog({
   };
 
   const closeDialog = (): void => {
-    if (isBusy) {
+    if (isInteractionLocked) {
       return;
     }
 
@@ -143,9 +145,11 @@ export function TimekeepingEntryDialog({
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
 
-    if (isBusy) {
+    if (isInteractionLocked) {
       return;
     }
+
+    setActionState(initialTimekeepingEntryActionState);
 
     startTransition(async () => {
       const result = isCheckIn
@@ -206,7 +210,7 @@ export function TimekeepingEntryDialog({
                 aria-describedby={fieldErrors.mode?.[0] ? `${modeId}-error` : undefined}
                 aria-invalid={Boolean(fieldErrors.mode?.[0])}
                 className={inputClassName}
-                disabled={isBusy}
+                disabled={isInteractionLocked}
                 id={modeId}
                 onChange={(event) => updateValue("mode", event.target.value as TimeEntryActionInput["mode"])}
                 ref={modeRef}
@@ -227,7 +231,7 @@ export function TimekeepingEntryDialog({
               </p>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Button
-                  disabled={isBusy}
+                  disabled={isInteractionLocked}
                   onClick={captureLocation}
                   size="lg"
                   type="button"
@@ -236,7 +240,7 @@ export function TimekeepingEntryDialog({
                   {isLocating ? "Đang lấy vị trí…" : "Lấy vị trí hiện tại"}
                 </Button>
                 {hasLocation ? (
-                  <Button disabled={isBusy} onClick={clearLocation} size="lg" type="button" variant="ghost">
+                  <Button disabled={isInteractionLocked} onClick={clearLocation} size="lg" type="button" variant="ghost">
                     Bỏ dữ liệu vị trí
                   </Button>
                 ) : null}
@@ -262,7 +266,7 @@ export function TimekeepingEntryDialog({
                   aria-invalid={Boolean(fieldErrors.wifiSsid?.[0])}
                   autoComplete="off"
                   className={inputClassName}
-                  disabled={isBusy}
+                  disabled={isInteractionLocked}
                   id={wifiSsidId}
                   maxLength={128}
                   onChange={(event) => updateValue("wifiSsid", event.target.value)}
@@ -277,7 +281,7 @@ export function TimekeepingEntryDialog({
                   autoCapitalize="characters"
                   autoComplete="off"
                   className={inputClassName}
-                  disabled={isBusy}
+                  disabled={isInteractionLocked}
                   id={wifiBssidId}
                   maxLength={17}
                   onChange={(event) => updateValue("wifiBssid", event.target.value)}
@@ -296,11 +300,11 @@ export function TimekeepingEntryDialog({
             ) : null}
 
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button className="min-h-11" disabled={isBusy} onClick={closeDialog} type="button" variant="ghost">
+              <Button className="min-h-11" disabled={isInteractionLocked} onClick={closeDialog} type="button" variant="ghost">
                 Hủy
               </Button>
-              <Button className="min-h-11" disabled={isBusy} isLoading={isPending} type="submit">
-                {isBusy ? pendingLabel : title}
+              <Button className="min-h-11" disabled={isInteractionLocked} isLoading={isMutationInteractionLocked} type="submit">
+                {isInteractionLocked ? pendingLabel : title}
               </Button>
             </div>
           </form>

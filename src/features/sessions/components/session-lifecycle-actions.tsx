@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { ResultBanner } from "@/components/shared/result-banner";
 import {
   Card,
   CardContent,
@@ -61,6 +62,8 @@ export function SessionLifecycleActions({
   const [isPending, startTransition] =
     useTransition();
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const isInteractionLocked =
+    isPending && actionState?.status !== "error";
 
   const openIntent = (
     nextIntent: LifecycleIntent,
@@ -76,7 +79,7 @@ export function SessionLifecycleActions({
   };
 
   const closeIntent = () => {
-    if (isPending) {
+    if (isInteractionLocked) {
       return;
     }
 
@@ -91,6 +94,10 @@ export function SessionLifecycleActions({
       | "complete"
       | "cancel",
   ) => {
+    if (isInteractionLocked) {
+      return;
+    }
+
     setActionState(null);
 
     startTransition(async () => {
@@ -202,7 +209,7 @@ export function SessionLifecycleActions({
         <div aria-hidden={intent !== null} className="flex flex-wrap gap-2" hidden={intent !== null}>
             {status === "scheduled" ? (
               <Button
-                disabled={isPending}
+                disabled={isInteractionLocked}
                 onClick={(event) => openIntent("start", event.currentTarget)}
                 type="button"
               >
@@ -212,7 +219,7 @@ export function SessionLifecycleActions({
 
             {status === "in_progress" ? (
               <Button
-                disabled={isPending}
+                disabled={isInteractionLocked}
                 onClick={(event) => openIntent("complete", event.currentTarget)}
                 type="button"
               >
@@ -222,7 +229,7 @@ export function SessionLifecycleActions({
 
             <button
               className="inline-flex min-h-10 items-center justify-center rounded-md border border-danger-border bg-danger-bg px-4 text-control font-semibold text-danger transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isPending}
+              disabled={isInteractionLocked}
               onClick={(event) => openIntent("cancel", event.currentTarget)}
               type="button"
             >
@@ -231,9 +238,10 @@ export function SessionLifecycleActions({
           </div>
 
         <Dialog ariaDescribedBy="session-lifecycle-dialog-description" ariaLabelledBy="session-lifecycle-dialog-title" isOpen={intent !== null} onClose={closeIntent} returnFocusRef={triggerRef}>
+          <>
           {intent === "start" ? <ConfirmationPanel
             description="Sau khi bắt đầu, trợ giảng có thể nhập điểm danh và kết quả cho học viên."
-            isPending={isPending}
+            isInteractionLocked={isInteractionLocked}
             onCancel={closeIntent}
             onConfirm={() =>
               runLifecycleAction("start")
@@ -243,7 +251,7 @@ export function SessionLifecycleActions({
 
           {intent === "complete" ? <ConfirmationPanel
             description="Sau khi hoàn thành, buổi học không thể quay lại trạng thái đang diễn ra. Điểm danh và kết quả vẫn có thể được bổ sung trước khi khóa."
-            isPending={isPending}
+            isInteractionLocked={isInteractionLocked}
             onCancel={closeIntent}
             onConfirm={() =>
               runLifecycleAction("complete")
@@ -276,7 +284,7 @@ export function SessionLifecycleActions({
 
               <textarea
                 className="min-h-28 rounded-md border border-border-subtle bg-field-bg px-3 py-2 text-body font-normal text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:bg-disabled-bg"
-                disabled={isPending}
+                disabled={isInteractionLocked}
                 maxLength={500}
                 onChange={(event) => {
                   setCancelReason(
@@ -296,7 +304,7 @@ export function SessionLifecycleActions({
 
             <div className="flex flex-wrap justify-end gap-2">
               <Button
-                disabled={isPending}
+                disabled={isInteractionLocked}
                 onClick={closeIntent}
                 type="button"
                 variant="ghost"
@@ -307,7 +315,7 @@ export function SessionLifecycleActions({
               <button
               className="inline-flex min-h-10 items-center justify-center rounded-md border border-danger bg-danger px-4 text-control font-semibold text-text-on-danger transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={
-                  isPending ||
+                  isInteractionLocked ||
                   cancelReason.trim().length < 3
                 }
                 onClick={() =>
@@ -315,16 +323,24 @@ export function SessionLifecycleActions({
                 }
                 type="button"
               >
-                {isPending
+                {isInteractionLocked
                   ? "Đang hủy..."
                   : "Xác nhận hủy"}
               </button>
             </div>
           </div>
           ) : null}
+          {actionState?.status === "error" ? (
+            <ResultBanner
+              description={actionState.message}
+              title="Không thể cập nhật trạng thái buổi học"
+              tone="error"
+            />
+          ) : null}
+          </>
         </Dialog>
 
-        {actionState ? (
+        {actionState?.status === "success" ? (
           <ActionMessage
             state={actionState}
           />
@@ -336,13 +352,13 @@ export function SessionLifecycleActions({
 
 function ConfirmationPanel({
   description,
-  isPending,
+  isInteractionLocked,
   onCancel,
   onConfirm,
   title,
 }: {
   description: string;
-  isPending: boolean;
+  isInteractionLocked: boolean;
   onCancel: () => void;
   onConfirm: () => void;
   title: string;
@@ -361,7 +377,7 @@ function ConfirmationPanel({
 
       <div className="flex flex-wrap justify-end gap-2">
         <Button
-          disabled={isPending}
+          disabled={isInteractionLocked}
           onClick={onCancel}
           type="button"
           variant="ghost"
@@ -370,11 +386,11 @@ function ConfirmationPanel({
         </Button>
 
         <Button
-          disabled={isPending}
+          disabled={isInteractionLocked}
           onClick={onConfirm}
           type="button"
         >
-          {isPending
+          {isInteractionLocked
             ? "Đang xử lý..."
             : "Xác nhận"}
         </Button>

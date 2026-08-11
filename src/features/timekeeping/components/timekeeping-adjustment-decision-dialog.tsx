@@ -49,6 +49,8 @@ export function TimekeepingAdjustmentDecisionDialog({
     useState<TimekeepingAdjustmentActionState>(
       initialTimekeepingAdjustmentActionState,
     );
+  const isInteractionLocked =
+    isPending && actionState.status !== "error";
 
   // Stable IDs scoped to request.id — safe when multiple dialogs are mounted.
   const titleId = `adj-decision-title-${request.id}`;
@@ -64,13 +66,19 @@ export function TimekeepingAdjustmentDecisionDialog({
   };
 
   const closeDialog = (): void => {
-    if (!isPending) {
+    if (!isInteractionLocked) {
       setIsOpen(false);
     }
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
+
+    if (isInteractionLocked) {
+      return;
+    }
+
+    setActionState(initialTimekeepingAdjustmentActionState);
 
     startTransition(async () => {
       const result = await decideTimeEntryAdjustmentAction(values);
@@ -181,7 +189,7 @@ export function TimekeepingAdjustmentDecisionDialog({
                   actionState.fieldErrors?.decision?.[0] ? true : undefined
                 }
                 className={formInputClassName}
-                disabled={isPending}
+                disabled={isInteractionLocked}
                 id={decisionId}
                 onChange={(event) =>
                   setValues((current) => ({
@@ -209,7 +217,7 @@ export function TimekeepingAdjustmentDecisionDialog({
                 aria-invalid={reasonError ? true : undefined}
                 aria-required={isRejection ? "true" : undefined}
                 className={`${formInputClassName} min-h-28 py-3`}
-                disabled={isPending}
+                disabled={isInteractionLocked}
                 id={reasonId}
                 maxLength={2000}
                 onChange={(event) =>
@@ -233,7 +241,7 @@ export function TimekeepingAdjustmentDecisionDialog({
 
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button
-              disabled={isPending}
+              disabled={isInteractionLocked}
               onClick={closeDialog}
               size="lg"
               type="button"
@@ -242,12 +250,12 @@ export function TimekeepingAdjustmentDecisionDialog({
               Hủy
             </Button>
             <Button
-              isLoading={isPending}
+              isLoading={isInteractionLocked}
               size="lg"
               type="submit"
               variant={isRejection ? "danger" : "primary"}
             >
-              {isPending
+              {isInteractionLocked
                 ? "Đang xử lý..."
                 : isRejection
                   ? "Từ chối yêu cầu"
