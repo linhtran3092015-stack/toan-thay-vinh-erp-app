@@ -23,17 +23,20 @@ vi.mock("@/features/timekeeping/timekeeping-page", () => ({
   TimekeepingPage: ({
     canApproveAdjustments,
     canCheck,
+    canManage,
     dayEntries,
     myEntries,
   }: {
     canApproveAdjustments: boolean;
     canCheck: boolean;
+    canManage: boolean;
     dayEntries: readonly { id: string }[];
     myEntries: readonly { id: string }[];
   }) => (
     <div>
       <p>canCheck:{String(canCheck)}</p>
       <p>canApproveAdjustments:{String(canApproveAdjustments)}</p>
+      <p>canManage:{String(canManage)}</p>
       <p>dayEntries:{dayEntries.length}</p>
       <p>myEntries:{myEntries.length}</p>
     </div>
@@ -44,6 +47,7 @@ function setSharedReadResults() {
   dependencies.getTimekeepingSchedule.mockResolvedValue({ entries: [], ok: true });
   dependencies.getTimekeepingWorkShifts.mockResolvedValue({ ok: true, workShifts: [] });
   dependencies.getTimekeepingDayEntries.mockResolvedValue({ entries: [{ id: "day-entry" }], ok: true });
+  dependencies.getTimekeepingStaffOptions.mockResolvedValue({ ok: true, staffOptions: [] });
 }
 
 afterEach(() => {
@@ -62,6 +66,7 @@ describe("Timekeeping route authority", () => {
     render(await TimekeepingRoute());
 
     expect(screen.getByText("canCheck:false")).toBeInTheDocument();
+    expect(screen.getByText("canManage:false")).toBeInTheDocument();
     expect(screen.getByText("canApproveAdjustments:false")).toBeInTheDocument();
     expect(screen.getByText("dayEntries:1")).toBeInTheDocument();
     expect(screen.getByText("myEntries:0")).toBeInTheDocument();
@@ -71,6 +76,9 @@ describe("Timekeeping route authority", () => {
     expect(dependencies.getMyTimekeepingAdjustableEntries).not.toHaveBeenCalled();
     expect(dependencies.getMyTimeEntryAdjustmentRequests).not.toHaveBeenCalled();
     expect(dependencies.getTimeEntryAdjustmentApprovalQueue).not.toHaveBeenCalled();
+    expect(dependencies.getTimekeepingSchedule).toHaveBeenCalledOnce();
+    expect(dependencies.getTimekeepingWorkShifts).toHaveBeenCalledOnce();
+    expect(dependencies.getTimekeepingStaffOptions).not.toHaveBeenCalled();
   });
 
   it("retains timekeeping.check as the composition that loads personal entries and adjustment readers without loading approval queue", async () => {
@@ -111,5 +119,20 @@ describe("Timekeeping route authority", () => {
     expect(dependencies.getTimeEntryAdjustmentApprovalQueue).toHaveBeenCalledOnce();
     expect(dependencies.getMyTimekeepingAdjustableEntries).not.toHaveBeenCalled();
     expect(dependencies.getMyTimeEntryAdjustmentRequests).not.toHaveBeenCalled();
+  });
+
+  it("loads management options only when staff.manage is present", async () => {
+    setSharedReadResults();
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["timekeeping.view", "staff.manage"],
+    });
+
+    render(await TimekeepingRoute());
+
+    expect(screen.getByText("canManage:true")).toBeInTheDocument();
+    expect(dependencies.getTimekeepingSchedule).toHaveBeenCalledOnce();
+    expect(dependencies.getTimekeepingWorkShifts).toHaveBeenCalledOnce();
+    expect(dependencies.getTimekeepingStaffOptions).toHaveBeenCalledOnce();
   });
 });

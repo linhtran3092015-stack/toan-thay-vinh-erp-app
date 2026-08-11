@@ -1,202 +1,30 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
-import { useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition, type FormEvent } from "react";
 
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
-import type {
-  ReplaceStaffShiftAssignmentActionInput,
-  TimekeepingManagementActionState,
-} from "@/features/timekeeping/timekeeping-action-types";
+import { Dialog } from "@/components/ui/dialog";
+import type { ReplaceStaffShiftAssignmentActionInput, TimekeepingManagementActionState } from "@/features/timekeeping/timekeeping-action-types";
 import { initialTimekeepingManagementActionState } from "@/features/timekeeping/timekeeping-action-types";
 import { replaceStaffShiftAssignmentAction } from "@/features/timekeeping/timekeeping-actions";
-import {
-  formInputClassName,
-  getVietnamBusinessDate,
-} from "@/features/timekeeping/timekeeping-client-utils";
-import type {
-  TimekeepingScheduleEntry,
-  TimekeepingWorkShift,
-} from "@/features/timekeeping/types";
+import { getVietnamBusinessDate } from "@/features/timekeeping/timekeeping-client-utils";
+import type { TimekeepingScheduleEntry, TimekeepingWorkShift } from "@/features/timekeeping/types";
 
-interface StaffShiftReplaceActionProps {
-  entry: TimekeepingScheduleEntry;
-  workShifts: readonly TimekeepingWorkShift[];
-}
+const inputClassName = "min-h-11 w-full rounded-md border border-border-subtle bg-surface-base px-3 text-control text-text-default outline-none transition focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
+function initialValues(entry: TimekeepingScheduleEntry, shifts: readonly TimekeepingWorkShift[]): ReplaceStaffShiftAssignmentActionInput { return { effectiveFrom: getVietnamBusinessDate(), reason: "", staffShiftAssignmentId: entry.assignmentId, workShiftId: shifts.find((shift) => shift.id !== entry.workShiftId)?.id ?? entry.workShiftId }; }
 
-function createInitialValues(
-  entry: TimekeepingScheduleEntry,
-  workShifts: readonly TimekeepingWorkShift[],
-): ReplaceStaffShiftAssignmentActionInput {
-  return {
-    effectiveFrom: getVietnamBusinessDate(),
-    reason: "",
-    staffShiftAssignmentId: entry.assignmentId,
-    workShiftId: workShifts.find((shift) => shift.id !== entry.workShiftId)?.id ?? "",
-  };
-}
-
-export function StaffShiftReplaceAction({ entry, workShifts }: StaffShiftReplaceActionProps) {
-  const router = useRouter();
-  const businessDate = getVietnamBusinessDate();
-  const canReplaceToday = entry.effectiveFrom < businessDate;
-  const replacementWorkShifts = workShifts.filter((shift) => shift.id !== entry.workShiftId);
-  const [isOpen, setIsOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const [values, setValues] = useState<ReplaceStaffShiftAssignmentActionInput>(() =>
-    createInitialValues(entry, replacementWorkShifts),
-  );
-  const [actionState, setActionState] = useState<TimekeepingManagementActionState>(
-    initialTimekeepingManagementActionState,
-  );
-
-  const canReplace = canReplaceToday && replacementWorkShifts.length > 0;
-
-  const openDialog = (): void => {
-    if (!canReplace) {
-      return;
-    }
-
-    setValues(createInitialValues(entry, replacementWorkShifts));
-    setActionState(initialTimekeepingManagementActionState);
-    setIsOpen(true);
-  };
-
-  const closeDialog = (): void => {
-    if (!isPending) {
-      setIsOpen(false);
-    }
-  };
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-
-    startTransition(async () => {
-      const result = await replaceStaffShiftAssignmentAction(values);
-      setActionState(result);
-
-      if (result.status === "success") {
-        setIsOpen(false);
-        router.refresh();
-      }
-    });
-  };
-
-  return (
-    <>
-      <Button className="w-full" disabled={!canReplace} onClick={openDialog} size="lg" type="button" variant="outline">
-        Thay ca
-      </Button>
-      {!canReplaceToday ? (
-        <p className="mt-2 text-xs text-amber-700">Lịch bắt đầu hôm nay nên chưa thể thay ca.</p>
-      ) : replacementWorkShifts.length === 0 ? (
-        <p className="mt-2 text-xs text-amber-700">Cần tạo thêm một ca khác trước khi thay lịch.</p>
-      ) : null}
-
-      {isOpen ? (
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-4"
-          role="dialog"
-        >
-          <form
-            className="my-auto grid w-full max-w-xl gap-5 rounded-lg border border-hairline bg-white p-5 shadow-xl"
-            onSubmit={handleSubmit}
-          >
-            <div>
-              <h2 className="text-lg font-semibold text-ink">Thay ca trong lịch phân công</h2>
-              <p className="mt-1 text-sm leading-6 text-ink-muted">
-                Lịch cũ sẽ kết thúc vào hôm qua và được giữ nguyên trong lịch sử.
-              </p>
-            </div>
-
-            <label className="grid gap-2 text-sm font-semibold text-ink">
-              <span>Ca thay thế</span>
-              <select
-                className={formInputClassName}
-                disabled={isPending}
-                onChange={(event) =>
-                  setValues((current) => ({ ...current, workShiftId: event.target.value }))
-                }
-                required
-                value={values.workShiftId}
-              >
-                {replacementWorkShifts.map((shift) => (
-                  <option key={shift.id} value={shift.id}>
-                    {shift.code} - {shift.name} ({shift.startTime.slice(0, 5)}-{shift.endTime.slice(0, 5)})
-                  </option>
-                ))}
-              </select>
-              {actionState.fieldErrors?.workShiftId?.[0] ? (
-                <span className="text-xs font-medium text-red-600">
-                  {actionState.fieldErrors.workShiftId[0]}
-                </span>
-              ) : null}
-            </label>
-
-            <label className="grid gap-2 text-sm font-semibold text-ink">
-              <span>Ngày bắt đầu hiệu lực</span>
-              <input className={formInputClassName} disabled type="date" value={values.effectiveFrom} />
-            </label>
-
-            <label className="grid gap-2 text-sm font-semibold text-ink">
-              <span>Lý do thay ca</span>
-              <textarea
-                autoFocus
-                className={`${formInputClassName} min-h-28 resize-y py-3`}
-                disabled={isPending}
-                maxLength={2000}
-                onChange={(event) =>
-                  setValues((current) => ({ ...current, reason: event.target.value }))
-                }
-                placeholder="Nhập lý do thay ca"
-                required
-                value={values.reason}
-              />
-              {actionState.fieldErrors?.reason?.[0] ? (
-                <span className="text-xs font-medium text-red-600">
-                  {actionState.fieldErrors.reason[0]}
-                </span>
-              ) : null}
-            </label>
-
-            <ActionMessage actionState={actionState} />
-
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button disabled={isPending} onClick={closeDialog} size="lg" type="button" variant="ghost">
-                Hủy
-              </Button>
-              <Button disabled={isPending} size="lg" type="submit">
-                {isPending ? "Đang thay ca..." : "Xác nhận thay ca"}
-              </Button>
-            </div>
-          </form>
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-function ActionMessage({
-  actionState,
-}: {
-  actionState: TimekeepingManagementActionState;
-}) {
-  if (!actionState.message) {
-    return null;
-  }
-
-  return (
-    <div
-      aria-live="polite"
-      className={
-        actionState.status === "error"
-          ? "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-          : "rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
-      }
-    >
-      {actionState.message}
-    </div>
-  );
+/** Replaces an active assignment only through the existing server workflow. */
+export function StaffShiftReplaceAction({ entry, workShifts }: { entry: TimekeepingScheduleEntry; workShifts: readonly TimekeepingWorkShift[] }) {
+  const router = useRouter(); const triggerRef = useRef<HTMLButtonElement>(null); const shiftRef = useRef<HTMLSelectElement>(null);
+  const titleId = useId(); const descriptionId = useId(); const shiftId = useId(); const effectiveFromId = useId(); const reasonId = useId();
+  const [isOpen, setIsOpen] = useState(false); const [values, setValues] = useState<ReplaceStaffShiftAssignmentActionInput>(() => initialValues(entry, workShifts)); const [actionState, setActionState] = useState<TimekeepingManagementActionState>(initialTimekeepingManagementActionState); const [isPending, startTransition] = useTransition();
+  const isInteractionLocked = isPending && actionState.status !== "error"; const errors = actionState.status === "error" ? actionState.fieldErrors ?? {} : {};
+  const open = (): void => { setValues(initialValues(entry, workShifts)); setActionState(initialTimekeepingManagementActionState); setIsOpen(true); };
+  const close = (): void => { if (isInteractionLocked) return; setIsOpen(false); setActionState(initialTimekeepingManagementActionState); };
+  const submit = (): void => { if (isInteractionLocked) return; setActionState(initialTimekeepingManagementActionState); startTransition(async () => { const result = await replaceStaffShiftAssignmentAction(values); setActionState(result); if (result.status === "success") { setIsOpen(false); router.refresh(); } }); };
+  const onSubmit = (event: FormEvent<HTMLFormElement>): void => { event.preventDefault(); submit(); };
+  const shiftErrorId = `${shiftId}-error`; const effectiveFromErrorId = `${effectiveFromId}-error`; const reasonErrorId = `${reasonId}-error`;
+  return <><Button className="min-h-11 w-full" onClick={open} ref={triggerRef} type="button" variant="outline">Thay ca</Button><Dialog ariaDescribedBy={descriptionId} ariaLabelledBy={titleId} className="max-w-xl" initialFocusRef={shiftRef} isOpen={isOpen} onClose={close} returnFocusRef={triggerRef}><div className="p-4 sm:p-5"><h2 className="text-section-title text-text-strong" id={titleId}>Thay ca trong lịch phân công</h2><p className="mt-1 text-secondary text-text-muted" id={descriptionId}>Hệ thống quyết định lịch có thể thay hay không, kết thúc phiên bản cũ và tạo lịch kế tiếp.</p><form className="mt-5 grid gap-4" onSubmit={onSubmit}><div className="grid gap-1.5"><label className="text-label text-text-default" htmlFor={shiftId}>Ca thay thế</label><select aria-describedby={errors.workShiftId?.[0] ? shiftErrorId : undefined} aria-invalid={Boolean(errors.workShiftId?.[0])} className={inputClassName} disabled={isInteractionLocked} id={shiftId} onChange={(event) => setValues((current) => ({ ...current, workShiftId: event.target.value }))} ref={shiftRef} required value={values.workShiftId}>{workShifts.map((shift) => <option key={shift.id} value={shift.id}>{shift.code} · {shift.name}{shift.id === entry.workShiftId ? " (ca hiện tại)" : ""}{shift.isActive ? "" : " — Đã ngừng dùng"}</option>)}</select>{errors.workShiftId?.[0] ? <p className="text-caption font-medium text-danger" id={shiftErrorId}>{errors.workShiftId[0]}</p> : null}</div><div className="grid gap-1.5"><label className="text-label text-text-default" htmlFor={effectiveFromId}>Ngày bắt đầu hiệu lực</label><input aria-describedby={errors.effectiveFrom?.[0] ? effectiveFromErrorId : undefined} aria-invalid={Boolean(errors.effectiveFrom?.[0])} className={inputClassName} disabled id={effectiveFromId} type="date" value={values.effectiveFrom} />{errors.effectiveFrom?.[0] ? <p className="text-caption font-medium text-danger" id={effectiveFromErrorId}>{errors.effectiveFrom[0]}</p> : null}</div><div className="grid gap-1.5"><label className="text-label text-text-default" htmlFor={reasonId}>Lý do thay ca</label><textarea aria-describedby={errors.reason?.[0] ? reasonErrorId : undefined} aria-invalid={Boolean(errors.reason?.[0])} className={`${inputClassName} min-h-24 resize-y py-3`} disabled={isInteractionLocked} id={reasonId} maxLength={2000} onChange={(event) => setValues((current) => ({ ...current, reason: event.target.value }))} required value={values.reason} />{errors.reason?.[0] ? <p className="text-caption font-medium text-danger" id={reasonErrorId}>{errors.reason[0]}</p> : null}</div>{actionState.status === "error" ? <ResultBanner description={actionState.message} title="Không thể thay ca" tone="error" /> : null}<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button className="min-h-11" disabled={isInteractionLocked} onClick={close} type="button" variant="ghost">Hủy</Button><Button className="min-h-11" disabled={isInteractionLocked} isLoading={isInteractionLocked} type="submit">{isInteractionLocked ? "Đang thay ca…" : "Xác nhận thay ca"}</Button></div></form></div></Dialog></>;
 }

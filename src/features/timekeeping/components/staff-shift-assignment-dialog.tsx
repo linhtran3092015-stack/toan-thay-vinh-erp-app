@@ -1,240 +1,35 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
-import { useState, useTransition } from "react";
+import { cloneElement, isValidElement, useId, useRef, useState, useTransition, type FormEvent, type ReactElement, type ReactNode } from "react";
 
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
-import type {
-  CreateStaffShiftAssignmentActionInput,
-  TimekeepingManagementActionState,
-} from "@/features/timekeeping/timekeeping-action-types";
+import { Dialog } from "@/components/ui/dialog";
+import type { CreateStaffShiftAssignmentActionInput, TimekeepingManagementActionState } from "@/features/timekeeping/timekeeping-action-types";
 import { initialTimekeepingManagementActionState } from "@/features/timekeeping/timekeeping-action-types";
 import { createStaffShiftAssignmentAction } from "@/features/timekeeping/timekeeping-actions";
-import {
-  formInputClassName,
-  getVietnamBusinessDate,
-  WEEKDAY_OPTIONS,
-} from "@/features/timekeeping/timekeeping-client-utils";
-import type {
-  TimekeepingStaffOption,
-  TimekeepingWorkShift,
-} from "@/features/timekeeping/types";
+import { getVietnamBusinessDate, WEEKDAY_OPTIONS } from "@/features/timekeeping/timekeeping-client-utils";
+import type { TimekeepingStaffOption, TimekeepingWorkShift } from "@/features/timekeeping/types";
 
-interface StaffShiftAssignmentDialogProps {
-  staffOptions: readonly TimekeepingStaffOption[];
-  workShifts: readonly TimekeepingWorkShift[];
+const inputClassName = "min-h-11 w-full rounded-md border border-border-subtle bg-surface-base px-3 text-control text-text-default outline-none transition focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
+const staffLabel = (staff: TimekeepingStaffOption): string => staff.displayName?.trim() || staff.employeeCode || "Nhân sự chưa đặt tên";
+const shiftLabel = (shift: TimekeepingWorkShift): string => `${shift.code} · ${shift.name} (${shift.startTime.slice(0, 5)}-${shift.endTime.slice(0, 5)})${shift.isActive ? "" : " — Đã ngừng dùng"}`;
+function initialValues(staff: readonly TimekeepingStaffOption[], shifts: readonly TimekeepingWorkShift[]): CreateStaffShiftAssignmentActionInput { return { effectiveFrom: getVietnamBusinessDate(), reason: "", staffId: staff[0]?.id ?? "", weekday: 1, workShiftId: shifts[0]?.id ?? "" }; }
+
+export function StaffShiftAssignmentDialog({ staffOptions, workShifts }: { staffOptions: readonly TimekeepingStaffOption[]; workShifts: readonly TimekeepingWorkShift[] }) {
+  const router = useRouter(); const triggerRef = useRef<HTMLButtonElement>(null); const staffRef = useRef<HTMLSelectElement>(null);
+  const titleId = useId(); const descriptionId = useId(); const staffId = useId(); const weekdayId = useId(); const shiftId = useId(); const effectiveFromId = useId(); const reasonId = useId();
+  const [isOpen, setIsOpen] = useState(false); const [values, setValues] = useState<CreateStaffShiftAssignmentActionInput>(() => initialValues(staffOptions, workShifts)); const [actionState, setActionState] = useState<TimekeepingManagementActionState>(initialTimekeepingManagementActionState); const [isPending, startTransition] = useTransition();
+  const isInteractionLocked = isPending && actionState.status !== "error"; const fieldErrors = actionState.status === "error" ? actionState.fieldErrors ?? {} : {}; const hasOptions = staffOptions.length > 0 && workShifts.length > 0;
+  const open = (): void => { setValues(initialValues(staffOptions, workShifts)); setActionState(initialTimekeepingManagementActionState); setIsOpen(true); };
+  const close = (): void => { if (isInteractionLocked) return; setIsOpen(false); setActionState(initialTimekeepingManagementActionState); };
+  const setValue = <Key extends keyof CreateStaffShiftAssignmentActionInput>(key: Key, value: CreateStaffShiftAssignmentActionInput[Key]): void => setValues((current) => ({ ...current, [key]: value }));
+  const submit = (): void => { if (isInteractionLocked) return; setActionState(initialTimekeepingManagementActionState); startTransition(async () => { const result = await createStaffShiftAssignmentAction(values); setActionState(result); if (result.status === "success") { setIsOpen(false); router.refresh(); } }); };
+  const onSubmit = (event: FormEvent<HTMLFormElement>): void => { event.preventDefault(); submit(); };
+  return <><Button className="min-h-11" disabled={!hasOptions} onClick={open} ref={triggerRef} type="button" variant="outline">Phân công lịch</Button><Dialog ariaDescribedBy={descriptionId} ariaLabelledBy={titleId} className="max-w-xl" initialFocusRef={staffRef} isOpen={isOpen} onClose={close} returnFocusRef={triggerRef}><div className="p-4 sm:p-5"><h2 className="text-section-title text-text-strong" id={titleId}>Phân công lịch làm việc</h2><p className="mt-1 text-secondary text-text-muted" id={descriptionId}>Hệ thống xác minh nhân sự, ca làm, ngày hiệu lực và lịch trùng trước khi lưu.</p><form className="mt-5 grid gap-4" onSubmit={onSubmit}><SelectField error={fieldErrors.staffId?.[0]} id={staffId} label="Nhân sự"><select className={inputClassName} disabled={isInteractionLocked} id={staffId} onChange={(event) => setValue("staffId", event.target.value)} ref={staffRef} required value={values.staffId}>{staffOptions.map((staff) => <option key={staff.id} value={staff.id}>{staffLabel(staff)}{staff.employeeCode ? ` (${staff.employeeCode})` : ""}</option>)}</select></SelectField><SelectField error={fieldErrors.weekday?.[0]} id={weekdayId} label="Thứ trong tuần"><select className={inputClassName} disabled={isInteractionLocked} id={weekdayId} onChange={(event) => setValue("weekday", Number(event.target.value))} value={values.weekday}>{WEEKDAY_OPTIONS.map((weekday) => <option key={weekday.value} value={weekday.value}>{weekday.label}</option>)}</select></SelectField><SelectField error={fieldErrors.workShiftId?.[0]} id={shiftId} label="Ca làm"><select className={inputClassName} disabled={isInteractionLocked} id={shiftId} onChange={(event) => setValue("workShiftId", event.target.value)} required value={values.workShiftId}>{workShifts.map((shift) => <option key={shift.id} value={shift.id}>{shiftLabel(shift)}</option>)}</select></SelectField><InputField disabled error={fieldErrors.effectiveFrom?.[0]} id={effectiveFromId} label="Ngày bắt đầu hiệu lực" value={values.effectiveFrom} /><TextAreaField disabled={isInteractionLocked} error={fieldErrors.reason?.[0]} id={reasonId} label="Lý do phân công" onChange={(value) => setValue("reason", value)} value={values.reason} />{actionState.status === "error" ? <ResultBanner description={actionState.message} title="Không thể phân công lịch" tone="error" /> : null}<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button className="min-h-11" disabled={isInteractionLocked} onClick={close} type="button" variant="ghost">Hủy</Button><Button className="min-h-11" disabled={isInteractionLocked} isLoading={isInteractionLocked} type="submit">{isInteractionLocked ? "Đang phân công…" : "Xác nhận phân công"}</Button></div></form></div></Dialog></>;
 }
 
-function getStaffLabel(staff: TimekeepingStaffOption): string {
-  return staff.displayName?.trim() || staff.employeeCode || "Nhân sự chưa đặt tên";
-}
-
-function createInitialValues(
-  staffOptions: readonly TimekeepingStaffOption[],
-  workShifts: readonly TimekeepingWorkShift[],
-): CreateStaffShiftAssignmentActionInput {
-  return {
-    effectiveFrom: getVietnamBusinessDate(),
-    reason: "",
-    staffId: staffOptions[0]?.id ?? "",
-    weekday: 1,
-    workShiftId: workShifts[0]?.id ?? "",
-  };
-}
-
-export function StaffShiftAssignmentDialog({
-  staffOptions,
-  workShifts,
-}: StaffShiftAssignmentDialogProps) {
-  const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const [values, setValues] = useState<CreateStaffShiftAssignmentActionInput>(
-    () => createInitialValues(staffOptions, workShifts),
-  );
-  const [actionState, setActionState] = useState<TimekeepingManagementActionState>(
-    initialTimekeepingManagementActionState,
-  );
-
-  const hasOptions = staffOptions.length > 0 && workShifts.length > 0;
-
-  const openDialog = (): void => {
-    setValues(createInitialValues(staffOptions, workShifts));
-    setActionState(initialTimekeepingManagementActionState);
-    setIsOpen(true);
-  };
-
-  const closeDialog = (): void => {
-    if (!isPending) {
-      setIsOpen(false);
-    }
-  };
-
-  const updateValue = <Key extends keyof CreateStaffShiftAssignmentActionInput>(
-    key: Key,
-    value: CreateStaffShiftAssignmentActionInput[Key],
-  ): void => {
-    setValues((current) => ({ ...current, [key]: value }));
-  };
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-
-    startTransition(async () => {
-      const result = await createStaffShiftAssignmentAction(values);
-      setActionState(result);
-
-      if (result.status === "success") {
-        setIsOpen(false);
-        router.refresh();
-      }
-    });
-  };
-
-  return (
-    <>
-      <Button disabled={!hasOptions} onClick={openDialog} size="lg" type="button" variant="outline">
-        Phân công lịch
-      </Button>
-
-      {isOpen ? (
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-4"
-          role="dialog"
-        >
-          <form
-            className="my-auto grid w-full max-w-xl gap-5 rounded-lg border border-hairline bg-white p-5 shadow-xl"
-            onSubmit={handleSubmit}
-          >
-            <div>
-              <h2 className="text-lg font-semibold text-ink">Phân công lịch làm việc</h2>
-              <p className="mt-1 text-sm leading-6 text-ink-muted">
-                Mỗi nhân sự chỉ có một lịch đang hiệu lực cho mỗi thứ trong tuần.
-              </p>
-            </div>
-
-            <div className="grid gap-4">
-              <FormField error={actionState.fieldErrors?.staffId?.[0]} label="Nhân sự">
-                <select
-                  className={formInputClassName}
-                  disabled={isPending}
-                  onChange={(event) => updateValue("staffId", event.target.value)}
-                  required
-                  value={values.staffId}
-                >
-                  {staffOptions.map((staff) => (
-                    <option key={staff.id} value={staff.id}>
-                      {getStaffLabel(staff)}{staff.employeeCode ? ` (${staff.employeeCode})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <FormField error={actionState.fieldErrors?.weekday?.[0]} label="Thứ trong tuần">
-                <select
-                  className={formInputClassName}
-                  disabled={isPending}
-                  onChange={(event) => updateValue("weekday", Number(event.target.value))}
-                  value={values.weekday}
-                >
-                  {WEEKDAY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <FormField error={actionState.fieldErrors?.workShiftId?.[0]} label="Ca làm">
-                <select
-                  className={formInputClassName}
-                  disabled={isPending}
-                  onChange={(event) => updateValue("workShiftId", event.target.value)}
-                  required
-                  value={values.workShiftId}
-                >
-                  {workShifts.map((shift) => (
-                    <option key={shift.id} value={shift.id}>
-                      {shift.code} - {shift.name} ({shift.startTime.slice(0, 5)}-{shift.endTime.slice(0, 5)})
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <FormField error={actionState.fieldErrors?.effectiveFrom?.[0]} label="Ngày bắt đầu hiệu lực">
-                <input className={formInputClassName} disabled type="date" value={values.effectiveFrom} />
-              </FormField>
-
-              <FormField error={actionState.fieldErrors?.reason?.[0]} label="Lý do phân công">
-                <textarea
-                  autoFocus
-                  className={`${formInputClassName} min-h-28 resize-y py-3`}
-                  disabled={isPending}
-                  maxLength={2000}
-                  onChange={(event) => updateValue("reason", event.target.value)}
-                  placeholder="Nhập lý do phân công lịch"
-                  required
-                  value={values.reason}
-                />
-              </FormField>
-            </div>
-
-            <ActionMessage actionState={actionState} />
-
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button disabled={isPending} onClick={closeDialog} size="lg" type="button" variant="ghost">
-                Hủy
-              </Button>
-              <Button disabled={isPending} size="lg" type="submit">
-                {isPending ? "Đang phân công..." : "Xác nhận phân công"}
-              </Button>
-            </div>
-          </form>
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-function FormField({
-  children,
-  error,
-  label,
-}: {
-  children: React.ReactNode;
-  error?: string;
-  label: string;
-}) {
-  return (
-    <label className="grid gap-2 text-sm font-semibold text-ink">
-      <span>{label}</span>
-      {children}
-      {error ? <span className="text-xs font-medium text-red-600">{error}</span> : null}
-    </label>
-  );
-}
-
-function ActionMessage({
-  actionState,
-}: {
-  actionState: TimekeepingManagementActionState;
-}) {
-  if (!actionState.message) {
-    return null;
-  }
-
-  return (
-    <div
-      aria-live="polite"
-      className={
-        actionState.status === "error"
-          ? "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-          : "rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
-      }
-    >
-      {actionState.message}
-    </div>
-  );
-}
+function SelectField({ children, error, id, label }: { children: ReactNode; error?: string; id: string; label: string }) { const errorId = `${id}-error`; const control = isValidElement(children) ? cloneElement(children as ReactElement<{ "aria-describedby"?: string; "aria-invalid"?: boolean }>, { "aria-describedby": error ? errorId : undefined, "aria-invalid": Boolean(error) }) : children; return <div className="grid gap-1.5"><label className="text-label text-text-default" htmlFor={id}>{label}</label>{control}{error ? <p className="text-caption font-medium text-danger" id={errorId}>{error}</p> : null}</div>; }
+function InputField({ disabled, error, id, label, value }: { disabled: boolean; error?: string; id: string; label: string; value: string }) { const errorId = `${id}-error`; return <div className="grid gap-1.5"><label className="text-label text-text-default" htmlFor={id}>{label}</label><input aria-describedby={error ? errorId : undefined} aria-invalid={Boolean(error)} className={inputClassName} disabled={disabled} id={id} type="date" value={value} />{error ? <p className="text-caption font-medium text-danger" id={errorId}>{error}</p> : null}</div>; }
+function TextAreaField({ disabled, error, id, label, onChange, value }: { disabled: boolean; error?: string; id: string; label: string; onChange: (value: string) => void; value: string }) { const errorId = `${id}-error`; return <div className="grid gap-1.5"><label className="text-label text-text-default" htmlFor={id}>{label}</label><textarea aria-describedby={error ? errorId : undefined} aria-invalid={Boolean(error)} className={`${inputClassName} min-h-24 resize-y py-3`} disabled={disabled} id={id} maxLength={2000} onChange={(event) => onChange(event.target.value)} required value={value} />{error ? <p className="text-caption font-medium text-danger" id={errorId}>{error}</p> : null}</div>; }

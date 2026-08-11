@@ -578,6 +578,43 @@
   }
 }
 
+/* Timekeeping 3: active schedules and the shift catalogue have separate
+   readable operational widths. DataTableFrame owns two border pixels. */
+.timekeeping-assignment-work-area,
+.timekeeping-shift-catalogue-work-area {
+  container-type: inline-size;
+}
+
+.timekeeping-assignment-table,
+.timekeeping-shift-catalogue-table {
+  display: none;
+}
+
+.timekeeping-assignment-record-list,
+.timekeeping-shift-catalogue-record-list {
+  display: grid;
+}
+
+@container (min-width: 1042px) {
+  .timekeeping-assignment-table {
+    display: block;
+  }
+
+  .timekeeping-assignment-record-list {
+    display: none;
+  }
+}
+
+@container (min-width: 962px) {
+  .timekeeping-shift-catalogue-table {
+    display: block;
+  }
+
+  .timekeeping-shift-catalogue-record-list {
+    display: none;
+  }
+}
+
 .staff-directory-table,
 .staff-rate-history-table {
   display: none;

@@ -1,181 +1,30 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
-import { useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition, type FormEvent } from "react";
 
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
-import type {
-  EndStaffShiftAssignmentActionInput,
-  TimekeepingManagementActionState,
-} from "@/features/timekeeping/timekeeping-action-types";
+import { Dialog } from "@/components/ui/dialog";
+import type { EndStaffShiftAssignmentActionInput, TimekeepingManagementActionState } from "@/features/timekeeping/timekeeping-action-types";
 import { initialTimekeepingManagementActionState } from "@/features/timekeeping/timekeeping-action-types";
 import { endStaffShiftAssignmentAction } from "@/features/timekeeping/timekeeping-actions";
-import {
-  formInputClassName,
-  getVietnamBusinessDate,
-} from "@/features/timekeeping/timekeeping-client-utils";
+import { getVietnamBusinessDate } from "@/features/timekeeping/timekeeping-client-utils";
 import type { TimekeepingScheduleEntry } from "@/features/timekeeping/types";
 
-interface StaffShiftEndActionProps {
-  entry: TimekeepingScheduleEntry;
-}
+const inputClassName = "min-h-11 w-full rounded-md border border-border-subtle bg-surface-base px-3 text-control text-text-default outline-none transition focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
+function initialValues(entry: TimekeepingScheduleEntry): EndStaffShiftAssignmentActionInput { return { effectiveTo: getVietnamBusinessDate(), reason: "", staffShiftAssignmentId: entry.assignmentId }; }
 
-function createInitialValues(entry: TimekeepingScheduleEntry): EndStaffShiftAssignmentActionInput {
-  return {
-    effectiveTo: getVietnamBusinessDate(),
-    reason: "",
-    staffShiftAssignmentId: entry.assignmentId,
-  };
-}
-
-export function StaffShiftEndAction({ entry }: StaffShiftEndActionProps) {
-  const router = useRouter();
-  const businessDate = getVietnamBusinessDate();
-  const canEndToday = entry.effectiveFrom <= businessDate;
-  const [isOpen, setIsOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const [values, setValues] = useState<EndStaffShiftAssignmentActionInput>(() =>
-    createInitialValues(entry),
-  );
-  const [actionState, setActionState] = useState<TimekeepingManagementActionState>(
-    initialTimekeepingManagementActionState,
-  );
-
-  const openDialog = (): void => {
-    if (!canEndToday) {
-      return;
-    }
-
-    setValues(createInitialValues(entry));
-    setActionState(initialTimekeepingManagementActionState);
-    setIsOpen(true);
-  };
-
-  const closeDialog = (): void => {
-    if (!isPending) {
-      setIsOpen(false);
-    }
-  };
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-
-    startTransition(async () => {
-      const result = await endStaffShiftAssignmentAction(values);
-      setActionState(result);
-
-      if (result.status === "success") {
-        setIsOpen(false);
-        router.refresh();
-      }
-    });
-  };
-
-  return (
-    <>
-      <Button className="w-full" disabled={!canEndToday} onClick={openDialog} size="lg" type="button" variant="ghost">
-        Kết thúc lịch
-      </Button>
-      {!canEndToday ? (
-        <p className="mt-2 text-xs text-amber-700">Lịch chưa đến ngày bắt đầu nên chưa thể kết thúc.</p>
-      ) : null}
-
-      {isOpen ? (
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-4"
-          role="dialog"
-        >
-          <form
-            className="my-auto grid w-full max-w-lg gap-5 rounded-lg border border-hairline bg-white p-5 shadow-xl"
-            onSubmit={handleSubmit}
-          >
-            <div>
-              <h2 className="text-lg font-semibold text-ink">Kết thúc lịch phân công</h2>
-              <p className="mt-1 text-sm leading-6 text-ink-muted">
-                Lịch sẽ ngừng hiệu lực và được giữ nguyên trong lịch sử. Thao tác này không tạo lịch thay thế.
-              </p>
-            </div>
-
-            <label className="grid gap-2 text-sm font-semibold text-ink">
-              <span>Ngày kết thúc hiệu lực</span>
-              <input
-                className={formInputClassName}
-                disabled={isPending}
-                max={businessDate}
-                min={entry.effectiveFrom}
-                onChange={(event) =>
-                  setValues((current) => ({ ...current, effectiveTo: event.target.value }))
-                }
-                required
-                type="date"
-                value={values.effectiveTo}
-              />
-              {actionState.fieldErrors?.effectiveTo?.[0] ? (
-                <span className="text-xs font-medium text-red-600">
-                  {actionState.fieldErrors.effectiveTo[0]}
-                </span>
-              ) : null}
-            </label>
-
-            <label className="grid gap-2 text-sm font-semibold text-ink">
-              <span>Lý do kết thúc</span>
-              <textarea
-                autoFocus
-                className={`${formInputClassName} min-h-28 resize-y py-3`}
-                disabled={isPending}
-                maxLength={2000}
-                onChange={(event) =>
-                  setValues((current) => ({ ...current, reason: event.target.value }))
-                }
-                placeholder="Nhập lý do kết thúc lịch"
-                required
-                value={values.reason}
-              />
-              {actionState.fieldErrors?.reason?.[0] ? (
-                <span className="text-xs font-medium text-red-600">
-                  {actionState.fieldErrors.reason[0]}
-                </span>
-              ) : null}
-            </label>
-
-            <ActionMessage actionState={actionState} />
-
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button disabled={isPending} onClick={closeDialog} size="lg" type="button" variant="ghost">
-                Hủy
-              </Button>
-              <Button disabled={isPending || values.reason.trim().length === 0} size="lg" type="submit">
-                {isPending ? "Đang kết thúc..." : "Xác nhận kết thúc"}
-              </Button>
-            </div>
-          </form>
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-function ActionMessage({
-  actionState,
-}: {
-  actionState: TimekeepingManagementActionState;
-}) {
-  if (!actionState.message) {
-    return null;
-  }
-
-  return (
-    <div
-      aria-live="polite"
-      className={
-        actionState.status === "error"
-          ? "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-          : "rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
-      }
-    >
-      {actionState.message}
-    </div>
-  );
+/** Ends an assignment without creating a successor; all date validity remains server-owned. */
+export function StaffShiftEndAction({ entry }: { entry: TimekeepingScheduleEntry }) {
+  const router = useRouter(); const triggerRef = useRef<HTMLButtonElement>(null); const effectiveToRef = useRef<HTMLInputElement>(null);
+  const titleId = useId(); const descriptionId = useId(); const effectiveToId = useId(); const reasonId = useId();
+  const [isOpen, setIsOpen] = useState(false); const [values, setValues] = useState<EndStaffShiftAssignmentActionInput>(() => initialValues(entry)); const [actionState, setActionState] = useState<TimekeepingManagementActionState>(initialTimekeepingManagementActionState); const [isPending, startTransition] = useTransition();
+  const isInteractionLocked = isPending && actionState.status !== "error"; const errors = actionState.status === "error" ? actionState.fieldErrors ?? {} : {};
+  const open = (): void => { setValues(initialValues(entry)); setActionState(initialTimekeepingManagementActionState); setIsOpen(true); };
+  const close = (): void => { if (isInteractionLocked) return; setIsOpen(false); setActionState(initialTimekeepingManagementActionState); };
+  const submit = (): void => { if (isInteractionLocked) return; setActionState(initialTimekeepingManagementActionState); startTransition(async () => { const result = await endStaffShiftAssignmentAction(values); setActionState(result); if (result.status === "success") { setIsOpen(false); router.refresh(); } }); };
+  const onSubmit = (event: FormEvent<HTMLFormElement>): void => { event.preventDefault(); submit(); };
+  const effectiveToErrorId = `${effectiveToId}-error`; const reasonErrorId = `${reasonId}-error`;
+  return <><Button className="min-h-11 w-full" onClick={open} ref={triggerRef} type="button" variant="ghost">Kết thúc lịch</Button><Dialog ariaDescribedBy={descriptionId} ariaLabelledBy={titleId} className="max-w-lg" initialFocusRef={effectiveToRef} isOpen={isOpen} onClose={close} returnFocusRef={triggerRef}><div className="p-4 sm:p-5"><h2 className="text-section-title text-text-strong" id={titleId}>Kết thúc lịch phân công</h2><p className="mt-1 text-secondary text-text-muted" id={descriptionId}>Lịch sẽ ngừng hiệu lực và được giữ nguyên trong dữ liệu. Thao tác này không tạo lịch thay thế.</p><form className="mt-5 grid gap-4" onSubmit={onSubmit}><div className="grid gap-1.5"><label className="text-label text-text-default" htmlFor={effectiveToId}>Ngày kết thúc hiệu lực</label><input aria-describedby={errors.effectiveTo?.[0] ? effectiveToErrorId : undefined} aria-invalid={Boolean(errors.effectiveTo?.[0])} className={inputClassName} disabled={isInteractionLocked} id={effectiveToId} onChange={(event) => setValues((current) => ({ ...current, effectiveTo: event.target.value }))} ref={effectiveToRef} required type="date" value={values.effectiveTo} />{errors.effectiveTo?.[0] ? <p className="text-caption font-medium text-danger" id={effectiveToErrorId}>{errors.effectiveTo[0]}</p> : null}</div><div className="grid gap-1.5"><label className="text-label text-text-default" htmlFor={reasonId}>Lý do kết thúc</label><textarea aria-describedby={errors.reason?.[0] ? reasonErrorId : undefined} aria-invalid={Boolean(errors.reason?.[0])} className={`${inputClassName} min-h-24 resize-y py-3`} disabled={isInteractionLocked} id={reasonId} maxLength={2000} onChange={(event) => setValues((current) => ({ ...current, reason: event.target.value }))} required value={values.reason} />{errors.reason?.[0] ? <p className="text-caption font-medium text-danger" id={reasonErrorId}>{errors.reason[0]}</p> : null}</div>{actionState.status === "error" ? <ResultBanner description={actionState.message} title="Không thể kết thúc lịch phân công" tone="error" /> : null}<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button className="min-h-11" disabled={isInteractionLocked} onClick={close} type="button" variant="ghost">Hủy</Button><Button className="min-h-11" disabled={isInteractionLocked} isLoading={isInteractionLocked} type="submit">{isInteractionLocked ? "Đang kết thúc phân công…" : "Xác nhận kết thúc"}</Button></div></form></div></Dialog></>;
 }
