@@ -645,6 +645,29 @@
   container-type: inline-size;
 }
 
+/* Commissions: management view needs six operational columns at 1120px inside DataTableFrame. */
+.commission-directory-work-area {
+  container-type: inline-size;
+}
+
+.commission-directory-table {
+  display: none;
+}
+
+.commission-directory-record-list {
+  display: grid;
+}
+
+@container (min-width: 1122px) {
+  .commission-directory-table {
+    display: block;
+  }
+
+  .commission-directory-record-list {
+    display: none;
+  }
+}
+
 .salary-advance-directory-table {
   display: none;
 }

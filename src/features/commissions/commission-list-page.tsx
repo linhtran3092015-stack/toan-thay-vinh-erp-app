@@ -1,10 +1,32 @@
+import { DataTableFrame } from "@/components/patterns/data-table-frame";
+import { PageHeader } from "@/components/patterns/page-header";
+import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { Badge } from "@/components/ui/badge";
-import type { SalesCommissionAccrualDashboardEntry } from "@/features/commissions/read-models";
+import type {
+  KnownSalesCommissionAccrualStatus,
+  KnownSalesCommissionSourceGroup,
+  SalesCommissionAccrualDashboardEntry,
+} from "@/features/commissions/read-models";
+import type { ReactNode } from "react";
 
 interface CommissionListPageProps {
   canManage: boolean;
   entries: readonly SalesCommissionAccrualDashboardEntry[];
 }
+
+type PresentationMetadata = {
+  label: string;
+  tone: "info" | "neutral" | "warning";
+};
+
+const sourceGroupMetadata: Record<KnownSalesCommissionSourceGroup, PresentationMetadata> = {
+  mma: { label: "MMA", tone: "info" },
+  sandbox: { label: "Sandbox", tone: "warning" },
+};
+
+const statusMetadata: Record<KnownSalesCommissionAccrualStatus, PresentationMetadata> = {
+  provisional: { label: "Chờ chính sách", tone: "warning" },
+};
 
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit",
@@ -16,110 +38,102 @@ const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN");
 
+function getSourceGroupPresentation(value: string): PresentationMetadata {
+  if (Object.hasOwn(sourceGroupMetadata, value)) {
+    return sourceGroupMetadata[value as KnownSalesCommissionSourceGroup];
+  }
+
+  return {
+    label: `Nguồn chưa hỗ trợ: ${value}`,
+    tone: "neutral",
+  };
+}
+
+function getStatusPresentation(value: string): PresentationMetadata {
+  if (Object.hasOwn(statusMetadata, value)) {
+    return statusMetadata[value as KnownSalesCommissionAccrualStatus];
+  }
+
+  return {
+    label: `Trạng thái chưa hỗ trợ: ${value}`,
+    tone: "neutral",
+  };
+}
+
+/** Presents immutable, server-provided eligible revenue without calculating commission money. */
 export function CommissionListPage({
   canManage,
   entries,
 }: CommissionListPageProps) {
-  const eligibleRevenue = entries.reduce(
-    (total, entry) => total + entry.recognizedRevenueVnd,
-    0,
-  );
-  const mmaCount = entries.filter(
-    (entry) => entry.leadSourceGroup === "mma",
-  ).length;
-  const sandboxCount = entries.length - mmaCount;
-
   return (
-    <div className="grid gap-5">
-      <header className="flex flex-col gap-4 rounded-lg border border-hairline bg-surface-1 p-5 shadow-card md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
-            Quản lý nhân sự
-          </p>
-          <h1 className="mt-1 text-page-title font-bold text-ink">Hoa hồng Sale</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">
-            Hệ thống ghi nhận tự động doanh thu học phí thực nhận của các case nguồn MMA và Sandbox. Đây là dữ liệu đối soát, chưa phải khoản lương hoặc số tiền hoa hồng.
-          </p>
-        </div>
-        <Badge tone={canManage ? "info" : "neutral"}>
-          {canManage ? "Phạm vi: toàn bộ" : "Phạm vi: của tôi"}
-        </Badge>
-      </header>
-
-      <section
-        aria-label="Tổng quan hoa hồng Sale"
-        className="grid gap-3 sm:grid-cols-3"
-      >
-        <SummaryCard label="Khoản thu đủ điều kiện" value={entries.length} />
-        <SummaryCard
-          label="Doanh thu đủ điều kiện"
-          value={formatCurrency(eligibleRevenue)}
-        />
-        <SummaryCard label="Quy đổi hoa hồng" value="Chưa thiết lập" />
-      </section>
+    <div className="grid min-w-0 gap-6">
+      <PageHeader title="Doanh thu đủ điều kiện hoa hồng">
+        <p className="mt-1 max-w-3xl text-secondary text-text-muted">
+          Sổ ghi nhận doanh thu đủ điều kiện theo nguồn MMA và Sandbox. Dữ liệu này chưa phải khoản hoa hồng, lương hoặc chi trả.
+        </p>
+      </PageHeader>
 
       {entries.length === 0 ? (
-        <section className="rounded-lg border border-dashed border-hairline-strong bg-surface-1 px-6 py-12 text-center shadow-xs">
-          <h2 className="text-section font-semibold text-ink">
-            Chưa có doanh thu hoa hồng
-          </h2>
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-ink-muted">
-            Một bản ghi sẽ được tạo khi học phí được ghi nhận và học viên thuộc CRM case đã chuyển đổi, có Sale phụ trách, với nguồn MMA hoặc Sandbox.
+        <section className="rounded-lg border border-dashed border-border-strong bg-surface-base px-6 py-12 text-center">
+          <h2 className="text-section-title text-text-strong">Chưa có doanh thu đủ điều kiện</h2>
+          <p className="mx-auto mt-2 max-w-xl text-secondary leading-6 text-text-muted">
+            Các khoản thu hợp lệ trong phạm vi dữ liệu của tài khoản hiện tại sẽ xuất hiện tại đây.
           </p>
         </section>
       ) : (
-        <section className="overflow-hidden rounded-lg border border-hairline bg-surface-1 shadow-card">
-          <div className="flex flex-col gap-1 border-b border-hairline px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-section font-semibold text-ink">
-                Lịch sử doanh thu đủ điều kiện
-              </h2>
-              <p className="mt-1 text-sm text-ink-muted">
-                Hiển thị tối đa 200 khoản thu mới nhất trong phạm vi tài khoản.
-              </p>
-            </div>
-            <p className="text-sm text-ink-muted">
-              MMA: {mmaCount} · Sandbox: {sandboxCount}
+        <section aria-labelledby="commission-directory-heading" className="grid gap-4">
+          <div>
+            <h2 className="text-section-title text-text-strong" id="commission-directory-heading">
+              Danh sách doanh thu đủ điều kiện
+            </h2>
+            <p className="mt-1 text-secondary text-text-muted">
+              Hiển thị tối đa 200 bản ghi mới nhất theo thứ tự hệ thống ghi nhận.
             </p>
           </div>
 
-          <div className="hidden overflow-x-auto lg:block">
-            <table className="min-w-[1060px] border-collapse text-left text-sm">
-              <thead className="bg-canvas text-xs uppercase tracking-[0.04em] text-ink-muted">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Học viên</th>
-                  {canManage ? (
-                    <th className="px-5 py-3 font-semibold">Sale phụ trách</th>
-                  ) : null}
-                  <th className="px-5 py-3 font-semibold">Nguồn</th>
-                  <th className="px-5 py-3 font-semibold">Doanh thu thực nhận</th>
-                  <th className="px-5 py-3 font-semibold">Trạng thái</th>
-                  <th className="px-5 py-3 font-semibold">Ghi nhận</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline">
-                {entries.map((entry) => (
-                  <CommissionTableRow
-                    canManage={canManage}
-                    entry={entry}
-                    key={entry.id}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="grid gap-3 p-4 lg:hidden">
-            {entries.map((entry) => (
-              <CommissionMobileCard
-                canManage={canManage}
-                entry={entry}
-                key={entry.id}
-              />
-            ))}
-          </div>
+          <CommissionDirectory canManage={canManage} entries={entries} />
         </section>
       )}
+    </div>
+  );
+}
+
+function CommissionDirectory({
+  canManage,
+  entries,
+}: {
+  canManage: boolean;
+  entries: readonly SalesCommissionAccrualDashboardEntry[];
+}) {
+  return (
+    <div className="commission-directory-work-area min-w-0">
+      <DataTableFrame
+        body={entries.map((entry) => (
+          <CommissionTableRow canManage={canManage} entry={entry} key={entry.id} />
+        ))}
+        caption="Danh sách doanh thu đủ điều kiện hoa hồng"
+        className="commission-directory-table"
+        header={
+          <tr>
+            <TableHeader>Học sinh</TableHeader>
+            {canManage ? <TableHeader>Người phụ trách</TableHeader> : null}
+            <TableHeader>Nguồn</TableHeader>
+            <TableHeader className="text-right">Doanh thu đủ điều kiện</TableHeader>
+            <TableHeader>Trạng thái</TableHeader>
+            <TableHeader>Ghi nhận lúc</TableHeader>
+          </tr>
+        }
+        tableClassName="min-w-[1120px] table-fixed text-table-body text-text-default"
+      />
+
+      <ResponsiveRecordList
+        className="commission-directory-record-list p-4"
+        label="Danh sách doanh thu đủ điều kiện hoa hồng"
+      >
+        {entries.map((entry) => (
+          <CommissionRecord canManage={canManage} entry={entry} key={entry.id} />
+        ))}
+      </ResponsiveRecordList>
     </div>
   );
 }
@@ -131,97 +145,114 @@ function CommissionTableRow({
   canManage: boolean;
   entry: SalesCommissionAccrualDashboardEntry;
 }) {
+  const source = getSourceGroupPresentation(entry.leadSourceGroup);
+  const status = getStatusPresentation(entry.status);
+
   return (
-    <tr className="align-top hover:bg-canvas/70">
-      <td className="px-5 py-4">
-        <p className="font-medium text-ink">{entry.studentFullName}</p>
-        <p className="mt-1 font-mono text-xs font-semibold text-ink-subtle">
-          {entry.studentPublicCode}
-        </p>
-      </td>
-      {canManage ? (
-        <td className="px-5 py-4">
-          <p className="text-ink">{entry.saleOwnerDisplayName}</p>
-          {entry.saleOwnerEmployeeCode ? (
-            <p className="mt-1 font-mono text-xs text-ink-muted">
-              {entry.saleOwnerEmployeeCode}
-            </p>
-          ) : null}
-        </td>
-      ) : null}
-      <td className="px-5 py-4">
-        <Badge tone={entry.leadSourceGroup === "mma" ? "info" : "purple"}>
-          {entry.leadSourceGroup.toUpperCase()}
-        </Badge>
-        <p className="mt-2 text-xs text-ink-muted">{entry.leadSourceName}</p>
-      </td>
-      <td className="px-5 py-4 font-medium text-ink">
+    <tr className="align-top hover:bg-[var(--table-row-hover)]">
+      <TableCell className="w-[190px]"><StudentIdentity entry={entry} /></TableCell>
+      {canManage ? <TableCell className="w-[180px]"><SaleOwner entry={entry} /></TableCell> : null}
+      <TableCell className="w-[190px]"><SourceContext entry={entry} source={source} /></TableCell>
+      <TableCell className="w-[190px] text-right tabular-nums font-semibold text-text-strong">
         {formatCurrency(entry.recognizedRevenueVnd)}
-      </td>
-      <td className="px-5 py-4">
-        <Badge tone="warning">Chờ chính sách</Badge>
-      </td>
-      <td className="px-5 py-4 text-ink-muted">
-        {formatDateTime(entry.recognizedAt)}
-      </td>
+      </TableCell>
+      <TableCell className="w-[160px]"><Badge tone={status.tone}>{status.label}</Badge></TableCell>
+      <TableCell className="w-[180px] tabular-nums">{formatDateTime(entry.recognizedAt)}</TableCell>
     </tr>
   );
 }
 
-function CommissionMobileCard({
+function CommissionRecord({
   canManage,
   entry,
 }: {
   canManage: boolean;
   entry: SalesCommissionAccrualDashboardEntry;
 }) {
+  const source = getSourceGroupPresentation(entry.leadSourceGroup);
+  const status = getStatusPresentation(entry.status);
+
   return (
-    <article className="rounded-lg border border-hairline bg-white p-4">
+    <article className="rounded-lg border border-border-subtle bg-surface-base p-4" role="listitem">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold text-ink">{entry.studentFullName}</h3>
-          <p className="mt-1 font-mono text-xs font-semibold text-ink-subtle">
-            {entry.studentPublicCode}
-          </p>
-        </div>
-        <Badge tone="warning">Chờ chính sách</Badge>
+        <StudentIdentity entry={entry} />
+        <Badge tone={status.tone}>{status.label}</Badge>
       </div>
-      <dl className="mt-4 grid gap-3 text-sm">
-        <MobileField
-          label="Doanh thu thực nhận"
-          value={formatCurrency(entry.recognizedRevenueVnd)}
-        />
-        <MobileField
-          label="Nguồn"
-          value={`${entry.leadSourceGroup.toUpperCase()} - ${entry.leadSourceName}`}
-        />
-        {canManage ? (
-          <MobileField label="Sale phụ trách" value={entry.saleOwnerDisplayName} />
-        ) : null}
-        <MobileField label="Ghi nhận" value={formatDateTime(entry.recognizedAt)} />
+
+      <p className="mt-3 text-lg font-semibold tabular-nums text-text-strong">
+        {formatCurrency(entry.recognizedRevenueVnd)}
+      </p>
+
+      <dl className="mt-4 grid gap-3 text-secondary text-text-default">
+        <RecordField content={<SourceContext entry={entry} source={source} />} label="Nguồn" />
+        {canManage ? <RecordField content={<SaleOwner entry={entry} />} label="Người phụ trách" /> : null}
+        <RecordField label="Ghi nhận lúc" value={formatDateTime(entry.recognizedAt)} />
       </dl>
     </article>
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number | string }) {
+function StudentIdentity({ entry }: { entry: SalesCommissionAccrualDashboardEntry }) {
   return (
-    <div className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
-      <p className="text-sm text-ink-muted">{label}</p>
-      <p className="mt-2 truncate text-lg font-bold text-ink">{value}</p>
+    <div>
+      <p className="font-semibold text-text-strong">{entry.studentFullName}</p>
+      <p className="mt-0.5 text-caption font-medium tabular-nums text-text-muted">
+        {entry.studentPublicCode}
+      </p>
     </div>
   );
 }
 
-function MobileField({ label, value }: { label: string; value: string }) {
+function SaleOwner({ entry }: { entry: SalesCommissionAccrualDashboardEntry }) {
   return (
     <div>
-      <dt className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-        {label}
-      </dt>
-      <dd className="mt-1 break-words text-ink">{value}</dd>
+      <p className="font-medium text-text-strong">{entry.saleOwnerDisplayName}</p>
+      {entry.saleOwnerEmployeeCode ? (
+        <p className="mt-0.5 text-caption tabular-nums text-text-muted">{entry.saleOwnerEmployeeCode}</p>
+      ) : null}
     </div>
   );
+}
+
+function SourceContext({
+  entry,
+  source,
+}: {
+  entry: SalesCommissionAccrualDashboardEntry;
+  source: PresentationMetadata;
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <Badge tone={source.tone}>{source.label}</Badge>
+      <p className="break-words text-caption text-text-default">{entry.leadSourceName}</p>
+      <p className="text-caption tabular-nums text-text-muted">{entry.leadSourceCode}</p>
+    </div>
+  );
+}
+
+function RecordField({
+  content,
+  label,
+  value,
+}: {
+  content?: ReactNode;
+  label: string;
+  value?: string;
+}) {
+  return (
+    <div>
+      <dt className="text-caption font-semibold text-text-muted">{label}</dt>
+      <dd className="mt-1">{content ?? value}</dd>
+    </div>
+  );
+}
+
+function TableCell({ children, className }: { children: ReactNode; className?: string }) {
+  return <td className={`px-4 py-3 ${className ?? ""}`}>{children}</td>;
+}
+
+function TableHeader({ children, className }: { children: ReactNode; className?: string }) {
+  return <th className={`px-4 py-3 font-semibold ${className ?? ""}`} scope="col">{children}</th>;
 }
 
 function formatCurrency(value: number): string {

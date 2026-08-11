@@ -1,9 +1,11 @@
-export type SalesCommissionAccrualStatus = "provisional";
+export type KnownSalesCommissionAccrualStatus = "provisional";
+export type KnownSalesCommissionSourceGroup = "mma" | "sandbox";
 
 export interface SalesCommissionAccrualDashboardEntry {
   id: string;
   leadSourceCode: string;
-  leadSourceGroup: "mma" | "sandbox";
+  /** Transports the server value exactly for safe unsupported-value presentation. */
+  leadSourceGroup: string;
   leadSourceName: string;
   recognizedAt: string;
   recognizedRevenueVnd: number;
@@ -11,7 +13,8 @@ export interface SalesCommissionAccrualDashboardEntry {
   saleOwnerEmployeeCode: string | null;
   saleOwnerId: string;
   sourceCashflowRecordId: string;
-  status: SalesCommissionAccrualStatus;
+  /** Transports the server value exactly; the feature owns read-only presentation. */
+  status: string;
   studentFullName: string;
   studentId: string;
   studentPublicCode: string;

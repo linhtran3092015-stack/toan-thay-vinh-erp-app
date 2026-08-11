@@ -6,10 +6,6 @@ import type {
 } from "@/features/commissions/read-models";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-function normalizeLeadSourceGroup(value: string): "mma" | "sandbox" {
-  return value === "sandbox" ? "sandbox" : "mma";
-}
-
 export async function getSalesCommissionAccrualsDashboardResult(): Promise<
   SalesCommissionAccrualReadResult<
     readonly SalesCommissionAccrualDashboardEntry[]
@@ -30,7 +26,7 @@ export async function getSalesCommissionAccrualsDashboardResult(): Promise<
       data: data.map((entry) => ({
         id: entry.sales_commission_accrual_id,
         leadSourceCode: entry.lead_source_code,
-        leadSourceGroup: normalizeLeadSourceGroup(entry.lead_source_group),
+        leadSourceGroup: entry.lead_source_group,
         leadSourceName: entry.lead_source_name,
         recognizedAt: entry.recognized_at,
         recognizedRevenueVnd: entry.recognized_revenue_vnd,
@@ -38,7 +34,7 @@ export async function getSalesCommissionAccrualsDashboardResult(): Promise<
         saleOwnerEmployeeCode: entry.sale_owner_employee_code,
         saleOwnerId: entry.sale_owner_id,
         sourceCashflowRecordId: entry.source_cashflow_record_id,
-        status: "provisional",
+        status: entry.accrual_status,
         studentFullName: entry.student_full_name,
         studentId: entry.student_id,
         studentPublicCode: entry.student_public_code,
