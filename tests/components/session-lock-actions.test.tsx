@@ -124,6 +124,66 @@ describe("Session lock presentation", () => {
     expect(screen.getByRole("button", { name: "Xác nhận khóa" })).not.toBeDisabled();
   });
 
+  it("allows Escape to dismiss immediately after a returned action error", async () => {
+    actions.lockSessionAction.mockResolvedValueOnce({
+      message: "Buổi học đã thay đổi trạng thái.",
+      status: "error",
+    });
+
+    render(<SessionLockActions {...lockProps()} />);
+    const trigger = screen.getByRole("button", { name: "Khóa buổi học" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    fireEvent.change(screen.getByLabelText(/Lý do khóa/), {
+      target: { value: "Đã đối soát điểm danh." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận khóa" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Buổi học đã thay đổi trạng thái."));
+
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Xác nhận khóa vĩnh viễn" }), { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
+  });
+
+  it("allows backdrop and Cancel dismissal immediately after a returned action error", async () => {
+    actions.lockSessionAction
+      .mockResolvedValueOnce({
+        message: "Buổi học đã thay đổi trạng thái.",
+        status: "error",
+      })
+      .mockResolvedValueOnce({
+        message: "Buổi học đã thay đổi trạng thái.",
+        status: "error",
+      });
+
+    render(<SessionLockActions {...lockProps()} />);
+    const trigger = screen.getByRole("button", { name: "Khóa buổi học" });
+    fireEvent.click(trigger);
+    fireEvent.change(screen.getByLabelText(/Lý do khóa/), {
+      target: { value: "Đã đối soát điểm danh." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận khóa" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Buổi học đã thay đổi trạng thái."));
+    const firstDialog = screen.getByRole("dialog", { name: "Xác nhận khóa vĩnh viễn" });
+    fireEvent.mouseDown(firstDialog.parentElement!);
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    fireEvent.click(trigger);
+    fireEvent.change(screen.getByLabelText(/Lý do khóa/), {
+      target: { value: "Đã đối soát điểm danh." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận khóa" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Buổi học đã thay đổi trạng thái."));
+    fireEvent.click(screen.getByRole("button", { name: "Quay lại" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
   it("restores focus to the lock trigger after an ordinary confirmation dismissal", async () => {
     render(<SessionLockActions {...lockProps()} />);
     const trigger = screen.getByRole("button", { name: "Khóa buổi học" });
@@ -151,16 +211,65 @@ describe("Session lock presentation", () => {
 
     await waitFor(() => expect(actions.lockSessionAction).toHaveBeenCalledOnce());
     expect(submit).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Quay lại" })).toBeDisabled();
+    expect(screen.getByLabelText(/Lý do khóa/)).toBeDisabled();
+    expect(screen.getByText("Đang khóa...")).toBeInTheDocument();
 
     const dialog = screen.getByRole("dialog", { name: "Xác nhận khóa vĩnh viễn" });
     fireEvent.keyDown(dialog, { key: "Escape" });
     fireEvent.mouseDown(dialog.parentElement!);
+    fireEvent.click(screen.getByRole("button", { name: "Quay lại" }));
     fireEvent.click(submit);
 
     expect(screen.getByRole("dialog", { name: "Xác nhận khóa vĩnh viễn" })).toBeInTheDocument();
     expect(actions.lockSessionAction).toHaveBeenCalledOnce();
 
     pending.resolve({
+      message: "Đã khóa buổi học. Dữ liệu không thể thay đổi thêm.",
+      sessionId: "session-1",
+      status: "success",
+    });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(router.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("retries after a returned error and locks interaction again until the retry resolves", async () => {
+    const retry = deferred<{ message: string; sessionId: string; status: "success" }>();
+    actions.lockSessionAction
+      .mockResolvedValueOnce({
+        message: "Buổi học đã thay đổi trạng thái.",
+        status: "error",
+      })
+      .mockReturnValueOnce(retry.promise);
+
+    render(<SessionLockActions {...lockProps()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Khóa buổi học" }));
+    fireEvent.change(screen.getByLabelText(/Lý do khóa/), {
+      target: { value: "Đã đối soát điểm danh." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận khóa" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Buổi học đã thay đổi trạng thái."));
+    const retryButton = screen.getByRole("button", { name: "Xác nhận khóa" });
+    expect(retryButton).not.toBeDisabled();
+    fireEvent.click(retryButton);
+
+    await waitFor(() => expect(actions.lockSessionAction).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Đang khóa..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Quay lại" })).toBeDisabled();
+
+    const dialog = screen.getByRole("dialog", { name: "Xác nhận khóa vĩnh viễn" });
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    fireEvent.mouseDown(dialog.parentElement!);
+    fireEvent.click(screen.getByRole("button", { name: "Quay lại" }));
+    fireEvent.click(screen.getByRole("button", { name: "Đang khóa..." }));
+
+    expect(actions.lockSessionAction).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("dialog", { name: "Xác nhận khóa vĩnh viễn" })).toBeInTheDocument();
+
+    retry.resolve({
       message: "Đã khóa buổi học. Dữ liệu không thể thay đổi thêm.",
       sessionId: "session-1",
       status: "success",

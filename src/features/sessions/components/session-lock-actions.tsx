@@ -52,6 +52,8 @@ export function SessionLockActions({
   const [actionState, setActionState] =
     useState<SessionLockActionState | null>(null);
   const [isPending, startTransition] = useTransition();
+  const isInteractionLocked =
+    isPending && actionState?.status !== "error";
 
   const isLockable =
     sessionStatus === "completed" && lockedAt === null;
@@ -67,7 +69,7 @@ export function SessionLockActions({
   }, [actionState]);
 
   const closeConfirmation = () => {
-    if (isPending) {
+    if (isInteractionLocked) {
       return;
     }
 
@@ -264,7 +266,7 @@ export function SessionLockActions({
               }
               aria-invalid={reasonError ? true : undefined}
               className="min-h-28 rounded-md border border-border-subtle bg-field-bg px-3 py-2 text-body font-normal text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled"
-              disabled={isPending}
+              disabled={isInteractionLocked}
               id={reasonInputId}
               maxLength={500}
               onChange={(event) => {
@@ -291,7 +293,7 @@ export function SessionLockActions({
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
-              disabled={isPending}
+              disabled={isInteractionLocked}
               onClick={closeConfirmation}
               type="button"
               variant="ghost"
@@ -299,14 +301,14 @@ export function SessionLockActions({
               Quay lại
             </Button>
             <Button
-              disabled={isPending || reason.trim().length < 3}
-              isLoading={isPending}
+              disabled={isInteractionLocked || reason.trim().length < 3}
+              isLoading={isInteractionLocked}
               onClick={submitLock}
               size="lg"
               type="button"
               variant="danger"
             >
-              {isPending ? "Đang khóa..." : "Xác nhận khóa"}
+              {isInteractionLocked ? "Đang khóa..." : "Xác nhận khóa"}
             </Button>
           </div>
         </div>
