@@ -27,8 +27,9 @@ export function PaymentRequestCreateForm({ isPaymentConfigured, students }: Paym
   const expectedAmountVnd = Number(form.expectedAmountVnd) || 0;
   const purchasedSessions = Number(form.purchasedSessions) || 0;
   const bonusSessions = Number(form.bonusSessions) || 0;
-  // This remains the existing create-form estimate only; it is not ledger or debt accounting.
-  const calculatedUnitPriceVnd = Math.round(expectedAmountVnd / Math.max(purchasedSessions, 1));
+  // Presentation-only preview. The payment-request RPC derives the persisted
+  // unit price from the authoritative amount and purchased-session inputs.
+  const unitPricePreviewVnd = Math.round(expectedAmountVnd / Math.max(purchasedSessions, 1));
   const fieldErrors = actionState?.status === "error" ? actionState.fieldErrors ?? {} : {};
   const returnQuery = getPaymentRequestDirectoryQuery(searchParams);
   const directoryHref = returnQuery ? `/finance/payment-requests?${returnQuery}` : "/finance/payment-requests";
@@ -38,7 +39,7 @@ export function PaymentRequestCreateForm({ isPaymentConfigured, students }: Paym
     event.preventDefault();
     setActionState(null);
     startTransition(async () => {
-      const result = await createPaymentRequestAction({ bonusSessions, calculatedUnitPriceVnd, expectedAmountVnd, notes: form.notes, purchasedSessions, studentId: form.studentId, topupType: form.topupType });
+      const result = await createPaymentRequestAction({ bonusSessions, expectedAmountVnd, notes: form.notes, purchasedSessions, studentId: form.studentId, topupType: form.topupType });
       setActionState(result);
     });
   };
@@ -91,7 +92,7 @@ export function PaymentRequestCreateForm({ isPaymentConfigured, students }: Paym
             <SummaryRow label="Phụ huynh" value={selectedStudent?.guardianName ?? "Chưa chọn"} />
             <SummaryRow label="Số tiền" value={formatCurrency(expectedAmountVnd)} />
             <SummaryRow label="Gói buổi học" value={`${purchasedSessions} mua${bonusSessions > 0 ? ` + ${bonusSessions} tặng` : ""}`} />
-            <SummaryRow label="Đơn giá" value={`${formatCurrency(calculatedUnitPriceVnd)}/buổi`} />
+            <SummaryRow label="Đơn giá ước tính" value={`${formatCurrency(unitPricePreviewVnd)}/buổi`} />
           </dl>
           <Button className="mt-5 min-h-11 w-full" disabled={!isPaymentConfigured || students.length === 0 || !form.studentId || expectedAmountVnd < 10000 || purchasedSessions < 1} isLoading={isPending} size="lg" type="submit">
             {isPending ? "Đang tạo yêu cầu..." : "Tạo yêu cầu và VietQR"}

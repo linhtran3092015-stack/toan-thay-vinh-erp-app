@@ -12,7 +12,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const students = [{ guardianName: "Nguyễn Thị Mai", guardianPhone: "0900000000", id: "student-1", name: "Nguyễn Minh An", publicCode: "HV001" }];
 
 describe("Payment request create presentation", () => {
-  it("keeps the existing direct-submit fields and feature-local unit-price payload", async () => {
+  it("submits only approved request inputs; the unit-price preview is not authority", async () => {
     vi.mocked(createPaymentRequestAction).mockResolvedValue({ id: "request-1", message: "ok", status: "success" });
     render(<PaymentRequestCreateForm isPaymentConfigured students={students} />);
     expect(screen.getByLabelText("Học viên")).toBeInTheDocument();
@@ -21,7 +21,14 @@ describe("Payment request create presentation", () => {
     expect(screen.queryByText(/Xác nhận tạo/i)).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Học viên"), { target: { value: "student-1" } });
     fireEvent.click(screen.getByRole("button", { name: "Tạo yêu cầu và VietQR" }));
-    await waitFor(() => expect(createPaymentRequestAction).toHaveBeenCalledWith(expect.objectContaining({ calculatedUnitPriceVnd: 140000, purchasedSessions: 10, bonusSessions: 0, studentId: "student-1", topupType: "new" })));
+    await waitFor(() => expect(createPaymentRequestAction).toHaveBeenCalledWith({
+      bonusSessions: 0,
+      expectedAmountVnd: 1_400_000,
+      notes: "",
+      purchasedSessions: 10,
+      studentId: "student-1",
+      topupType: "new",
+    }));
   });
 
   it("keeps error text associated with its explicitly labelled control", async () => {

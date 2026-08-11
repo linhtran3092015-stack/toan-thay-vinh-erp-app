@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const createPaymentRequestSchema = z.object({
   bonusSessions: z.coerce.number().int().min(0, "Số buổi thưởng từ 0 trở lên.").default(0),
-  calculatedUnitPriceVnd: z.coerce.number().int().min(0, "Đơn giá không được âm.").default(0),
   expectedAmountVnd: z.coerce
     .number()
     .int("Số tiền nạp phải là số nguyên VND.")

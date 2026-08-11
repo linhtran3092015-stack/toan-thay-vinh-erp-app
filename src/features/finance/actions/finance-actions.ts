@@ -135,15 +135,14 @@ export async function createPaymentRequestAction(
 
   try {
     const supabase = await createSupabaseServerClient();
-    const rpcArgs = {
+    const rpcArgs: CreatePaymentRequestRpcArgs = {
       p_bonus_sessions: parsed.data.bonusSessions,
-      p_calculated_unit_price_vnd: parsed.data.calculatedUnitPriceVnd,
       p_expected_amount_vnd: parsed.data.expectedAmountVnd,
-      p_notes: parsed.data.notes ?? null,
+      p_notes: parsed.data.notes ?? undefined,
       p_purchased_sessions: parsed.data.purchasedSessions,
       p_student_id: parsed.data.studentId,
       p_topup_type: parsed.data.topupType,
-    } as unknown as CreatePaymentRequestRpcArgs;
+    };
 
     const { data: rawData, error } = await supabase.rpc("create_student_payment_request", rpcArgs);
 
