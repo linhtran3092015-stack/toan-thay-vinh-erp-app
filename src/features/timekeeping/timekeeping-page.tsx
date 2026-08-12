@@ -156,13 +156,15 @@ export function TimekeepingPage({
         </section>
       ) : null}
 
-      <MyTimekeepingPanel canCheck={canCheck} entries={myEntries} />
+      {canCheck ? <MyTimekeepingPanel canCheck={canCheck} entries={myEntries} /> : null}
 
-      <TimekeepingAdjustmentRequests
-        canCheck={canCheck}
-        entries={adjustmentEntries}
-        requests={myAdjustmentRequests}
-      />
+      {canCheck ? (
+        <TimekeepingAdjustmentRequests
+          canCheck={canCheck}
+          entries={adjustmentEntries}
+          requests={myAdjustmentRequests}
+        />
+      ) : null}
 
       {canApproveAdjustments ? (
         <TimekeepingAdjustmentApprovalQueue requests={adjustmentApprovalQueue} />
