@@ -6,16 +6,21 @@ import type { RefObject } from "react";
 
 import { AuthUserMenu } from "@/features/auth/components/auth-user-menu";
 import type { AuthUser } from "@/features/auth/types";
+import { TopbarTimekeepingButton } from "@/components/layout/topbar-timekeeping-button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 
 interface TopbarProps {
-  onMenuClick: () => void;
+  canCheckTimekeeping?: boolean;
+  hasOpenTimekeepingEntry?: boolean;
   mobileMenuTriggerRef: RefObject<HTMLButtonElement | null>;
+  onMenuClick: () => void;
   unreadNotificationCount: number;
   user: AuthUser;
 }
 
 export function Topbar({
+  canCheckTimekeeping = false,
+  hasOpenTimekeepingEntry = false,
   onMenuClick,
   mobileMenuTriggerRef,
   unreadNotificationCount,
@@ -40,6 +45,10 @@ export function Topbar({
       </button>
 
       <div className="ml-auto flex items-center gap-2">
+        {canCheckTimekeeping ? (
+          <TopbarTimekeepingButton hasOpenEntry={hasOpenTimekeepingEntry} />
+        ) : null}
+
         <ThemeToggle />
 
         <Link

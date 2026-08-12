@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getCurrentAuthUser } from "@/features/auth/current-user";
 import { getCachedUnreadNotificationCountResult } from "@/features/notifications/data";
+import { getCachedMyTimekeepingEntries } from "@/features/timekeeping/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 interface AuthenticatedAppShellProps {
@@ -47,6 +48,19 @@ export async function AuthenticatedAppShell({
     );
   }
 
+  const canCheckTimekeeping =
+    permissionResult.permissions.includes("timekeeping.check");
+
+  let hasOpenTimekeepingEntry = false;
+  if (canCheckTimekeeping) {
+    const myEntriesResult = await getCachedMyTimekeepingEntries();
+    if (myEntriesResult.ok) {
+      hasOpenTimekeepingEntry = myEntriesResult.entries.some(
+        (entry) => entry.status === "open",
+      );
+    }
+  }
+
   const unreadNotificationCountResult =
     permissionResult.permissions.includes("notifications.view")
       ? await getCachedUnreadNotificationCountResult()
@@ -60,6 +74,8 @@ export async function AuthenticatedAppShell({
   return (
     <AppShell
       authUser={authResult.user}
+      canCheckTimekeeping={canCheckTimekeeping}
+      hasOpenTimekeepingEntry={hasOpenTimekeepingEntry}
       permissions={permissionResult.permissions}
       unreadNotificationCount={unreadNotificationCount}
     >

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import type {
   TimekeepingAdjustmentApprovalQueueResult,
   TimekeepingAdjustmentRequestsResult,
@@ -181,6 +183,8 @@ export async function getMyTimekeepingEntries(): Promise<TimekeepingMyEntriesRes
     })),
   };
 }
+
+export const getCachedMyTimekeepingEntries = cache(getMyTimekeepingEntries);
 
 export async function getTimekeepingDayEntries(): Promise<TimekeepingDayEntriesResult> {
   const supabase = await createSupabaseServerClient();

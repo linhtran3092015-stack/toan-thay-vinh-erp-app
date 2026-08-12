@@ -16,14 +16,18 @@ import type { PermissionCode } from "@/lib/permissions/types";
 
 interface AppShellProps {
   authUser: AuthUser;
+  canCheckTimekeeping?: boolean;
   children: ReactNode;
+  hasOpenTimekeepingEntry?: boolean;
   permissions: readonly PermissionCode[];
   unreadNotificationCount: number;
 }
 
 export function AppShell({
   authUser,
+  canCheckTimekeeping = false,
   children,
+  hasOpenTimekeepingEntry = false,
   permissions,
   unreadNotificationCount,
 }: AppShellProps) {
@@ -51,8 +55,10 @@ export function AppShell({
 
       <div className="min-h-screen md:pl-[72px] xl:pl-[var(--sidebar-width)]">
         <Topbar
-          onMenuClick={() => setIsMobileNavOpen(true)}
+          canCheckTimekeeping={canCheckTimekeeping}
+          hasOpenTimekeepingEntry={hasOpenTimekeepingEntry}
           mobileMenuTriggerRef={mobileMenuTriggerRef}
+          onMenuClick={() => setIsMobileNavOpen(true)}
           unreadNotificationCount={unreadNotificationCount}
           user={authUser}
         />
