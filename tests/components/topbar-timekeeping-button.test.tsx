@@ -9,20 +9,22 @@ afterEach(() => {
 });
 
 describe("TopbarTimekeepingButton", () => {
-  it("renders default attendance button when no open entry exists", () => {
+  it("renders default attendance button with explicit white text styling when no open entry exists", () => {
     render(<TopbarTimekeepingButton hasOpenEntry={false} />);
 
     const link = screen.getByRole("link", { name: "Chấm công ngay" });
     expect(link).toHaveAttribute("href", "/timekeeping");
     expect(link).toHaveTextContent("Chấm công");
+    expect(link.className).toContain("text-white");
   });
 
-  it("renders active attendance status button when an open entry exists", () => {
+  it("renders active attendance status button with explicit white text styling when an open entry exists", () => {
     render(<TopbarTimekeepingButton hasOpenEntry />);
 
     const link = screen.getByRole("link", { name: "Đang trong ca chấm công - Xem chi tiết" });
     expect(link).toHaveAttribute("href", "/timekeeping");
     expect(link).toHaveTextContent("Đang chấm công");
+    expect(link.className).toContain("text-white");
   });
 
   it("renders Topbar with button placed left of ThemeToggle when user has timekeeping permission", () => {

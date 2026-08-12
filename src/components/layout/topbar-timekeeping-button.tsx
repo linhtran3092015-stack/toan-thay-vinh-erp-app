@@ -18,12 +18,12 @@ export function TopbarTimekeepingButton({
   return (
     <Link
       aria-label={title}
-      className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-action-primary px-2.5 text-xs font-semibold text-text-on-primary shadow-xs transition-colors hover:bg-action-primary-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring sm:px-3 sm:text-sm"
+      className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-action-primary px-2.5 text-xs font-semibold text-white transition-colors hover:bg-action-primary-hover hover:text-white focus:text-white focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring sm:px-3 sm:text-sm"
       href="/timekeeping"
       title={title}
     >
-      <Clock aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={2} />
-      <span>{label}</span>
+      <Clock aria-hidden="true" className="h-4 w-4 shrink-0 text-white" strokeWidth={2} />
+      <span className="text-white font-semibold">{label}</span>
       {hasOpenEntry ? (
         <span
           aria-hidden="true"
