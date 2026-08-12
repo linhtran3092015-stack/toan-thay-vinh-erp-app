@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import type {
+  AttendanceHeartbeatInput,
+  AttendanceHeartbeatResult,
   TimeEntryActionInput,
   TimekeepingEntryActionState,
 } from "@/features/timekeeping/time-entry-action-types";
@@ -39,11 +41,19 @@ function getRpcErrorMessage(message: string, isCheckIn: boolean): string {
       "Tài khoản hiện tại không có quyền timekeeping.check.",
     TIME_ENTRY_ACTIVE_SCHEDULE_REQUIRED:
       "Bạn chưa có lịch làm việc hiệu lực ở thời điểm này.",
+    TIME_ENTRY_CENTER_CONFIG_NOT_FOUND:
+      "Hệ thống chưa được cấu hình tọa độ vị trí Trung tâm. Vui lòng liên hệ Quản trị viên.",
+    TIME_ENTRY_GPS_ACCURACY_TOO_LOW:
+      "Dữ liệu vị trí GPS chưa đủ độ chính xác (sai số > 100m). Vui lòng thử lại ở vị trí thông thoáng hơn.",
     TIME_ENTRY_GPS_EVIDENCE_INVALID: "Dữ liệu GPS chưa hợp lệ.",
+    TIME_ENTRY_GPS_REQUIRED_FOR_TEACHING_ASSISTANT:
+      "Trợ giảng cần bật định vị GPS để thực hiện chấm công tại Trung tâm.",
     TIME_ENTRY_MODE_INVALID: "Hình thức chấm công chưa hợp lệ.",
     TIME_ENTRY_OPEN_ENTRY_ALREADY_EXISTS:
       "Bạn đang có một lượt chấm công chưa kết thúc.",
     TIME_ENTRY_OPEN_ENTRY_NOT_FOUND: "Không tìm thấy lượt chấm công đang mở.",
+    TIME_ENTRY_OUTSIDE_GEOFENCE:
+      "Bạn đang ở ngoài khu vực Trung tâm. Vui lòng di chuyển vào Trung tâm để chấm công.",
     TIME_ENTRY_REQUIRES_ACTIVE_STAFF:
       "Chỉ nhân sự đang làm việc mới có thể chấm công.",
     TIME_ENTRY_TEACHING_ASSISTANT_CHECKIN_CUTOFF_REACHED:
@@ -132,4 +142,35 @@ export async function checkOutTimeEntryAction(
   input: TimeEntryActionInput,
 ): Promise<TimekeepingEntryActionState> {
   return await submitTimeEntryAction(input, false);
+}
+
+export async function submitAttendanceHeartbeatAction(
+  input: AttendanceHeartbeatInput,
+): Promise<AttendanceHeartbeatResult> {
+  const permissionError = await getPermissionError();
+
+  if (permissionError) {
+    return { messageVi: permissionError, reason: permissionError, sessionActive: false };
+  }
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const rpcFn = supabase.rpc as unknown as (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
+    const { data, error } = await rpcFn("submit_attendance_heartbeat", {
+      p_gps_accuracy_meters: input.gpsAccuracyMeters,
+      p_gps_latitude: input.gpsLatitude,
+      p_gps_longitude: input.gpsLongitude,
+    });
+
+    if (error) {
+      return { sessionActive: true, signalDegraded: true };
+    }
+
+    return (data as unknown as AttendanceHeartbeatResult) ?? { sessionActive: true };
+  } catch {
+    return { sessionActive: true, signalDegraded: true };
+  }
 }

@@ -24,3 +24,25 @@ export interface TimeEntryEvidenceInput {
 export interface TimeEntryActionInput extends TimeEntryEvidenceInput {
   mode: TimeEntryMode;
 }
+
+export interface AttendanceHeartbeatInput {
+  gpsAccuracyMeters: number;
+  gpsLatitude: number;
+  gpsLongitude: number;
+}
+
+export type AttendanceHeartbeatResult =
+  | {
+      ambiguousSample?: boolean;
+      distanceM?: number;
+      sessionActive: true;
+      signalDegraded?: boolean;
+      verifiedInside?: boolean;
+    }
+  | {
+      closedByServer?: boolean;
+      messageVi?: string;
+      reason?: string;
+      sessionActive: false;
+    };
+

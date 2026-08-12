@@ -126,7 +126,7 @@ export function TimekeepingEntryDialog({
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 60_000,
+        maximumAge: 0,
         timeout: 10_000,
       },
     );

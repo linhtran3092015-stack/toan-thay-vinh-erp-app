@@ -1,5 +1,10 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { TimekeepingEntryDialog } from "@/features/timekeeping/components/timekeeping-entry-dialog";
+import { useAttendanceHeartbeat } from "@/features/timekeeping/hooks/use-attendance-heartbeat";
 import type { TimeEntryStatus, TimekeepingMyEntry } from "@/features/timekeeping/types";
 
 interface MyTimekeepingPanelProps {
@@ -7,7 +12,7 @@ interface MyTimekeepingPanelProps {
   entries: readonly TimekeepingMyEntry[];
 }
 
-type TimekeepingEntryTone = "info" | "neutral" | "success";
+type TimekeepingEntryTone = "info" | "neutral" | "success" | "danger" | "warning";
 
 interface TimekeepingEntryStatusPresentation {
   label: string;
@@ -19,7 +24,6 @@ const modeLabels = {
   online: "Trực tuyến",
 } as const;
 
-/** Timekeeping-local state wording; status meaning remains server-owned. */
 export function getTimekeepingEntryStatusPresentation(
   status: TimeEntryStatus,
 ): TimekeepingEntryStatusPresentation {
@@ -41,6 +45,21 @@ export function getEvidencePresenceLabel(hasEvidence: boolean): string {
   return hasEvidence ? "Có dữ liệu" : "Không có dữ liệu";
 }
 
+export function getClockOutReasonLabel(reason?: string | null): string {
+  switch (reason) {
+    case "manual":
+      return "Tự check-out";
+    case "left_geofence":
+      return "Rời khỏi Trung tâm";
+    case "location_lost":
+      return "Mất kết nối vị trí (>90s)";
+    case "daily_cutoff":
+      return "Hết giờ ca (23:30)";
+    default:
+      return "Hệ thống tự động";
+  }
+}
+
 function formatTime(value: string): string {
   return new Intl.DateTimeFormat("vi-VN", {
     hour: "2-digit",
@@ -49,11 +68,19 @@ function formatTime(value: string): string {
   }).format(new Date(value));
 }
 
-function formatScheduleTime(value: string): string {
+function formatScheduleTime(value: string | null): string {
+  if (!value) return "Không áp dụng";
   return value.slice(0, 5);
 }
 
-/** Personal current-day presentation. It only displays the existing personal read model. */
+function formatElapsedTime(checkInAt: string): string {
+  const diffMs = Math.max(0, Date.now() - new Date(checkInAt).getTime());
+  const hours = Math.floor(diffMs / 3600000);
+  const minutes = Math.floor((diffMs % 3600000) / 60000);
+  const seconds = Math.floor((diffMs % 60000) / 1000);
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
 export function MyTimekeepingPanel({
   canCheck,
   entries,
@@ -63,6 +90,29 @@ export function MyTimekeepingPanel({
   const statusPresentation = entry
     ? getTimekeepingEntryStatusPresentation(entry.status)
     : null;
+
+  const [elapsedText, setElapsedText] = useState<string>("");
+
+  useEffect(() => {
+    if (!openEntry) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setElapsedText(formatElapsedTime(openEntry.checkInAt));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [openEntry]);
+
+  const displayElapsedText = openEntry
+    ? elapsedText || formatElapsedTime(openEntry.checkInAt)
+    : "";
+
+  const { distanceM, serverMessage, statusLabel } = useAttendanceHeartbeat({
+    activeSessionId: openEntry?.id ?? null,
+    enabled: Boolean(openEntry),
+  });
 
   return (
     <section
@@ -77,6 +127,9 @@ export function MyTimekeepingPanel({
             </h2>
             {statusPresentation ? (
               <Badge tone={statusPresentation.tone}>{statusPresentation.label}</Badge>
+            ) : null}
+            {openEntry?.isUnscheduled ? (
+              <Badge tone="warning">Không có ca được phân công hôm nay</Badge>
             ) : null}
           </div>
           <p className="mt-1 text-secondary text-text-muted">
@@ -97,12 +150,47 @@ export function MyTimekeepingPanel({
         )}
       </div>
 
+      {openEntry ? (
+        <div className="rounded-md border border-border-subtle bg-surface-subtle p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <span className="text-caption text-text-muted">Thời gian đã làm việc</span>
+              <p className="font-mono text-xl font-bold text-text-strong">{displayElapsedText || "00:00:00"}</p>
+            </div>
+            <div>
+              <span className="text-caption text-text-muted">Trạng thái định vị GPS</span>
+              <p className="text-body font-medium text-text-default">
+                {statusLabel}
+                {distanceM !== null ? ` (khoảng ${distanceM}m từ Trung tâm)` : ""}
+              </p>
+            </div>
+          </div>
+          {serverMessage ? (
+            <p className="mt-2 text-caption text-danger">{serverMessage}</p>
+          ) : null}
+          <p className="mt-3 rounded bg-surface-base p-2.5 text-caption text-text-muted border border-border-subtle">
+            ℹ️ <strong>Hướng dẫn:</strong> Trong thời gian chấm công, vui lòng duy trì quyền truy cập vị trí và kết nối mạng. Nếu hệ thống không xác minh được vị trí trong thời gian quy định, phiên chấm công có thể tự động kết thúc.
+          </p>
+        </div>
+      ) : null}
+
       {entry ? (
         <dl className="grid gap-x-6 gap-y-4 border-t border-border-subtle pt-4 sm:grid-cols-2 xl:grid-cols-3">
-          <EntryField label="Ca làm" value={`${entry.workShiftCode} · ${entry.workShiftName}`} />
+          <EntryField
+            label="Ca làm"
+            value={
+              entry.workShiftCode && entry.workShiftName
+                ? `${entry.workShiftCode} · ${entry.workShiftName}`
+                : "Không ca (Tự do)"
+            }
+          />
           <EntryField
             label="Thời gian ca"
-            value={`${formatScheduleTime(entry.scheduledStartTime)} – ${formatScheduleTime(entry.scheduledEndTime)}`}
+            value={
+              entry.scheduledStartTime && entry.scheduledEndTime
+                ? `${formatScheduleTime(entry.scheduledStartTime)} – ${formatScheduleTime(entry.scheduledEndTime)}`
+                : "Không có ca ấn định"
+            }
           />
           <EntryField
             label="Check-in"
@@ -112,7 +200,7 @@ export function MyTimekeepingPanel({
             label="Check-out"
             value={
               entry.checkOutAt && entry.checkOutMode
-                ? `${formatTime(entry.checkOutAt)} · ${entry.checkOutMode === "auto_end" ? "Tự động" : getTimekeepingModeLabel(entry.checkOutMode)}`
+                ? `${formatTime(entry.checkOutAt)} · ${entry.checkOutMode === "auto_end" ? `Tự động (${getClockOutReasonLabel(entry.clockOutReason)})` : getTimekeepingModeLabel(entry.checkOutMode)}`
                 : "Chưa check-out"
             }
           />

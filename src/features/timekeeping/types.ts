@@ -75,6 +75,8 @@ export type TimeEntryMode = "online" | "offline";
 
 export type TimeEntryStatus = "open" | "checked_out" | "auto_ended";
 
+export type ClockOutReason = "manual" | "left_geofence" | "location_lost" | "daily_cutoff";
+
 export interface TimekeepingEntryEvidence {
   hasCheckInGpsEvidence: boolean;
   hasCheckInWifiEvidence: boolean;
@@ -88,13 +90,16 @@ export interface TimekeepingMyEntry extends TimekeepingEntryEvidence {
   checkInMode: TimeEntryMode;
   checkOutAt: string | null;
   checkOutMode: TimeEntryMode | "auto_end" | null;
+  clockOutReason?: ClockOutReason | null;
   id: string;
-  scheduledEndTime: string;
-  scheduledStartTime: string;
+  isUnscheduled?: boolean;
+  lastLocationAt?: string | null;
+  scheduledEndTime: string | null;
+  scheduledStartTime: string | null;
   status: TimeEntryStatus;
   workDate: string;
-  workShiftCode: string;
-  workShiftName: string;
+  workShiftCode: string | null;
+  workShiftName: string | null;
 }
 
 export interface TimekeepingDayEntry extends TimekeepingMyEntry {
