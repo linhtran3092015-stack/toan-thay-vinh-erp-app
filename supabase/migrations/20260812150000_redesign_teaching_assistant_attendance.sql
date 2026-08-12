@@ -53,7 +53,7 @@ end;
 $$;
 
 grant select on public.center_attendance_configs to authenticated;
-grant select on public.center_attendance_configs to service_role;
+grant select, insert, update on public.center_attendance_configs to service_role;
 
 -- Seed default unconfigured center entry if none exists
 insert into public.center_attendance_configs (code, name, center_latitude, center_longitude, attendance_radius_m, is_active)
