@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -15,8 +16,7 @@ const nextConfig: NextConfig = {
       ignore: [/\/auth\/callback/],
     },
   },
-  outputFileTracingRoot:
-    "/Users/linhtran/Documents/ERP-Toan-Thay-Vinh/toan-thay-vinh-erp-app",
+  outputFileTracingRoot: path.join(__dirname),
 };
 
 export default nextConfig;
