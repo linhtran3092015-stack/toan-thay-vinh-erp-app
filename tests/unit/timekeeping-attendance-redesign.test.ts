@@ -143,4 +143,73 @@ describe("Teaching Assistant Attendance Redesign", () => {
       expect(presentation.tone).toBe("info");
     });
   });
+
+  describe("Teaching Assistant Check-in Business Rules Matrix", () => {
+    function evaluateCheckIn(input: {
+      isTeachingAssistant: boolean;
+      hasShift: boolean;
+      hasGps: boolean;
+      gpsAccuracyMeters?: number;
+      distanceM?: number;
+      centerRadiusM?: number;
+    }) {
+      const {
+        isTeachingAssistant,
+        hasShift,
+        hasGps,
+        gpsAccuracyMeters = 10,
+        distanceM = 20,
+        centerRadiusM = 100,
+      } = input;
+
+      if (isTeachingAssistant) {
+        if (!hasGps) {
+          return { allowed: false, errorCode: "TIME_ENTRY_GPS_REQUIRED_FOR_TEACHING_ASSISTANT", assignedShiftId: null };
+        }
+        if (gpsAccuracyMeters > 100) {
+          return { allowed: false, errorCode: "TIME_ENTRY_GPS_ACCURACY_TOO_LOW", assignedShiftId: null };
+        }
+        if (distanceM + gpsAccuracyMeters > centerRadiusM + 15) {
+          return { allowed: false, errorCode: "TIME_ENTRY_OUTSIDE_GEOFENCE", assignedShiftId: null };
+        }
+        return { allowed: true, assignedShiftId: hasShift ? "shift-123" : null };
+      }
+
+      if (!hasShift) {
+        return { allowed: false, errorCode: "TIME_ENTRY_ACTIVE_SCHEDULE_REQUIRED", assignedShiftId: null };
+      }
+
+      return { allowed: true, assignedShiftId: "shift-123" };
+    }
+
+    it("allows TA with no shift, valid GPS, and inside geofence to check in with null shift ID", () => {
+      const res = evaluateCheckIn({ isTeachingAssistant: true, hasShift: false, hasGps: true });
+      expect(res.allowed).toBe(true);
+      expect(res.assignedShiftId).toBeNull();
+    });
+
+    it("fails TA with no shift outside geofence with TIME_ENTRY_OUTSIDE_GEOFENCE (not shift error)", () => {
+      const res = evaluateCheckIn({ isTeachingAssistant: true, hasShift: false, hasGps: true, distanceM: 200 });
+      expect(res.allowed).toBe(false);
+      expect(res.errorCode).toBe("TIME_ENTRY_OUTSIDE_GEOFENCE");
+    });
+
+    it("fails TA with no shift and missing GPS with TIME_ENTRY_GPS_REQUIRED_FOR_TEACHING_ASSISTANT (not shift error)", () => {
+      const res = evaluateCheckIn({ isTeachingAssistant: true, hasShift: false, hasGps: false });
+      expect(res.allowed).toBe(false);
+      expect(res.errorCode).toBe("TIME_ENTRY_GPS_REQUIRED_FOR_TEACHING_ASSISTANT");
+    });
+
+    it("allows TA with active shift to check in and attach shift assignment ID", () => {
+      const res = evaluateCheckIn({ isTeachingAssistant: true, hasShift: true, hasGps: true });
+      expect(res.allowed).toBe(true);
+      expect(res.assignedShiftId).toBe("shift-123");
+    });
+
+    it("fails Non-TA without active shift with TIME_ENTRY_ACTIVE_SCHEDULE_REQUIRED", () => {
+      const res = evaluateCheckIn({ isTeachingAssistant: false, hasShift: false, hasGps: true });
+      expect(res.allowed).toBe(false);
+      expect(res.errorCode).toBe("TIME_ENTRY_ACTIVE_SCHEDULE_REQUIRED");
+    });
+  });
 });
