@@ -25,17 +25,19 @@ export default async function TimekeepingRoute() {
     );
   }
 
-  if (!permissionResult.permissions.includes("timekeeping.view")) {
+  const canView = permissionResult.permissions.includes("timekeeping.view");
+  const canCheck = permissionResult.permissions.includes("timekeeping.check");
+
+  if (!canView && !canCheck) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền timekeeping.view."
-        title="Không có quyền xem chấm công"
+        description="Tài khoản hiện tại không có quyền truy cập chấm công (yêu cầu timekeeping.check hoặc timekeeping.view)."
+        title="Không có quyền truy cập chấm công"
       />
     );
   }
 
   const canManage = permissionResult.permissions.includes("staff.manage");
-  const canCheck = permissionResult.permissions.includes("timekeeping.check");
   const canApproveAdjustments = permissionResult.permissions.includes(
     "timekeeping.approve_adjustment",
   );
@@ -54,11 +56,11 @@ export default async function TimekeepingRoute() {
       ? getTimeEntryAdjustmentApprovalQueue()
       : Promise.resolve(null),
     canCheck ? getMyTimeEntryAdjustmentRequests() : Promise.resolve(null),
-    getTimekeepingSchedule(),
-    getTimekeepingWorkShifts(),
+    canView ? getTimekeepingSchedule() : Promise.resolve(null),
+    canView ? getTimekeepingWorkShifts() : Promise.resolve(null),
     canManage ? getTimekeepingStaffOptions() : Promise.resolve(null),
     canCheck ? getMyTimekeepingEntries() : Promise.resolve(null),
-    getTimekeepingDayEntries(),
+    canView ? getTimekeepingDayEntries() : Promise.resolve(null),
   ]);
 
   if (adjustmentEntriesResult && !adjustmentEntriesResult.ok) {
@@ -88,7 +90,7 @@ export default async function TimekeepingRoute() {
     );
   }
 
-  if (!scheduleResult.ok) {
+  if (scheduleResult && !scheduleResult.ok) {
     return (
       <ErrorState
         description={scheduleResult.error.message}
@@ -97,7 +99,7 @@ export default async function TimekeepingRoute() {
     );
   }
 
-  if (!workShiftsResult.ok) {
+  if (workShiftsResult && !workShiftsResult.ok) {
     return (
       <ErrorState
         description={workShiftsResult.error.message}
@@ -124,7 +126,7 @@ export default async function TimekeepingRoute() {
     );
   }
 
-  if (!dayEntriesResult.ok) {
+  if (dayEntriesResult && !dayEntriesResult.ok) {
     return (
       <ErrorState
         description={dayEntriesResult.error.message}
@@ -142,12 +144,13 @@ export default async function TimekeepingRoute() {
       canApproveAdjustments={canApproveAdjustments}
       canCheck={canCheck}
       canManage={canManage}
-      dayEntries={dayEntriesResult.entries}
-      entries={scheduleResult.entries}
-      myEntries={myEntriesResult?.ok ? myEntriesResult.entries : []}
+      canView={canView}
+      dayEntries={dayEntriesResult?.ok ? dayEntriesResult.entries : []}
+      entries={scheduleResult?.ok ? scheduleResult.entries : []}
       myAdjustmentRequests={adjustmentRequestsResult?.ok ? adjustmentRequestsResult.requests : []}
+      myEntries={myEntriesResult?.ok ? myEntriesResult.entries : []}
       staffOptions={staffOptionsResult?.ok ? staffOptionsResult.staffOptions : []}
-      workShifts={workShiftsResult.workShifts}
+      workShifts={workShiftsResult?.ok ? workShiftsResult.workShifts : []}
     />
   );
 }

@@ -25,6 +25,7 @@ interface TimekeepingPageProps {
   canCheck: boolean;
   canManage: boolean;
   canApproveAdjustments: boolean;
+  canView?: boolean;
   adjustmentEntries: readonly TimekeepingAdjustableEntry[];
   adjustmentApprovalQueue: readonly TimekeepingAdjustmentApprovalQueueEntry[];
   dayEntries: readonly TimekeepingDayEntry[];
@@ -101,14 +102,15 @@ export function TimekeepingPage({
   canCheck,
   canManage,
   canApproveAdjustments,
-  adjustmentApprovalQueue,
-  adjustmentEntries,
-  dayEntries,
-  entries,
-  myEntries,
-  myAdjustmentRequests,
-  staffOptions,
-  workShifts,
+  canView = true,
+  adjustmentApprovalQueue = [],
+  adjustmentEntries = [],
+  dayEntries = [],
+  entries = [],
+  myEntries = [],
+  myAdjustmentRequests = [],
+  staffOptions = [],
+  workShifts = [],
 }: TimekeepingPageProps) {
   const activeWorkShifts = workShifts.filter((shift) => shift.isActive);
   const staffCount = new Set(entries.map((entry) => entry.staffId)).size;
@@ -123,7 +125,9 @@ export function TimekeepingPage({
           </p>
           <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">Chấm công & Ca làm</h1>
           <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink-muted">
-            Quản lý danh mục ca làm việc, chấm công di động và lịch phân công nhân sự đang hiệu lực.
+            {canView
+              ? "Quản lý danh mục ca làm việc, chấm công di động và lịch phân công nhân sự đang hiệu lực."
+              : "Thực hiện chấm công cá nhân và quản lý yêu cầu điều chỉnh công."}
           </p>
         </div>
 
@@ -137,18 +141,20 @@ export function TimekeepingPage({
               />
             </>
           ) : null}
-          <Badge tone={canManage ? "info" : "neutral"}>
-            {canManage ? "Quyền Quản lý" : "Chỉ đọc"}
+          <Badge tone={canManage ? "info" : canView ? "neutral" : "success"}>
+            {canManage ? "Quyền Quản lý" : canView ? "Chỉ đọc" : "Cá nhân"}
           </Badge>
         </div>
       </header>
 
-      {/* KPI Metrics */}
-      <section className="grid gap-4 sm:grid-cols-3">
-        <SummaryCard label="Lịch hiệu lực" value={entries.length} />
-        <SummaryCard label="Ca đang sử dụng" value={activeWorkShifts.length} />
-        <SummaryCard label="Nhân sự được phân công" value={staffCount} />
-      </section>
+      {/* KPI Metrics - Visible only for administrative readers */}
+      {canView ? (
+        <section className="grid gap-4 sm:grid-cols-3">
+          <SummaryCard label="Lịch hiệu lực" value={entries.length} />
+          <SummaryCard label="Ca đang sử dụng" value={activeWorkShifts.length} />
+          <SummaryCard label="Nhân sự được phân công" value={staffCount} />
+        </section>
+      ) : null}
 
       <MyTimekeepingPanel canCheck={canCheck} entries={myEntries} />
 
@@ -162,69 +168,71 @@ export function TimekeepingPage({
         <TimekeepingAdjustmentApprovalQueue requests={adjustmentApprovalQueue} />
       ) : null}
 
-      <TimekeepingDayEntries entries={dayEntries} />
+      {canView ? <TimekeepingDayEntries entries={dayEntries} /> : null}
 
-      <section aria-labelledby="active-shift-schedule-heading" className="timekeeping-assignment-work-area grid gap-4">
-        <div>
-          <h2 className="font-display text-lg font-semibold text-ink" id="active-shift-schedule-heading">
-            Lịch phân công ca đang hoạt động
-          </h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Các lịch lặp lại đang hiệu lực theo tuần. Lịch đã kết thúc không hiển thị tại đây.
-          </p>
-        </div>
+      {canView ? (
+        <section aria-labelledby="active-shift-schedule-heading" className="timekeeping-assignment-work-area grid gap-4">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-ink" id="active-shift-schedule-heading">
+              Lịch phân công ca đang hoạt động
+            </h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Các lịch lặp lại đang hiệu lực theo tuần. Lịch đã kết thúc không hiển thị tại đây.
+            </p>
+          </div>
 
-        <div className="timekeeping-assignment-table">
-          <DataTableFrame
-            caption="Lịch phân công ca đang hoạt động"
-            tableClassName="min-w-[1040px] text-sm"
-            header={
-              <tr>
-                <th className="px-6 py-3 font-semibold">Thứ</th>
-                <th className="px-6 py-3 font-semibold">Nhân sự</th>
-                <th className="px-6 py-3 font-semibold">Ca làm</th>
-                <th className="px-6 py-3 font-semibold">Thời gian</th>
-                <th className="px-6 py-3 font-semibold">Nghỉ giữa ca</th>
-                <th className="px-6 py-3 font-semibold">Hiệu lực</th>
-                {canManage ? <th className="px-6 py-3 font-semibold">Thao tác</th> : null}
-              </tr>
-            }
-            body={
-              entries.length === 0 ? (
+          <div className="timekeeping-assignment-table">
+            <DataTableFrame
+              caption="Lịch phân công ca đang hoạt động"
+              tableClassName="min-w-[1040px] text-sm"
+              header={
                 <tr>
-                  <td className="px-6 py-10 text-center text-sm text-ink-muted" colSpan={canManage ? 7 : 6}>
-                    Chưa có lịch phân công ca đang hoạt động.
-                  </td>
+                  <th className="px-6 py-3 font-semibold">Thứ</th>
+                  <th className="px-6 py-3 font-semibold">Nhân sự</th>
+                  <th className="px-6 py-3 font-semibold">Ca làm</th>
+                  <th className="px-6 py-3 font-semibold">Thời gian</th>
+                  <th className="px-6 py-3 font-semibold">Nghỉ giữa ca</th>
+                  <th className="px-6 py-3 font-semibold">Hiệu lực</th>
+                  {canManage ? <th className="px-6 py-3 font-semibold">Thao tác</th> : null}
                 </tr>
-              ) : entries.map((entry) => (
-                <tr className="align-top hover:bg-[var(--table-row-hover)]" key={entry.assignmentId}>
-                  <td className="px-6 py-4 font-semibold text-ink">{weekdayLabels[entry.weekday] ?? "Chưa xác định"}</td>
-                  <td className="px-6 py-4"><p className="font-semibold text-ink">{getStaffLabel(entry)}</p>{entry.staffEmployeeCode ? <p className="mt-1 font-mono text-xs text-ink-muted">{entry.staffEmployeeCode}</p> : null}</td>
-                  <td className="px-6 py-4"><p className="font-semibold text-ink">{entry.workShiftName}</p><p className="mt-1 font-mono text-xs text-ink-muted">{entry.workShiftCode}</p></td>
-                  <td className="px-6 py-4"><ShiftTime entry={entry} /></td>
-                  <td className="px-6 py-4 text-sm text-ink-muted">{formatBreak(entry.breakMinutes)}</td>
-                  <td className="px-6 py-4"><EffectivePeriod entry={entry} /></td>
-                  {canManage ? <td className="min-w-44 px-6 py-4"><div className="grid gap-2"><StaffShiftReplaceAction entry={entry} workShifts={workShifts} /><StaffShiftEndAction entry={entry} /></div></td> : null}
-                </tr>
-              ))
-            }
-          />
-        </div>
+              }
+              body={
+                entries.length === 0 ? (
+                  <tr>
+                    <td className="px-6 py-10 text-center text-sm text-ink-muted" colSpan={canManage ? 7 : 6}>
+                      Chưa có lịch phân công ca đang hoạt động.
+                    </td>
+                  </tr>
+                ) : entries.map((entry) => (
+                  <tr className="align-top hover:bg-[var(--table-row-hover)]" key={entry.assignmentId}>
+                    <td className="px-6 py-4 font-semibold text-ink">{weekdayLabels[entry.weekday] ?? "Chưa xác định"}</td>
+                    <td className="px-6 py-4"><p className="font-semibold text-ink">{getStaffLabel(entry)}</p>{entry.staffEmployeeCode ? <p className="mt-1 font-mono text-xs text-ink-muted">{entry.staffEmployeeCode}</p> : null}</td>
+                    <td className="px-6 py-4"><p className="font-semibold text-ink">{entry.workShiftName}</p><p className="mt-1 font-mono text-xs text-ink-muted">{entry.workShiftCode}</p></td>
+                    <td className="px-6 py-4"><ShiftTime entry={entry} /></td>
+                    <td className="px-6 py-4 text-sm text-ink-muted">{formatBreak(entry.breakMinutes)}</td>
+                    <td className="px-6 py-4"><EffectivePeriod entry={entry} /></td>
+                    {canManage ? <td className="min-w-44 px-6 py-4"><div className="grid gap-2"><StaffShiftReplaceAction entry={entry} workShifts={workShifts} /><StaffShiftEndAction entry={entry} /></div></td> : null}
+                  </tr>
+                ))
+              }
+            />
+          </div>
 
-        <ResponsiveRecordList className="timekeeping-assignment-record-list" label="Lịch phân công ca đang hoạt động">
-          {entries.length === 0 ? <p className="rounded-lg border border-dashed border-border-subtle p-6 text-center text-sm text-text-muted">Chưa có lịch phân công ca đang hoạt động.</p> : entries.map((entry) => (
-            <article className="rounded-lg border border-border-subtle bg-surface-base p-4" key={entry.assignmentId} role="listitem">
-              <p className="text-caption font-semibold text-text-muted">{weekdayLabels[entry.weekday] ?? "Chưa xác định"}</p>
-              <h3 className="mt-1 text-body font-semibold text-text-strong">{getStaffLabel(entry)}</h3>
-              {entry.staffEmployeeCode ? <p className="mt-1 font-mono text-caption text-text-muted">{entry.staffEmployeeCode}</p> : null}
-              <dl className="mt-4 grid gap-2 border-y border-border-subtle py-3 text-caption"><MobileField label="Ca làm" value={`${entry.workShiftCode} · ${entry.workShiftName}`} /><MobileField label="Thời gian" value={`${formatTime(entry.startTime)} - ${formatTime(entry.endTime)}${entry.crossesMidnight ? " (ngày hôm sau)" : ""}`} /><MobileField label="Nghỉ giữa ca" value={formatBreak(entry.breakMinutes)} /><MobileField label="Hiệu lực" value={entry.effectiveTo ? `Từ ${formatDate(entry.effectiveFrom)} đến ${formatDate(entry.effectiveTo)}` : `Từ ${formatDate(entry.effectiveFrom)}`} /></dl>
-              {canManage ? <div className="mt-4 grid gap-2 sm:grid-cols-2"><StaffShiftReplaceAction entry={entry} workShifts={workShifts} /><StaffShiftEndAction entry={entry} /></div> : null}
-            </article>
-          ))}
-        </ResponsiveRecordList>
-      </section>
+          <ResponsiveRecordList className="timekeeping-assignment-record-list" label="Lịch phân công ca đang hoạt động">
+            {entries.length === 0 ? <p className="rounded-lg border border-dashed border-border-subtle p-6 text-center text-sm text-text-muted">Chưa có lịch phân công ca đang hoạt động.</p> : entries.map((entry) => (
+              <article className="rounded-lg border border-border-subtle bg-surface-base p-4" key={entry.assignmentId} role="listitem">
+                <p className="text-caption font-semibold text-text-muted">{weekdayLabels[entry.weekday] ?? "Chưa xác định"}</p>
+                <h3 className="mt-1 text-body font-semibold text-text-strong">{getStaffLabel(entry)}</h3>
+                {entry.staffEmployeeCode ? <p className="mt-1 font-mono text-caption text-text-muted">{entry.staffEmployeeCode}</p> : null}
+                <dl className="mt-4 grid gap-2 border-y border-border-subtle py-3 text-caption"><MobileField label="Ca làm" value={`${entry.workShiftCode} · ${entry.workShiftName}`} /><MobileField label="Thời gian" value={`${formatTime(entry.startTime)} - ${formatTime(entry.endTime)}${entry.crossesMidnight ? " (ngày hôm sau)" : ""}`} /><MobileField label="Nghỉ giữa ca" value={formatBreak(entry.breakMinutes)} /><MobileField label="Hiệu lực" value={entry.effectiveTo ? `Từ ${formatDate(entry.effectiveFrom)} đến ${formatDate(entry.effectiveTo)}` : `Từ ${formatDate(entry.effectiveFrom)}`} /></dl>
+                {canManage ? <div className="mt-4 grid gap-2 sm:grid-cols-2"><StaffShiftReplaceAction entry={entry} workShifts={workShifts} /><StaffShiftEndAction entry={entry} /></div> : null}
+              </article>
+            ))}
+          </ResponsiveRecordList>
+        </section>
+      ) : null}
 
-      <WorkShiftCatalogue canManage={canManage} workShifts={workShifts} />
+      {canView ? <WorkShiftCatalogue canManage={canManage} workShifts={workShifts} /> : null}
     </div>
   );
 }

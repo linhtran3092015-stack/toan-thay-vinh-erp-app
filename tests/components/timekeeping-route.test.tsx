@@ -121,6 +121,47 @@ describe("Timekeeping route authority", () => {
     expect(dependencies.getMyTimeEntryAdjustmentRequests).not.toHaveBeenCalled();
   });
 
+  it("allows timekeeping.check-only users to access /timekeeping and load personal entries without loading broader staff attendance data", async () => {
+    setSharedReadResults();
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["timekeeping.check"],
+    });
+    dependencies.getMyTimekeepingEntries.mockResolvedValueOnce({ entries: [{ id: "my-entry" }], ok: true });
+    dependencies.getMyTimekeepingAdjustableEntries.mockResolvedValueOnce({ entries: [], ok: true });
+    dependencies.getMyTimeEntryAdjustmentRequests.mockResolvedValueOnce({ ok: true, requests: [] });
+
+    render(await TimekeepingRoute());
+
+    expect(screen.getByText("canCheck:true")).toBeInTheDocument();
+    expect(screen.getByText("myEntries:1")).toBeInTheDocument();
+    expect(screen.getByText("dayEntries:0")).toBeInTheDocument();
+
+    expect(dependencies.getMyTimekeepingEntries).toHaveBeenCalledOnce();
+    expect(dependencies.getMyTimekeepingAdjustableEntries).toHaveBeenCalledOnce();
+    expect(dependencies.getMyTimeEntryAdjustmentRequests).toHaveBeenCalledOnce();
+
+    expect(dependencies.getTimekeepingDayEntries).not.toHaveBeenCalled();
+    expect(dependencies.getTimekeepingSchedule).not.toHaveBeenCalled();
+    expect(dependencies.getTimekeepingWorkShifts).not.toHaveBeenCalled();
+    expect(dependencies.getTimekeepingStaffOptions).not.toHaveBeenCalled();
+    expect(dependencies.getTimeEntryAdjustmentApprovalQueue).not.toHaveBeenCalled();
+  });
+
+  it("denies access to /timekeeping when user has neither timekeeping.check nor timekeeping.view permission", async () => {
+    setSharedReadResults();
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: [],
+    });
+
+    render(await TimekeepingRoute());
+
+    expect(screen.getByText("Không có quyền truy cập chấm công")).toBeInTheDocument();
+    expect(dependencies.getMyTimekeepingEntries).not.toHaveBeenCalled();
+    expect(dependencies.getTimekeepingDayEntries).not.toHaveBeenCalled();
+  });
+
   it("loads management options only when staff.manage is present", async () => {
     setSharedReadResults();
     dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
