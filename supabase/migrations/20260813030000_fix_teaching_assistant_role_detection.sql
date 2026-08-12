@@ -1,7 +1,7 @@
 -- Migration: 20260813030000_fix_teaching_assistant_role_detection.sql
 -- Description: Resilient Teaching Assistant role detection matching canonical codes ('teaching_assistant', 'tro_giang', 'ta', 'assistant') and Vietnamese role name ('Trợ giảng').
 
--- 1. Helper function for resilient Teaching Assistant role detection
+-- 1. Helper function for deterministic Teaching Assistant role detection
 create or replace function public.is_user_teaching_assistant(p_user_id uuid)
 returns boolean
 language sql
@@ -15,20 +15,13 @@ as $$
     join public.roles as role
       on role.id = assignment.role_id
       and role.is_active
-      and (
-        role.code = 'teaching_assistant'
-        or pg_catalog.lower(role.code) in ('teaching_assistant', 'tro_giang', 'ta', 'assistant')
-        or pg_catalog.lower(role.code) like '%teaching_assistant%'
-        or pg_catalog.lower(role.code) like '%tro_giang%'
-        or pg_catalog.lower(role.name) like '%trợ giảng%'
-        or pg_catalog.lower(role.name) like '%teaching assistant%'
-      )
+      and pg_catalog.lower(role.code) in ('teaching_assistant', 'tro_giang')
     where assignment.user_id = p_user_id
       and assignment.revoked_at is null
   );
 $$;
 
-grant execute on function public.is_user_teaching_assistant(uuid) to authenticated, service_role;
+revoke all on function public.is_user_teaching_assistant(uuid) from public, anon, authenticated;
 
 -- 2. Update run_teaching_assistant_timekeeping_watchdog using helper
 create or replace function public.run_teaching_assistant_timekeeping_watchdog()
