@@ -39,8 +39,6 @@ function getRpcErrorMessage(message: string, isCheckIn: boolean): string {
     STAFF_PROFILE_NOT_FOUND: "Không tìm thấy hồ sơ nhân sự đang hoạt động.",
     TIMEKEEPING_CHECK_PERMISSION_REQUIRED:
       "Tài khoản hiện tại không có quyền timekeeping.check.",
-    TIME_ENTRY_ACTIVE_SCHEDULE_REQUIRED:
-      "Bạn chưa có lịch làm việc hiệu lực ở thời điểm này.",
     TIME_ENTRY_CENTER_CONFIG_NOT_FOUND:
       "Hệ thống chưa được cấu hình tọa độ vị trí Trung tâm. Vui lòng liên hệ Quản trị viên.",
     TIME_ENTRY_GPS_ACCURACY_TOO_LOW:

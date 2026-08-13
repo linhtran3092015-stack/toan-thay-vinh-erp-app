@@ -8,7 +8,7 @@ import {
   getEvidencePresenceLabel,
   getTimekeepingEntryStatusPresentation,
   getTimekeepingModeLabel,
-} from "@/features/timekeeping/components/my-timekeeping-panel";
+} from "@/features/timekeeping/timekeeping-entry-presentation";
 import type { TimekeepingDayEntry } from "@/features/timekeeping/types";
 
 interface TimekeepingDayEntriesProps {
@@ -100,8 +100,16 @@ function DayEntryTableRow({ entry }: { entry: TimekeepingDayEntry }) {
     <tr className="hover:bg-[var(--table-row-hover)]">
       <TableCell className="w-[176px]"><StaffIdentity entry={entry} /></TableCell>
       <TableCell className="w-[156px]">
-        <p className="font-medium text-text-default">{entry.workShiftName}</p>
-        <p className="mt-0.5 font-mono text-caption text-text-muted">{entry.workShiftCode}</p>
+        {entry.workShiftName ? (
+          <>
+            <p className="font-medium text-text-default">{entry.workShiftName}</p>
+            {entry.workShiftCode ? (
+              <p className="mt-0.5 font-mono text-caption text-text-muted">{entry.workShiftCode}</p>
+            ) : null}
+          </>
+        ) : (
+          <p className="text-text-muted">Không có ca được phân công</p>
+        )}
       </TableCell>
       <TableCell className="w-[134px] tabular-nums">
         <p>{formatTime(entry.checkInAt)}</p>
@@ -138,7 +146,12 @@ function DayEntryRecord({ entry }: { entry: TimekeepingDayEntry }) {
           label="Check-out"
           value={`${formatTime(entry.checkOutAt)}${entry.checkOutMode ? ` · ${entry.checkOutMode === "auto_end" ? "Tự động" : getTimekeepingModeLabel(entry.checkOutMode)}` : ""}`}
         />
-        <RecordField label="Ca làm" value={`${entry.workShiftCode} · ${entry.workShiftName}`} />
+        <RecordField
+          label="Ca làm"
+          value={entry.workShiftName
+            ? `${entry.workShiftCode ? `${entry.workShiftCode} · ` : ""}${entry.workShiftName}`
+            : "Không có ca được phân công"}
+        />
         <div>
           <dt className="text-label text-text-muted">Bằng chứng</dt>
           <dd className="mt-1"><EvidencePresence entry={entry} /></dd>

@@ -175,11 +175,7 @@ describe("Teaching Assistant Attendance Redesign", () => {
         return { allowed: true, assignedShiftId: hasShift ? "shift-123" : null };
       }
 
-      if (!hasShift) {
-        return { allowed: false, errorCode: "TIME_ENTRY_ACTIVE_SCHEDULE_REQUIRED", assignedShiftId: null };
-      }
-
-      return { allowed: true, assignedShiftId: "shift-123" };
+      return { allowed: true, assignedShiftId: hasShift ? "shift-123" : null };
     }
 
     it("allows TA with no shift, valid GPS, and inside geofence to check in with null shift ID", () => {
@@ -206,10 +202,10 @@ describe("Teaching Assistant Attendance Redesign", () => {
       expect(res.assignedShiftId).toBe("shift-123");
     });
 
-    it("fails Non-TA without active shift with TIME_ENTRY_ACTIVE_SCHEDULE_REQUIRED", () => {
+    it("allows Non-TA without an active shift and leaves the assignment null", () => {
       const res = evaluateCheckIn({ isTeachingAssistant: false, hasShift: false, hasGps: true });
-      expect(res.allowed).toBe(false);
-      expect(res.errorCode).toBe("TIME_ENTRY_ACTIVE_SCHEDULE_REQUIRED");
+      expect(res.allowed).toBe(true);
+      expect(res.assignedShiftId).toBeNull();
     });
   });
 });

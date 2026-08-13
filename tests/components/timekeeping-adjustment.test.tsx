@@ -308,6 +308,18 @@ describe("B. History", () => {
 // ─── C. Request Form & Chronology Validation ──────────────────────────────────
 
 describe("C. Request Form & Chronology Validation", () => {
+  it("labels an unscheduled attendance entry without hiding it", () => {
+    render(
+      <TimekeepingAdjustmentRequestDialog
+        entries={[{ ...eligibleEntry, workShiftCode: null, workShiftName: null }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Yêu cầu điều chỉnh" }));
+
+    expect(screen.getByRole("option", { name: /Không có ca được phân công/ })).toBeInTheDocument();
+  });
+
   it("opens the request dialog and shows required form fields", () => {
     render(
       <TimekeepingAdjustmentRequestDialog entries={[eligibleEntry]} />,

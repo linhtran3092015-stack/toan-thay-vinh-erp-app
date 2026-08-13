@@ -227,6 +227,53 @@ export type Database = {
           },
         ]
       }
+      center_attendance_configs: {
+        Row: {
+          attendance_radius_m: number
+          center_latitude: number | null
+          center_longitude: number | null
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          attendance_radius_m?: number
+          center_latitude?: number | null
+          center_longitude?: number | null
+          code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          attendance_radius_m?: number
+          center_latitude?: number | null
+          center_longitude?: number | null
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "center_attendance_configs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       class_schedule_import_batches: {
         Row: {
           academic_year_code: string
@@ -3515,10 +3562,15 @@ export type Database = {
           check_in_mode: string
           check_out_at: string | null
           check_out_mode: string | null
+          clock_out_reason: string | null
           created_at: string
           id: string
+          last_latitude: number | null
+          last_location_accuracy: number | null
+          last_location_at: string | null
+          last_longitude: number | null
           staff_id: string
-          staff_shift_assignment_id: string
+          staff_shift_assignment_id: string | null
           status: string
           updated_at: string
           work_date: string
@@ -3529,10 +3581,15 @@ export type Database = {
           check_in_mode: string
           check_out_at?: string | null
           check_out_mode?: string | null
+          clock_out_reason?: string | null
           created_at?: string
           id?: string
+          last_latitude?: number | null
+          last_location_accuracy?: number | null
+          last_location_at?: string | null
+          last_longitude?: number | null
           staff_id: string
-          staff_shift_assignment_id: string
+          staff_shift_assignment_id?: string | null
           status?: string
           updated_at?: string
           work_date: string
@@ -3543,10 +3600,15 @@ export type Database = {
           check_in_mode?: string
           check_out_at?: string | null
           check_out_mode?: string | null
+          clock_out_reason?: string | null
           created_at?: string
           id?: string
+          last_latitude?: number | null
+          last_location_accuracy?: number | null
+          last_location_at?: string | null
+          last_longitude?: number | null
           staff_id?: string
-          staff_shift_assignment_id?: string
+          staff_shift_assignment_id?: string | null
           status?: string
           updated_at?: string
           work_date?: string
@@ -4149,6 +4211,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      calculate_haversine_distance_m: {
+        Args: { lat1: number; lat2: number; lon1: number; lon2: number }
+        Returns: number
+      }
       cancel_class_session: {
         Args: { p_class_session_id: string; p_reason: string }
         Returns: {
@@ -4252,10 +4318,15 @@ export type Database = {
           check_in_mode: string
           check_out_at: string | null
           check_out_mode: string | null
+          clock_out_reason: string | null
           created_at: string
           id: string
+          last_latitude: number | null
+          last_location_accuracy: number | null
+          last_location_at: string | null
+          last_longitude: number | null
           staff_id: string
-          staff_shift_assignment_id: string
+          staff_shift_assignment_id: string | null
           status: string
           updated_at: string
           work_date: string
@@ -4282,10 +4353,15 @@ export type Database = {
           check_in_mode: string
           check_out_at: string | null
           check_out_mode: string | null
+          clock_out_reason: string | null
           created_at: string
           id: string
+          last_latitude: number | null
+          last_location_accuracy: number | null
+          last_location_at: string | null
+          last_longitude: number | null
           staff_id: string
-          staff_shift_assignment_id: string
+          staff_shift_assignment_id: string | null
           status: string
           updated_at: string
           work_date: string
@@ -5233,12 +5309,15 @@ export type Database = {
           check_in_mode: string
           check_out_at: string
           check_out_mode: string
+          clock_out_reason: string
           entry_id: string
           entry_status: string
           has_check_in_gps_evidence: boolean
           has_check_in_wifi_evidence: boolean
           has_check_out_gps_evidence: boolean
           has_check_out_wifi_evidence: boolean
+          is_unscheduled: boolean
+          last_location_at: string
           scheduled_end_time: string
           scheduled_start_time: string
           work_date: string
@@ -5246,6 +5325,7 @@ export type Database = {
           work_shift_name: string
         }[]
       }
+      get_my_timekeeping_status: { Args: never; Returns: Json }
       get_payroll_dashboard: {
         Args: never
         Returns: {
@@ -5397,6 +5477,10 @@ export type Database = {
         Returns: boolean
       }
       is_active_owner: { Args: never; Returns: boolean }
+      is_user_teaching_assistant: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       lock_class_session: {
         Args: { p_class_session_id: string; p_reason: string }
         Returns: {
@@ -5963,6 +6047,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      run_teaching_assistant_timekeeping_watchdog: {
+        Args: never
+        Returns: number
+      }
       set_role_permissions: {
         Args: {
           change_reason: string
@@ -6016,6 +6104,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      submit_attendance_heartbeat: {
+        Args: {
+          p_gps_accuracy_meters: number
+          p_gps_latitude: number
+          p_gps_longitude: number
+        }
+        Returns: Json
       }
       submit_payroll_for_review: {
         Args: { p_payroll_period_id: string }

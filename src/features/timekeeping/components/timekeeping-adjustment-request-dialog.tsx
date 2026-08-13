@@ -210,8 +210,9 @@ export function TimekeepingAdjustmentRequestDialog({
               >
                 {entries.map((entry) => (
                   <option key={entry.id} value={entry.id}>
-                    {formatVietnamDate(entry.workDate)} · {entry.workShiftCode}{" "}
-                    · {entry.workShiftName}
+                    {formatVietnamDate(entry.workDate)} · {entry.workShiftName
+                      ? `${entry.workShiftCode ? `${entry.workShiftCode} · ` : ""}${entry.workShiftName}`
+                      : "Không có ca được phân công"}
                   </option>
                 ))}
               </select>

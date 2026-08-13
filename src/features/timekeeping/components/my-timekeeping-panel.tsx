@@ -5,59 +5,24 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { TimekeepingEntryDialog } from "@/features/timekeeping/components/timekeeping-entry-dialog";
 import { useAttendanceHeartbeat } from "@/features/timekeeping/hooks/use-attendance-heartbeat";
-import type { TimeEntryStatus, TimekeepingMyEntry } from "@/features/timekeeping/types";
+import {
+  getClockOutReasonLabel,
+  getEvidencePresenceLabel,
+  getTimekeepingEntryStatusPresentation,
+  getTimekeepingModeLabel,
+} from "@/features/timekeeping/timekeeping-entry-presentation";
+import type { TimekeepingMyEntry } from "@/features/timekeeping/types";
+
+export {
+  getClockOutReasonLabel,
+  getEvidencePresenceLabel,
+  getTimekeepingEntryStatusPresentation,
+  getTimekeepingModeLabel,
+} from "@/features/timekeeping/timekeeping-entry-presentation";
 
 interface MyTimekeepingPanelProps {
   canCheck: boolean;
   entries: readonly TimekeepingMyEntry[];
-}
-
-type TimekeepingEntryTone = "info" | "neutral" | "success" | "danger" | "warning";
-
-interface TimekeepingEntryStatusPresentation {
-  label: string;
-  tone: TimekeepingEntryTone;
-}
-
-const modeLabels = {
-  offline: "Tại trung tâm",
-  online: "Trực tuyến",
-} as const;
-
-export function getTimekeepingEntryStatusPresentation(
-  status: TimeEntryStatus,
-): TimekeepingEntryStatusPresentation {
-  switch (status) {
-    case "open":
-      return { label: "Đang trong ca", tone: "info" };
-    case "checked_out":
-      return { label: "Đã check-out", tone: "success" };
-    case "auto_ended":
-      return { label: "Tự động kết thúc", tone: "neutral" };
-  }
-}
-
-export function getTimekeepingModeLabel(mode: "online" | "offline"): string {
-  return modeLabels[mode];
-}
-
-export function getEvidencePresenceLabel(hasEvidence: boolean): string {
-  return hasEvidence ? "Có dữ liệu" : "Không có dữ liệu";
-}
-
-export function getClockOutReasonLabel(reason?: string | null): string {
-  switch (reason) {
-    case "manual":
-      return "Tự check-out";
-    case "left_geofence":
-      return "Rời khỏi Trung tâm";
-    case "location_lost":
-      return "Mất kết nối vị trí (>90s)";
-    case "daily_cutoff":
-      return "Hết giờ ca (23:30)";
-    default:
-      return "Hệ thống tự động";
-  }
 }
 
 function formatTime(value: string): string {

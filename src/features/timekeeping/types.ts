@@ -151,8 +151,8 @@ export interface TimekeepingAdjustableEntry {
   id: string;
   status: Exclude<TimeEntryStatus, "open">;
   workDate: string;
-  workShiftCode: string;
-  workShiftName: string;
+  workShiftCode: string | null;
+  workShiftName: string | null;
 }
 
 export interface TimekeepingAdjustmentRequest {

@@ -72,6 +72,27 @@ describe("Timekeeping 1 day audit and personal panel", () => {
     expect(screen.queryByRole("button", { name: /đảo|điều chỉnh|kết thúc/i })).not.toBeInTheDocument();
   });
 
+  it("renders a nullable shift as an informational unscheduled entry", () => {
+    render(
+      <TimekeepingDayEntries
+        entries={[{ ...baseEntry, scheduledEndTime: null, scheduledStartTime: null, workShiftCode: null, workShiftName: null }]}
+      />,
+    );
+
+    expect(screen.getAllByText("Không có ca được phân công")).not.toHaveLength(0);
+    expect(screen.queryByText("null · null")).not.toBeInTheDocument();
+  });
+
+  it("keeps daily-audit presentation helpers outside the client-only personal panel", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/features/timekeeping/components/timekeeping-day-entries.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("timekeeping-entry-presentation");
+    expect(source).not.toContain("components/my-timekeeping-panel");
+  });
+
   it("keeps inbound and outbound evidence presence distinct without exposing raw evidence", () => {
     render(<MyTimekeepingPanel canCheck entries={[baseEntry]} />);
 
