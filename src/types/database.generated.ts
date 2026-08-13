@@ -1292,6 +1292,48 @@ export type Database = {
           },
         ]
       }
+      finance_order_reviews: {
+        Row: {
+          checked_at: string | null
+          checked_by: string | null
+          created_at: string
+          is_checked: boolean
+          source_cashflow_record_id: string
+          updated_at: string
+        }
+        Insert: {
+          checked_at?: string | null
+          checked_by?: string | null
+          created_at?: string
+          is_checked?: boolean
+          source_cashflow_record_id: string
+          updated_at?: string
+        }
+        Update: {
+          checked_at?: string | null
+          checked_by?: string | null
+          created_at?: string
+          is_checked?: boolean
+          source_cashflow_record_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_order_reviews_checked_by_fkey"
+            columns: ["checked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_order_reviews_source_cashflow_record_id_fkey"
+            columns: ["source_cashflow_record_id"]
+            isOneToOne: true
+            referencedRelation: "finance_cashflow_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_fee_policies: {
         Row: {
           area_code: string | null
@@ -2131,6 +2173,7 @@ export type Database = {
       sepay_transactions: {
         Row: {
           account_number: string
+          account_purpose: string
           amount_vnd: number
           bank_brand: string
           bank_transaction_id: string
@@ -2147,6 +2190,7 @@ export type Database = {
         }
         Insert: {
           account_number: string
+          account_purpose?: string
           amount_vnd: number
           bank_brand: string
           bank_transaction_id: string
@@ -2163,6 +2207,7 @@ export type Database = {
         }
         Update: {
           account_number?: string
+          account_purpose?: string
           amount_vnd?: number
           bank_brand?: string
           bank_transaction_id?: string
@@ -5216,6 +5261,32 @@ export type Database = {
           refund_vnd: number
         }[]
       }
+      get_finance_orders_dashboard: {
+        Args: {
+          p_month: string
+          p_order_type?: string
+          p_period?: number
+          p_source?: string
+        }
+        Returns: Json
+      }
+      get_finance_order_operating_cost: {
+        Args: {
+          p_order_type: string
+          p_source_code: string
+          p_source_group: string
+          p_tuition_amount_vnd: number
+        }
+        Returns: {
+          mechanism_code: string
+          operating_cost_vnd: number | null
+          status: string
+        }[]
+      }
+      get_finance_order_settlement_period: {
+        Args: { p_at: string }
+        Returns: number
+      }
       get_grading_credits_dashboard: {
         Args: { p_limit?: number }
         Returns: {
@@ -5625,6 +5696,7 @@ export type Database = {
       process_sepay_webhook_transaction: {
         Args: {
           p_account_number: string
+          p_account_purpose: string
           p_amount_in: number
           p_amount_out: number
           p_body_raw?: Json
@@ -5635,6 +5707,13 @@ export type Database = {
           p_sepay_id: number
           p_transaction_date: string
           p_transfer_type: string
+        }
+        Returns: Json
+      }
+      set_finance_order_review: {
+        Args: {
+          p_is_checked: boolean
+          p_source_cashflow_record_id: string
         }
         Returns: Json
       }

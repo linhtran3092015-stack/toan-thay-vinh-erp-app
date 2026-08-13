@@ -5,6 +5,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  getSepayAccountPurposePresentation,
   getSepayMatchPresentation,
   SepayTransactionHistory,
 } from "@/features/finance/components/sepay-transaction-history";
@@ -14,6 +15,7 @@ afterEach(cleanup);
 
 const transaction: SepayTransactionReadModel = {
   accountNumber: "0123456789",
+  accountPurpose: "new_enrollment",
   amountVnd: 1_250_000,
   bankBrand: "MB Bank",
   bankTransactionId: "SEPAY-001",
@@ -28,22 +30,28 @@ const transaction: SepayTransactionReadModel = {
 };
 
 describe("SePay transaction history presentation", () => {
-  it("keeps the mounted history strictly read-only without filters, pagination, or Finance actions", () => {
+  it("keeps the mounted history read-only while allowing a server-driven account-purpose filter", () => {
     render(<SepayTransactionHistory transactions={[transaction]} />);
 
     expect(screen.getByText("Hiển thị 1 giao dịch SePay mới nhất (tối đa 100).")).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tất cả tài khoản" })).toHaveAttribute("href", "/finance/sepay");
+    expect(screen.getByRole("link", { name: "Tuyển mới" })).toHaveAttribute("href", "/finance/sepay?accountPurpose=new_enrollment");
     expect(screen.queryByText(/phân bổ|đối soát thủ công|hoàn phí|hoàn tiền|xác nhận kế toán/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/trang \d|phân trang/i)).not.toBeInTheDocument();
   });
 
-  it("maps only the five existing match states with textual SePay-local meaning", () => {
+  it("maps reconciliation and receiving-account states with SePay-local meaning", () => {
     expect(getSepayMatchPresentation("unmatched")).toEqual({ label: "Chưa khớp", tone: "neutral" });
     expect(getSepayMatchPresentation("auto_matched")).toEqual({ label: "Khớp tự động", tone: "success" });
     expect(getSepayMatchPresentation("manual_matched")).toEqual({ label: "Khớp thủ công", tone: "success" });
     expect(getSepayMatchPresentation("split_allocated")).toEqual({ label: "Đã phân bổ nhiều học viên", tone: "info" });
     expect(getSepayMatchPresentation("amount_mismatch")).toEqual({ label: "Sai số tiền – cần đối soát", tone: "warning" });
+    expect(getSepayMatchPresentation("account_purpose_mismatch")).toEqual({ label: "Sai tài khoản nhận – cần đối soát", tone: "warning" });
+    expect(getSepayAccountPurposePresentation("new_enrollment")).toEqual({ label: "Tuyển mới", tone: "success" });
+    expect(getSepayAccountPurposePresentation("renewal")).toEqual({ label: "Tái phí", tone: "info" });
+    expect(getSepayAccountPurposePresentation("unknown")).toEqual({ label: "Chưa xác định", tone: "warning" });
   });
 
   it("keeps the bank amount neutral and transfer content fully available as plain text", () => {
@@ -76,7 +84,7 @@ describe("SePay transaction history presentation", () => {
     expect(screen.getAllByText("Chưa có tham chiếu")).toHaveLength(2);
   });
 
-  it("uses the zero-padding work area and the approved 1202px container threshold", () => {
+  it("uses the zero-padding work area and the approved 1342px container threshold", () => {
     const { container } = render(<SepayTransactionHistory transactions={[transaction]} />);
     const table = screen.getByRole("table", { name: "Danh sách giao dịch SePay mới nhất" });
     const list = screen.getByRole("list", { name: "Danh sách giao dịch SePay mới nhất" });
@@ -84,11 +92,11 @@ describe("SePay transaction history presentation", () => {
 
     expect(table.closest(".sepay-transaction-operational-work-area")).not.toBeNull();
     expect(list.closest(".sepay-transaction-operational-work-area")).not.toBeNull();
-    expect(table).toHaveClass("min-w-[1200px]");
+    expect(table).toHaveClass("min-w-[1340px]");
     expect(container.querySelector(".sepay-transaction-directory-table")).not.toBeNull();
     expect(container.querySelector(".sepay-transaction-directory-record-list")).not.toBeNull();
     expect(globals).toMatch(/\.sepay-transaction-operational-work-area\s*\{\s*container-type: inline-size/);
-    expect(globals).toMatch(/@container \(min-width: 1202px\)[\s\S]*\.sepay-transaction-directory-table/);
+    expect(globals).toMatch(/@container \(min-width: 1342px\)[\s\S]*\.sepay-transaction-directory-table/);
   });
 
   it("keeps the feature-owned empty state without creating controls", () => {

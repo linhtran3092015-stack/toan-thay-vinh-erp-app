@@ -2,9 +2,14 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { SepayTransactionHistory } from "@/features/finance/components/sepay-transaction-history";
 import { getSepayTransactionsResult } from "@/features/finance/data";
+import { parseSepayAccountPurposeFilter } from "@/features/finance/sepay-transaction-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
-export default async function SepayTransactionsPage() {
+interface SepayTransactionsPageProps {
+  searchParams: Promise<{ accountPurpose?: string | string[] }>;
+}
+
+export default async function SepayTransactionsPage({ searchParams }: SepayTransactionsPageProps) {
   const permissionResult = await getCachedDatabasePermissions();
 
   if (!permissionResult.ok) {
@@ -25,7 +30,10 @@ export default async function SepayTransactionsPage() {
     );
   }
 
-  const transactionsResult = await getSepayTransactionsResult();
+  const accountPurposeFilter = parseSepayAccountPurposeFilter(
+    (await searchParams).accountPurpose,
+  );
+  const transactionsResult = await getSepayTransactionsResult(accountPurposeFilter);
   if (!transactionsResult.ok) {
     return (
       <ErrorState
@@ -35,5 +43,10 @@ export default async function SepayTransactionsPage() {
     );
   }
 
-  return <SepayTransactionHistory transactions={transactionsResult.data} />;
+  return (
+    <SepayTransactionHistory
+      accountPurposeFilter={accountPurposeFilter}
+      transactions={transactionsResult.data}
+    />
+  );
 }

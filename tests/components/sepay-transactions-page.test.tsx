@@ -21,7 +21,7 @@ describe("SePay transaction history route states", () => {
       permissions: [],
     });
 
-    render(await SepayTransactionsPage());
+    render(await SepayTransactionsPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText("Không có quyền xem Giao dịch SePay")).toBeInTheDocument();
     expect(data.getSepayTransactionsResult).not.toHaveBeenCalled();
@@ -34,7 +34,7 @@ describe("SePay transaction history route states", () => {
     });
     data.getSepayTransactionsResult.mockResolvedValue({ ok: false });
 
-    render(await SepayTransactionsPage());
+    render(await SepayTransactionsPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText("Không tải được giao dịch SePay")).toBeInTheDocument();
   });

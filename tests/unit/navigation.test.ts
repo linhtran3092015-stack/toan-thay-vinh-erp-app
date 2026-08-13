@@ -72,6 +72,15 @@ describe("redesigned shell navigation", () => {
     expect(paymentsModule?.href).toBe("/finance/payment-requests");
   });
 
+  it("keeps Finance Orders in the finance domain under finance.view", () => {
+    const domains = getVisibleNavigationDomains(ownerPermissions);
+    const finance = getActiveNavigationDomain("/finance/orders", domains);
+    const ordersModule = getActiveNavigationItem(finance?.items ?? [], "/finance/orders");
+
+    expect(finance?.key).toBe("finance");
+    expect(ordersModule?.href).toBe("/finance/orders");
+  });
+
   it("maps the existing settings audit-log route to the audit module", () => {
     const domains = getVisibleNavigationDomains(ownerPermissions);
     const administration = getActiveNavigationDomain("/settings/audit-logs", domains);

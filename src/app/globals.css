@@ -362,13 +362,36 @@
   display: grid;
 }
 
-/* DataTableFrame owns a one-pixel border on each side of its 1200px table. */
-@container (min-width: 1202px) {
+/* DataTableFrame owns a one-pixel border on each side of its 1340px table. */
+@container (min-width: 1342px) {
   .sepay-transaction-directory-table {
     display: block;
   }
 
   .sepay-transaction-directory-record-list {
+    display: none;
+  }
+}
+
+/* Finance orders retain compact records until the full operational table is safe. */
+.finance-orders-operational-work-area {
+  container-type: inline-size;
+}
+
+.finance-orders-directory-table {
+  display: none;
+}
+
+.finance-orders-directory-record-list {
+  display: grid;
+}
+
+@container (min-width: 1882px) {
+  .finance-orders-directory-table {
+    display: block;
+  }
+
+  .finance-orders-directory-record-list {
     display: none;
   }
 }

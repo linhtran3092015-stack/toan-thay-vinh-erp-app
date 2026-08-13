@@ -30,8 +30,8 @@ select is(
     from cron.job
     where jobname = 'timekeeping-auto-end-teaching-assistants'
   ),
-  '30 16 * * *',
-  'the Timekeeping auto-end job uses the 16:30 UTC / Vietnam 23:30 schedule'
+  '* * * * *',
+  'the Timekeeping watchdog job runs every minute'
 );
 
 select is(
@@ -70,13 +70,13 @@ select is(
     from cron.job
     where jobname = 'timekeeping-auto-end-teaching-assistants'
   ),
-  'select public.auto_end_stale_teaching_assistant_time_entries();',
-  'the Timekeeping auto-end job invokes the expected function'
+  'select public.run_teaching_assistant_timekeeping_watchdog();',
+  'the Timekeeping watchdog job invokes the expected function'
 );
 
 select ok(
-  to_regprocedure('public.auto_end_stale_teaching_assistant_time_entries()') is not null,
-  'the Timekeeping auto-end target function resolves'
+  to_regprocedure('public.run_teaching_assistant_timekeeping_watchdog()') is not null,
+  'the Timekeeping watchdog target function resolves'
 );
 
 select is(

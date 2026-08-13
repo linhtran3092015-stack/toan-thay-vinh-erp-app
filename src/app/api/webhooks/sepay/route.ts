@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
-  isExpectedSepayAccount,
+  classifySepayReceivingAccount,
   parseSepayWebhookPayload,
   toSepayTransactionTimestamp,
   verifySepayWebhookSignature,
@@ -69,12 +69,14 @@ export async function POST(request: Request) {
     return webhookResponse(false, 400);
   }
 
-  if (!isExpectedSepayAccount(payload.accountNumber, webhookEnv.accountNumber)) {
-    return webhookResponse(false, 422);
-  }
+  const accountPurpose = classifySepayReceivingAccount(
+    payload.accountNumber,
+    webhookEnv.receivingAccounts,
+  );
 
   const args: ProcessSepayWebhookArgs = {
     p_account_number: payload.accountNumber,
+    p_account_purpose: accountPurpose,
     p_amount_in:
       payload.transferType === "in" ? payload.transferAmount : 0,
     p_amount_out:

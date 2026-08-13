@@ -20,6 +20,13 @@ import type { Database } from "@/types/database.generated";
 
 type CreatePaymentRequestRpcArgs = Database["public"]["Functions"]["create_student_payment_request"]["Args"];
 type AllocatePaymentRpcArgs = Database["public"]["Functions"]["allocate_payment_to_students"]["Args"];
+type SetFinanceOrderReviewRpcArgs = Database["public"]["Functions"]["set_finance_order_review"]["Args"];
+
+export interface FinanceOrderReviewActionResult {
+  isChecked?: boolean;
+  message: string;
+  status: "error" | "success";
+}
 
 function createErrorState(
   message: string,
@@ -76,6 +83,9 @@ function getFinanceRpcErrorMessage(message: string): string {
     SEPAY_ALLOCATE_PERMISSION_DENIED:
       "Tài khoản hiện tại không có quyền phân bổ giao dịch SePay.",
 
+    SEPAY_ACCOUNT_PURPOSE_UNRESOLVED:
+      "Giao dịch thuộc tài khoản nhận chưa được cấu hình nên chưa thể phân bổ.",
+
     STUDENT_NOT_FOUND:
       "Không tìm thấy học viên trong hệ thống.",
 
@@ -126,7 +136,9 @@ export async function createPaymentRequestAction(
 
   let paymentConfig: ReturnType<typeof getSepayPaymentEnv>;
   try {
-    paymentConfig = getSepayPaymentEnv();
+    paymentConfig = getSepayPaymentEnv(
+      parsed.data.topupType === "new" ? "new_enrollment" : "renewal",
+    );
   } catch {
     return createErrorState(
       "Chưa cấu hình tài khoản nhận tiền VietQR. Vui lòng liên hệ quản trị hệ thống.",
@@ -246,5 +258,51 @@ export async function allocatePaymentAction(
     };
   } catch {
     return createErrorState("Không thể kết nối tới hệ thống phân bổ học phí.");
+  }
+}
+
+export async function setFinanceOrderReviewAction(
+  sourceCashflowRecordId: string,
+  isChecked: boolean,
+): Promise<FinanceOrderReviewActionResult> {
+  const permissionResult = await getDatabasePermissions();
+  if (!permissionResult.ok || !permissionResult.permissions.includes("payments.manage")) {
+    return {
+      message: "Tài khoản hiện tại không có quyền xác nhận đơn hàng tài chính.",
+      status: "error",
+    };
+  }
+
+  if (!sourceCashflowRecordId || typeof isChecked !== "boolean") {
+    return { message: "Dữ liệu xác nhận đơn hàng không hợp lệ.", status: "error" };
+  }
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const args: SetFinanceOrderReviewRpcArgs = {
+      p_is_checked: isChecked,
+      p_source_cashflow_record_id: sourceCashflowRecordId,
+    };
+    const { error } = await supabase.rpc("set_finance_order_review", args);
+
+    if (error) {
+      return {
+        message: getFinanceRpcErrorMessage(error.message),
+        status: "error",
+      };
+    }
+
+    revalidatePath("/finance/orders");
+
+    return {
+      isChecked,
+      message: isChecked ? "Đã xác nhận đơn hàng." : "Đã bỏ xác nhận đơn hàng.",
+      status: "success",
+    };
+  } catch {
+    return {
+      message: "Không thể cập nhật xác nhận đơn hàng. Vui lòng thử lại sau.",
+      status: "error",
+    };
   }
 }

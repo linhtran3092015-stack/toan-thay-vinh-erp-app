@@ -4,6 +4,11 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { z } from "zod";
 
+import type {
+  SepayReceivingAccount,
+  SepayReceivingAccountPurpose,
+} from "@/lib/env";
+
 const SEPAY_SIGNATURE_PREFIX = "sha256=";
 const SEPAY_MAX_TIMESTAMP_AGE_SECONDS = 5 * 60;
 
@@ -82,11 +87,28 @@ export function parseSepayWebhookPayload(
   }
 }
 
-export function isExpectedSepayAccount(
+export type SepayAccountPurpose = SepayReceivingAccountPurpose | "unknown";
+
+/**
+ * The destination account from the signed SePay payload is the sole authority
+ * for a receipt's purpose. Unknown accounts remain auditable but are never
+ * inferred from transfer content or a matching payment request.
+ */
+export function classifySepayReceivingAccount(
   accountNumber: string,
-  expectedAccountNumber: string,
-): boolean {
-  return normalizeAccountNumber(accountNumber) === normalizeAccountNumber(expectedAccountNumber);
+  receivingAccounts: Record<SepayReceivingAccountPurpose, SepayReceivingAccount>,
+): SepayAccountPurpose {
+  const normalizedAccountNumber = normalizeAccountNumber(accountNumber);
+
+  for (const [purpose, account] of Object.entries(receivingAccounts) as Array<
+    [SepayReceivingAccountPurpose, SepayReceivingAccount]
+  >) {
+    if (normalizedAccountNumber === normalizeAccountNumber(account.accountNumber)) {
+      return purpose;
+    }
+  }
+
+  return "unknown";
 }
 
 export function toSepayTransactionTimestamp(

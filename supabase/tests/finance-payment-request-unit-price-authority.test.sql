@@ -1,6 +1,6 @@
 begin;
 
-select plan(7);
+select plan(11);
 
 insert into auth.users (
   id,
@@ -191,6 +191,7 @@ select public.process_sepay_webhook_transaction(
   'in',
   1400000,
   0,
+  'new_enrollment',
   null,
   '{}'::jsonb
 );
@@ -238,6 +239,82 @@ select is(
   ),
   'integer',
   'SePay finalization preserves the integer session-ledger invariant'
+);
+
+select is(
+  (
+    select transaction.account_purpose
+    from public.sepay_transactions as transaction
+    where transaction.bank_transaction_id = '610000001'
+  ),
+  'new_enrollment',
+  'the trusted receiving-account purpose is stored on the parsed SePay transaction'
+);
+
+select public.process_sepay_webhook_transaction(
+  610000001,
+  'TESTBANK',
+  '2026-08-11 00:00:00+00',
+  '0123456789',
+  null,
+  'duplicate delivery must be ignored',
+  'in',
+  1400000,
+  0,
+  'new_enrollment',
+  null,
+  '{}'::jsonb
+);
+
+select is(
+  (
+    select count(*)
+    from public.sepay_transactions as transaction
+    where transaction.bank_transaction_id = '610000001'
+  ),
+  1::bigint,
+  'a duplicate SePay delivery remains idempotent after account-purpose classification'
+);
+
+select public.process_sepay_webhook_transaction(
+  610000002,
+  'TESTBANK',
+  '2026-08-11 00:00:00+00',
+  '0999999999',
+  null,
+  (
+    select request.transfer_code
+    from finance_a1_requests as fixture
+    join public.student_payment_requests as request on request.id = fixture.id
+    where fixture.request_key = 'forged_low'
+  ),
+  'in',
+  1400000,
+  0,
+  'unknown',
+  null,
+  '{}'::jsonb
+);
+
+select is(
+  (
+    select transaction.account_purpose
+    from public.sepay_transactions as transaction
+    where transaction.bank_transaction_id = '610000002'
+  ),
+  'unknown',
+  'an unknown receiving account is retained visibly instead of guessed'
+);
+
+select is(
+  (
+    select request.status
+    from finance_a1_requests as fixture
+    join public.student_payment_requests as request on request.id = fixture.id
+    where fixture.request_key = 'forged_low'
+  ),
+  'pending',
+  'an unknown receiving account does not auto-match, credit, or settle a pending request'
 );
 
 select * from finish();

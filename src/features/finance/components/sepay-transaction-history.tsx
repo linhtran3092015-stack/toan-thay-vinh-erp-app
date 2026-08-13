@@ -1,13 +1,16 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { DataTableFrame } from "@/components/patterns/data-table-frame";
 import { PageHeader } from "@/components/patterns/page-header";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { getSepayAccountPurposeQuery, type SepayAccountPurposeFilter } from "@/features/finance/sepay-transaction-url-state";
 import type { SepayTransactionReadModel } from "@/features/finance/read-models";
 
 interface SepayTransactionHistoryProps {
+  accountPurposeFilter?: SepayAccountPurposeFilter;
   transactions: SepayTransactionReadModel[];
 }
 
@@ -16,6 +19,19 @@ type SepayMatchTone = "info" | "neutral" | "success" | "warning";
 interface SepayMatchPresentation {
   label: string;
   tone: SepayMatchTone;
+}
+
+export function getSepayAccountPurposePresentation(
+  purpose: SepayTransactionReadModel["accountPurpose"],
+): { label: string; tone: SepayMatchTone } {
+  switch (purpose) {
+    case "new_enrollment":
+      return { label: "Tuyển mới", tone: "success" };
+    case "renewal":
+      return { label: "Tái phí", tone: "info" };
+    case "unknown":
+      return { label: "Chưa xác định", tone: "warning" };
+  }
 }
 
 /** SePay-local reconciliation wording; it does not imply payment settlement. */
@@ -31,6 +47,8 @@ export function getSepayMatchPresentation(
       return { label: "Đã phân bổ nhiều học viên", tone: "info" };
     case "amount_mismatch":
       return { label: "Sai số tiền – cần đối soát", tone: "warning" };
+    case "account_purpose_mismatch":
+      return { label: "Sai tài khoản nhận – cần đối soát", tone: "warning" };
     case "unmatched":
       return { label: "Chưa khớp", tone: "neutral" };
   }
@@ -38,6 +56,7 @@ export function getSepayMatchPresentation(
 
 /** Read-only presentation of the existing 100-row SePay transaction read. */
 export function SepayTransactionHistory({
+  accountPurposeFilter = "",
   transactions,
 }: SepayTransactionHistoryProps) {
   return (
@@ -52,6 +71,12 @@ export function SepayTransactionHistory({
         aria-labelledby="sepay-transaction-result-context"
         className="sepay-transaction-operational-work-area grid min-w-0 gap-4"
       >
+        <nav aria-label="Lọc mục đích tài khoản nhận" className="flex flex-wrap gap-2">
+          <SepayPurposeFilterLink active={accountPurposeFilter === ""} purpose="">Tất cả tài khoản</SepayPurposeFilterLink>
+          <SepayPurposeFilterLink active={accountPurposeFilter === "new_enrollment"} purpose="new_enrollment">Tuyển mới</SepayPurposeFilterLink>
+          <SepayPurposeFilterLink active={accountPurposeFilter === "renewal"} purpose="renewal">Tái phí</SepayPurposeFilterLink>
+          <SepayPurposeFilterLink active={accountPurposeFilter === "unknown"} purpose="unknown">Chưa xác định</SepayPurposeFilterLink>
+        </nav>
         <p
           aria-live="polite"
           className="text-secondary text-text-muted"
@@ -75,7 +100,7 @@ export function SepayTransactionHistory({
 
 function SepayTransactionTable({
   transactions,
-}: SepayTransactionHistoryProps) {
+}: Pick<SepayTransactionHistoryProps, "transactions">) {
   return (
     <div className="sepay-transaction-results-work-area">
       <DataTableFrame
@@ -89,13 +114,14 @@ function SepayTransactionTable({
             <TableHeader>Mã giao dịch</TableHeader>
             <TableHeader>Thời gian</TableHeader>
             <TableHeader>Ngân hàng · STK</TableHeader>
+            <TableHeader>Tài khoản nhận</TableHeader>
             <TableHeader>Nội dung chuyển khoản</TableHeader>
             <TableHeader className="text-right">Số tiền</TableHeader>
             <TableHeader>Trạng thái khớp</TableHeader>
             <TableHeader>Tham chiếu hiện có</TableHeader>
           </tr>
         }
-        tableClassName="min-w-[1200px] table-fixed text-table-body text-text-default"
+        tableClassName="min-w-[1340px] table-fixed text-table-body text-text-default"
       />
 
       <ResponsiveRecordList
@@ -129,6 +155,7 @@ function SepayTransactionTableRow({
           {transaction.accountNumber}
         </p>
       </TableCell>
+      <TableCell className="w-[136px]"><SepayAccountPurposeBadge purpose={transaction.accountPurpose} /></TableCell>
       <TableCell className="w-[286px] break-words font-mono text-caption text-text-default">
         {transaction.transferContent}
       </TableCell>
@@ -172,6 +199,7 @@ function SepayTransactionRecord({
           <span className="font-medium text-text-default">Ngân hàng · STK:</span>{" "}
           {transaction.bankBrand} · {transaction.accountNumber}
         </p>
+        <p><span className="font-medium text-text-default">Tài khoản nhận:</span> <SepayAccountPurposeBadge purpose={transaction.accountPurpose} /></p>
         <p className="break-words font-mono text-caption text-text-default">
           {transaction.transferContent}
         </p>
@@ -184,6 +212,26 @@ function SepayTransactionRecord({
   );
 }
 
+function SepayPurposeFilterLink({
+  active,
+  children,
+  purpose,
+}: {
+  active: boolean;
+  children: ReactNode;
+  purpose: SepayAccountPurposeFilter;
+}) {
+  return (
+    <Link
+      aria-current={active ? "page" : undefined}
+      className={`inline-flex h-9 items-center rounded-md border px-3 text-control font-semibold transition-colors ${active ? "border-action-primary bg-action-primary text-text-on-primary" : "border-border-subtle bg-surface-base text-text-muted hover:bg-interactive-hover hover:text-text-strong"}`}
+      href={`/finance/sepay${getSepayAccountPurposeQuery(purpose)}`}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function SepayMatchBadge({
   status,
 }: {
@@ -191,6 +239,15 @@ function SepayMatchBadge({
 }) {
   const presentation = getSepayMatchPresentation(status);
 
+  return <Badge tone={presentation.tone}>{presentation.label}</Badge>;
+}
+
+function SepayAccountPurposeBadge({
+  purpose,
+}: {
+  purpose: SepayTransactionReadModel["accountPurpose"];
+}) {
+  const presentation = getSepayAccountPurposePresentation(purpose);
   return <Badge tone={presentation.tone}>{presentation.label}</Badge>;
 }
 

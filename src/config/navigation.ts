@@ -118,6 +118,12 @@ export const navigationDomains: readonly NavigationDomain[] = [
       },
       {
         available: true,
+        href: "/finance/orders",
+        label: "Đơn hàng",
+        permission: "finance.view",
+      },
+      {
+        available: true,
         href: "/finance/session-ledger",
         label: "Sổ cái số buổi",
         permission: "session_ledger.view",

@@ -29,6 +29,7 @@ export interface PaymentRequestFiltersState {
 
 export interface SepayTransactionReadModel {
   accountNumber: string;
+  accountPurpose: "new_enrollment" | "renewal" | "unknown";
   amountVnd: number;
   bankBrand: string;
   bankTransactionId: string;
@@ -39,12 +40,79 @@ export interface SepayTransactionReadModel {
     | "auto_matched"
     | "manual_matched"
     | "split_allocated"
-    | "amount_mismatch";
+    | "amount_mismatch"
+    | "account_purpose_mismatch";
   matchedAt: string | null;
   matchedPaymentRequestCode: string | null;
   matchedStudentFullName: string | null;
   transactionAt: string;
   transferContent: string;
+}
+
+export interface FinanceOrderFiltersState {
+  month: string;
+  orderType: "" | "new_enrollment" | "renewal";
+  period: "" | "1" | "2" | "3";
+  source: "" | "mma" | "sb" | "sb_f1";
+}
+
+export interface FinanceOrderReadModel {
+  bankTransactionId: string;
+  checkedAt: string | null;
+  checkedBy: string | null;
+  classCode: string | null;
+  className: string | null;
+  isChecked: boolean;
+  leadSourceCode: string | null;
+  leadSourceName: string | null;
+  mechanismCode: string;
+  operatingCostStatus: "configured" | "unconfigured";
+  operatingCostVnd: number | null;
+  orderType: "new_enrollment" | "renewal" | "unknown";
+  referenceCode: string;
+  saleOwnerFullName: string | null;
+  saleOwnerId: string | null;
+  sepayTransactionId: string;
+  settlementPeriod: 1 | 2 | 3;
+  sourceCashflowRecordId: string;
+  sourceCode: "mma" | "sb" | "sb_f1" | null;
+  sourceLabel: "MMA" | "SB" | "SB F1" | null;
+  studentFullName: string;
+  studentId: string;
+  studentPublicCode: string;
+  transactionAt: string;
+  transferContent: string;
+  tuitionAmountVnd: number;
+  guardianFullName: string | null;
+  guardianPhone: string | null;
+}
+
+export interface FinanceOrderSummaryReadModel {
+  checkedCount: number;
+  operatingCostVnd: number;
+  orderCount: number;
+  tuitionAmountVnd: number;
+  uncheckedCount: number;
+  unconfiguredCount: number;
+}
+
+export interface FinanceOrderSettlementReadModel {
+  checkedCount: number;
+  newEnrollmentCount: number;
+  operatingCostVnd: number;
+  period: 1 | 2 | 3;
+  renewalCount: number;
+  tuitionAmountVnd: number;
+  uncheckedCount: number;
+  unconfiguredCount: number;
+}
+
+export interface FinanceOrdersDashboardReadModel {
+  month: string;
+  orders: FinanceOrderReadModel[];
+  settlement: FinanceOrderSettlementReadModel[];
+  settlementEligible: boolean;
+  summary: FinanceOrderSummaryReadModel;
 }
 
 export interface CashflowRecordReadModel {
