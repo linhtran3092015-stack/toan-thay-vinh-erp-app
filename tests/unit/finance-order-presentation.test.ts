@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { getFinanceOrderCostPresentation } from "@/features/finance/finance-order-presentation";
+import {
+  formatFinanceDateTime,
+  getFinanceOrderCostPresentation,
+} from "@/features/finance/finance-order-presentation";
 
 describe("Finance Order cost presentation", () => {
+  it("formats transaction timestamps in the fixed business timezone for deterministic hydration", () => {
+    expect(formatFinanceDateTime("2026-07-25T07:00:00.000Z")).toBe("14:00 25/07/2026");
+  });
+
   it("never presents an unconfigured policy as zero VND", () => {
     expect(getFinanceOrderCostPresentation({
       mechanismCode: "unconfigured",
