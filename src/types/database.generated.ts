@@ -2179,6 +2179,7 @@ export type Database = {
           effective_to: string | null
           id: string
           purpose: string
+          signed_account_number: string | null
           status: string
         }
         Insert: {
@@ -2194,6 +2195,7 @@ export type Database = {
           effective_to?: string | null
           id?: string
           purpose: string
+          signed_account_number?: string | null
           status?: string
         }
         Update: {
@@ -2209,6 +2211,7 @@ export type Database = {
           effective_to?: string | null
           id?: string
           purpose?: string
+          signed_account_number?: string | null
           status?: string
         }
         Relationships: [
@@ -5406,6 +5409,38 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_sepay_receiving_account_version: {
+        Args: {
+          p_account_display_name: string
+          p_account_number: string
+          p_bank_code: string
+          p_effective_from: string
+          p_purpose: string
+          p_reason: string
+        }
+        Returns: {
+          account_display_name: string
+          account_number: string
+          audit_metadata: Json
+          bank_code: string
+          changed_at: string | null
+          changed_by: string | null
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          purpose: string
+          signed_account_number: string | null
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sepay_receiving_account_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_session_balance_import_batch: {
         Args: {
           p_effective_on: string
@@ -5889,6 +5924,16 @@ export type Database = {
           student_public_code: string
         }[]
       }
+      get_effective_sepay_receiving_account: {
+        Args: { p_effective_on?: string; p_purpose: string }
+        Returns: {
+          account_display_name: string
+          account_number: string
+          account_version_id: string
+          bank_code: string
+          purpose: string
+        }[]
+      }
       get_finance_cashflow_summary: {
         Args: never
         Returns: {
@@ -6295,6 +6340,10 @@ export type Database = {
         Returns: Json
       }
       next_student_public_code: { Args: never; Returns: string }
+      normalize_sepay_receiving_account_number: {
+        Args: { p_account_number: string }
+        Returns: string
+      }
       normalize_student_name: { Args: { name_value: string }; Returns: string }
       normalize_vietnam_phone: {
         Args: { phone_value: string }
@@ -6703,6 +6752,17 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      resolve_sepay_receiving_account: {
+        Args: { p_signed_account_number: string; p_transaction_at: string }
+        Returns: {
+          account_display_name: string
+          account_number: string
+          account_version_id: string
+          bank_code: string
+          purpose: string
+          signed_account_number: string
+        }[]
+      }
       resume_student_enrollment: {
         Args: {
           p_effective_from: string
@@ -6731,6 +6791,35 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "student_enrollments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      retire_sepay_receiving_account_version: {
+        Args: {
+          p_account_version_id: string
+          p_effective_to: string
+          p_reason: string
+        }
+        Returns: {
+          account_display_name: string
+          account_number: string
+          audit_metadata: Json
+          bank_code: string
+          changed_at: string | null
+          changed_by: string | null
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          purpose: string
+          signed_account_number: string | null
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sepay_receiving_account_versions"
           isOneToOne: true
           isSetofReturn: false
         }

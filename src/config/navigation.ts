@@ -134,6 +134,12 @@ export const navigationDomains: readonly NavigationDomain[] = [
         label: "Kỳ thu học phí",
         permission: "tuition_periods.view",
       },
+      {
+        available: true,
+        href: "/finance/receiving-accounts",
+        label: "Tài khoản nhận SePay",
+        permission: "settings.sepay_receiving_accounts.manage",
+      },
     ],
     key: "finance",
     label: "Tài chính",

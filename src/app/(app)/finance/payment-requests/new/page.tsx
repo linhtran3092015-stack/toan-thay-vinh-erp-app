@@ -2,8 +2,8 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { PaymentRequestCreateForm } from "@/features/finance/components/payment-request-create-form";
 import { getPaymentRequestCreationOptions } from "@/features/finance/payment-request-create-data";
-import { isSepayPaymentConfigured } from "@/lib/env";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function NewPaymentRequestPage() {
   const permissionResult = await getCachedDatabasePermissions();
@@ -48,11 +48,19 @@ export default async function NewPaymentRequestPage() {
     );
   }
 
+  const supabase = await createSupabaseServerClient();
+  const accountChecks = await Promise.all([
+    supabase.rpc("get_effective_sepay_receiving_account", { p_purpose: "new_enrollment" }),
+    supabase.rpc("get_effective_sepay_receiving_account", { p_purpose: "renewal" }),
+  ]);
+  const isPaymentConfigured = accountChecks.every(
+    ({ data, error }) => !error && Array.isArray(data) && data.length === 1,
+  );
+
   return (
     <PaymentRequestCreateForm
-      isPaymentConfigured={isSepayPaymentConfigured()}
+      isPaymentConfigured={isPaymentConfigured}
       students={optionsResult.data}
     />
   );
 }
-

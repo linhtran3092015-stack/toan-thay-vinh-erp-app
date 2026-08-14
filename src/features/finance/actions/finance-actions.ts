@@ -12,8 +12,7 @@ import {
   allocatePaymentSchema,
   createPaymentRequestSchema,
 } from "@/features/finance/forms/finance-schemas";
-import { buildVietQrPaymentDetails } from "@/features/finance/vietqr";
-import { getSepayPaymentEnv } from "@/lib/env";
+import { buildLockedVietQrPaymentDetails } from "@/features/finance/vietqr";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.generated";
@@ -134,19 +133,26 @@ export async function createPaymentRequestAction(
     );
   }
 
-  let paymentConfig: ReturnType<typeof getSepayPaymentEnv>;
-  try {
-    paymentConfig = getSepayPaymentEnv(
-      parsed.data.topupType === "new" ? "new_enrollment" : "renewal",
-    );
-  } catch {
-    return createErrorState(
-      "Chưa cấu hình tài khoản nhận tiền VietQR. Vui lòng liên hệ quản trị hệ thống.",
-    );
-  }
-
   try {
     const supabase = await createSupabaseServerClient();
+    const { data: accountRows, error: accountError } = await supabase.rpc(
+      "get_effective_sepay_receiving_account",
+      { p_purpose: parsed.data.topupType === "new" ? "new_enrollment" : "renewal" },
+    );
+    const account = Array.isArray(accountRows) ? accountRows[0] : null;
+
+    if (
+      accountError ||
+      !account ||
+      !account.bank_code ||
+      !account.account_number ||
+      !account.account_display_name
+    ) {
+      return createErrorState(
+        "Chưa cấu hình tài khoản nhận tiền VietQR trong catalog SePay.",
+      );
+    }
+
     const rpcArgs: CreatePaymentRequestRpcArgs = {
       p_bonus_sessions: parsed.data.bonusSessions,
       p_expected_amount_vnd: parsed.data.expectedAmountVnd,
@@ -176,8 +182,11 @@ export async function createPaymentRequestAction(
     const expectedAmountVnd = Number(
       data.expected_amount_vnd ?? parsed.data.expectedAmountVnd,
     );
-    const qrDetails = buildVietQrPaymentDetails(paymentConfig, {
+    const qrDetails = buildLockedVietQrPaymentDetails({
+      accountDisplayName: account.account_display_name,
+      accountNumber: account.account_number,
       amountVnd: expectedAmountVnd,
+      bankCode: account.bank_code,
       transferCode: data.transfer_code,
     });
 

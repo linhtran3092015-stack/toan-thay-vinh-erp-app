@@ -1,6 +1,6 @@
 begin;
 
-select plan(27);
+select plan(35);
 
 select ok(
   exists (select 1 from public.tuition_receipt_template_versions where version_number = 1),
@@ -36,8 +36,56 @@ insert into public.sepay_receiving_account_versions (
   'renewal', 'ACB', '999999', 'Renewal Account B', date '2026-09-01'
 );
 
+insert into public.sepay_receiving_account_versions (
+  purpose, bank_code, account_number, account_display_name, effective_from, effective_to
+) values (
+  'new_enrollment', 'MB', '0100123456', 'New Enrollment Account', date '2026-08-01', date '2026-08-31'
+);
+
 select is(
-  (select account_number from public.sepay_receiving_account_versions where effective_from = date '2026-08-01'),
+  (select purpose from public.resolve_sepay_receiving_account('0100 123 456', timestamptz '2026-08-31 16:00:00+00')),
+  'new_enrollment',
+  'a signed new-enrollment account resolves from the canonical catalog'
+);
+
+select is(
+  (select purpose from public.resolve_sepay_receiving_account('0999999999', timestamptz '2026-09-02 01:00:00+00')),
+  'unknown',
+  'an unknown signed account remains unknown and cannot be inferred from payment content'
+);
+
+select throws_ok(
+  $$insert into public.sepay_receiving_account_versions (purpose, bank_code, account_number, account_display_name, effective_from) values ('new_enrollment','VCB','1900123456','Conflicting Account A',date '2026-08-15')$$,
+  '23P01',
+  null,
+  'the same signed account identity cannot map to a conflicting purpose during an overlapping range'
+);
+
+select lives_ok(
+  $$insert into public.sepay_receiving_account_versions (purpose, bank_code, account_number, account_display_name, effective_from) values ('new_enrollment','VCB','1900123456','Account A later purpose',date '2026-09-01')$$,
+  'the same signed identity may be reused after its historical effective range ends'
+);
+
+select is(
+  (select purpose from public.resolve_sepay_receiving_account('1900123456', timestamptz '2026-08-31 16:00:00+00')),
+  'renewal',
+  'Account A resolves as renewal using the Vietnam business date at the historical transaction time'
+);
+
+select is(
+  (select purpose from public.resolve_sepay_receiving_account('999999', timestamptz '2026-09-01 00:01:00+07')),
+  'renewal',
+  'Account B resolves as renewal at its future effective transaction time'
+);
+
+select is(
+  (select purpose from public.resolve_sepay_receiving_account('1900123456', timestamptz '2026-08-31 16:00:00+00')),
+  'renewal',
+  'a webhook retried after Account B is current retains Account A renewal classification when it passes the signed August transaction timestamp'
+);
+
+select is(
+  (select account_number from public.sepay_receiving_account_versions where purpose = 'renewal' and effective_from = date '2026-08-01'),
   '1900123456',
   'closing Account A does not rewrite its historical public account record'
 );
@@ -99,6 +147,7 @@ select is((public.lock_tuition_collection_period('7a000000-0000-0000-0000-000000
 select is((select payment_contract_snapshot->>'account_number' from public.tuition_collection_items where period_id='7a000000-0000-0000-0000-000000000001'),'1900123456','lock snapshots Account A, rather than a later account');
 select is((select (payment_contract_snapshot->>'amount_vnd')::bigint from public.tuition_collection_items where period_id='7a000000-0000-0000-0000-000000000001'),600000::bigint,'lock snapshots exact locked tuition amount');
 select matches((select payment_contract_snapshot->>'transfer_code' from public.tuition_collection_items where period_id='7a000000-0000-0000-0000-000000000001'),'^TTV PAY-.*$','lock snapshots the canonical transfer reference');
+select is((select purpose from public.resolve_sepay_receiving_account((select payment_contract_snapshot->>'account_number' from public.tuition_collection_items where period_id='7a000000-0000-0000-0000-000000000001'),timestamptz '2026-08-31 16:00:00+00')),'renewal','the locked QR account identity resolves to the same renewal purpose in webhook classification');
 select is((public.lock_tuition_collection_period('7a000000-0000-0000-0000-000000000001')->>'idempotent'),'true','lock retry is idempotent');
 select is((select count(*) from public.student_payment_requests where notes like 'Tuition collection item%'),1::bigint,'retry creates exactly one renewal payment request');
 

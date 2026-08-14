@@ -11,7 +11,8 @@ insert into public.permissions (code, module, name, description) values
   ('tuition_periods.adjust', 'tuition_periods', 'Điều chỉnh phiếu học phí', 'Lập điều chỉnh hoặc phát hành lại phiếu đã khóa'),
   ('students.manage_tuition_rates', 'students', 'Quản lý đơn giá học phí', 'Thêm phiên bản đơn giá học phí học viên'),
   ('students.correct_acquisition_source', 'students', 'Sửa nguồn học viên', 'Hiệu chỉnh nguồn học viên có lưu vết'),
-  ('settings.receipts.manage', 'settings', 'Quản lý mẫu phiếu học phí', 'Xuất bản phiên bản mẫu phiếu học phí')
+  ('settings.receipts.manage', 'settings', 'Quản lý mẫu phiếu học phí', 'Xuất bản phiên bản mẫu phiếu học phí'),
+  ('settings.sepay_receiving_accounts.manage', 'settings', 'Quản lý tài khoản nhận SePay', 'Quản lý phiên bản tài khoản nhận công khai theo mục đích')
 on conflict (code) do update set module = excluded.module, name = excluded.name, description = excluded.description;
 
 insert into public.role_permissions (role_id, permission_id)
@@ -19,7 +20,7 @@ select r.id, p.id
 from public.roles r join public.permissions p on true
 where (r.code = 'owner' and p.code in (
   'tuition_periods.view','tuition_periods.manage','tuition_periods.lock','tuition_periods.export','tuition_periods.adjust',
-  'students.manage_tuition_rates','students.correct_acquisition_source','settings.receipts.manage'
+  'students.manage_tuition_rates','students.correct_acquisition_source','settings.receipts.manage','settings.sepay_receiving_accounts.manage'
 )) or (r.code in ('operations_manager','assistant_manager','accountant') and p.code in (
   'tuition_periods.view','tuition_periods.manage','tuition_periods.export'
 ))
@@ -76,11 +77,17 @@ on conflict (template_id,version_number) do nothing;
 
 -- Public receiving-account identity only. SePay credentials and webhook secrets
 -- remain environment-managed and never appear in this catalog or a notice.
+create or replace function public.normalize_sepay_receiving_account_number(p_account_number text)
+returns text language sql immutable strict set search_path = '' as $$
+  select pg_catalog.upper(pg_catalog.regexp_replace(pg_catalog.btrim(p_account_number), '[[:space:]]+', '', 'g'));
+$$;
+
 create table public.sepay_receiving_account_versions (
   id uuid primary key default gen_random_uuid(),
   purpose text not null check (purpose in ('new_enrollment','renewal')),
   bank_code text not null check (length(trim(bank_code)) > 0),
   account_number text not null check (length(trim(account_number)) > 0),
+  signed_account_number text generated always as (public.normalize_sepay_receiving_account_number(account_number)) stored,
   account_display_name text not null check (length(trim(account_display_name)) > 0),
   effective_from date not null,
   effective_to date,
@@ -96,6 +103,9 @@ create index sepay_receiving_account_versions_effective_idx on public.sepay_rece
 create extension if not exists btree_gist;
 alter table public.sepay_receiving_account_versions add constraint sepay_receiving_account_versions_no_active_overlap
   exclude using gist (purpose with =, daterange(effective_from, coalesce(effective_to + 1, 'infinity'::date), '[)') with &&)
+  where (status = 'active');
+alter table public.sepay_receiving_account_versions add constraint sepay_receiving_account_versions_no_active_signed_identity_overlap
+  exclude using gist (signed_account_number with =, daterange(effective_from, coalesce(effective_to + 1, 'infinity'::date), '[)') with &&)
   where (status = 'active');
 
 create table public.tuition_collection_periods (
@@ -233,6 +243,88 @@ begin
   return v_row;
 end; $$;
 
+-- accountNumber is the only receiving-account identifier signed in the current
+-- SePay webhook payload. Resolve it at the transaction's Vietnam business date,
+-- never from process ENV or transfer content.
+create or replace function public.resolve_sepay_receiving_account(p_signed_account_number text, p_transaction_at timestamptz)
+returns table(account_version_id uuid, purpose text, bank_code text, account_number text, account_display_name text, signed_account_number text)
+language plpgsql security definer set search_path = '' as $$
+declare v_effective_on date; v_matches integer;
+begin
+  if p_transaction_at is null or nullif(trim(p_signed_account_number),'') is null then
+    return query select null::uuid, 'unknown'::text, null::text, null::text, null::text, null::text;
+    return;
+  end if;
+  v_effective_on := (p_transaction_at at time zone 'Asia/Ho_Chi_Minh')::date;
+  select count(*) into v_matches
+  from public.sepay_receiving_account_versions v
+  where v.status='active'
+    and v.signed_account_number=public.normalize_sepay_receiving_account_number(p_signed_account_number)
+    and v.effective_from<=v_effective_on
+    and coalesce(v.effective_to,v_effective_on)>=v_effective_on;
+  if v_matches<>1 then
+    return query select null::uuid, 'unknown'::text, null::text, null::text, null::text, null::text;
+    return;
+  end if;
+  return query
+  select v.id,v.purpose,v.bank_code,v.account_number,v.account_display_name,v.signed_account_number
+  from public.sepay_receiving_account_versions v
+  where v.status='active'
+    and v.signed_account_number=public.normalize_sepay_receiving_account_number(p_signed_account_number)
+    and v.effective_from<=v_effective_on
+    and coalesce(v.effective_to,v_effective_on)>=v_effective_on;
+end; $$;
+
+create or replace function public.get_effective_sepay_receiving_account(p_purpose text, p_effective_on date default current_date)
+returns table(account_version_id uuid, purpose text, bank_code text, account_number text, account_display_name text)
+language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid:=auth.uid(); v_matches integer;
+begin
+  if v_actor is null then raise exception 'AUTHENTICATION_REQUIRED'; end if;
+  if not (public.has_permission('payments.create_request') or public.has_permission('payments.manage') or public.has_permission('settings.sepay_receiving_accounts.manage')) then
+    raise exception 'SEPAY_RECEIVING_ACCOUNT_PERMISSION_DENIED';
+  end if;
+  if p_purpose not in ('new_enrollment','renewal') or p_effective_on is null then raise exception 'SEPAY_RECEIVING_ACCOUNT_INPUT_INVALID'; end if;
+  select count(*) into v_matches from public.sepay_receiving_account_versions v
+  where v.purpose=p_purpose and v.status='active' and v.effective_from<=p_effective_on and coalesce(v.effective_to,p_effective_on)>=p_effective_on;
+  if v_matches<>1 then raise exception 'SEPAY_RECEIVING_ACCOUNT_UNAVAILABLE'; end if;
+  return query select v.id,v.purpose,v.bank_code,v.account_number,v.account_display_name from public.sepay_receiving_account_versions v
+  where v.purpose=p_purpose and v.status='active' and v.effective_from<=p_effective_on and coalesce(v.effective_to,p_effective_on)>=p_effective_on;
+end; $$;
+
+create or replace function public.create_sepay_receiving_account_version(p_purpose text, p_bank_code text, p_account_number text, p_account_display_name text, p_effective_from date, p_reason text)
+returns public.sepay_receiving_account_versions
+language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid:=auth.uid(); v_row public.sepay_receiving_account_versions;
+begin
+  if v_actor is null then raise exception 'AUTHENTICATION_REQUIRED'; end if;
+  if not public.has_permission('settings.sepay_receiving_accounts.manage') then raise exception 'SEPAY_RECEIVING_ACCOUNT_PERMISSION_DENIED'; end if;
+  if p_purpose not in ('new_enrollment','renewal') or p_effective_from is null or nullif(trim(p_bank_code),'') is null or nullif(trim(p_account_number),'') is null or nullif(trim(p_account_display_name),'') is null or nullif(trim(p_reason),'') is null then raise exception 'SEPAY_RECEIVING_ACCOUNT_INPUT_INVALID'; end if;
+  insert into public.sepay_receiving_account_versions(purpose,bank_code,account_number,account_display_name,effective_from,created_by,audit_metadata)
+  values(p_purpose,trim(p_bank_code),trim(p_account_number),trim(p_account_display_name),p_effective_from,v_actor,jsonb_build_object('reason',trim(p_reason)))
+  returning * into v_row;
+  insert into public.audit_logs(actor_user_id,module,action,entity_type,entity_id,new_data,reason)
+  values(v_actor,'finance','sepay_receiving_account_version_created','sepay_receiving_account_version',v_row.id::text,to_jsonb(v_row),trim(p_reason));
+  return v_row;
+end; $$;
+
+create or replace function public.retire_sepay_receiving_account_version(p_account_version_id uuid, p_effective_to date, p_reason text)
+returns public.sepay_receiving_account_versions
+language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid:=auth.uid(); v_row public.sepay_receiving_account_versions;
+begin
+  if v_actor is null then raise exception 'AUTHENTICATION_REQUIRED'; end if;
+  if not public.has_permission('settings.sepay_receiving_accounts.manage') then raise exception 'SEPAY_RECEIVING_ACCOUNT_PERMISSION_DENIED'; end if;
+  if p_account_version_id is null or p_effective_to is null or nullif(trim(p_reason),'') is null then raise exception 'SEPAY_RECEIVING_ACCOUNT_INPUT_INVALID'; end if;
+  select * into v_row from public.sepay_receiving_account_versions where id=p_account_version_id for update;
+  if not found then raise exception 'SEPAY_RECEIVING_ACCOUNT_NOT_FOUND'; end if;
+  if p_effective_to<v_row.effective_from then raise exception 'SEPAY_RECEIVING_ACCOUNT_EFFECTIVE_DATE_INVALID'; end if;
+  update public.sepay_receiving_account_versions set effective_to=p_effective_to,changed_by=v_actor,changed_at=now(),audit_metadata=audit_metadata || jsonb_build_object('retired_reason',trim(p_reason)) where id=v_row.id returning * into v_row;
+  insert into public.audit_logs(actor_user_id,module,action,entity_type,entity_id,new_data,reason)
+  values(v_actor,'finance','sepay_receiving_account_version_retired','sepay_receiving_account_version',v_row.id::text,to_jsonb(v_row),trim(p_reason));
+  return v_row;
+end; $$;
+
 create or replace function public.reissue_tuition_collection_item(p_original_item_id uuid, p_payable_amount_vnd bigint, p_reason text)
 returns public.tuition_collection_items language plpgsql security definer set search_path='' as $$
 declare v_actor uuid:=auth.uid(); v_original public.tuition_collection_items; v_new public.tuition_collection_items; v_period public.tuition_collection_periods; v_account public.sepay_receiving_account_versions; v_guardian uuid; v_request uuid; v_public text; v_transfer text; v_new_id uuid:=gen_random_uuid(); v_contract jsonb:='{}'::jsonb;
@@ -351,13 +443,15 @@ alter table public.tuition_collection_item_adjustments enable row level security
 create policy student_tuition_rates_select on public.student_tuition_rate_versions for select to authenticated using (public.has_permission('students.view') or public.has_permission('students.manage_tuition_rates'));
 create policy student_source_assignments_select on public.student_acquisition_source_assignments for select to authenticated using (public.has_permission('students.view') or public.has_permission('students.correct_acquisition_source'));
 create policy tuition_templates_select on public.tuition_receipt_templates for select to authenticated using (public.has_permission('tuition_periods.view') or public.has_permission('settings.receipts.manage'));
-create policy sepay_receiving_account_versions_select on public.sepay_receiving_account_versions for select to authenticated using (public.has_permission('tuition_periods.view') or public.has_permission('sepay.view'));
+create policy sepay_receiving_account_versions_select on public.sepay_receiving_account_versions for select to authenticated using (public.has_permission('tuition_periods.view') or public.has_permission('sepay.view') or public.has_permission('settings.sepay_receiving_accounts.manage'));
 create policy tuition_template_versions_select on public.tuition_receipt_template_versions for select to authenticated using (public.has_permission('tuition_periods.view') or public.has_permission('settings.receipts.manage'));
 create policy tuition_periods_select on public.tuition_collection_periods for select to authenticated using (public.has_permission('tuition_periods.view'));
 create policy tuition_items_select on public.tuition_collection_items for select to authenticated using (public.has_permission('tuition_periods.view'));
 create policy tuition_item_lines_select on public.tuition_collection_item_lines for select to authenticated using (public.has_permission('tuition_periods.view'));
 create policy tuition_item_adjustments_select on public.tuition_collection_item_adjustments for select to authenticated using (public.has_permission('tuition_periods.view'));
 
-revoke all on function public.create_student_tuition_rate_version(uuid,date,bigint,text), public.correct_student_acquisition_source(uuid,uuid,text), public.create_tuition_collection_period(text,date,date,date,uuid), public.publish_tuition_receipt_template_version(text,text,jsonb,text), public.reissue_tuition_collection_item(uuid,bigint,text), public.preview_tuition_collection_period(uuid), public.lock_tuition_collection_period(uuid) from public, anon;
-grant execute on function public.create_student_tuition_rate_version(uuid,date,bigint,text), public.correct_student_acquisition_source(uuid,uuid,text), public.create_tuition_collection_period(text,date,date,date,uuid), public.publish_tuition_receipt_template_version(text,text,jsonb,text), public.reissue_tuition_collection_item(uuid,bigint,text), public.preview_tuition_collection_period(uuid), public.lock_tuition_collection_period(uuid) to authenticated;
+revoke all on function public.create_student_tuition_rate_version(uuid,date,bigint,text), public.correct_student_acquisition_source(uuid,uuid,text), public.create_tuition_collection_period(text,date,date,date,uuid), public.publish_tuition_receipt_template_version(text,text,jsonb,text), public.create_sepay_receiving_account_version(text,text,text,text,date,text), public.retire_sepay_receiving_account_version(uuid,date,text), public.get_effective_sepay_receiving_account(text,date), public.resolve_sepay_receiving_account(text,timestamptz), public.reissue_tuition_collection_item(uuid,bigint,text), public.preview_tuition_collection_period(uuid), public.lock_tuition_collection_period(uuid) from public, anon;
+revoke all on function public.resolve_sepay_receiving_account(text,timestamptz) from authenticated;
+grant execute on function public.create_student_tuition_rate_version(uuid,date,bigint,text), public.correct_student_acquisition_source(uuid,uuid,text), public.create_tuition_collection_period(text,date,date,date,uuid), public.publish_tuition_receipt_template_version(text,text,jsonb,text), public.create_sepay_receiving_account_version(text,text,text,text,date,text), public.retire_sepay_receiving_account_version(uuid,date,text), public.get_effective_sepay_receiving_account(text,date), public.reissue_tuition_collection_item(uuid,bigint,text), public.preview_tuition_collection_period(uuid), public.lock_tuition_collection_period(uuid) to authenticated;
+grant execute on function public.resolve_sepay_receiving_account(text,timestamptz) to service_role;
 commit;

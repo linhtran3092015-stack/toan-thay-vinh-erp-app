@@ -1,69 +1,31 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { classifySepayReceivingAccount } from "@/features/finance/sepay-webhook";
-import { getSepayWebhookEnv } from "@/lib/env";
-
-const receivingAccounts = {
-  new_enrollment: {
-    accountNumber: "0100123456",
-    bankCode: "MB",
-    purpose: "new_enrollment" as const,
-  },
-  renewal: {
-    accountNumber: "0123987654",
-    bankCode: "VCB",
-    purpose: "renewal" as const,
-  },
-};
+import { resolveSignedSepayReceivingAccount } from "@/features/finance/sepay-receiving-account-catalog";
 
 describe("SePay receiving-account classification", () => {
-  it("uses only the destination account and tolerates whitespace", () => {
-    expect(classifySepayReceivingAccount("0100 123 456", receivingAccounts)).toBe("new_enrollment");
-    expect(classifySepayReceivingAccount("0123987654", receivingAccounts)).toBe("renewal");
+  it("uses the DB catalog for the signed account even when legacy ENV differs", async () => {
+    process.env.SEPAY_RENEWAL_ACCOUNT_NUMBER = "ENV-ACCOUNT-MUST-NOT-DECIDE";
+    const rpc = vi.fn().mockResolvedValue({
+      data: [{ account_display_name: "Account A", account_number: "1900123456", account_version_id: "version-a", bank_code: "VCB", purpose: "renewal" }],
+      error: null,
+    });
+
+    const result = await resolveSignedSepayReceivingAccount({ rpc } as never, "1900 123 456", "2026-08-31T16:00:00.000Z");
+
+    expect(result).toEqual({ ok: true, value: { accountDisplayName: "Account A", accountNumber: "1900123456", accountVersionId: "version-a", bankCode: "VCB", purpose: "renewal" } });
+    expect(rpc).toHaveBeenCalledWith("resolve_sepay_receiving_account", {
+      p_signed_account_number: "1900 123 456",
+      p_transaction_at: "2026-08-31T16:00:00.000Z",
+    });
   });
 
-  it("keeps an unknown account unknown instead of guessing from a payment reference", () => {
-    expect(classifySepayReceivingAccount("0999999999", receivingAccounts)).toBe("unknown");
+  it("preserves unknown-account safety and never guesses from transfer content", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [{ account_display_name: null, account_number: null, account_version_id: null, bank_code: null, purpose: "unknown" }], error: null });
+    await expect(resolveSignedSepayReceivingAccount({ rpc } as never, "0999999999", "2026-09-02T01:00:00.000Z")).resolves.toEqual({ ok: true, value: { accountDisplayName: null, accountNumber: null, accountVersionId: null, bankCode: null, purpose: "unknown" } });
   });
 
-  it("requires signed receiving-account data, not VietQR display-only fields", () => {
-    const original = {
-      newEnrollmentAccountNumber: process.env.SEPAY_NEW_ENROLLMENT_ACCOUNT_NUMBER,
-      renewalAccountNumber: process.env.SEPAY_RENEWAL_ACCOUNT_NUMBER,
-      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-      webhookSecret: process.env.SEPAY_WEBHOOK_SECRET,
-    };
-
-    try {
-      process.env.SEPAY_NEW_ENROLLMENT_ACCOUNT_NUMBER = "0100123456";
-      process.env.SEPAY_RENEWAL_ACCOUNT_NUMBER = "0123987654";
-      process.env.SEPAY_WEBHOOK_SECRET = "webhook-secret";
-      process.env.SUPABASE_SERVICE_ROLE_KEY = "local-test-service-role-key";
-
-      expect(getSepayWebhookEnv().receivingAccounts).toEqual({
-        new_enrollment: { accountNumber: "0100123456", purpose: "new_enrollment" },
-        renewal: { accountNumber: "0123987654", purpose: "renewal" },
-      });
-    } finally {
-      restoreEnvironmentVariable(
-        "SEPAY_NEW_ENROLLMENT_ACCOUNT_NUMBER",
-        original.newEnrollmentAccountNumber,
-      );
-      restoreEnvironmentVariable(
-        "SEPAY_RENEWAL_ACCOUNT_NUMBER",
-        original.renewalAccountNumber,
-      );
-      restoreEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY", original.serviceRoleKey);
-      restoreEnvironmentVariable("SEPAY_WEBHOOK_SECRET", original.webhookSecret);
-    }
+  it("fails closed when catalog resolution is unavailable", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "database unavailable" } });
+    await expect(resolveSignedSepayReceivingAccount({ rpc } as never, "1900123456", "2026-08-31T16:00:00.000Z")).resolves.toEqual({ ok: false });
   });
 });
-
-function restoreEnvironmentVariable(name: string, value: string | undefined) {
-  if (value === undefined) {
-    delete process.env[name];
-    return;
-  }
-
-  process.env[name] = value;
-}

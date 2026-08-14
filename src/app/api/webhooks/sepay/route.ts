@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
 import {
-  classifySepayReceivingAccount,
   parseSepayWebhookPayload,
   toSepayTransactionTimestamp,
   verifySepayWebhookSignature,
 } from "@/features/finance/sepay-webhook";
+import { resolveSignedSepayReceivingAccount } from "@/features/finance/sepay-receiving-account-catalog";
 import { getSepayWebhookEnv } from "@/lib/env";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 import type { Database } from "@/types/database.generated";
@@ -69,14 +69,28 @@ export async function POST(request: Request) {
     return webhookResponse(false, 400);
   }
 
-  const accountPurpose = classifySepayReceivingAccount(
-    payload.accountNumber,
-    webhookEnv.receivingAccounts,
-  );
+  let supabase: ReturnType<typeof createSupabaseServiceRoleClient>;
+  let accountResolution: Awaited<ReturnType<typeof resolveSignedSepayReceivingAccount>>;
+  try {
+    supabase = createSupabaseServiceRoleClient();
+    accountResolution = await resolveSignedSepayReceivingAccount(
+      supabase,
+      payload.accountNumber,
+      transactionTimestamp,
+    );
+  } catch {
+    console.error("SEPAY_RECEIVING_ACCOUNT_RESOLUTION_FAILED");
+    return webhookResponse(false, 500);
+  }
+
+  if (!accountResolution.ok) {
+    console.error("SEPAY_RECEIVING_ACCOUNT_RESOLUTION_FAILED");
+    return webhookResponse(false, 500);
+  }
 
   const args: ProcessSepayWebhookArgs = {
     p_account_number: payload.accountNumber,
-    p_account_purpose: accountPurpose,
+    p_account_purpose: accountResolution.value.purpose,
     p_amount_in:
       payload.transferType === "in" ? payload.transferAmount : 0,
     p_amount_out:
@@ -92,7 +106,6 @@ export async function POST(request: Request) {
   };
 
   try {
-    const supabase = createSupabaseServiceRoleClient();
     const { error } = await supabase.rpc(
       "process_sepay_webhook_transaction",
       args,
