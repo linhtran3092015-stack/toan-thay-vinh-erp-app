@@ -128,6 +128,12 @@ export const navigationDomains: readonly NavigationDomain[] = [
         label: "Sổ cái số buổi",
         permission: "session_ledger.view",
       },
+      {
+        available: true,
+        href: "/finance/tuition-periods",
+        label: "Kỳ thu học phí",
+        permission: "tuition_periods.view",
+      },
     ],
     key: "finance",
     label: "Tài chính",

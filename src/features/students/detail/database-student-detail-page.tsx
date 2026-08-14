@@ -13,7 +13,9 @@ import { StudentStatusBadge } from "@/features/students/components/student-statu
 import { StudentEnrollmentManagement } from "@/features/students/enrollment/student-enrollment-management";
 import type { StudentEnrollmentUiModel } from "@/features/students/enrollment/student-enrollment-ui-types";
 import { StudentSessionLedgerCard } from "@/features/students/detail/components/student-session-ledger-card";
+import { StudentTuitionProfileCard } from "@/features/students/detail/components/student-tuition-profile-card";
 import type { StudentLedgerReadModel } from "@/features/students/ledger-data";
+import type { StudentTuitionProfile } from "@/features/students/tuition-profile-data";
 import type {
   StudentDetailReadModel,
   StudentEnrollmentReadModel,
@@ -25,11 +27,14 @@ interface DatabaseStudentDetailPageProps {
   canViewClasses: boolean;
   canViewGuardians: boolean;
   canViewLedger?: boolean;
+  canCorrectAcquisitionSource?: boolean;
+  canManageTuitionRates?: boolean;
   directoryHref: string;
   detail: StudentDetailReadModel;
   editHref: string;
   enrollmentUiModel: StudentEnrollmentUiModel;
   ledgerSummary?: StudentLedgerReadModel | null;
+  tuitionProfile?: StudentTuitionProfile;
 }
 
 export function DatabaseStudentDetailPage({
@@ -37,11 +42,14 @@ export function DatabaseStudentDetailPage({
   canViewClasses,
   canViewGuardians,
   canViewLedger = false,
+  canCorrectAcquisitionSource = false,
+  canManageTuitionRates = false,
   directoryHref,
   detail,
   editHref,
   enrollmentUiModel,
   ledgerSummary = null,
+  tuitionProfile,
 }: DatabaseStudentDetailPageProps) {
   const activeClass = detail.activeEnrollment?.classInfo;
   const learningLevel =
@@ -249,6 +257,7 @@ export function DatabaseStudentDetailPage({
         </div>
 
         <div className="grid content-start gap-4">
+          {tuitionProfile ? <StudentTuitionProfileCard canCorrectSource={canCorrectAcquisitionSource} canManageRates={canManageTuitionRates} profile={tuitionProfile} studentId={detail.id} /> : null}
           <Card>
             <CardHeader>
               <CardTitle>Phụ huynh</CardTitle>

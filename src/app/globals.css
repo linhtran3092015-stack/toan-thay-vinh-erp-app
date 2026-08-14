@@ -1011,3 +1011,7 @@ a {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
+@media print {
+  body { background: #fff !important; }
+  .fee-notice { break-after: page; page-break-after: always; }
+}

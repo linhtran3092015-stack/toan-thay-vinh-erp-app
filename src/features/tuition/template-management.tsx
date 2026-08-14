@@ -1,0 +1,8 @@
+"use client";
+import { useState, useTransition } from "react";
+import { publishTuitionTemplateAction } from "@/features/tuition/actions";
+
+export function TuitionTemplateManagement({ current }: { current: { content: Record<string, unknown>; version: number } | null }) {
+ const [pending,start]=useTransition(); const [message,setMessage]=useState(""); const content=current?.content ?? {};
+ return <section className="rounded-lg border border-border-subtle bg-surface-base p-4"><h2 className="font-semibold text-text-strong">Mẫu Phiếu học phí</h2><p className="mt-1 text-secondary text-text-muted">Phiên bản hiện tại: {current?.version ?? "mặc định"}. Chỉ lưu trường hiển thị an toàn, không nhận HTML/JavaScript.</p><form className="mt-4 grid gap-3 md:grid-cols-2" action={(f)=>start(async()=>setMessage((await publishTuitionTemplateAction({ centerDisplayName:String(f.get("center")), title:String(f.get("title")), footer:String(f.get("footer")), announcement:String(f.get("announcement")), reason:String(f.get("reason")) })).message))}><label>Trung tâm<input defaultValue={String(content.center_display_name??"")} name="center" required/></label><label>Tiêu đề<input defaultValue={String(content.title??"")} name="title" required/></label><label className="md:col-span-2">Thông báo<textarea defaultValue={String(content.announcement??"")} name="announcement"/></label><label className="md:col-span-2">Chân trang<textarea defaultValue={String(content.footer??"")} name="footer" required/></label><label>Lý do xuất bản<input name="reason" required/></label><div className="flex items-end"><button disabled={pending} type="submit">Xuất bản phiên bản mới</button></div></form>{message?<p className="mt-3" role="status">{message}</p>:null}</section>;
+}

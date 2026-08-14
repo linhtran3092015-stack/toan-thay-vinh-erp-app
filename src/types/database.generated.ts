@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   public: {
     Tables: {
       academic_years: {
@@ -1292,6 +1287,42 @@ export type Database = {
           },
         ]
       }
+      finance_fee_policies: {
+        Row: {
+          area_code: string | null
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          learning_mode: string
+          name: string
+          standard_unit_price_vnd: number
+        }
+        Insert: {
+          area_code?: string | null
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          learning_mode: string
+          name: string
+          standard_unit_price_vnd: number
+        }
+        Update: {
+          area_code?: string | null
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          learning_mode?: string
+          name?: string
+          standard_unit_price_vnd?: number
+        }
+        Relationships: []
+      }
       finance_order_reviews: {
         Row: {
           checked_at: string | null
@@ -1333,42 +1364,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      finance_fee_policies: {
-        Row: {
-          area_code: string | null
-          code: string
-          created_at: string
-          description: string | null
-          id: string
-          is_active: boolean
-          learning_mode: string
-          name: string
-          standard_unit_price_vnd: number
-        }
-        Insert: {
-          area_code?: string | null
-          code: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          learning_mode: string
-          name: string
-          standard_unit_price_vnd: number
-        }
-        Update: {
-          area_code?: string | null
-          code?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          learning_mode?: string
-          name?: string
-          standard_unit_price_vnd?: number
-        }
-        Relationships: []
       }
       grading_credits: {
         Row: {
@@ -2170,6 +2165,69 @@ export type Database = {
           },
         ]
       }
+      sepay_receiving_account_versions: {
+        Row: {
+          account_display_name: string
+          account_number: string
+          audit_metadata: Json
+          bank_code: string
+          changed_at: string | null
+          changed_by: string | null
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          purpose: string
+          status: string
+        }
+        Insert: {
+          account_display_name: string
+          account_number: string
+          audit_metadata?: Json
+          bank_code: string
+          changed_at?: string | null
+          changed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          purpose: string
+          status?: string
+        }
+        Update: {
+          account_display_name?: string
+          account_number?: string
+          audit_metadata?: Json
+          bank_code?: string
+          changed_at?: string | null
+          changed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          purpose?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sepay_receiving_account_versions_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sepay_receiving_account_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sepay_transactions: {
         Row: {
           account_number: string
@@ -2782,6 +2840,78 @@ export type Database = {
             columns: ["work_shift_id"]
             isOneToOne: false
             referencedRelation: "work_shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_acquisition_source_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string
+          crm_case_id: string | null
+          id: string
+          is_current: boolean
+          lead_source_id: string
+          reason: string
+          student_id: string
+          supersedes_id: string | null
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by: string
+          crm_case_id?: string | null
+          id?: string
+          is_current?: boolean
+          lead_source_id: string
+          reason: string
+          student_id: string
+          supersedes_id?: string | null
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string
+          crm_case_id?: string | null
+          id?: string
+          is_current?: boolean
+          lead_source_id?: string
+          reason?: string
+          student_id?: string
+          supersedes_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_acquisition_source_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_acquisition_source_assignments_crm_case_id_fkey"
+            columns: ["crm_case_id"]
+            isOneToOne: false
+            referencedRelation: "crm_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_acquisition_source_assignments_lead_source_id_fkey"
+            columns: ["lead_source_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_acquisition_source_assignments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_acquisition_source_assignments_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "student_acquisition_source_assignments"
             referencedColumns: ["id"]
           },
         ]
@@ -3535,6 +3665,51 @@ export type Database = {
           },
         ]
       }
+      student_tuition_rate_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          reason: string
+          student_id: string
+          unit_price_vnd: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          id?: string
+          reason: string
+          student_id: string
+          unit_price_vnd: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          reason?: string
+          student_id?: string
+          unit_price_vnd?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_tuition_rate_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_tuition_rate_versions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           birth_year: number
@@ -3806,6 +3981,392 @@ export type Database = {
             columns: ["time_entry_id"]
             isOneToOne: false
             referencedRelation: "time_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tuition_collection_item_adjustments: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          original_item_id: string
+          reason: string
+          replacement_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          original_item_id: string
+          reason: string
+          replacement_item_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          original_item_id?: string
+          reason?: string
+          replacement_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tuition_collection_item_adjustments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_item_adjustments_original_item_id_fkey"
+            columns: ["original_item_id"]
+            isOneToOne: false
+            referencedRelation: "tuition_collection_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_item_adjustments_replacement_item_id_fkey"
+            columns: ["replacement_item_id"]
+            isOneToOne: true
+            referencedRelation: "tuition_collection_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tuition_collection_item_lines: {
+        Row: {
+          amount_vnd: number
+          class_session_id: string | null
+          id: string
+          item_id: string
+          line_kind: string
+          payable_session_count: number
+          session_count: number
+          session_date: string | null
+          session_kind: string | null
+          snapshot: Json
+          unit_price_vnd: number
+        }
+        Insert: {
+          amount_vnd?: number
+          class_session_id?: string | null
+          id?: string
+          item_id: string
+          line_kind: string
+          payable_session_count?: number
+          session_count?: number
+          session_date?: string | null
+          session_kind?: string | null
+          snapshot?: Json
+          unit_price_vnd: number
+        }
+        Update: {
+          amount_vnd?: number
+          class_session_id?: string | null
+          id?: string
+          item_id?: string
+          line_kind?: string
+          payable_session_count?: number
+          session_count?: number
+          session_date?: string | null
+          session_kind?: string | null
+          snapshot?: Json
+          unit_price_vnd?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tuition_collection_item_lines_class_session_id_fkey"
+            columns: ["class_session_id"]
+            isOneToOne: false
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_item_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "tuition_collection_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tuition_collection_items: {
+        Row: {
+          acquisition_source_id: string | null
+          class_id: string | null
+          created_at: string
+          created_by: string
+          credit_offset_sessions: number
+          debit_carry_sessions: number
+          enrollment_id: string | null
+          id: string
+          opening_balance_sessions: number
+          payable_amount_vnd: number
+          payable_sessions: number
+          payment_contract_snapshot: Json
+          payment_request_id: string | null
+          period_id: string
+          receipt_template_snapshot: Json
+          receipt_template_version_id: string | null
+          reissued_from_item_id: string | null
+          scheduled_chargeable_sessions: number
+          source_snapshot: Json
+          status: string
+          student_id: string
+          student_snapshot: Json
+        }
+        Insert: {
+          acquisition_source_id?: string | null
+          class_id?: string | null
+          created_at?: string
+          created_by: string
+          credit_offset_sessions?: number
+          debit_carry_sessions?: number
+          enrollment_id?: string | null
+          id?: string
+          opening_balance_sessions: number
+          payable_amount_vnd: number
+          payable_sessions: number
+          payment_contract_snapshot?: Json
+          payment_request_id?: string | null
+          period_id: string
+          receipt_template_snapshot: Json
+          receipt_template_version_id?: string | null
+          reissued_from_item_id?: string | null
+          scheduled_chargeable_sessions: number
+          source_snapshot: Json
+          status: string
+          student_id: string
+          student_snapshot: Json
+        }
+        Update: {
+          acquisition_source_id?: string | null
+          class_id?: string | null
+          created_at?: string
+          created_by?: string
+          credit_offset_sessions?: number
+          debit_carry_sessions?: number
+          enrollment_id?: string | null
+          id?: string
+          opening_balance_sessions?: number
+          payable_amount_vnd?: number
+          payable_sessions?: number
+          payment_contract_snapshot?: Json
+          payment_request_id?: string | null
+          period_id?: string
+          receipt_template_snapshot?: Json
+          receipt_template_version_id?: string | null
+          reissued_from_item_id?: string | null
+          scheduled_chargeable_sessions?: number
+          source_snapshot?: Json
+          status?: string
+          student_id?: string
+          student_snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tuition_collection_items_acquisition_source_id_fkey"
+            columns: ["acquisition_source_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_items_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_items_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "student_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_items_payment_request_id_fkey"
+            columns: ["payment_request_id"]
+            isOneToOne: true
+            referencedRelation: "student_payment_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_items_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "tuition_collection_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_items_receipt_template_version_id_fkey"
+            columns: ["receipt_template_version_id"]
+            isOneToOne: false
+            referencedRelation: "tuition_receipt_template_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_items_reissued_from_item_id_fkey"
+            columns: ["reissued_from_item_id"]
+            isOneToOne: false
+            referencedRelation: "tuition_collection_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_items_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tuition_collection_periods: {
+        Row: {
+          created_at: string
+          created_by: string
+          due_on: string | null
+          ends_on: string
+          id: string
+          locked_at: string | null
+          locked_by: string | null
+          name: string
+          receipt_template_version_id: string | null
+          starts_on: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          due_on?: string | null
+          ends_on: string
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          name: string
+          receipt_template_version_id?: string | null
+          starts_on: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          due_on?: string | null
+          ends_on?: string
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          name?: string
+          receipt_template_version_id?: string | null
+          starts_on?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tuition_collection_periods_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_periods_locked_by_fkey"
+            columns: ["locked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_collection_periods_receipt_template_version_id_fkey"
+            columns: ["receipt_template_version_id"]
+            isOneToOne: false
+            referencedRelation: "tuition_receipt_template_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tuition_receipt_template_versions: {
+        Row: {
+          content: Json
+          id: string
+          published_at: string
+          published_by: string | null
+          reason: string
+          template_id: string
+          version_number: number
+        }
+        Insert: {
+          content?: Json
+          id?: string
+          published_at?: string
+          published_by?: string | null
+          reason: string
+          template_id: string
+          version_number: number
+        }
+        Update: {
+          content?: Json
+          id?: string
+          published_at?: string
+          published_by?: string | null
+          reason?: string
+          template_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tuition_receipt_template_versions_published_by_fkey"
+            columns: ["published_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tuition_receipt_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "tuition_receipt_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tuition_receipt_templates: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tuition_receipt_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -4535,6 +5096,30 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      correct_student_acquisition_source: {
+        Args: {
+          p_lead_source_id: string
+          p_reason: string
+          p_student_id: string
+        }
+        Returns: {
+          assigned_at: string
+          assigned_by: string
+          crm_case_id: string | null
+          id: string
+          is_current: boolean
+          lead_source_id: string
+          reason: string
+          student_id: string
+          supersedes_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "student_acquisition_source_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_academic_year: {
         Args: {
           p_code: string
@@ -4930,6 +5515,29 @@ export type Database = {
         }
         Returns: Json
       }
+      create_student_tuition_rate_version: {
+        Args: {
+          p_effective_from: string
+          p_reason: string
+          p_student_id: string
+          p_unit_price_vnd: number
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          reason: string
+          student_id: string
+          unit_price_vnd: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "student_tuition_rate_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_student_with_primary_guardian: {
         Args: {
           p_birth_year: number
@@ -4956,6 +5564,34 @@ export type Database = {
           student_id: string
           student_public_code: string
         }[]
+      }
+      create_tuition_collection_period: {
+        Args: {
+          p_due_on?: string
+          p_ends_on: string
+          p_name: string
+          p_receipt_template_version_id?: string
+          p_starts_on: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          due_on: string | null
+          ends_on: string
+          id: string
+          locked_at: string | null
+          locked_by: string | null
+          name: string
+          receipt_template_version_id: string | null
+          starts_on: string
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tuition_collection_periods"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_work_shift: {
         Args: {
@@ -5261,15 +5897,6 @@ export type Database = {
           refund_vnd: number
         }[]
       }
-      get_finance_orders_dashboard: {
-        Args: {
-          p_month: string
-          p_order_type?: string
-          p_period?: number
-          p_source?: string
-        }
-        Returns: Json
-      }
       get_finance_order_operating_cost: {
         Args: {
           p_order_type: string
@@ -5279,13 +5906,22 @@ export type Database = {
         }
         Returns: {
           mechanism_code: string
-          operating_cost_vnd: number | null
+          operating_cost_vnd: number
           status: string
         }[]
       }
       get_finance_order_settlement_period: {
         Args: { p_at: string }
         Returns: number
+      }
+      get_finance_orders_dashboard: {
+        Args: {
+          p_month: string
+          p_order_type?: string
+          p_period?: number
+          p_source?: string
+        }
+        Returns: Json
       }
       get_grading_credits_dashboard: {
         Args: { p_limit?: number }
@@ -5590,6 +6226,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      lock_tuition_collection_period: {
+        Args: { p_period_id: string }
+        Returns: Json
+      }
       mark_all_notifications_read: { Args: never; Returns: number }
       mark_notification_read: {
         Args: { p_notification_id: string }
@@ -5693,6 +6333,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      preview_tuition_collection_period: {
+        Args: { p_period_id: string }
+        Returns: {
+          acquisition_source_id: string
+          blocker_code: string
+          class_id: string
+          class_session_id: string
+          enrollment_id: string
+          opening_balance_sessions: number
+          session_date: string
+          session_kind: string
+          student_id: string
+          unit_price_vnd: number
+        }[]
+      }
       process_sepay_webhook_transaction: {
         Args: {
           p_account_number: string
@@ -5710,13 +6365,6 @@ export type Database = {
         }
         Returns: Json
       }
-      set_finance_order_review: {
-        Args: {
-          p_is_checked: boolean
-          p_source_cashflow_record_id: string
-        }
-        Returns: Json
-      }
       process_student_refund: {
         Args: {
           p_reason: string
@@ -5725,6 +6373,29 @@ export type Database = {
           p_student_id: string
         }
         Returns: Json
+      }
+      publish_tuition_receipt_template_version: {
+        Args: {
+          p_code: string
+          p_content: Json
+          p_name: string
+          p_reason: string
+        }
+        Returns: {
+          content: Json
+          id: string
+          published_at: string
+          published_by: string | null
+          reason: string
+          template_id: string
+          version_number: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tuition_receipt_template_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       reconcile_session_balance_import_batch: {
         Args: { p_batch_id: string; p_reason: string }
@@ -5785,6 +6456,43 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "session_results"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reissue_tuition_collection_item: {
+        Args: {
+          p_original_item_id: string
+          p_payable_amount_vnd: number
+          p_reason: string
+        }
+        Returns: {
+          acquisition_source_id: string | null
+          class_id: string | null
+          created_at: string
+          created_by: string
+          credit_offset_sessions: number
+          debit_carry_sessions: number
+          enrollment_id: string | null
+          id: string
+          opening_balance_sessions: number
+          payable_amount_vnd: number
+          payable_sessions: number
+          payment_contract_snapshot: Json
+          payment_request_id: string | null
+          period_id: string
+          receipt_template_snapshot: Json
+          receipt_template_version_id: string | null
+          reissued_from_item_id: string | null
+          scheduled_chargeable_sessions: number
+          source_snapshot: Json
+          status: string
+          student_id: string
+          student_snapshot: Json
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tuition_collection_items"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -6129,6 +6837,10 @@ export type Database = {
       run_teaching_assistant_timekeeping_watchdog: {
         Args: never
         Returns: number
+      }
+      set_finance_order_review: {
+        Args: { p_is_checked: boolean; p_source_cashflow_record_id: string }
+        Returns: Json
       }
       set_role_permissions: {
         Args: {

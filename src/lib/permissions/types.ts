@@ -65,6 +65,14 @@ export const DATABASE_PERMISSION_CODES = [
   "commissions.owner_adjust",
   "grading_credits.view",
   "grading_credits.view_all",
+  "tuition_periods.view",
+  "tuition_periods.manage",
+  "tuition_periods.lock",
+  "tuition_periods.export",
+  "tuition_periods.adjust",
+  "students.manage_tuition_rates",
+  "students.correct_acquisition_source",
+  "settings.receipts.manage",
 ] as const;
 
 export type PermissionCode = (typeof DATABASE_PERMISSION_CODES)[number];

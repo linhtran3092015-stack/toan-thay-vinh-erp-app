@@ -4,6 +4,7 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { getStudentDetail } from "@/features/students/data";
 import { getStudentEnrollmentUiModel } from "@/features/students/enrollment/student-enrollment-data";
 import { getStudentLedgerSummary } from "@/features/students/ledger-data";
+import { getStudentTuitionProfile } from "@/features/students/tuition-profile-data";
 import { DatabaseStudentDetailPage } from "@/features/students/detail/database-student-detail-page";
 import { withStudentDirectoryQuery } from "@/features/students/student-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
@@ -118,6 +119,7 @@ export default async function StudentDetailRoute({
   const ledgerSummary = canViewLedger
     ? await getStudentLedgerSummary(studentId)
     : null;
+  const tuitionProfile = await getStudentTuitionProfile(studentId);
 
   return (
     <DatabaseStudentDetailPage
@@ -125,11 +127,14 @@ export default async function StudentDetailRoute({
       canViewClasses={canViewClasses}
       canViewGuardians={canViewGuardians}
       canViewLedger={canViewLedger}
+      canCorrectAcquisitionSource={permissionResult.permissions.includes("students.correct_acquisition_source")}
+      canManageTuitionRates={permissionResult.permissions.includes("students.manage_tuition_rates")}
       directoryHref={directoryHref}
       detail={detailResult.detail}
       editHref={editHref}
       enrollmentUiModel={enrollmentUiModel}
       ledgerSummary={ledgerSummary}
+      tuitionProfile={tuitionProfile}
     />
   );
 }

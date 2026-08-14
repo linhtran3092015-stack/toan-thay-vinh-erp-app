@@ -1,0 +1,4 @@
+"use client";
+import { useState, useTransition } from "react";
+import { reissueTuitionItemAction } from "@/features/tuition/actions";
+export function TuitionReissueForm({ amountVnd,itemId }:{amountVnd:number;itemId:string}){const [pending,start]=useTransition();const [message,setMessage]=useState("");return <form className="mt-5 grid gap-2 border-t pt-4" action={f=>start(async()=>setMessage((await reissueTuitionItemAction(itemId,Number(f.get("amount")),String(f.get("reason")))).message))}><h2 className="font-semibold">Điều chỉnh / phát hành lại</h2><p className="text-sm">Phiếu gốc không bị sửa. Phiếu thay thế có yêu cầu tái phí và QR mới nếu số tiền lớn hơn 0.</p><input defaultValue={amountVnd} min="0" name="amount" required type="number"/><input name="reason" placeholder="Lý do điều chỉnh" required/><button disabled={pending} type="submit">Tạo phiếu thay thế</button>{message?<p role="status">{message}</p>:null}</form>}
