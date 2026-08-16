@@ -9,11 +9,17 @@ import type {
   CoachingRecordDashboardEntry,
   CoachingRecordEvent,
 } from "@/features/coaching/read-models";
+import { CoachingPublicLinkPanel } from "@/features/coaching/components/coaching-public-link-panel";
+import type { CoachingFormSummary, CoachingPublicLinkSummary, CoachingRecordResponseSummary } from "@/features/coaching/coaching-form-data";
 
 interface CoachingDetailPageProps {
   canManage: boolean;
   events: readonly CoachingRecordEvent[];
   record: CoachingRecordDashboardEntry;
+  forms?: CoachingFormSummary[];
+  responses?: CoachingRecordResponseSummary[];
+  links?: CoachingPublicLinkSummary[];
+  canManageLinks?: boolean;
 }
 
 const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
@@ -41,6 +47,10 @@ export function CoachingDetailPage({
   canManage,
   events,
   record,
+  forms = [],
+  responses = [],
+  links = [],
+  canManageLinks = false,
 }: CoachingDetailPageProps) {
   return (
     <div className="grid gap-5">
@@ -131,6 +141,14 @@ export function CoachingDetailPage({
           </ol>
         )}
       </section>
+
+      <section className="rounded-lg border border-hairline bg-surface-1 p-5 shadow-card">
+        <h2 className="text-section font-semibold text-ink">Phản hồi Phiếu Coaching</h2>
+        <p className="mt-1 text-sm text-ink-muted">{responses.length ? `${responses.length} phản hồi đã gắn với lịch sử phiếu này.` : "Chưa có phản hồi công khai nào."}</p>
+        {responses.length ? <ul className="mt-3 divide-y divide-hairline rounded-md border border-hairline">{responses.map((response) => <li className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm" key={response.id}><span>{response.formName} · v{response.versionNumber} · {formatDateTime(response.submittedAt)}</span><Link className="font-semibold text-primary hover:underline" href={`/coaching/responses/${response.id}`}>Xem phản hồi</Link></li>)}</ul> : null}
+        <Link className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline" href="/coaching/responses">Xem tất cả phản hồi</Link>
+      </section>
+      {canManageLinks ? <CoachingPublicLinkPanel coachingRecordId={record.id} forms={forms} links={links} /> : null}
 
       <div className="flex justify-end">
         <Link

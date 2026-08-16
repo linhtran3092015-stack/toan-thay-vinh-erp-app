@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       academic_years: {
@@ -837,6 +862,345 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coaching_form_answers: {
+        Row: {
+          answer: Json
+          created_at: string
+          id: string
+          question_id: string
+          response_id: string
+        }
+        Insert: {
+          answer: Json
+          created_at?: string
+          id?: string
+          question_id: string
+          response_id: string
+        }
+        Update: {
+          answer?: Json
+          created_at?: string
+          id?: string
+          question_id?: string
+          response_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_form_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_form_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_form_answers_response_id_fkey"
+            columns: ["response_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_form_responses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coaching_form_questions: {
+        Row: {
+          configuration: Json
+          created_at: string
+          description: string | null
+          form_version_id: string
+          id: string
+          is_required: boolean
+          question_type: string
+          sort_order: number
+          title: string
+        }
+        Insert: {
+          configuration?: Json
+          created_at?: string
+          description?: string | null
+          form_version_id: string
+          id?: string
+          is_required?: boolean
+          question_type: string
+          sort_order: number
+          title: string
+        }
+        Update: {
+          configuration?: Json
+          created_at?: string
+          description?: string | null
+          form_version_id?: string
+          id?: string
+          is_required?: boolean
+          question_type?: string
+          sort_order?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_form_questions_form_version_id_fkey"
+            columns: ["form_version_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_form_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coaching_form_responses: {
+        Row: {
+          coaching_record_id: string
+          created_at: string
+          form_id: string
+          form_version_id: string
+          id: string
+          public_link_id: string
+          student_id: string
+          submitted_at: string
+        }
+        Insert: {
+          coaching_record_id: string
+          created_at?: string
+          form_id: string
+          form_version_id: string
+          id?: string
+          public_link_id: string
+          student_id: string
+          submitted_at?: string
+        }
+        Update: {
+          coaching_record_id?: string
+          created_at?: string
+          form_id?: string
+          form_version_id?: string
+          id?: string
+          public_link_id?: string
+          student_id?: string
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_form_responses_coaching_record_id_fkey"
+            columns: ["coaching_record_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_form_responses_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_form_responses_form_version_id_fkey"
+            columns: ["form_version_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_form_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_form_responses_public_link_id_fkey"
+            columns: ["public_link_id"]
+            isOneToOne: true
+            referencedRelation: "coaching_public_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_form_responses_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coaching_form_versions: {
+        Row: {
+          created_at: string
+          created_by: string
+          form_id: string
+          id: string
+          instructions: string | null
+          published_at: string | null
+          published_by: string | null
+          status: string
+          title: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          form_id: string
+          id?: string
+          instructions?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          status?: string
+          title: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          form_id?: string
+          id?: string
+          instructions?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          status?: string
+          title?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_form_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_form_versions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_form_versions_published_by_fkey"
+            columns: ["published_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coaching_forms: {
+        Row: {
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          status: string
+        }
+        Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          status?: string
+        }
+        Update: {
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_forms_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_forms_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coaching_public_links: {
+        Row: {
+          coaching_record_id: string
+          expires_at: string
+          form_version_id: string
+          id: string
+          issued_at: string
+          issued_by: string
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          status: string
+          student_id: string
+          token_hash: string
+        }
+        Insert: {
+          coaching_record_id: string
+          expires_at: string
+          form_version_id: string
+          id?: string
+          issued_at?: string
+          issued_by: string
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          student_id: string
+          token_hash: string
+        }
+        Update: {
+          coaching_record_id?: string
+          expires_at?: string
+          form_version_id?: string
+          id?: string
+          issued_at?: string
+          issued_by?: string
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          student_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_public_links_coaching_record_id_fkey"
+            columns: ["coaching_record_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_public_links_form_version_id_fkey"
+            columns: ["form_version_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_form_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_public_links_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_public_links_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_public_links_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -4788,6 +5152,15 @@ export type Database = {
           user_id: string
         }[]
       }
+      audit_coaching_form_mutation: {
+        Args: {
+          p_action: string
+          p_entity_id: string
+          p_entity_type: string
+          p_reason?: string
+        }
+        Returns: undefined
+      }
       auto_end_stale_teaching_assistant_time_entries: {
         Args: never
         Returns: number
@@ -4981,6 +5354,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      coaching_validate_question: {
+        Args: { p_configuration: Json; p_question_type: string }
+        Returns: boolean
       }
       commit_class_schedule_import_batch: {
         Args: { p_batch_id: string; p_reason: string }
@@ -5325,6 +5702,13 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      create_coaching_form_version_draft: {
+        Args: { p_form_id: string }
+        Returns: {
+          form_version_id: string
+          version_number: number
+        }[]
       }
       create_coaching_record: {
         Args: {
@@ -5865,6 +6249,65 @@ export type Database = {
           role_code: string
         }[]
       }
+      get_coaching_form_detail: {
+        Args: { p_form_id: string }
+        Returns: {
+          configuration: Json
+          form_id: string
+          form_status: string
+          instructions: string
+          is_required: boolean
+          name: string
+          question_description: string
+          question_id: string
+          question_title: string
+          question_type: string
+          sort_order: number
+          title: string
+          version_id: string
+          version_number: number
+          version_status: string
+        }[]
+      }
+      get_coaching_form_responses: {
+        Args: { p_coaching_record_id: string }
+        Returns: {
+          form_name: string
+          response_id: string
+          student_name: string
+          submitted_at: string
+          version_number: number
+        }[]
+      }
+      get_coaching_forms: {
+        Args: never
+        Returns: {
+          form_id: string
+          form_status: string
+          instructions: string
+          name: string
+          published_at: string
+          response_count: number
+          title: string
+          version_id: string
+          version_number: number
+          version_status: string
+        }[]
+      }
+      get_coaching_public_links: {
+        Args: { p_coaching_record_id: string }
+        Returns: {
+          expires_at: string
+          form_name: string
+          form_version_id: string
+          issued_at: string
+          link_id: string
+          revoke_reason: string
+          revoked_at: string
+          status: string
+          version_number: number
+        }[]
+      }
       get_coaching_record_detail: {
         Args: { p_coaching_record_id: string }
         Returns: {
@@ -5913,6 +6356,46 @@ export type Database = {
           student_full_name: string
           student_id: string
           student_public_code: string
+        }[]
+      }
+      get_coaching_response_detail: {
+        Args: { p_response_id: string }
+        Returns: {
+          answer: Json
+          coaching_record_id: string
+          form_id: string
+          form_name: string
+          form_version_id: string
+          question_description: string
+          question_id: string
+          question_title: string
+          question_type: string
+          response_id: string
+          sort_order: number
+          student_id: string
+          student_name: string
+          submitted_at: string
+          version_number: number
+        }[]
+      }
+      get_coaching_responses: {
+        Args: {
+          p_form_id?: string
+          p_form_version_id?: string
+          p_from?: string
+          p_student_id?: string
+          p_to?: string
+        }
+        Returns: {
+          coaching_record_id: string
+          form_id: string
+          form_name: string
+          form_version_id: string
+          response_id: string
+          student_id: string
+          student_name: string
+          submitted_at: string
+          version_number: number
         }[]
       }
       get_coaching_student_options: {
@@ -6106,6 +6589,23 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_public_coaching_form: {
+        Args: { p_token: string }
+        Returns: {
+          configuration: Json
+          form_title: string
+          form_version_id: string
+          instructions: string
+          is_required: boolean
+          question_description: string
+          question_id: string
+          question_title: string
+          question_type: string
+          sort_order: number
+          state: string
+          student_name: string
+        }[]
+      }
       get_salary_advances_dashboard: {
         Args: never
         Returns: {
@@ -6232,6 +6732,17 @@ export type Database = {
       is_user_teaching_assistant: {
         Args: { p_user_id: string }
         Returns: boolean
+      }
+      issue_coaching_public_link: {
+        Args: {
+          p_coaching_record_id: string
+          p_expires_at: string
+          p_form_version_id: string
+          p_token_hash: string
+        }
+        Returns: {
+          link_id: string
+        }[]
       }
       lock_class_session: {
         Args: { p_class_session_id: string; p_reason: string }
@@ -6422,6 +6933,14 @@ export type Database = {
           p_student_id: string
         }
         Returns: Json
+      }
+      publish_coaching_form_version: {
+        Args: { p_form_version_id: string }
+        Returns: {
+          form_id: string
+          form_version_id: string
+          version_number: number
+        }[]
       }
       publish_tuition_receipt_template_version: {
         Args: {
@@ -6913,6 +7432,10 @@ export type Database = {
         Args: { revocation_reason: string; target_invitation_id: string }
         Returns: boolean
       }
+      revoke_coaching_public_link: {
+        Args: { p_link_id: string; p_reason: string }
+        Returns: undefined
+      }
       revoke_user_role_assignment: {
         Args: { revocation_reason: string; target_assignment_id: string }
         Returns: {
@@ -6926,6 +7449,20 @@ export type Database = {
       run_teaching_assistant_timekeeping_watchdog: {
         Args: never
         Returns: number
+      }
+      save_coaching_form_draft: {
+        Args: {
+          p_form_id: string
+          p_instructions: string
+          p_name: string
+          p_questions: Json
+          p_title: string
+        }
+        Returns: {
+          form_id: string
+          form_version_id: string
+          version_number: number
+        }[]
       }
       set_finance_order_review: {
         Args: { p_is_checked: boolean; p_source_cashflow_record_id: string }
@@ -7013,6 +7550,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      submit_public_coaching_form: {
+        Args: { p_answers: Json; p_token: string }
+        Returns: string
       }
       transfer_crm_case_lead: {
         Args: {
@@ -7413,6 +7954,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

@@ -20,6 +20,10 @@ const PUBLIC_PATHS = new Set([
   "/api/webhooks/sepay",
 ]);
 
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.has(pathname) || pathname.startsWith("/coaching/form/");
+}
+
 function hasAuthCookie(request: NextRequest): boolean {
   return request.cookies
     .getAll()
@@ -60,7 +64,10 @@ function createAppRedirect(
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  if (PUBLIC_PATHS.has(pathname)) {
+  // Public Coaching links are intentionally anonymous, opaque-token routes.
+  // They must bypass the ERP staff session/allowed-email gate; authorization is
+  // enforced exclusively by the token-bound public RPCs.
+  if (isPublicPath(pathname)) {
     return NextResponse.next({ request });
   }
 

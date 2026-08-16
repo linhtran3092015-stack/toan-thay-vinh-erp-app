@@ -78,12 +78,15 @@ export function CoachingListPage({
               sự kiện, không ghi đè lên thông tin đã ghi nhận.
             </p>
           </div>
-          {canManage && managementOptions ? (
-            <CreateCoachingDialog
-              assignees={managementOptions.assignees}
-              students={managementOptions.students}
-            />
-          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Link className="inline-flex min-h-11 items-center rounded-md border border-hairline px-4 text-sm font-semibold text-ink hover:bg-surface-2" href="/coaching/forms">Phiếu / Biểu mẫu</Link>
+            {canManage && managementOptions ? (
+              <CreateCoachingDialog
+                assignees={managementOptions.assignees}
+                students={managementOptions.students}
+              />
+            ) : null}
+          </div>
         </div>
       </header>
 

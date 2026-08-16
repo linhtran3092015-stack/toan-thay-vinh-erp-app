@@ -7,6 +7,7 @@ import {
   getCoachingRecordDetailResult,
   getCoachingRecordEventsResult,
 } from "@/features/coaching/data";
+import { getCoachingForms, getCoachingPublicLinks, getCoachingRecordResponses } from "@/features/coaching/coaching-form-data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 interface CoachingDetailRouteProps {
@@ -52,7 +53,12 @@ export default async function CoachingDetailRoute({
     notFound();
   }
 
-  const eventsResult = await getCoachingRecordEventsResult(coachingId);
+  const [eventsResult, forms, responses, links] = await Promise.all([
+    getCoachingRecordEventsResult(coachingId),
+    permissionResult.permissions.includes("coaching_forms.view") ? getCoachingForms() : Promise.resolve([]),
+    permissionResult.permissions.includes("coaching_responses.view") ? getCoachingRecordResponses(coachingId) : Promise.resolve([]),
+    permissionResult.permissions.includes("coaching_links.manage") ? getCoachingPublicLinks(coachingId) : Promise.resolve([]),
+  ]);
 
   if (!eventsResult.ok) {
     return (
@@ -68,6 +74,10 @@ export default async function CoachingDetailRoute({
       canManage={permissionResult.permissions.includes("coaching.manage")}
       events={eventsResult.data}
       record={detailResult.data}
+      forms={forms ?? []}
+      responses={responses ?? []}
+      links={links ?? []}
+      canManageLinks={permissionResult.permissions.includes("coaching_links.manage")}
     />
   );
 }
