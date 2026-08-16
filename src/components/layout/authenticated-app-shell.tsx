@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getCurrentAuthUser } from "@/features/auth/current-user";
 import { getCachedUnreadNotificationCountResult } from "@/features/notifications/data";
+import { getCenterDisplayName } from "@/features/settings/system-settings-data";
 import { getCachedMyTimekeepingEntries } from "@/features/timekeeping/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -61,10 +62,12 @@ export async function AuthenticatedAppShell({
     }
   }
 
-  const unreadNotificationCountResult =
+  const [unreadNotificationCountResult, centerDisplayName] = await Promise.all([
     permissionResult.permissions.includes("notifications.view")
       ? await getCachedUnreadNotificationCountResult()
-      : { data: 0, ok: true as const };
+      : Promise.resolve({ data: 0, ok: true as const }),
+    getCenterDisplayName(),
+  ]);
 
   const unreadNotificationCount =
     unreadNotificationCountResult.ok
@@ -75,6 +78,7 @@ export async function AuthenticatedAppShell({
     <AppShell
       authUser={authResult.user}
       canCheckTimekeeping={canCheckTimekeeping}
+      centerDisplayName={centerDisplayName}
       hasOpenTimekeepingEntry={hasOpenTimekeepingEntry}
       permissions={permissionResult.permissions}
       unreadNotificationCount={unreadNotificationCount}

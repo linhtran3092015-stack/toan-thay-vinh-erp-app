@@ -21,6 +21,7 @@ interface CoachingPublicLinkPanelProps {
   coachingRecordId: string;
   forms: CoachingFormSummary[];
   links?: CoachingPublicLinkSummary[];
+  defaultExpiryDays?: number;
 }
 
 function statusLabel(status: CoachingPublicLinkSummary["status"]) {
@@ -33,11 +34,12 @@ export function CoachingPublicLinkPanel({
   coachingRecordId,
   forms,
   links = [],
+  defaultExpiryDays = 7,
 }: CoachingPublicLinkPanelProps) {
   const published = forms.filter((form) => form.versionStatus === "published");
   const [versionId, setVersionId] = useState(published[0]?.versionId ?? "");
   const [expiresAt, setExpiresAt] = useState(() => {
-    const date = new Date(Date.now() + 7 * 86_400_000);
+    const date = new Date(Date.now() + defaultExpiryDays * 86_400_000);
     return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
       .toISOString()
       .slice(0, 16);

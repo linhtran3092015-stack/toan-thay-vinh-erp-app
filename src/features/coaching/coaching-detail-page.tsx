@@ -20,6 +20,7 @@ interface CoachingDetailPageProps {
   responses?: CoachingRecordResponseSummary[];
   links?: CoachingPublicLinkSummary[];
   canManageLinks?: boolean;
+  defaultPublicLinkExpiryDays?: number;
 }
 
 const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
@@ -51,6 +52,7 @@ export function CoachingDetailPage({
   responses = [],
   links = [],
   canManageLinks = false,
+  defaultPublicLinkExpiryDays = 7,
 }: CoachingDetailPageProps) {
   return (
     <div className="grid gap-5">
@@ -148,7 +150,7 @@ export function CoachingDetailPage({
         {responses.length ? <ul className="mt-3 divide-y divide-hairline rounded-md border border-hairline">{responses.map((response) => <li className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm" key={response.id}><span>{response.formName} · v{response.versionNumber} · {formatDateTime(response.submittedAt)}</span><Link className="font-semibold text-primary hover:underline" href={`/coaching/responses/${response.id}`}>Xem phản hồi</Link></li>)}</ul> : null}
         <Link className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline" href="/coaching/responses">Xem tất cả phản hồi</Link>
       </section>
-      {canManageLinks ? <CoachingPublicLinkPanel coachingRecordId={record.id} forms={forms} links={links} /> : null}
+      {canManageLinks ? <CoachingPublicLinkPanel coachingRecordId={record.id} defaultExpiryDays={defaultPublicLinkExpiryDays} forms={forms} links={links} /> : null}
 
       <div className="flex justify-end">
         <Link

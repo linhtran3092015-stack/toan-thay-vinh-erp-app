@@ -17,6 +17,7 @@ import type { PermissionCode } from "@/lib/permissions/types";
 interface AppShellProps {
   authUser: AuthUser;
   canCheckTimekeeping?: boolean;
+  centerDisplayName: string;
   children: ReactNode;
   hasOpenTimekeepingEntry?: boolean;
   permissions: readonly PermissionCode[];
@@ -26,6 +27,7 @@ interface AppShellProps {
 export function AppShell({
   authUser,
   canCheckTimekeeping = false,
+  centerDisplayName,
   children,
   hasOpenTimekeepingEntry = false,
   permissions,
@@ -48,6 +50,7 @@ export function AppShell({
     <div className="min-h-screen bg-surface-canvas text-text-strong">
       <Sidebar
         activeDomainKey={activeDomain?.key}
+        centerDisplayName={centerDisplayName}
         domains={visibleDomains}
         isMobileOpen={isMobileNavOpen}
         onClose={closeMobileNavigation}

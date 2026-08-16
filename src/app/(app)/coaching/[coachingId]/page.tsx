@@ -8,6 +8,7 @@ import {
   getCoachingRecordEventsResult,
 } from "@/features/coaching/data";
 import { getCoachingForms, getCoachingPublicLinks, getCoachingRecordResponses } from "@/features/coaching/coaching-form-data";
+import { getSystemSettings } from "@/features/settings/system-settings-data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 interface CoachingDetailRouteProps {
@@ -53,11 +54,13 @@ export default async function CoachingDetailRoute({
     notFound();
   }
 
-  const [eventsResult, forms, responses, links] = await Promise.all([
+  const canManageLinks = permissionResult.permissions.includes("coaching_links.manage");
+  const [eventsResult, forms, responses, links, systemSettings] = await Promise.all([
     getCoachingRecordEventsResult(coachingId),
     permissionResult.permissions.includes("coaching_forms.view") ? getCoachingForms() : Promise.resolve([]),
     permissionResult.permissions.includes("coaching_responses.view") ? getCoachingRecordResponses(coachingId) : Promise.resolve([]),
-    permissionResult.permissions.includes("coaching_links.manage") ? getCoachingPublicLinks(coachingId) : Promise.resolve([]),
+    canManageLinks ? getCoachingPublicLinks(coachingId) : Promise.resolve([]),
+    canManageLinks && permissionResult.permissions.includes("settings.view") ? getSystemSettings() : Promise.resolve(null),
   ]);
 
   if (!eventsResult.ok) {
@@ -77,7 +80,8 @@ export default async function CoachingDetailRoute({
       forms={forms ?? []}
       responses={responses ?? []}
       links={links ?? []}
-      canManageLinks={permissionResult.permissions.includes("coaching_links.manage")}
+      canManageLinks={canManageLinks}
+      defaultPublicLinkExpiryDays={systemSettings?.["coaching.default_public_link_expiry_days"]}
     />
   );
 }

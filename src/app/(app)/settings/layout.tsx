@@ -21,10 +21,10 @@ export default async function SettingsLayout({
     );
   }
 
-  if (!permissionResult.permissions.includes("staff.roles.view")) {
+  if (!permissionResult.permissions.includes("settings.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền staff.roles.view."
+        description="Tài khoản hiện tại không có quyền settings.view."
         title="Không có quyền xem cài đặt hệ thống"
       />
     );
@@ -46,6 +46,7 @@ export default async function SettingsLayout({
 
       <SettingsNavigation
         canViewAudit={permissionResult.permissions.includes("audit.view")}
+        canViewSettings={permissionResult.permissions.includes("settings.view")}
         canViewUsers={permissionResult.permissions.includes("staff.view")}
       />
 

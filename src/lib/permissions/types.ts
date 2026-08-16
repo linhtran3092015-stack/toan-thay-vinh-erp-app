@@ -80,6 +80,8 @@ export const DATABASE_PERMISSION_CODES = [
   "students.correct_acquisition_source",
   "settings.receipts.manage",
   "settings.sepay_receiving_accounts.manage",
+  "settings.view",
+  "settings.manage",
 ] as const;
 
 export type PermissionCode = (typeof DATABASE_PERMISSION_CODES)[number];

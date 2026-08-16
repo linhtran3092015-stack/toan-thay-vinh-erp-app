@@ -41,6 +41,15 @@ const revokeInvitationSchema = z.object({
   reason: reasonSchema,
 });
 
+const updateSystemSettingsSchema = z.object({
+  address: z.string().trim().max(500, "Địa chỉ không được vượt quá 500 ký tự."),
+  contactEmail: z.string().trim().max(160).refine((value) => !value || z.string().email().safeParse(value).success, "Email liên hệ không hợp lệ."),
+  contactPhone: z.string().trim().max(160, "Số điện thoại liên hệ quá dài."),
+  defaultPublicLinkExpiryDays: z.number().int().min(1, "Thời hạn tối thiểu là 1 ngày.").max(90, "Thời hạn tối đa là 90 ngày."),
+  displayName: z.string().trim().min(1, "Bắt buộc nhập tên trung tâm.").max(160),
+  teacherDisplayName: z.string().trim().min(1, "Bắt buộc nhập tên giáo viên / thương hiệu.").max(160),
+});
+
 const setRolePermissionsSchema = z.object({
   permissionIds: z
     .array(z.string().uuid("Quyền không hợp lệ."))
@@ -54,6 +63,7 @@ const setRolePermissionsSchema = z.object({
 type InviteAccountInput = z.input<typeof inviteAccountSchema>;
 type SetAccountRolesInput = z.input<typeof setAccountRolesSchema>;
 type RevokeInvitationInput = z.input<typeof revokeInvitationSchema>;
+type UpdateSystemSettingsInput = z.input<typeof updateSystemSettingsSchema>;
 type SetRolePermissionsInput = z.input<typeof setRolePermissionsSchema>;
 
 function createErrorState(
@@ -108,6 +118,10 @@ function getRpcErrorMessage(message: string): string {
     TARGET_ROLE_MUST_BE_ACTIVE: "Vai trò được chọn hiện không hoạt động.",
     TARGET_ROLE_NOT_FOUND: "Không tìm thấy vai trò được chọn.",
     VALID_EMAIL_REQUIRED: "Email không hợp lệ.",
+    SYSTEM_SETTINGS_INVALID_EXPIRY: "Thời hạn liên kết phải từ 1 đến 90 ngày.",
+    SYSTEM_SETTINGS_INVALID_VALUE: "Giá trị cài đặt không hợp lệ.",
+    SYSTEM_SETTINGS_PERMISSION_DENIED: "Không có quyền quản lý cài đặt hệ thống.",
+    SYSTEM_SETTINGS_UNKNOWN_KEY: "Khóa cài đặt không được hỗ trợ.",
   };
 
   for (const [code, userMessage] of Object.entries(knownMessages)) {
@@ -270,5 +284,31 @@ export async function setRolePermissionsAction(
     return { message: "Đã cập nhật quyền của vai trò.", status: "success" };
   } catch {
     return createErrorState("Không thể kết nối hệ thống phân quyền.");
+  }
+}
+
+export async function updateSystemSettingsAction(input: UpdateSystemSettingsInput): Promise<SettingsActionState> {
+  const parsed = updateSystemSettingsSchema.safeParse(input);
+  if (!parsed.success) return createErrorState(parsed.error.issues[0]?.message ?? "Cài đặt không hợp lệ.");
+  const { getDatabasePermissions } = await import("@/lib/permissions/database-permissions");
+  const permissions = await getDatabasePermissions();
+  if (!permissions.ok || !permissions.permissions.includes("settings.manage")) return createErrorState("Không có quyền quản lý cài đặt hệ thống.");
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.rpc("update_system_settings", { p_values: {
+      "center.address": parsed.data.address,
+      "center.contact_email": parsed.data.contactEmail,
+      "center.contact_phone": parsed.data.contactPhone,
+      "center.display_name": parsed.data.displayName,
+      "coaching.default_public_link_expiry_days": parsed.data.defaultPublicLinkExpiryDays,
+      "teacher.display_name": parsed.data.teacherDisplayName,
+    } });
+    if (error) return createErrorState(getRpcErrorMessage(error.message));
+    revalidatePath("/settings");
+    revalidatePath("/settings/general");
+    revalidatePath("/coaching");
+    return { message: "Đã lưu cài đặt hệ thống.", status: "success" };
+  } catch {
+    return createErrorState("Không thể kết nối hệ thống cài đặt.");
   }
 }

@@ -8,15 +8,18 @@ import { cn } from "@/lib/utils";
 interface SettingsNavigationProps {
   canViewAudit: boolean;
   canViewUsers: boolean;
+  canViewSettings: boolean;
 }
 
 export function SettingsNavigation({
   canViewAudit,
   canViewUsers,
+  canViewSettings,
 }: SettingsNavigationProps) {
   const pathname = usePathname();
   const items = [
     { href: "/settings", label: "Tổng quan", visible: true },
+    { href: "/settings/general", label: "Trung tâm", visible: canViewSettings },
     {
       href: "/settings/users",
       label: "Người dùng & vai trò",

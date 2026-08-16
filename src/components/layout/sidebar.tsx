@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 interface SidebarProps {
   activeDomainKey?: string;
+  centerDisplayName: string;
   domains: readonly VisibleNavigationDomain[];
   isMobileOpen: boolean;
   onClose: (restoreFocus?: boolean) => void;
@@ -17,6 +18,7 @@ interface SidebarProps {
 
 export function Sidebar({
   activeDomainKey,
+  centerDisplayName,
   domains,
   isMobileOpen,
   onClose,
@@ -75,6 +77,7 @@ export function Sidebar({
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[72px] border-r border-[var(--nav-sidebar-border)] bg-[var(--nav-sidebar-bg)] text-[var(--nav-sidebar-fg)] md:block xl:w-[var(--sidebar-width)]">
         <SidebarContents
           activeDomainKey={activeDomainKey}
+          centerDisplayName={centerDisplayName}
           domains={domains}
           isMobile={false}
         />
@@ -101,6 +104,7 @@ export function Sidebar({
         >
           <SidebarContents
             activeDomainKey={activeDomainKey}
+            centerDisplayName={centerDisplayName}
             domains={domains}
             isMobile
             onClose={() => onClose()}
@@ -114,6 +118,7 @@ export function Sidebar({
 
 interface SidebarContentsProps {
   activeDomainKey?: string;
+  centerDisplayName: string;
   domains: readonly VisibleNavigationDomain[];
   isMobile: boolean;
   onClose?: () => void;
@@ -122,6 +127,7 @@ interface SidebarContentsProps {
 
 function SidebarContents({
   activeDomainKey,
+  centerDisplayName,
   domains,
   isMobile,
   onClose,
@@ -135,7 +141,7 @@ function SidebarContents({
         <div className="flex min-w-0 items-center gap-3">
           <School aria-hidden="true" className="h-5 w-5 flex-none" strokeWidth={1.8} />
           <div className={cn("min-w-0", !isMobile && "hidden xl:block")}>
-            <p className="truncate text-sm font-semibold tracking-[0.01em]">Toán Thầy Vinh</p>
+            <p className="truncate text-sm font-semibold tracking-[0.01em]">{centerDisplayName}</p>
             <p className="mt-0.5 text-caption text-[var(--nav-sidebar-muted)]">ERP vận hành</p>
           </div>
         </div>
