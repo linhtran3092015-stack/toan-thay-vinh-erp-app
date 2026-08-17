@@ -1,6 +1,6 @@
 begin;
 
-select plan(41);
+select plan(42);
 
 insert into auth.users (id,aud,role,email,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
 values ('ca000000-0000-0000-0000-000000000001','authenticated','authenticated','component-roster@example.test','{"provider":"email"}','{}',now(),now());
@@ -67,13 +67,18 @@ insert into public.students(id,public_code,full_name,birth_year,current_grade,li
   ('ca000000-0000-0000-0000-000000000042','TV-2030-00042','Composite 5A1',2020,5,'active'),
   ('ca000000-0000-0000-0000-000000000043','TV-2030-00043','Composite 5A2',2020,5,'active'),
   ('ca000000-0000-0000-0000-000000000044','TV-2030-00044','Composite 5A0',2020,5,'active'),
-  ('ca000000-0000-0000-0000-000000000045','TV-2030-00045','Unrelated enrollment',2020,5,'active');
+  ('ca000000-0000-0000-0000-000000000045','TV-2030-00045','Unrelated enrollment',2020,5,'active'),
+  ('ca000000-0000-0000-0000-000000000046','TV-2030-00046','Historical composite 5A1',2020,5,'active');
 insert into public.student_enrollments(id,student_id,class_id,registered_mode,status,effective_from,effective_to) values
   ('ca000000-0000-0000-0000-000000000051','ca000000-0000-0000-0000-000000000041','ca000000-0000-0000-0000-000000000011','offline','active',date '2030-08-01',null),
   ('ca000000-0000-0000-0000-000000000052','ca000000-0000-0000-0000-000000000042','ca000000-0000-0000-0000-000000000015','offline','active',date '2030-08-01',null),
   ('ca000000-0000-0000-0000-000000000053','ca000000-0000-0000-0000-000000000043','ca000000-0000-0000-0000-000000000016','offline','active',date '2030-08-01',null),
   ('ca000000-0000-0000-0000-000000000054','ca000000-0000-0000-0000-000000000044','ca000000-0000-0000-0000-000000000017','offline','active',date '2030-08-01',null),
-  ('ca000000-0000-0000-0000-000000000055','ca000000-0000-0000-0000-000000000045','ca000000-0000-0000-0000-000000000018','offline','active',date '2030-08-01',null);
+  ('ca000000-0000-0000-0000-000000000055','ca000000-0000-0000-0000-000000000045','ca000000-0000-0000-0000-000000000018','offline','active',date '2030-08-01',null),
+  ('ca000000-0000-0000-0000-000000000056','ca000000-0000-0000-0000-000000000046','ca000000-0000-0000-0000-000000000015','offline','active',date '2030-08-01',null);
+update public.student_enrollments
+set status='transferred', effective_to=date '2030-08-05', ended_by='ca000000-0000-0000-0000-000000000001', end_reason='Test transfer'
+where id='ca000000-0000-0000-0000-000000000056';
 
 select is((select count(*) from public.resolve_class_session_roster('ca000000-0000-0000-0000-000000000031'))::integer,4,'5A roster contains direct, 5A1, 5A2, and 5A0 students exactly once');
 select ok(exists(select 1 from public.resolve_class_session_roster('ca000000-0000-0000-0000-000000000031') where student_id='ca000000-0000-0000-0000-000000000041'),'direct 5A student appears in 5A roster');
@@ -113,6 +118,7 @@ insert into public.tuition_collection_periods(id,name,starts_on,ends_on,status,c
 values ('ca000000-0000-0000-0000-000000000061','Kỳ component roster',date '2030-08-01',date '2030-08-31','draft','ca000000-0000-0000-0000-000000000001');
 select is((select count(*) from public.preview_tuition_collection_period('ca000000-0000-0000-0000-000000000061') where student_id='ca000000-0000-0000-0000-000000000042')::integer,2,'tuition preview counts both 5A1 physical components');
 select is((select distinct class_id from public.preview_tuition_collection_period('ca000000-0000-0000-0000-000000000061') where student_id='ca000000-0000-0000-0000-000000000042'),'ca000000-0000-0000-0000-000000000015'::uuid,'tuition preview preserves the official 5A1 enrollment class');
+select is((select count(*) from public.preview_tuition_collection_period('ca000000-0000-0000-0000-000000000061') where student_id='ca000000-0000-0000-0000-000000000046')::integer,2,'tuition preview retains transferred composite enrollment sessions within its effective dates');
 select set_config('request.jwt.claim.sub','',true);
 select throws_ok($$select public.resolve_class_session_roster('ca000000-0000-0000-0000-000000000031')$$,'28000','AUTHENTICATION_REQUIRED','anon cannot access the internal roster RPC');
 select throws_ok($$select public.preview_tuition_collection_period('ca000000-0000-0000-0000-000000000010')$$,'28000','AUTHENTICATION_REQUIRED','anon cannot access tuition preview');
