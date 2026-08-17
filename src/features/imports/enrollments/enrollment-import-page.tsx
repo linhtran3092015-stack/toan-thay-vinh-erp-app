@@ -77,30 +77,79 @@ interface CommitResultInfo {
   committed_at: string;
 }
 
-export function EnrollmentImportPage() {
+export interface EnrollmentImportPageProps {
+  initialBatch?: {
+    id?: string;
+    status?: string;
+    row_count?: number;
+    new_count?: number;
+    matching_count?: number;
+  };
+  initialDryRun?: EnrollmentImportDryRunResult;
+}
+
+export function EnrollmentImportPage({ initialBatch, initialDryRun }: EnrollmentImportPageProps = {}) {
   const [academicYearCode, setAcademicYearCode] = useState("2026-2027");
   const [file, setFile] = useState<File | null>(null);
   const [fileSha256, setFileSha256] = useState<string | null>(null);
   const [parsedWorkbook, setParsedWorkbook] = useState<ParsedEnrollmentWorkbook | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
 
-  const [dryRunResult, setDryRunResult] = useState<EnrollmentImportDryRunResult | null>(null);
+  const [dryRunResult, setDryRunResult] = useState<EnrollmentImportDryRunResult | null>(initialDryRun || null);
   const [dryRunError, setDryRunError] = useState<string | null>(null);
   const [isStale, setIsStale] = useState(false);
 
-  const [createBatchResult, setCreateBatchResult] = useState<BatchResultInfo | null>(null);
+  const [createBatchResult, setCreateBatchResult] = useState<BatchResultInfo | null>(
+    initialBatch ? { batch: initialBatch } : null
+  );
   const [createBatchError, setCreateBatchError] = useState<string | null>(null);
-  const [reasonInput, setReasonInput] = useState("Import ghi danh học viên chính thức 2026-2027 - 710 học viên");
+  const [reasonInput, setReasonInput] = useState("Import ghi danh học viên chính thức 2026-2027");
 
   const [commitResult, setCommitResult] = useState<CommitResultInfo | null>(null);
   const [commitError, setCommitError] = useState<string | null>(null);
   const [commitConfirmInput, setCommitConfirmInput] = useState("");
-  const [commitReasonInput, setCommitReasonInput] = useState(
-    "Commit ghi danh học viên chính thức 2026-2027 - 702 mới + 8 khớp"
-  );
+  const [commitReasonInput, setCommitReasonInput] = useState("");
 
   const [filterClassification, setFilterClassification] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
+
+  const effectiveNewCount = useMemo(() => {
+    if (createBatchResult?.batch?.new_count != null) {
+      return Number(createBatchResult.batch.new_count);
+    }
+    if (dryRunResult?.new_count != null) {
+      return dryRunResult.new_count;
+    }
+    if (initialBatch?.new_count != null) {
+      return Number(initialBatch.new_count);
+    }
+    return 0;
+  }, [createBatchResult, dryRunResult, initialBatch]);
+
+  const effectiveMatchingCount = useMemo(() => {
+    if (createBatchResult?.batch?.matching_count != null) {
+      return Number(createBatchResult.batch.matching_count);
+    }
+    if (dryRunResult?.matching_count != null) {
+      return dryRunResult.matching_count;
+    }
+    if (initialBatch?.matching_count != null) {
+      return Number(initialBatch.matching_count);
+    }
+    return 0;
+  }, [createBatchResult, dryRunResult, initialBatch]);
+
+  const effectiveTotalCommitCount = effectiveNewCount + effectiveMatchingCount;
+  const expectedConfirmationPhrase = `GHI DANH ${effectiveTotalCommitCount}`;
+
+  const defaultCommitReason = useMemo(() => {
+    if (effectiveTotalCommitCount > 0) {
+      return `Commit ghi danh học viên chính thức ${academicYearCode} - ${effectiveNewCount} mới + ${effectiveMatchingCount} khớp`;
+    }
+    return `Commit ghi danh học viên chính thức ${academicYearCode}`;
+  }, [academicYearCode, effectiveNewCount, effectiveMatchingCount, effectiveTotalCommitCount]);
+
+  const activeCommitReason = commitReasonInput.trim() || defaultCommitReason;
 
   // Handle File Upload & SHA-256 Calculation
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -201,13 +250,13 @@ export function EnrollmentImportPage() {
   // Run Commit Action
   const handleCommitBatch = () => {
     const targetBatchId = createBatchResult?.batch?.id || "36be8c0e-2787-4d88-ab21-61e1a43baccb";
-    if (commitConfirmInput.trim() !== "GHI DANH 702") return;
-    if (!commitReasonInput.trim()) return;
+    if (commitConfirmInput.trim() !== expectedConfirmationPhrase) return;
+    if (!activeCommitReason) return;
 
     setCommitError(null);
 
     startTransition(async () => {
-      const res = await commitStudentEnrollmentImportBatchAction(targetBatchId, commitReasonInput.trim());
+      const res = await commitStudentEnrollmentImportBatchAction(targetBatchId, activeCommitReason);
 
       if (res.success && res.data) {
         setCommitResult(res.data);
@@ -232,8 +281,9 @@ export function EnrollmentImportPage() {
     !createBatchResult;
 
   const canCommitBatch =
-    commitConfirmInput.trim() === "GHI DANH 702" &&
-    commitReasonInput.trim().length > 0 &&
+    effectiveTotalCommitCount > 0 &&
+    commitConfirmInput.trim() === expectedConfirmationPhrase &&
+    activeCommitReason.length > 0 &&
     !commitResult;
 
   return (
@@ -418,7 +468,7 @@ export function EnrollmentImportPage() {
             <p><strong>Batch ID:</strong> {commitResult.batch_id}</p>
             <p><strong>Trạng thái:</strong> <span className="text-blue-700 font-bold">{commitResult.status}</span></p>
             <p><strong>Số ghi danh mới đã tạo:</strong> <strong className="text-emerald-700">{commitResult.committed_new_count}</strong></p>
-            <p><strong>Số ghi danh pilot dùng lại:</strong> <strong className="text-blue-700">{commitResult.reused_matching_count}</strong></p>
+            <p><strong>Số ghi danh dùng lại:</strong> <strong className="text-blue-700">{commitResult.reused_matching_count}</strong></p>
             <p><strong>Thời gian Commit:</strong> {commitResult.committed_at}</p>
           </div>
         </div>
@@ -507,7 +557,7 @@ export function EnrollmentImportPage() {
                     Commit Ghi Danh Học Viên Vào Cơ Sở Dữ Liệu Vận Hành
                   </h4>
                   <span className="text-xs font-mono text-amber-800">
-                    Ghi danh mới: <strong>702</strong> | Dùng lại pilot: <strong>8</strong>
+                    Ghi danh mới: <strong>{effectiveNewCount}</strong> | Dùng lại: <strong>{effectiveMatchingCount}</strong>
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -519,19 +569,19 @@ export function EnrollmentImportPage() {
                       type="text"
                       value={commitReasonInput}
                       onChange={(e) => setCommitReasonInput(e.target.value)}
-                      placeholder="Lý do commit..."
+                      placeholder={defaultCommitReason}
                       className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-medium"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-amber-800 mb-1">
-                      Nhập mã xác nhận: <code className="bg-amber-200 px-1 py-0.5 rounded text-amber-900 font-bold">GHI DANH 702</code>
+                      Nhập mã xác nhận: <code className="bg-amber-200 px-1 py-0.5 rounded text-amber-900 font-bold">{expectedConfirmationPhrase}</code>
                     </label>
                     <input
                       type="text"
                       value={commitConfirmInput}
                       onChange={(e) => setCommitConfirmInput(e.target.value)}
-                      placeholder="Nhập chính xác: GHI DANH 702"
+                      placeholder={`Nhập chính xác: ${expectedConfirmationPhrase}`}
                       className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-mono font-bold"
                     />
                   </div>
@@ -542,7 +592,7 @@ export function EnrollmentImportPage() {
                     disabled={!canCommitBatch || isPending}
                     className="px-6 py-2.5 bg-red-600 text-white font-bold text-sm rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
                   >
-                    {isPending ? "Đang Commit Ghi Danh..." : "XÁC NHẬN COMMIT GHI DANH 702 HỌC VIÊN"}
+                    {isPending ? "Đang Commit Ghi Danh..." : `XÁC NHẬN COMMIT GHI DANH ${effectiveTotalCommitCount} HỌC VIÊN`}
                   </button>
                 </div>
               </div>
