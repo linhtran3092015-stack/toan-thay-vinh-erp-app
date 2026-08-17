@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getSessionDirectory } from "@/features/sessions/data";
@@ -59,15 +61,17 @@ export default async function SessionsRoute() {
   }
 
   return (
-    <SessionListPage
-      canManageSessions={
-        permissionResult.permissions.includes(
-          "sessions.manage",
-        )
-      }
-      canViewAttendance={canViewAttendance}
-      canViewResults={canViewResults}
-      sessions={directoryResult.sessions}
-    />
+    <Suspense>
+      <SessionListPage
+        canManageSessions={
+          permissionResult.permissions.includes(
+            "sessions.manage",
+          )
+        }
+        canViewAttendance={canViewAttendance}
+        canViewResults={canViewResults}
+        sessions={directoryResult.sessions}
+      />
+    </Suspense>
   );
 }

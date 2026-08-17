@@ -69,7 +69,15 @@ function SelectField({ children, label, onChange, testId, value }: { children: R
 function TableHeader({ children, className }: { children: ReactNode; className?: string }) { return <th className={`h-10 border-b border-border-subtle px-3 text-left font-semibold ${className ?? ""}`} scope="col">{children}</th>; }
 function TableCell({ children, className }: { children: ReactNode; className?: string }) { return <td className={`h-14 px-3 align-middle text-table-body ${className ?? ""}`}>{children}</td>; }
 function sessionHref(id: string, query: string) { return query ? `/sessions/${id}?${query}` : `/sessions/${id}`; }
-function formatDate(value: string) { return new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", weekday: "short", year: "numeric" }).format(new Date(`${value}T00:00:00+07:00`)); }
+const VI_SHORT_WEEKDAYS = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"] as const;
+export function formatDate(value: string) {
+  const date = new Date(`${value}T00:00:00+07:00`);
+  const weekday = VI_SHORT_WEEKDAYS[date.getDay()];
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${weekday}, ${day}/${month}/${year}`;
+}
 function formatTime(value: string) { return value.slice(0, 5); }
 function formatKind(value: SessionKind) { return { additional: "Buổi bổ sung", makeup: "Buổi bù", regular: "Buổi chính" }[value]; }
 function formatMode(value: SessionLearningMode) { return { hybrid: "Kết hợp", offline: "Offline", online: "Online" }[value]; }
