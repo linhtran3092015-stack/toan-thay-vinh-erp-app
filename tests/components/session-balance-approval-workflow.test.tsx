@@ -2,7 +2,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionBalanceBatchDetailPage } from "@/features/imports/session-balances/session-balance-batch-detail-page";
-import type { SessionBalanceImportBatchDetail } from "@/features/imports/session-balances/types";
+import { SessionBalanceImportPage } from "@/features/imports/session-balances/session-balance-import-page";
+import type {
+  SessionBalanceImportBatchDetail,
+  SessionBalanceImportBatchListItem,
+} from "@/features/imports/session-balances/types";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -50,6 +54,33 @@ const mockBatchDetail: SessionBalanceImportBatchDetail = {
   },
   rows: [],
 };
+
+const mockBatchListItems: SessionBalanceImportBatchListItem[] = [
+  {
+    approved_at: null,
+    approved_by: null,
+    created_at: "2026-08-17T15:00:00Z",
+    created_by: "user-creator-111",
+    creator_name: "Linh Trần Văn",
+    effective_on: "2026-06-12",
+    excluded_count: 0,
+    id: "551f9877-9fd8-4f99-9001-67efddd32b57",
+    invalid_count: 0,
+    no_change_count: 0,
+    posted_at: null,
+    posted_by: null,
+    posted_count: 0,
+    reason: "Import số dư 682 học viên",
+    reconciled_at: "2026-08-17T15:05:00Z",
+    reconciled_by: "user-creator-111",
+    review_count: 0,
+    row_count: 489,
+    source_filename: "session_balances.xlsx",
+    source_sha256: "abc123sha256",
+    status: "awaiting_approval",
+    valid_count: 489,
+  },
+];
 
 describe("Session Balance Import Approval Workflow UI & RBAC", () => {
   it("Scenario 1: hides approval panel when batch is still in awaiting_reconciliation status", () => {
@@ -127,5 +158,41 @@ describe("Session Balance Import Approval Workflow UI & RBAC", () => {
 
     const approveBtn = screen.getByRole("button", { name: "Phê duyệt batch" });
     expect(approveBtn).toBeDisabled();
+  });
+
+  it("Scenario 5: Batch Discovery UI - renders pending batch list for Checker with 'Xem & Phê duyệt' action button", () => {
+    render(
+      <SessionBalanceImportPage
+        batches={mockBatchListItems}
+        canApprove={true}
+        currentUserId="user-approver-222"
+      />
+    );
+
+    expect(
+      screen.getByText(/Danh sách Batch đối soát & Phê duyệt/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("session_balances.xlsx")).toBeInTheDocument();
+    expect(screen.getByText("Linh Trần Văn")).toBeInTheDocument();
+    expect(screen.getByText("Chờ bạn duyệt")).toBeInTheDocument();
+
+    const linkBtn = screen.getByRole("button", { name: /Xem & Phê duyệt/i });
+    expect(linkBtn).toBeInTheDocument();
+    expect(linkBtn.closest("a")).toHaveAttribute(
+      "href",
+      "/imports/session-balances/551f9877-9fd8-4f99-9001-67efddd32b57"
+    );
+  });
+
+  it("Scenario 6: Batch Discovery UI - renders 'Chờ đối tác duyệt' badge for Maker on /imports/session-balances", () => {
+    render(
+      <SessionBalanceImportPage
+        batches={mockBatchListItems}
+        canApprove={true}
+        currentUserId="user-creator-111"
+      />
+    );
+
+    expect(screen.getByText("Chờ đối tác duyệt (Maker)")).toBeInTheDocument();
   });
 });

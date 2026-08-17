@@ -2,6 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import {
 } from "@/features/imports/session-balances/mapping";
 import { downloadSessionBalanceImportTemplate } from "@/features/imports/session-balances/template-browser";
 import type {
+  SessionBalanceImportBatchListItem,
   SessionBalanceImportCellValue,
   SessionBalanceImportColumnMapping,
   SessionBalanceImportDryRunResult,
@@ -47,6 +49,20 @@ function getTodayInVietnam(): string {
     day: "2-digit",
   });
   return formatter.format(new Date());
+}
+
+function formatBatchDateTime(isoString: string | null): string {
+  if (!isoString) return "—";
+  try {
+    const d = new Date(isoString);
+    return new Intl.DateTimeFormat("vi-VN", {
+      dateStyle: "short",
+      timeStyle: "short",
+      timeZone: "Asia/Ho_Chi_Minh",
+    }).format(d);
+  } catch {
+    return isoString;
+  }
 }
 
 function displayCellValue(
@@ -88,7 +104,17 @@ function getStatusLabel(
   return "Hợp lệ";
 }
 
-export function SessionBalanceImportPage() {
+export interface SessionBalanceImportPageProps {
+  batches?: SessionBalanceImportBatchListItem[];
+  canApprove?: boolean;
+  currentUserId?: string | null;
+}
+
+export function SessionBalanceImportPage({
+  batches = [],
+  canApprove = false,
+  currentUserId = null,
+}: SessionBalanceImportPageProps = {}) {
   const router = useRouter();
 
   const [effectiveOn, setEffectiveOn] = useState<string>(getTodayInVietnam);
@@ -319,6 +345,103 @@ export function SessionBalanceImportPage() {
           Kiểm tra dữ liệu số dư buổi đầu kỳ từ file Excel và khởi tạo batch đối soát.
         </p>
       </header>
+
+      {/* Batch History & Pending Approvals List */}
+      {batches.length > 0 ? (
+        <Card className="border-primary/20 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="text-base font-bold text-ink flex items-center gap-2">
+                <span>📋 Danh sách Batch đối soát &amp; Phê duyệt ({batches.length})</span>
+              </CardTitle>
+              <p className="text-xs text-ink-subtle">
+                Chọn batch đang chờ duyệt để mở trang phê duyệt chính thức
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto rounded-md border border-hairline">
+              <table className="w-full text-left text-sm text-ink">
+                <thead className="border-b border-hairline bg-surface-2 text-xs font-semibold uppercase text-ink-subtle">
+                  <tr>
+                    <th className="px-3 py-2.5">Thời gian tạo</th>
+                    <th className="px-3 py-2.5">File nguồn / Lý do</th>
+                    <th className="px-3 py-2.5">Người tạo</th>
+                    <th className="px-3 py-2.5 text-center">Số dòng</th>
+                    <th className="px-3 py-2.5">Trạng thái</th>
+                    <th className="px-3 py-2.5 text-right">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-hairline">
+                  {batches.map((b) => {
+                    const isMaker = currentUserId === b.created_by;
+                    const isAwaitingApproval = b.status === "awaiting_approval";
+                    const isAwaitingReconciliation = b.status === "awaiting_reconciliation";
+
+                    let statusTone: "danger" | "neutral" | "success" | "warning" = "neutral";
+                    let statusLabel = b.status as string;
+
+                    if (b.status === "approved" || b.status === "posted") {
+                      statusTone = "success";
+                      statusLabel = b.status === "posted" ? "Đã ghi sổ" : "Đã phê duyệt";
+                    } else if (isAwaitingApproval) {
+                      statusTone = "warning";
+                      statusLabel = isMaker ? "Chờ đối tác duyệt (Maker)" : "Chờ bạn duyệt";
+                    } else if (isAwaitingReconciliation) {
+                      statusTone = "warning";
+                      statusLabel = "Đang chờ đối soát";
+                    } else if (b.status === "rejected") {
+                      statusTone = "danger";
+                      statusLabel = "Đã từ chối";
+                    }
+
+                    return (
+                      <tr className="hover:bg-surface-2/50 transition-colors" key={b.id}>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs font-mono text-ink-subtle">
+                          {formatBatchDateTime(b.created_at)}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <p className="font-medium text-ink text-sm">{b.source_filename}</p>
+                          <p className="text-xs text-ink-subtle line-clamp-1">{b.reason}</p>
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs text-ink">
+                          {b.creator_name ?? "—"}
+                        </td>
+                        <td className="px-3 py-2.5 text-center whitespace-nowrap font-mono text-xs">
+                          <span className="font-bold text-ink">{b.row_count ?? 0}</span>
+                          {b.valid_count != null ? (
+                            <span className="text-success ml-1">({b.valid_count} hợp lệ)</span>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          <Badge tone={statusTone}>{statusLabel}</Badge>
+                        </td>
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                          <Link href={`/imports/session-balances/${b.id}`}>
+                            {isAwaitingApproval && !isMaker && canApprove ? (
+                              <Button size="sm" variant="primary">
+                                Xem &amp; Phê duyệt →
+                              </Button>
+                            ) : isAwaitingReconciliation ? (
+                              <Button size="sm" variant="outline">
+                                Xem đối soát →
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="outline">
+                                Xem chi tiết →
+                              </Button>
+                            )}
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

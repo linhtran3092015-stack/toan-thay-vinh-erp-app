@@ -112,3 +112,67 @@ export async function getSessionBalanceImportBatchDetail(
     return null;
   }
 }
+
+export async function listSessionBalanceImportBatches(): Promise<
+  import("./types").SessionBalanceImportBatchListItem[]
+> {
+  try {
+    const supabase = await createSupabaseServerClient();
+
+    const { data: batchesData, error } = await supabase
+      .from("session_balance_import_batches")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error || !batchesData) {
+      return [];
+    }
+
+    const profileIds = new Set<string>();
+    for (const b of batchesData) {
+      if (b.created_by) profileIds.add(b.created_by);
+    }
+
+    const profiles: Record<string, string> = {};
+    if (profileIds.size > 0) {
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", Array.from(profileIds));
+
+      if (profilesData) {
+        for (const p of profilesData) {
+          profiles[p.id] = p.display_name ?? "";
+        }
+      }
+    }
+
+    return batchesData.map((b) => ({
+      approved_at: b.approved_at,
+      approved_by: b.approved_by,
+      created_at: b.created_at,
+      created_by: b.created_by,
+      creator_name: b.created_by ? profiles[b.created_by] ?? null : null,
+      effective_on: b.effective_on,
+      excluded_count: b.excluded_count,
+      id: b.id,
+      invalid_count: b.invalid_count,
+      no_change_count: b.no_change_count,
+      posted_at: b.posted_at,
+      posted_by: b.posted_by,
+      posted_count: b.posted_count,
+      reason: b.reason ?? "",
+      reconciled_at: b.reconciled_at,
+      reconciled_by: b.reconciled_by,
+      review_count: b.review_count,
+      row_count: b.row_count,
+      source_filename: b.source_filename,
+      source_sha256: b.source_sha256,
+      status: b.status as import("./types").SessionBalanceImportBatchStatus,
+      valid_count: b.valid_count,
+    }));
+  } catch {
+    return [];
+  }
+}

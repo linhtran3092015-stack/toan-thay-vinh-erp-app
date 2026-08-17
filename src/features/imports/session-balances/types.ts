@@ -178,6 +178,31 @@ export interface SessionBalanceImportBatchRecord {
   valid_count: number | null;
 }
 
+export interface SessionBalanceImportBatchListItem {
+  approved_at: string | null;
+  approved_by: string | null;
+  created_at: string;
+  created_by: string | null;
+  creator_name?: string | null;
+  effective_on: string;
+  excluded_count: number | null;
+  id: string;
+  invalid_count: number | null;
+  no_change_count: number | null;
+  posted_at: string | null;
+  posted_by: string | null;
+  posted_count: number | null;
+  reason: string;
+  reconciled_at: string | null;
+  reconciled_by: string | null;
+  review_count: number | null;
+  row_count: number | null;
+  source_filename: string;
+  source_sha256: string;
+  status: SessionBalanceImportBatchStatus;
+  valid_count: number | null;
+}
+
 export interface SessionBalanceImportRowRecord {
   batch_id: string;
   created_at: string;

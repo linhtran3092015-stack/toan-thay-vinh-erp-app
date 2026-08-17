@@ -1,7 +1,9 @@
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
+import { listSessionBalanceImportBatches } from "@/features/imports/session-balances/queries";
 import { SessionBalanceImportPage } from "@/features/imports/session-balances/session-balance-import-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function SessionBalanceImportRoute() {
   const permissionResult = await getCachedDatabasePermissions();
@@ -15,16 +17,33 @@ export default async function SessionBalanceImportRoute() {
     );
   }
 
-  if (
-    !permissionResult.permissions.includes("imports.session_balances")
-  ) {
+  const hasViewPermission = permissionResult.permissions.includes(
+    "imports.session_balances",
+  );
+  const canApprove = permissionResult.permissions.includes(
+    "imports.session_balances.approve",
+  );
+
+  if (!hasViewPermission && !canApprove) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền imports.session_balances."
-        title="Không có quyền import số dư buổi"
+        description="Tài khoản hiện tại không có quyền xem hoặc duyệt import số dư buổi."
+        title="Không có quyền truy cập"
       />
     );
   }
 
-  return <SessionBalanceImportPage />;
+  const batches = await listSessionBalanceImportBatches();
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return (
+    <SessionBalanceImportPage
+      batches={batches}
+      canApprove={canApprove}
+      currentUserId={user?.id ?? null}
+    />
+  );
 }
