@@ -26,6 +26,7 @@ export interface SessionParticipantReadModel {
     | SessionAttendanceStatus
     | null;
   currentGrade: number | null;
+  enrollmentClassId: string | null;
   enrollmentId: string | null;
   isLateUpdate: boolean;
   notebookScore: number | null;

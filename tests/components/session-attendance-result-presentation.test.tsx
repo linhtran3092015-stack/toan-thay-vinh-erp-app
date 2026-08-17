@@ -19,7 +19,7 @@ vi.mock("@/features/sessions/actions/session-result-actions", () => resultAction
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 const participant: SessionParticipantReadModel = {
-  actualLearningMode: "offline", attendanceId: null, attendanceNotes: null, attendanceStatus: "present", currentGrade: 7, enrollmentId: "enrollment-1", isLateUpdate: false, notebookScore: null, notebookStatus: "not_submitted", registeredMode: "offline", resultComment: null, resultId: null, studentCode: "HV-001", studentId: "student-1", studentName: "Nguyễn Minh An", testScore: null,
+  actualLearningMode: "offline", attendanceId: null, attendanceNotes: null, attendanceStatus: "present", currentGrade: 7, enrollmentClassId: "class-1", enrollmentId: "enrollment-1", isLateUpdate: false, notebookScore: null, notebookStatus: "not_submitted", registeredMode: "offline", resultComment: null, resultId: null, studentCode: "HV-001", studentId: "student-1", studentName: "Nguyễn Minh An", testScore: null,
 };
 
 function attendanceProps(overrides: Partial<ComponentProps<typeof SessionAttendanceManagement>> = {}) {

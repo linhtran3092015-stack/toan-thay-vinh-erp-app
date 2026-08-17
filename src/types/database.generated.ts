@@ -269,6 +269,61 @@ export type Database = {
           },
         ]
       }
+      class_component_links: {
+        Row: {
+          component_class_id: string
+          component_order: number
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          parent_class_id: string
+        }
+        Insert: {
+          component_class_id: string
+          component_order: number
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          parent_class_id: string
+        }
+        Update: {
+          component_class_id?: string
+          component_order?: number
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          parent_class_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_component_links_component_class_id_fkey"
+            columns: ["component_class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_component_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_component_links_parent_class_id_fkey"
+            columns: ["parent_class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       class_schedule_import_batches: {
         Row: {
           academic_year_code: string
@@ -5577,6 +5632,32 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_class_component_link: {
+        Args: {
+          p_component_class_id: string
+          p_component_order: number
+          p_effective_from: string
+          p_effective_to: string
+          p_parent_class_id: string
+          p_reason: string
+        }
+        Returns: {
+          component_class_id: string
+          component_order: number
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          parent_class_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_component_links"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_class_schedule_import_batch: {
         Args: {
           p_academic_year_code: string
@@ -6104,6 +6185,25 @@ export type Database = {
       dry_run_student_enrollment_import: {
         Args: { p_academic_year_code: string; p_rows: Json }
         Returns: Json
+      }
+      end_class_component_link: {
+        Args: { p_effective_to: string; p_link_id: string; p_reason: string }
+        Returns: {
+          component_class_id: string
+          component_order: number
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          parent_class_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_component_links"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       end_class_schedule_template: {
         Args: {
@@ -7275,6 +7375,27 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      resolve_class_session_roster: {
+        Args: { p_class_session_id: string }
+        Returns: {
+          enrollment_class_id: string
+          registered_mode: string
+          session_class_id: string
+          student_enrollment_id: string
+          student_id: string
+        }[]
+      }
+      resolve_class_session_rosters: {
+        Args: { p_class_session_ids: string[] }
+        Returns: {
+          class_session_id: string
+          enrollment_class_id: string
+          registered_mode: string
+          session_class_id: string
+          student_enrollment_id: string
+          student_id: string
+        }[]
       }
       resolve_sepay_receiving_account: {
         Args: { p_signed_account_number: string; p_transaction_at: string }

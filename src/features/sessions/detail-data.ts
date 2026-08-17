@@ -49,11 +49,10 @@ interface SessionDetailQueryRow {
 }
 
 interface EnrollmentQueryRow {
-  effective_from: string;
-  effective_to: string | null;
-  id: string;
+  enrollment_class_id: string;
   registered_mode: string;
   student_id: string;
+  student_enrollment_id: string;
 }
 
 interface AttendanceQueryRow {
@@ -253,24 +252,8 @@ export async function getSessionDetail(
         data: enrollmentData,
         error: enrollmentError,
       } = await supabase
-        .from("student_enrollments")
-        .select(`
-          id,
-          student_id,
-          registered_mode,
-          effective_from,
-          effective_to
-        `)
-        .eq("class_id", session.class_id)
-        .lte(
-          "effective_from",
-          session.session_date,
-        )
-        .or(
-          `effective_to.is.null,effective_to.gte.${session.session_date}`,
-        )
-        .order("effective_from", {
-          ascending: true,
+        .rpc("resolve_class_session_roster", {
+          p_class_session_id: sessionId,
         });
 
       if (enrollmentError) {
@@ -482,8 +465,10 @@ export async function getSessionDetail(
           attendanceStatus,
           currentGrade:
             student?.current_grade ?? null,
+          enrollmentClassId:
+            enrollment?.enrollment_class_id ?? null,
           enrollmentId:
-            enrollment?.id ??
+            enrollment?.student_enrollment_id ??
             attendance?.student_enrollment_id ??
             null,
           isLateUpdate:
