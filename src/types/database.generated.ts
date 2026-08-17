@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.15"
+  }
   public: {
     Tables: {
       academic_years: {
@@ -7387,6 +7392,17 @@ export type Database = {
         }[]
       }
       resolve_class_session_rosters: {
+        Args: { p_class_session_ids: string[] }
+        Returns: {
+          class_session_id: string
+          enrollment_class_id: string
+          registered_mode: string
+          session_class_id: string
+          student_enrollment_id: string
+          student_id: string
+        }[]
+      }
+      resolve_class_session_rosters_for_tuition: {
         Args: { p_class_session_ids: string[] }
         Returns: {
           class_session_id: string
