@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,8 +44,8 @@ export function BulkStatusTransitionDialog({
   const [actionError, setActionError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const [isPreviewing, startPreviewTransition] = useTransition();
-  const [isExecuting, startExecuteTransition] = useTransition();
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
 
   const isSpecificSelection = selectedStudentIds.length > 0;
 
@@ -77,11 +77,12 @@ export function BulkStatusTransitionDialog({
     resetState();
   }
 
-  function handlePreview(): void {
+  async function handlePreview(): Promise<void> {
     setActionError(null);
     setSuccessMessage(null);
+    setIsPreviewing(true);
 
-    startPreviewTransition(async () => {
+    try {
       const res = await previewBulkStudentStatusTransitionAction({
         sourceStatus,
         studentIds: isSpecificSelection ? selectedStudentIds : undefined,
@@ -94,10 +95,15 @@ export function BulkStatusTransitionDialog({
       }
 
       setPreviewCount(res.data.count);
-    });
+    } catch {
+      setActionError("Không thể tải thông tin xem trước. Vui lòng thử lại.");
+      setPreviewCount(null);
+    } finally {
+      setIsPreviewing(false);
+    }
   }
 
-  function handleExecute(): void {
+  async function handleExecute(): Promise<void> {
     if (previewCount === null || previewCount < 0) {
       setActionError("Vui lòng thực hiện Preview trước khi xác nhận.");
       return;
@@ -105,8 +111,9 @@ export function BulkStatusTransitionDialog({
 
     setActionError(null);
     setSuccessMessage(null);
+    setIsExecuting(true);
 
-    startExecuteTransition(async () => {
+    try {
       const res = await executeBulkStudentStatusTransitionAction({
         expectedCount: previewCount,
         reason: reason.trim() || undefined,
@@ -127,7 +134,11 @@ export function BulkStatusTransitionDialog({
       if (onSuccess) {
         onSuccess(res.data.affectedCount);
       }
-    });
+    } catch {
+      setActionError("Không thể thực thi chuyển trạng thái. Vui lòng thử lại.");
+    } finally {
+      setIsExecuting(false);
+    }
   }
 
   if (!isOpen) return null;

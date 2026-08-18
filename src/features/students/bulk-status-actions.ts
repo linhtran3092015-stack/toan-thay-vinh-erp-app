@@ -116,7 +116,7 @@ export async function previewBulkStudentStatusTransitionAction(
 
     let query = supabase
       .from("students")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("lifecycle_status", sourceStatus);
 
     if (studentIds && studentIds.length > 0) {
