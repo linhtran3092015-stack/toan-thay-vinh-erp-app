@@ -95,8 +95,12 @@ export function BulkStatusTransitionDialog({
       }
 
       setPreviewCount(res.data.count);
-    } catch {
-      setActionError("Không thể tải thông tin xem trước. Vui lòng thử lại.");
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Không thể tải thông tin xem trước. Vui lòng thử lại.";
+      setActionError(msg);
       setPreviewCount(null);
     } finally {
       setIsPreviewing(false);
@@ -134,8 +138,12 @@ export function BulkStatusTransitionDialog({
       if (onSuccess) {
         onSuccess(res.data.affectedCount);
       }
-    } catch {
-      setActionError("Không thể thực thi chuyển trạng thái. Vui lòng thử lại.");
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Không thể thực thi chuyển trạng thái. Vui lòng thử lại.";
+      setActionError(msg);
     } finally {
       setIsExecuting(false);
     }

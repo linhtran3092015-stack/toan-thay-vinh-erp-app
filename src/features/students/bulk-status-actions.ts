@@ -1,54 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 
 import type { StudentLifecycleStatus } from "@/types/domain";
 import { isSupabaseConfigured } from "@/lib/env";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-const studentLifecycleStatusSchema = z.enum([
-  "active",
-  "completed",
-  "interested",
-  "pending_enrollment_confirmation",
-  "reserved",
-  "resumed",
-  "trial_booked",
-  "trial_completed",
-  "waiting_class",
-]);
-
-export const previewBulkStudentStatusInputSchema = z.object({
-  sourceStatus: studentLifecycleStatusSchema,
-  studentIds: z.array(z.string().uuid()).optional(),
-});
-
-export type PreviewBulkStudentStatusInput = z.infer<
-  typeof previewBulkStudentStatusInputSchema
->;
-
-export const executeBulkStudentStatusInputSchema = z
-  .object({
-    expectedCount: z.number().int().min(0),
-    reason: z.string().trim().max(500).optional(),
-    sourceStatus: studentLifecycleStatusSchema,
-    studentIds: z.array(z.string().uuid()).optional(),
-    targetStatus: studentLifecycleStatusSchema,
-  })
-  .refine((data) => data.sourceStatus !== data.targetStatus, {
-    message: "Trạng thái đích phải khác trạng thái nguồn.",
-    path: ["targetStatus"],
-  });
-
-export type ExecuteBulkStudentStatusInput = z.infer<
-  typeof executeBulkStudentStatusInputSchema
->;
-
-export type BulkStudentStatusActionResult<T> =
-  | { data: T; ok: true }
-  | { code: string; message: string; ok: false };
+import {
+  type BulkStudentStatusActionResult,
+  executeBulkStudentStatusInputSchema,
+  type ExecuteBulkStudentStatusInput,
+  previewBulkStudentStatusInputSchema,
+  type PreviewBulkStudentStatusInput,
+} from "./bulk-status-types";
 
 async function requireManageStatusPermission(): Promise<{
   code: string;
@@ -128,7 +92,7 @@ export async function previewBulkStudentStatusTransitionAction(
     if (error) {
       return {
         code: "query_failed",
-        message: "Không thể đếm số lượng học sinh xem trước.",
+        message: `Không thể đếm số lượng học sinh xem trước: ${error.message}`,
         ok: false,
       };
     }
@@ -140,10 +104,11 @@ export async function previewBulkStudentStatusTransitionAction(
       },
       ok: true,
     };
-  } catch {
+  } catch (err) {
+    const sysMsg = err instanceof Error ? err.message : "Lỗi không xác định";
     return {
       code: "system_error",
-      message: "Hệ thống gặp lỗi khi xem trước.",
+      message: `Hệ thống gặp lỗi khi xem trước: ${sysMsg}`,
       ok: false,
     };
   }
@@ -221,10 +186,11 @@ export async function executeBulkStudentStatusTransitionAction(
       },
       ok: true,
     };
-  } catch {
+  } catch (err) {
+    const sysMsg = err instanceof Error ? err.message : "Lỗi không xác định";
     return {
       code: "system_error",
-      message: "Hệ thống gặp lỗi khi chuyển trạng thái hàng loạt.",
+      message: `Hệ thống gặp lỗi khi chuyển trạng thái hàng loạt: ${sysMsg}`,
       ok: false,
     };
   }

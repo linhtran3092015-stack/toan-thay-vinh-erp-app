@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   executeBulkStudentStatusInputSchema,
   previewBulkStudentStatusInputSchema,
-} from "@/features/students/bulk-status-actions";
+} from "@/features/students/bulk-status-types";
 
 describe("Bulk Student Status Transition Schemas & Validation", () => {
   describe("previewBulkStudentStatusInputSchema", () => {
