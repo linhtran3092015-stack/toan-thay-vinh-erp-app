@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { Button } from "@/components/ui/button";
+import { BulkStatusTransitionDialog } from "./components/bulk-status-transition-dialog";
 import { StudentFilters } from "./components/student-filters";
 import { StudentListEmptyState } from "./components/student-list-empty-state";
 import { StudentListToolbar } from "./components/student-list-toolbar";
@@ -28,19 +29,23 @@ import {
   parseStudentDirectoryViewState,
   resetStudentDirectoryViewState,
 } from "./student-directory-url-state";
+import type { StudentLifecycleStatus } from "@/types/domain";
 
 interface StudentListPageProps {
   canCreateStudent?: boolean;
+  canManageStatus?: boolean;
   students: StudentDirectoryItem[];
 }
 
 export function StudentListPage({
   canCreateStudent = false,
+  canManageStatus = false,
   students,
 }: StudentListPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+  const [isBulkTransitionOpen, setIsBulkTransitionOpen] = useState(false);
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
   const pendingFiltersRef = useRef<StudentDirectoryFiltersState | null>(null);
 
@@ -134,8 +139,10 @@ export function StudentListPage({
       <StudentListToolbar
         activeFilterCount={activeFilterCount}
         canCreateStudent={canCreateStudent}
+        canManageStatus={canManageStatus}
         createHref={createHref}
         filterButtonRef={filterTriggerRef}
+        onOpenBulkTransition={() => setIsBulkTransitionOpen(true)}
         onOpenFilters={() => setIsMobileFiltersOpen(true)}
         resultCount={filteredStudents.length}
         totalCount={students.length}
@@ -190,6 +197,19 @@ export function StudentListPage({
           />
         </>
       )}
+
+      <BulkStatusTransitionDialog
+        initialSourceStatus={
+          viewState.filters.status !== "all"
+            ? (viewState.filters.status as StudentLifecycleStatus)
+            : "interested"
+        }
+        isOpen={isBulkTransitionOpen}
+        onClose={() => setIsBulkTransitionOpen(false)}
+        onSuccess={() => {
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

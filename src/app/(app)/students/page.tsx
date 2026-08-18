@@ -55,6 +55,9 @@ export default async function StudentsRoute() {
       canCreateStudent={permissionResult.permissions.includes(
         "students.create",
       )}
+      canManageStatus={permissionResult.permissions.includes(
+        "students.manage_status",
+      )}
       students={directoryResult.students}
     />
   );
