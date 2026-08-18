@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import type { StudentLifecycleStatus } from "@/types/domain";
 import { isSupabaseConfigured } from "@/lib/env";
-import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
+import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const studentLifecycleStatusSchema = z.enum([
@@ -29,16 +29,18 @@ export type PreviewBulkStudentStatusInput = z.infer<
   typeof previewBulkStudentStatusInputSchema
 >;
 
-export const executeBulkStudentStatusInputSchema = z.object({
-  expectedCount: z.number().int().min(0),
-  reason: z.string().trim().max(500).optional(),
-  sourceStatus: studentLifecycleStatusSchema,
-  studentIds: z.array(z.string().uuid()).optional(),
-  targetStatus: studentLifecycleStatusSchema,
-}).refine((data) => data.sourceStatus !== data.targetStatus, {
-  message: "Trạng thái đích phải khác trạng thái nguồn.",
-  path: ["targetStatus"],
-});
+export const executeBulkStudentStatusInputSchema = z
+  .object({
+    expectedCount: z.number().int().min(0),
+    reason: z.string().trim().max(500).optional(),
+    sourceStatus: studentLifecycleStatusSchema,
+    studentIds: z.array(z.string().uuid()).optional(),
+    targetStatus: studentLifecycleStatusSchema,
+  })
+  .refine((data) => data.sourceStatus !== data.targetStatus, {
+    message: "Trạng thái đích phải khác trạng thái nguồn.",
+    path: ["targetStatus"],
+  });
 
 export type ExecuteBulkStudentStatusInput = z.infer<
   typeof executeBulkStudentStatusInputSchema
@@ -48,23 +50,36 @@ export type BulkStudentStatusActionResult<T> =
   | { data: T; ok: true }
   | { code: string; message: string; ok: false };
 
-async function requireManageStatusPermission(): Promise<{ code: string; message: string; ok: false } | null> {
-  const permResult = await getCachedDatabasePermissions();
-  if (!permResult.ok) {
+async function requireManageStatusPermission(): Promise<{
+  code: string;
+  message: string;
+  ok: false;
+} | null> {
+  try {
+    const permResult = await getDatabasePermissions();
+    if (!permResult.ok) {
+      return {
+        code: "permission_error",
+        message: "Không thể xác minh quyền người dùng.",
+        ok: false,
+      };
+    }
+    if (!permResult.permissions.includes("students.manage_status")) {
+      return {
+        code: "forbidden",
+        message:
+          "Bạn không có quyền chuyển trạng thái học viên (`students.manage_status`).",
+        ok: false,
+      };
+    }
+    return null;
+  } catch {
     return {
       code: "permission_error",
       message: "Không thể xác minh quyền người dùng.",
       ok: false,
     };
   }
-  if (!permResult.permissions.includes("students.manage_status")) {
-    return {
-      code: "forbidden",
-      message: "Bạn không có quyền chuyển trạng thái học viên (`students.manage_status`).",
-      ok: false,
-    };
-  }
-  return null;
 }
 
 export async function previewBulkStudentStatusTransitionAction(
@@ -75,9 +90,6 @@ export async function previewBulkStudentStatusTransitionAction(
     sourceStatus: StudentLifecycleStatus;
   }>
 > {
-  const permFailure = await requireManageStatusPermission();
-  if (permFailure) return permFailure;
-
   const parsed = previewBulkStudentStatusInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -96,6 +108,9 @@ export async function previewBulkStudentStatusTransitionAction(
   }
 
   try {
+    const permFailure = await requireManageStatusPermission();
+    if (permFailure) return permFailure;
+
     const supabase = await createSupabaseServerClient();
     const { sourceStatus, studentIds } = parsed.data;
 
@@ -143,9 +158,6 @@ export async function executeBulkStudentStatusTransitionAction(
     targetStatus: StudentLifecycleStatus;
   }>
 > {
-  const permFailure = await requireManageStatusPermission();
-  if (permFailure) return permFailure;
-
   const parsed = executeBulkStudentStatusInputSchema.safeParse(input);
   if (!parsed.success) {
     const firstIssue = parsed.error.issues[0]?.message;
@@ -165,6 +177,9 @@ export async function executeBulkStudentStatusTransitionAction(
   }
 
   try {
+    const permFailure = await requireManageStatusPermission();
+    if (permFailure) return permFailure;
+
     const supabase = await createSupabaseServerClient();
     const { expectedCount, reason, sourceStatus, studentIds, targetStatus } =
       parsed.data;
@@ -199,8 +214,10 @@ export async function executeBulkStudentStatusTransitionAction(
     return {
       data: {
         affectedCount: Number(resultRecord?.affected_count ?? 0),
-        sourceStatus: (resultRecord?.source_status ?? sourceStatus) as StudentLifecycleStatus,
-        targetStatus: (resultRecord?.target_status ?? targetStatus) as StudentLifecycleStatus,
+        sourceStatus: (resultRecord?.source_status ??
+          sourceStatus) as StudentLifecycleStatus,
+        targetStatus: (resultRecord?.target_status ??
+          targetStatus) as StudentLifecycleStatus,
       },
       ok: true,
     };
