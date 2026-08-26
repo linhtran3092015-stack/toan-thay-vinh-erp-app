@@ -2,6 +2,7 @@ begin;
 
 drop trigger if exists payroll_statements_prevent_mutation on public.payroll_statements;
 drop trigger if exists payroll_periods_protect_history on public.payroll_periods;
+drop trigger if exists payroll_periods_audit_change on public.payroll_periods;
 
 create table public.payroll_calculation_runs (
   id uuid primary key default gen_random_uuid(),
@@ -1741,6 +1742,10 @@ $$;
 create trigger payroll_periods_protect_history
 before update or delete on public.payroll_periods
 for each row execute function public.protect_payroll_period_history();
+
+create trigger payroll_periods_audit_change
+after insert or update on public.payroll_periods
+for each row execute function public.audit_payroll_period_change();
 
 create or replace function public.submit_payroll_for_review(p_payroll_period_id uuid)
 returns public.payroll_periods

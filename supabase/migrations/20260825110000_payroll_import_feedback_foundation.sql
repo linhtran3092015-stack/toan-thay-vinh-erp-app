@@ -1,8 +1,9 @@
 begin;
 
--- The previous immutable-history trigger rejects the one-time feedback-state backfill.
--- Remove it inside this transaction and recreate the stricter replacement below.
+-- The previous immutable-history and audit triggers reject the one-time feedback-state backfill.
+-- Remove them inside this transaction and recreate the stricter replacements below.
 drop trigger if exists payroll_periods_protect_history on public.payroll_periods;
+drop trigger if exists payroll_periods_audit_change on public.payroll_periods;
 
 alter table public.payroll_periods
   add column feedback_opened_at timestamptz,
@@ -784,6 +785,10 @@ $$;
 create trigger payroll_periods_protect_history
 before update or delete on public.payroll_periods
 for each row execute function public.protect_payroll_period_history();
+
+create trigger payroll_periods_audit_change
+after insert or update on public.payroll_periods
+for each row execute function public.audit_payroll_period_change();
 
 create or replace function public.close_payroll_feedback(p_payroll_period_id uuid)
 returns public.payroll_periods
