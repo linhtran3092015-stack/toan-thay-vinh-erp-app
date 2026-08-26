@@ -2,11 +2,59 @@ import "server-only";
 
 import type {
   PayrollDashboardEntry,
+  PayrollManagementOverviewRead,
   PayrollPeriodRead,
   PayrollReadResult,
 } from "@/features/payroll/read-models";
-import { normalizePayrollPeriodsWithDetailsRows } from "@/features/payroll/read-models";
+import {
+  enrichPayrollPeriodsWithExplanations,
+  normalizePayrollPeriodsWithDetailsRows,
+} from "@/features/payroll/read-models";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { z } from "zod";
+
+const payrollManagementOverviewSchema = z.object({
+  correctionRequests: z.array(z.object({
+    id: z.string().uuid(),
+    items: z.array(z.object({
+      evidenceUrl: z.string().nullable(),
+      id: z.string().uuid(),
+      itemLabel: z.string(),
+      requestedChange: z.string(),
+    })),
+    payrollPeriodId: z.string().uuid(),
+    payrollStatementId: z.string().uuid(),
+    requestMessage: z.string(),
+    requestedAt: z.string(),
+    requestedBy: z.string().uuid(),
+    responseMessage: z.string().nullable(),
+    staffDisplayName: z.string(),
+    status: z.enum(["pending", "accepted", "rejected"]),
+  })),
+  importBatches: z.array(z.object({
+    conflictRows: z.number().int().nonnegative(),
+    datasetType: z.enum(["timekeeping", "grading", "renewal_orders", "new_enrollment_orders"]),
+    errorRows: z.number().int().nonnegative(),
+    fileName: z.string(),
+    id: z.string().uuid(),
+    periodMonth: z.string(),
+    status: z.enum(["pending_review", "approved", "rejected"]),
+    totalRows: z.number().int().nonnegative(),
+    uploadedAt: z.string(),
+    validRows: z.number().int().nonnegative(),
+  })),
+  issues: z.array(z.object({
+    details: z.record(z.string(), z.unknown()),
+    id: z.string().uuid(),
+    issueCode: z.string(),
+    payrollPeriodId: z.string().uuid(),
+    periodMonth: z.string(),
+    revision: z.number().int().positive(),
+    severity: z.enum(["blocking", "warning"]),
+    sourceFactId: z.string().uuid().nullable(),
+    staffId: z.string().uuid().nullable(),
+  })),
+});
 
 export async function getPayrollDashboardResult(): Promise<
   PayrollReadResult<readonly PayrollDashboardEntry[]>
@@ -47,18 +95,46 @@ export async function getPayrollPeriodsWithDetailsResult(): Promise<
 > {
   try {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase.rpc(
-      "get_payroll_periods_with_details",
-    );
+    const untypedRpcClient = supabase as unknown as {
+      rpc: (name: string) => Promise<{
+        data: unknown;
+        error: { message: string } | null;
+      }>;
+    };
+    const [detailsResult, explanationsResult] = await Promise.all([
+      supabase.rpc("get_payroll_periods_with_details"),
+      untypedRpcClient.rpc("get_payroll_explanations"),
+    ]);
 
-    if (error) {
+    if (detailsResult.error || explanationsResult.error) {
       return { ok: false };
     }
 
     return {
-      data: normalizePayrollPeriodsWithDetailsRows(data),
+      data: enrichPayrollPeriodsWithExplanations(
+        normalizePayrollPeriodsWithDetailsRows(detailsResult.data),
+        explanationsResult.data,
+      ),
       ok: true,
     };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function getPayrollManagementOverviewResult(): Promise<
+  PayrollReadResult<PayrollManagementOverviewRead>
+> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const result = await (supabase as unknown as {
+      rpc: (name: string) => Promise<{ data: unknown; error: { message: string } | null }>;
+    }).rpc("get_payroll_management_overview");
+    if (result.error) return { ok: false };
+    const parsed = payrollManagementOverviewSchema.safeParse(result.data);
+    return parsed.success
+      ? { data: parsed.data, ok: true }
+      : { ok: false };
   } catch {
     return { ok: false };
   }
