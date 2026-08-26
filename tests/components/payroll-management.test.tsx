@@ -23,18 +23,30 @@ const statementId = "11111111-1111-4111-8111-111111111111";
 const line = (overrides: Partial<PayrollLineRead>): PayrollLineRead => ({
   amountVnd: 1_000,
   direction: "earning",
+  evidenceSnapshot: {},
+  formulaSnapshot: {},
   id: "line-1",
   lineType: "hourly_wage",
   note: "Dữ liệu đã ghi nhận",
   payrollStatementId: statementId,
+  policyCode: null,
+  quantity: null,
+  sourceKind: null,
   unitCount: 9,
+  unitLabel: null,
   unitRateVnd: 100,
+  workMinutes: null,
   ...overrides,
 });
 
 const period = (overrides: Partial<PayrollPeriodRead> = {}): PayrollPeriodRead => ({
+  blockingIssueCount: 0,
+  currentRevision: 1,
+  feedbackClosedAt: "2026-05-20T00:00:00Z",
+  feedbackOpenedAt: "2026-05-15T00:00:00Z",
   id: "22222222-2222-4222-8222-222222222222",
   payDate: "2026-05-28",
+  pendingCorrectionCount: 0,
   periodMonth: "2026-04-01",
   statements: [{
     id: statementId,
@@ -50,6 +62,7 @@ const period = (overrides: Partial<PayrollPeriodRead> = {}): PayrollPeriodRead =
     totalDeductionsVnd: 111,
     totalEarningsVnd: 888,
     workHours: 18,
+    workMinutes: 1_080,
     workUnits: 2,
   }],
   status: "draft",
@@ -135,9 +148,9 @@ describe("Payroll 1 presentation", () => {
     expect(screen.queryByText(/^function constructor/)).not.toBeInTheDocument();
   });
 
-  it("uses the reader-provided draft/review/approved labels and limits manual controls to draft", () => {
+  it("uses reader-provided status labels and limits manual controls to an open draft", () => {
     render(<PayrollPage canApprove={false} canManage canReconcile={false} periods={[
-      period({ id: "draft", status: "draft" }),
+      period({ feedbackClosedAt: null, id: "draft", status: "draft" }),
       period({ id: "review", status: "review" }),
       period({ id: "approved", status: "approved" }),
     ]} />);

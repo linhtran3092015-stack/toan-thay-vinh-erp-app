@@ -77,18 +77,71 @@ export const createStaffRateVersionSchema = z.object({
     .string()
     .trim()
     .max(1000, "Ghi chú tối đa 1.000 ký tự."),
-  offlineHourlyRateVnd: z
+  offlineDailyRateVnd: z
     .number()
-    .int("Đơn giá phải là số nguyên.")
-    .nonnegative("Đơn giá không thể âm.")
-    .refine(
-      (value) => value % 2 === 0,
-      "Đơn giá offline phải là số chẵn để tính đúng mức online 50%.",
-    ),
+    .int("Mức lương ngày phải là số nguyên.")
+    .nonnegative("Mức lương ngày không thể âm."),
   reason: z
     .string()
     .trim()
     .min(1, "Bắt buộc nhập lý do thêm phiên bản đơn giá.")
     .max(2000, "Lý do tối đa 2.000 ký tự."),
+  staffId: z.string().uuid("Mã hồ sơ nhân sự không hợp lệ."),
+});
+
+export const configureStaffPayrollCompensationSchema =
+  createStaffRateVersionSchema.extend({
+    positionCode: z.enum([
+      "teaching_assistant",
+      "operations_assistant",
+      "admissions_manager",
+    ]),
+  });
+
+export const createStaffGradeAssignmentSchema = z
+  .object({
+    effectiveFrom: dateStringSchema,
+    effectiveTo: optionalDateStringSchema,
+    grade: z.number().int().min(2).max(12),
+    reason: z.string().trim().min(1, "Bắt buộc nhập lý do.").max(2000),
+    staffId: z.string().uuid("Mã hồ sơ nhân sự không hợp lệ."),
+  })
+  .refine(
+    (value) => !value.effectiveTo || value.effectiveTo >= value.effectiveFrom,
+    { message: "Ngày kết thúc không thể trước ngày bắt đầu.", path: ["effectiveTo"] },
+  );
+
+export const createStaffPayrollTaskVersionSchema = z.object({
+  effectiveFrom: dateStringSchema,
+  isEnabled: z.boolean(),
+  reason: z.string().trim().min(1, "Bắt buộc nhập lý do.").max(2000),
+  staffId: z.string().uuid("Mã hồ sơ nhân sự không hợp lệ."),
+  taskCode: z.enum([
+    "center_renewal_duty",
+    "record_excess",
+    "payroll_processing",
+    "staff_recruitment_care",
+    "student_coaching",
+    "daily_admin_reporting",
+    "addon_product_sales",
+  ]),
+});
+
+export const submitStaffBankAccountChangeSchema = z.object({
+  accountHolderName: z.string().trim().min(1, "Bắt buộc nhập chủ tài khoản.").max(160),
+  accountNumber: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9.-]{4,40}$/, "Số tài khoản không hợp lệ."),
+  bankName: z.string().trim().min(1, "Bắt buộc nhập ngân hàng.").max(160),
+  effectiveFrom: dateStringSchema,
+  reason: z.string().trim().min(1, "Bắt buộc nhập lý do.").max(2000),
+  staffId: z.string().uuid("Mã hồ sơ nhân sự không hợp lệ."),
+});
+
+export const decideStaffBankAccountChangeSchema = z.object({
+  decision: z.enum(["approved", "rejected"]),
+  requestId: z.string().uuid("Yêu cầu ngân hàng không hợp lệ."),
+  reviewNote: z.string().trim().min(1, "Bắt buộc nhập nội dung phản hồi.").max(2000),
   staffId: z.string().uuid("Mã hồ sơ nhân sự không hợp lệ."),
 });

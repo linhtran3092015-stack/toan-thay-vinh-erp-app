@@ -1,7 +1,8 @@
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
-import { getPayrollPeriodsWithDetailsResult } from "@/features/payroll/data";
+import { getCurrentAuthUser } from "@/features/auth/current-user";
+import { getPayrollManagementOverviewResult, getPayrollPeriodsWithDetailsResult } from "@/features/payroll/data";
 import { PayrollPage } from "@/features/payroll/payroll-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -26,9 +27,25 @@ export default async function PayrollRoute() {
     );
   }
 
-  const payrollResult = await getPayrollPeriodsWithDetailsResult();
+  const canResolveFeedback = permissionResult.permissions.includes(
+    "payroll.feedback.resolve",
+  );
+  const canImport = permissionResult.permissions.includes("payroll.import");
+  const canManage = permissionResult.permissions.includes("payroll.manage");
+  const canReconcile = permissionResult.permissions.includes(
+    "payroll.accountant_reconcile",
+  );
+  const canApprove = permissionResult.permissions.includes(
+    "payroll.owner_approve",
+  );
+  const canViewManagement = canManage || canReconcile || canApprove;
+  const [payrollResult, authUserResult, correctionsResult] = await Promise.all([
+    getPayrollPeriodsWithDetailsResult(),
+    getCurrentAuthUser(),
+    canViewManagement ? getPayrollManagementOverviewResult() : Promise.resolve({ data: { correctionRequests: [], importBatches: [], issues: [] }, ok: true } as const),
+  ]);
 
-  if (!payrollResult.ok) {
+  if (!payrollResult.ok || !authUserResult.ok || !correctionsResult.ok) {
     return (
       <ErrorState
         description="Không tải được dữ liệu bảng lương từ hệ thống."
@@ -37,13 +54,6 @@ export default async function PayrollRoute() {
     );
   }
 
-  const canManage = permissionResult.permissions.includes("payroll.manage");
-  const canReconcile = permissionResult.permissions.includes(
-    "payroll.accountant_reconcile",
-  );
-  const canApprove = permissionResult.permissions.includes(
-    "payroll.owner_approve",
-  );
   if (payrollResult.data.length === 0 && !canManage) {
     return (
       <EmptyState
@@ -56,8 +66,14 @@ export default async function PayrollRoute() {
   return (
     <PayrollPage
       canApprove={canApprove}
+      canImport={canImport}
       canManage={canManage}
       canReconcile={canReconcile}
+      canResolveFeedback={canResolveFeedback}
+      currentStaffId={authUserResult.user.id}
+      correctionRequests={correctionsResult.data.correctionRequests}
+      importBatches={correctionsResult.data.importBatches}
+      issues={correctionsResult.data.issues}
       periods={payrollResult.data}
     />
   );

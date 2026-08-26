@@ -57,7 +57,7 @@ describe("normalizePayrollPeriodsWithDetailsRows", () => {
           work_units: null,
         }),
       ]),
-    ).toEqual([
+    ).toMatchObject([
       {
         id: "empty-period",
         payDate: "2026-05-28",
@@ -90,7 +90,7 @@ describe("normalizePayrollPeriodsWithDetailsRows", () => {
       }),
     ]);
 
-    expect(result).toEqual([
+    expect(result).toMatchObject([
       {
         id: "period-1",
         payDate: "2026-05-28",

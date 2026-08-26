@@ -154,12 +154,13 @@ describe("Staff route authority", () => {
     render(await StaffDetailRoute({ params: Promise.resolve({ staffId: selfStaffId }) }));
 
     expect(dependencies.getStaffDetail).toHaveBeenCalledWith(selfStaffId, {
+      includePayrollProfile: true,
       includeRateVersions: true,
       includeRoles: false,
     });
     expect(screen.getByRole("heading", { name: "Lịch sử đơn giá theo phiên bản" })).toBeInTheDocument();
     expect(screen.getAllByText(/120\.000/)).not.toHaveLength(0);
-    expect(screen.queryByRole("button", { name: "Thêm phiên bản đơn giá" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Thêm mức lương ngày" })).not.toBeInTheDocument();
   });
 
   it("mounts rate history and the add-rate trigger only for staff.manage_rates", async () => {
@@ -182,11 +183,12 @@ describe("Staff route authority", () => {
     render(await StaffDetailRoute({ params: Promise.resolve({ staffId: selfStaffId }) }));
 
     expect(dependencies.getStaffDetail).toHaveBeenCalledWith(selfStaffId, {
+      includePayrollProfile: true,
       includeRateVersions: true,
       includeRoles: false,
     });
     expect(screen.getByRole("heading", { name: "Lịch sử đơn giá theo phiên bản" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Thêm phiên bản đơn giá" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Thêm mức lương ngày" })).toBeInTheDocument();
   });
 
   it("does not load rate history for another staff member without staff.manage_rates", async () => {
@@ -212,10 +214,11 @@ describe("Staff route authority", () => {
     render(await StaffDetailRoute({ params: Promise.resolve({ staffId: selfStaffId }) }));
 
     expect(dependencies.getStaffDetail).toHaveBeenCalledWith(selfStaffId, {
+      includePayrollProfile: true,
       includeRateVersions: false,
       includeRoles: false,
     });
     expect(screen.queryByRole("heading", { name: "Lịch sử đơn giá theo phiên bản" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Thêm phiên bản đơn giá" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Thêm mức lương ngày" })).not.toBeInTheDocument();
   });
 });

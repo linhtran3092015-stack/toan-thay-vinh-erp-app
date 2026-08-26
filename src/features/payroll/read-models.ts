@@ -1,4 +1,5 @@
 import type { Database } from "@/types/database.generated";
+import { z } from "zod";
 
 export type PayrollPeriodStatus = "draft" | "review" | "approved";
 
@@ -23,12 +24,19 @@ export interface PayrollDashboardEntry {
 export interface PayrollLineRead {
   amountVnd: number;
   direction: string;
+  evidenceSnapshot: Record<string, unknown>;
+  formulaSnapshot: Record<string, unknown>;
   id: string;
   lineType: string;
   note: string | null;
   payrollStatementId: string;
+  policyCode: string | null;
+  quantity: number | null;
+  sourceKind: string | null;
   unitCount: number | null;
+  unitLabel: string | null;
   unitRateVnd: number | null;
+  workMinutes: number | null;
 }
 
 export interface PayrollStatementRead {
@@ -42,17 +50,72 @@ export interface PayrollStatementRead {
   totalDeductionsVnd: number;
   totalEarningsVnd: number;
   workHours: number;
+  workMinutes: number;
   workUnits: number;
 }
 
 export interface PayrollPeriodRead {
+  blockingIssueCount: number;
+  currentRevision: number;
+  feedbackClosedAt: string | null;
+  feedbackOpenedAt: string | null;
   id: string;
   payDate: string;
   periodMonth: string;
   // Transport the stored value exactly. Payroll 0 must not coerce unknown
   // database states into a mutable client lifecycle.
   status: string;
+  pendingCorrectionCount: number;
   statements: readonly PayrollStatementRead[];
+}
+
+export interface PayrollCorrectionRequestRead {
+  id: string;
+  items: readonly {
+    evidenceUrl: string | null;
+    id: string;
+    itemLabel: string;
+    requestedChange: string;
+  }[];
+  payrollPeriodId: string;
+  payrollStatementId: string;
+  requestMessage: string;
+  requestedAt: string;
+  requestedBy: string;
+  responseMessage: string | null;
+  staffDisplayName: string;
+  status: "pending" | "accepted" | "rejected";
+}
+
+export interface PayrollImportBatchRead {
+  conflictRows: number;
+  datasetType: "timekeeping" | "grading" | "renewal_orders" | "new_enrollment_orders";
+  errorRows: number;
+  fileName: string;
+  id: string;
+  periodMonth: string;
+  status: "pending_review" | "approved" | "rejected";
+  totalRows: number;
+  uploadedAt: string;
+  validRows: number;
+}
+
+export interface PayrollCalculationIssueRead {
+  details: Record<string, unknown>;
+  id: string;
+  issueCode: string;
+  payrollPeriodId: string;
+  periodMonth: string;
+  revision: number;
+  severity: "blocking" | "warning";
+  sourceFactId: string | null;
+  staffId: string | null;
+}
+
+export interface PayrollManagementOverviewRead {
+  correctionRequests: readonly PayrollCorrectionRequestRead[];
+  importBatches: readonly PayrollImportBatchRead[];
+  issues: readonly PayrollCalculationIssueRead[];
 }
 
 type GeneratedPayrollPeriodsWithDetailsRow = Database["public"]["Functions"]["get_payroll_periods_with_details"]["Returns"][number];
@@ -92,10 +155,15 @@ export function normalizePayrollPeriodsWithDetailsRows(
 
     if (!period) {
       period = {
+        blockingIssueCount: 0,
+        currentRevision: 1,
+        feedbackClosedAt: null,
+        feedbackOpenedAt: null,
         id: row.payroll_period_id,
         payDate: row.pay_date,
         periodMonth: row.period_month,
         status: row.period_status,
+        pendingCorrectionCount: 0,
         statements: [],
       };
       periods.set(period.id, period);
@@ -131,6 +199,7 @@ export function normalizePayrollPeriodsWithDetailsRows(
         totalDeductionsVnd: row.total_deductions_vnd,
         totalEarningsVnd: row.total_earnings_vnd,
         workHours: row.work_hours,
+        workMinutes: row.work_hours * 60,
         workUnits: row.work_units,
       };
       statements.set(statement.id, statement);
@@ -152,16 +221,78 @@ export function normalizePayrollPeriodsWithDetailsRows(
     statement.lines.push({
       amountVnd: row.line_amount_vnd,
       direction: row.line_direction,
+      evidenceSnapshot: {},
+      formulaSnapshot: {},
       id: row.payroll_line_item_id,
       lineType: row.line_type,
       note: row.note,
       payrollStatementId: statement.id,
+      policyCode: null,
+      quantity: row.unit_count,
+      sourceKind: null,
       unitCount: row.unit_count,
+      unitLabel: null,
       unitRateVnd: row.unit_rate_vnd,
+      workMinutes: null,
     });
   }
 
   return [...periods.values()];
+}
+
+const payrollExplanationsSchema = z.object({
+  lines: z.array(z.object({
+    evidenceSnapshot: z.record(z.string(), z.unknown()),
+    formulaSnapshot: z.record(z.string(), z.unknown()),
+    id: z.string(),
+    policyCode: z.string().nullable(),
+    quantity: z.number().nullable(),
+    sourceKind: z.string().nullable(),
+    unitLabel: z.string().nullable(),
+    workMinutes: z.number().int().nonnegative().nullable(),
+  })),
+  periods: z.array(z.object({
+    blockingIssueCount: z.number().int().nonnegative(),
+    currentRevision: z.number().int().positive(),
+    feedbackClosedAt: z.string().nullable(),
+    feedbackOpenedAt: z.string().nullable(),
+    id: z.string(),
+    pendingCorrectionCount: z.number().int().nonnegative(),
+  })),
+  statements: z.array(z.object({
+    id: z.string(),
+    workMinutes: z.number().int().nonnegative(),
+  })),
+});
+
+export function enrichPayrollPeriodsWithExplanations(
+  periods: readonly PayrollPeriodRead[],
+  payload: unknown,
+): readonly PayrollPeriodRead[] {
+  const parsed = payrollExplanationsSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new Error("PAYROLL_EXPLANATIONS_INVALID");
+  }
+
+  const periodById = new Map(parsed.data.periods.map((period) => [period.id, period]));
+  const statementById = new Map(parsed.data.statements.map((statement) => [statement.id, statement]));
+  const lineById = new Map(parsed.data.lines.map((line) => [line.id, line]));
+
+  return periods.map((period) => {
+    const explanation = periodById.get(period.id);
+    return {
+      ...period,
+      ...(explanation ?? {}),
+      statements: period.statements.map((statement) => ({
+        ...statement,
+        workMinutes: statementById.get(statement.id)?.workMinutes ?? statement.workMinutes,
+        lines: statement.lines.map((line) => ({
+          ...line,
+          ...(lineById.get(line.id) ?? {}),
+        })),
+      })),
+    };
+  });
 }
 
 export type PayrollReadResult<T> =

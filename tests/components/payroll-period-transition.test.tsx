@@ -17,9 +17,14 @@ vi.mock("@/features/payroll/actions/payroll-actions", () => actions);
 const payrollPeriodId = "11111111-1111-4111-8111-111111111111";
 
 const period = (overrides: Partial<PayrollPeriodRead> = {}): PayrollPeriodRead => ({
+  blockingIssueCount: 0,
+  currentRevision: 1,
+  feedbackClosedAt: "2026-05-20T00:00:00Z",
+  feedbackOpenedAt: "2026-05-15T00:00:00Z",
   id: payrollPeriodId,
   payDate: "2026-05-28",
   periodMonth: "2026-04-01",
+  pendingCorrectionCount: 0,
   statements: [],
   status: "draft",
   ...overrides,
