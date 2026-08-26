@@ -4,8 +4,20 @@ import {
   getSettingsPermissionMatrix,
 } from "@/features/settings/data";
 import { PermissionMatrixPage } from "@/features/settings/permission-matrix-page";
+import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 export default async function SettingsPermissionsRoute() {
+  const permissionResult = await getCachedDatabasePermissions();
+
+  if (!permissionResult.ok) {
+    return (
+      <ErrorState
+        description="Hệ thống chưa tải được quyền truy cập cài đặt phân quyền."
+        title="Không tải được quyền truy cập"
+      />
+    );
+  }
+
   const [matrixResult, ownerStatus] = await Promise.all([
     getSettingsPermissionMatrix(),
     getCurrentOwnerStatus(),
