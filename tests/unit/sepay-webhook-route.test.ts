@@ -16,7 +16,7 @@ vi.mock("@/features/finance/sepay-receiving-account-catalog", () => ({
 }));
 
 vi.mock("@/lib/env", () => ({
-  getSepayWebhookEnv: vi.fn(() => ({ serviceRoleKey: "service-role-test-key", webhookSecret: "webhook-test-secret" })),
+  getSepayWebhookEnv: vi.fn(() => ({ webhookSecret: "webhook-test-secret" })),
 }));
 
 vi.mock("@/lib/supabase/service-role", () => ({
@@ -24,9 +24,11 @@ vi.mock("@/lib/supabase/service-role", () => ({
 }));
 
 import { POST } from "@/app/api/webhooks/sepay/route";
+import { getSepayWebhookEnv } from "@/lib/env";
 
 describe("SePay webhook account-purpose integration", () => {
   beforeEach(() => {
+    vi.mocked(getSepayWebhookEnv).mockReturnValue({ webhookSecret: "webhook-test-secret" });
     harness.resolve.mockClear();
     harness.rpc.mockClear();
     harness.resolve.mockResolvedValue({ ok: true, value: { accountDisplayName: "Account A", accountNumber: "1900123456", accountVersionId: "version-a", bankCode: "VCB", purpose: "renewal" } });
@@ -61,6 +63,23 @@ describe("SePay webhook account-purpose integration", () => {
     }));
 
     expect(response.status).toBe(500);
+    expect(harness.rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 when SEPAY_WEBHOOK_SECRET is not configured", async () => {
+    vi.mocked(getSepayWebhookEnv).mockImplementation(() => {
+      throw new Error("SePay webhook environment is not configured correctly.");
+    });
+
+    const response = await POST(new Request("http://localhost/api/webhooks/sepay", {
+      body: "{}",
+      headers: { "content-type": "application/json", "x-sepay-signature": "sha256=test", "x-sepay-timestamp": "1" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body).toEqual({ success: false });
     expect(harness.rpc).not.toHaveBeenCalled();
   });
 });

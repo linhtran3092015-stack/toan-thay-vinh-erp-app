@@ -36,14 +36,21 @@ export interface SupabasePublicEnv {
   publishableKey: string;
 }
 
-const sepayWebhookEnvSchema = z
+const supabaseServiceRoleEnvSchema = z
   .object({
-    SEPAY_WEBHOOK_SECRET: z.string().trim().min(1),
     SUPABASE_SERVICE_ROLE_KEY: z.string().trim().min(20),
   });
 
-export interface SepayWebhookEnv {
+export interface SupabaseServiceRoleEnv {
   serviceRoleKey: string;
+}
+
+const sepayWebhookEnvSchema = z
+  .object({
+    SEPAY_WEBHOOK_SECRET: z.string().trim().min(1),
+  });
+
+export interface SepayWebhookEnv {
   webhookSecret: string;
 }
 
@@ -82,10 +89,25 @@ export function getSupabasePublicEnv(): SupabasePublicEnv {
   };
 }
 
+export function getSupabaseServiceRoleEnv(): SupabaseServiceRoleEnv {
+  const result = supabaseServiceRoleEnvSchema.safeParse({
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  });
+
+  if (!result.success) {
+    throw new Error(
+      "Supabase service role environment is not configured correctly.",
+    );
+  }
+
+  return {
+    serviceRoleKey: result.data.SUPABASE_SERVICE_ROLE_KEY,
+  };
+}
+
 export function getSepayWebhookEnv(): SepayWebhookEnv {
   const result = sepayWebhookEnvSchema.safeParse({
     SEPAY_WEBHOOK_SECRET: process.env.SEPAY_WEBHOOK_SECRET,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   });
 
   if (!result.success) {
@@ -93,7 +115,6 @@ export function getSepayWebhookEnv(): SepayWebhookEnv {
   }
 
   return {
-    serviceRoleKey: result.data.SUPABASE_SERVICE_ROLE_KEY,
     webhookSecret: result.data.SEPAY_WEBHOOK_SECRET,
   };
 }

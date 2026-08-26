@@ -3,14 +3,14 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 
 import {
-  getSepayWebhookEnv,
   getSupabasePublicEnv,
+  getSupabaseServiceRoleEnv,
 } from "@/lib/env";
 import type { Database } from "@/types/database.generated";
 
 export function createSupabaseServiceRoleClient() {
   const { url } = getSupabasePublicEnv();
-  const { serviceRoleKey } = getSepayWebhookEnv();
+  const { serviceRoleKey } = getSupabaseServiceRoleEnv();
 
   return createClient<Database>(url, serviceRoleKey, {
     auth: {
