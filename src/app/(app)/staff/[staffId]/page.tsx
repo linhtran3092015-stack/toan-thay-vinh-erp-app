@@ -71,8 +71,16 @@ export default async function StaffDetailRoute({
   const canManageRateVersions = permissionResult.permissions.includes(
     "staff.manage_rates",
   );
+  const canManagePayrollProfile = permissionResult.permissions.includes(
+    "staff.manage_payroll_profile",
+  );
+  const canSubmitBankAccount =
+    authUserResult.user.id === staffId ||
+    permissionResult.permissions.includes("staff.bank.manage");
+  const canManageBankAccount = permissionResult.permissions.includes("staff.bank.manage");
 
   const detailResult = await getStaffDetail(staffId, {
+    includePayrollProfile: true,
     includeRateVersions: canViewRateVersions,
     includeRoles: canViewRoles,
   });
@@ -98,7 +106,10 @@ export default async function StaffDetailRoute({
   return (
     <StaffDetailPage
       canManageProfile={canManageProfile}
+      canManageBankAccount={canManageBankAccount}
+      canManagePayrollProfile={canManagePayrollProfile}
       canManageRateVersions={canManageRateVersions}
+      canSubmitBankAccount={canSubmitBankAccount}
       canViewRateVersions={canViewRateVersions}
       canViewRoles={canViewRoles}
       detail={detailResult.detail}

@@ -1,3 +1,5 @@
+import type { StaffPayrollProfile } from "@/features/staff/payroll-profile-types";
+
 export type StaffEmploymentStatus =
   | "active"
   | "inactive"
@@ -44,6 +46,7 @@ export interface StaffRateVersion {
 }
 
 export interface StaffDetailReadModel extends StaffDirectoryMember {
+  payrollProfile?: StaffPayrollProfile | null;
   profileDisplayName: string | null;
   rateVersions: readonly StaffRateVersion[] | null;
 }
@@ -56,6 +59,7 @@ export type StaffDirectoryErrorCode =
 export type StaffDetailErrorCode =
   | StaffDirectoryErrorCode
   | "profile_not_found"
+  | "payroll_profile_query_failed"
   | "rate_versions_query_failed";
 
 export interface StaffDirectoryError {

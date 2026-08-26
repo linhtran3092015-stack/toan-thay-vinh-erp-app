@@ -25,7 +25,7 @@ const moneyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
 });
 
-/** Presents the existing append-only rate workflow; Staff owns all mutation policy. */
+/** Presents the append-only 9-hour day-rate workflow. */
 export function StaffRateVersionDialog({
   staffId,
 }: StaffRateVersionDialogProps) {
@@ -41,7 +41,7 @@ export function StaffRateVersionDialog({
   const reasonId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [effectiveFrom, setEffectiveFrom] = useState("");
-  const [offlineHourlyRateVnd, setOfflineHourlyRateVnd] = useState(0);
+  const [offlineDailyRateVnd, setOfflineDailyRateVnd] = useState(0);
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
   const [actionState, setActionState] = useState<StaffManagementActionState>(
@@ -62,7 +62,7 @@ export function StaffRateVersionDialog({
 
   const openDialog = (): void => {
     setEffectiveFrom("");
-    setOfflineHourlyRateVnd(0);
+    setOfflineDailyRateVnd(0);
     setNote("");
     setReason("");
     setActionState(initialStaffManagementActionState);
@@ -79,7 +79,7 @@ export function StaffRateVersionDialog({
       const result = await createStaffRateVersionAction({
         effectiveFrom,
         note,
-        offlineHourlyRateVnd,
+        offlineDailyRateVnd,
         reason,
         staffId,
       });
@@ -102,7 +102,7 @@ export function StaffRateVersionDialog({
         type="button"
         variant="secondary"
       >
-        Thêm phiên bản đơn giá
+        Thêm mức lương ngày
       </Button>
 
       <Dialog
@@ -117,11 +117,11 @@ export function StaffRateVersionDialog({
         <div className="p-4 sm:p-5">
           <div>
             <h2 className="text-section-title text-text-strong" id={dialogTitleId}>
-              Thêm phiên bản đơn giá
+              Thêm mức lương ngày
             </h2>
             <p className="mt-1 text-secondary text-text-muted" id={dialogDescriptionId}>
-              Lưu sẽ tạo một phiên bản đơn giá mới và không thể chỉnh sửa sau đó.
-              Mức online được xem trước bằng 50% mức offline.
+              Một ngày công tương đương 9 giờ. Phiên bản đã lưu không thể chỉnh sửa;
+              ngày công online hưởng 50%.
             </p>
           </div>
 
@@ -145,22 +145,22 @@ export function StaffRateVersionDialog({
             />
             <InputField
               disabled={isInteractionLocked}
-              error={fieldErrors.offlineHourlyRateVnd?.[0]}
+              error={fieldErrors.offlineDailyRateVnd?.[0]}
               helpId={offlineRateHintId}
-              helpText="Nhập số nguyên VND không âm và là số chẵn để xem trước mức online 50%."
+              helpText="Nhập tổng lương cho một ngày làm việc offline 9 giờ."
               id={offlineRateId}
-              label="Đơn giá offline / giờ (VND)"
+              label="Lương ngày offline 9 giờ (VND)"
               min={0}
-              onChange={(value) => setOfflineHourlyRateVnd(Number(value))}
+              onChange={(value) => setOfflineDailyRateVnd(Number(value))}
               required
-              step={2}
+              step={1}
               type="number"
-              value={offlineHourlyRateVnd}
+              value={offlineDailyRateVnd}
             />
             <div className="rounded-md border border-info-border bg-info-bg px-3 py-3">
-              <p className="text-label text-info">Đơn giá online / giờ (xem trước)</p>
+              <p className="text-label text-info">Lương ngày online 9 giờ (50%)</p>
               <p className="mt-1 tabular-nums text-secondary font-semibold text-text-strong">
-                {moneyFormatter.format(offlineHourlyRateVnd / 2)}
+                {moneyFormatter.format(offlineDailyRateVnd / 2)}
               </p>
             </div>
             <TextAreaField
@@ -186,7 +186,7 @@ export function StaffRateVersionDialog({
             {actionState.status === "error" ? (
               <ResultBanner
                 description={actionState.message}
-                title="Không thể thêm phiên bản đơn giá"
+                title="Không thể thêm mức lương ngày"
                 tone="error"
               />
             ) : null}
@@ -202,7 +202,7 @@ export function StaffRateVersionDialog({
                 Hủy
               </Button>
               <Button className="min-h-11" disabled={isInteractionLocked} isLoading={isInteractionLocked} type="submit">
-                {isInteractionLocked ? "Đang lưu..." : "Thêm phiên bản"}
+                {isInteractionLocked ? "Đang lưu..." : "Lưu mức lương ngày"}
               </Button>
             </div>
           </form>

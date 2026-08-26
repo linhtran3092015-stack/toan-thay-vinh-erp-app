@@ -1,5 +1,6 @@
 import "server-only";
 
+import { staffPayrollProfileSchema } from "@/features/staff/payroll-profile-types";
 import type {
   StaffDetailError,
   StaffDetailErrorCode,
@@ -37,6 +38,7 @@ function createStaffDetailError(
     assignments_query_failed: "Không thể tải vai trò đang được cấp.",
     profile_not_found: "Không tìm thấy hồ sơ nhân sự.",
     profiles_query_failed: "Không thể tải hồ sơ nhân sự.",
+    payroll_profile_query_failed: "Không thể tải cấu hình lương và thông tin ngân hàng.",
     rate_versions_query_failed: "Không thể tải lịch sử đơn giá nhân sự.",
     roles_query_failed: "Không thể tải danh mục vai trò.",
   };
@@ -197,6 +199,7 @@ export async function getStaffDirectory(options: {
 export async function getStaffDetail(
   staffId: string,
   options: {
+    includePayrollProfile: boolean;
     includeRateVersions: boolean;
     includeRoles: boolean;
   },
@@ -310,6 +313,34 @@ export async function getStaffDetail(
     }));
   }
 
+  let payrollProfile: StaffDetailReadModel["payrollProfile"] = null;
+
+  if (options.includePayrollProfile) {
+    const payrollRpcClient = supabase as unknown as {
+      rpc: (
+        name: string,
+        args: Record<string, unknown>,
+      ) => Promise<{
+        data: unknown;
+        error: { message: string } | null;
+      }>;
+    };
+    const { data, error } = await payrollRpcClient.rpc(
+      "get_staff_payroll_profile",
+      { p_staff_id: staffId },
+    );
+    const parsed = staffPayrollProfileSchema.safeParse(data);
+
+    if (error || !parsed.success) {
+      return {
+        ok: false,
+        error: createStaffDetailError("payroll_profile_query_failed"),
+      };
+    }
+
+    payrollProfile = parsed.data;
+  }
+
   return {
     ok: true,
     detail: {
@@ -323,6 +354,7 @@ export async function getStaffDetail(
       lastLoginAt: profile.last_login_at,
       leftAt: profile.left_at,
       phone: profile.phone,
+      payrollProfile,
       profileDisplayName: profile.display_name,
       rateVersions,
       roles,

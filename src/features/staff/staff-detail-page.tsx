@@ -6,12 +6,24 @@ import { PageHeader } from "@/components/patterns/page-header";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { StaffProfileEditDialog } from "@/features/staff/components/staff-profile-edit-dialog";
 import { StaffRateVersionDialog } from "@/features/staff/components/staff-rate-version-dialog";
+import { StaffBankAccountDialog } from "@/features/staff/components/staff-bank-account-dialog";
+import { StaffBankAccountDecisionDialog } from "@/features/staff/components/staff-bank-account-decision-dialog";
+import { StaffPayrollAssignmentDialog } from "@/features/staff/components/staff-payroll-assignment-dialog";
+import { StaffPayrollCompensationDialog } from "@/features/staff/components/staff-payroll-compensation-dialog";
+import {
+  payrollPositionLabels,
+  payrollTaskLabels,
+  type StaffPayrollProfile,
+} from "@/features/staff/payroll-profile-types";
 import { EmploymentStatusBadge } from "@/features/staff/staff-directory-page";
 import type { StaffDetailReadModel, StaffRateVersion } from "@/features/staff/types";
 
 interface StaffDetailPageProps {
   canManageProfile: boolean;
+  canManageBankAccount?: boolean;
+  canManagePayrollProfile?: boolean;
   canManageRateVersions: boolean;
+  canSubmitBankAccount?: boolean;
   canViewRateVersions: boolean;
   canViewRoles: boolean;
   detail: StaffDetailReadModel;
@@ -29,7 +41,10 @@ const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium"
 /** Presentation-only profile hierarchy. Role and rate mutation components stay feature-owned. */
 export function StaffDetailPage({
   canManageProfile,
+  canManageBankAccount = false,
+  canManagePayrollProfile = false,
   canManageRateVersions,
+  canSubmitBankAccount = false,
   canViewRateVersions,
   canViewRoles,
   detail,
@@ -47,7 +62,7 @@ export function StaffDetailPage({
         <p className="mt-1 font-mono text-caption text-text-muted">{detail.employeeCode ?? "Chưa có mã nhân sự"}</p>
       </PageHeader>
 
-      {!canManageProfile && !canManageRateVersions ? <p className="text-secondary text-text-muted">Hồ sơ chỉ đọc theo quyền hiện tại.</p> : null}
+      {!canManageProfile && !canManageRateVersions && !canManagePayrollProfile ? <p className="text-secondary text-text-muted">Hồ sơ chỉ đọc theo quyền hiện tại.</p> : null}
 
       <section aria-labelledby="staff-profile-information" className="rounded-lg border border-border-subtle bg-surface-base p-4 md:p-5">
         <h2 className="text-section-title text-text-strong" id="staff-profile-information">Thông tin nhân sự</h2>
@@ -78,23 +93,48 @@ export function StaffDetailPage({
         ) : <EmptyPanel text="Chưa được cấp vai trò hiệu lực." />}
       </section>
 
-      {canViewRateVersions ? (
-        <section aria-labelledby="staff-rate-history" className="rounded-lg border border-border-subtle bg-surface-base p-4 md:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-section-title text-text-strong" id="staff-rate-history">Lịch sử đơn giá theo phiên bản</h2>
-              <p className="mt-1 text-secondary text-text-muted">Đơn giá online luôn bằng 50% đơn giá offline trong cùng phiên bản.</p>
-            </div>
-            {canManageRateVersions ? <StaffRateVersionDialog staffId={detail.id} /> : null}
-          </div>
-          {detail.rateVersions?.length ? <RateHistory rateVersions={detail.rateVersions} /> : <EmptyPanel text="Chưa thiết lập phiên bản đơn giá cho nhân sự này." />}
-        </section>
+      {detail.payrollProfile ? (
+        <PayrollProfileSection
+          canManage={canManagePayrollProfile || canManageRateVersions}
+          canManageBankAccount={canManageBankAccount}
+          canSubmitBankAccount={canSubmitBankAccount}
+          profile={detail.payrollProfile}
+        />
+      ) : canViewRateVersions ? (
+        <LegacyRateHistorySection
+          canManage={canManageRateVersions}
+          rateVersions={detail.rateVersions ?? []}
+          staffId={detail.id}
+        />
       ) : null}
     </div>
   );
 }
 
-function RateHistory({ rateVersions }: { rateVersions: readonly StaffRateVersion[] }) {
+function LegacyRateHistorySection({
+  canManage,
+  rateVersions,
+  staffId,
+}: {
+  canManage: boolean;
+  rateVersions: readonly StaffRateVersion[];
+  staffId: string;
+}) {
+  return (
+    <section aria-labelledby="staff-rate-history" className="rounded-lg border border-border-subtle bg-surface-base p-4 md:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-section-title text-text-strong" id="staff-rate-history">Lịch sử đơn giá theo phiên bản</h2>
+          <p className="mt-1 text-secondary text-text-muted">Đơn giá online luôn bằng 50% đơn giá offline trong cùng phiên bản.</p>
+        </div>
+        {canManage ? <StaffRateVersionDialog staffId={staffId} /> : null}
+      </div>
+      {rateVersions.length ? <LegacyRateHistory rateVersions={rateVersions} /> : <EmptyPanel text="Chưa thiết lập phiên bản đơn giá cho nhân sự này." />}
+    </section>
+  );
+}
+
+function LegacyRateHistory({ rateVersions }: { rateVersions: readonly StaffRateVersion[] }) {
   return (
     <div className="staff-rate-history-work-area mt-4 min-w-0">
       <DataTableFrame
@@ -121,6 +161,84 @@ function RateHistory({ rateVersions }: { rateVersions: readonly StaffRateVersion
       </ResponsiveRecordList>
     </div>
   );
+}
+
+function PayrollProfileSection({
+  canManage,
+  canManageBankAccount,
+  canSubmitBankAccount,
+  profile,
+}: {
+  canManage: boolean;
+  canManageBankAccount: boolean;
+  canSubmitBankAccount: boolean;
+  profile: StaffPayrollProfile;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const currentPosition = profile.positions.find((version) => version.effectiveFrom <= today);
+  const currentRate = profile.dailyRates.find((version) => version.effectiveFrom <= today);
+  const currentBank = profile.bankAccounts.find((version) => version.effectiveFrom <= today);
+  const latestTaskByCode = new Map<string, StaffPayrollProfile["tasks"][number]>();
+  for (const task of profile.tasks.filter((version) => version.effectiveFrom <= today)) {
+    if (!latestTaskByCode.has(task.taskCode)) latestTaskByCode.set(task.taskCode, task);
+  }
+  const enabledTasks = [...latestTaskByCode.values()].filter((task) => task.isEnabled);
+
+  return (
+    <>
+      <section aria-labelledby="staff-payroll-profile" className="rounded-lg border border-border-subtle bg-surface-base p-4 md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-section-title text-text-strong" id="staff-payroll-profile">Cấu hình lương</h2>
+            <p className="mt-1 text-secondary text-text-muted">Mức lương ngày áp dụng cho 9 giờ; online hưởng 50%.</p>
+          </div>
+          {canManage ? <div className="flex flex-wrap gap-2"><StaffPayrollCompensationDialog staffId={profile.staffId} /><StaffPayrollAssignmentDialog staffId={profile.staffId} /></div> : null}
+        </div>
+
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard label="Vị trí tính lương" value={currentPosition ? payrollPositionLabels[currentPosition.positionCode] : "Chưa thiết lập"} />
+          <SummaryCard label="Lương ngày offline" value={currentRate ? moneyFormatter.format(currentRate.offlineDailyRateVnd) : "Chưa thiết lập"} />
+          <SummaryCard label="Lương ngày online" value={currentRate ? moneyFormatter.format(currentRate.onlineDailyRateVnd) : "Chưa thiết lập"} />
+          <SummaryCard label="Hiệu lực hiện tại" value={formatDate(currentRate?.effectiveFrom ?? currentPosition?.effectiveFrom ?? null)} />
+        </dl>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-lg border border-border-subtle p-4">
+            <h3 className="font-semibold text-text-strong">Khối đang/phải phụ trách</h3>
+            {profile.gradeAssignments.length ? <ul className="mt-3 flex flex-wrap gap-2">{profile.gradeAssignments.map((assignment) => <li className="rounded-full border border-border-subtle bg-surface-raised px-3 py-1.5 text-secondary font-medium" key={assignment.id}>Khối {assignment.grade} · từ {formatDate(assignment.effectiveFrom)}{assignment.effectiveTo ? ` đến ${formatDate(assignment.effectiveTo)}` : ""}</li>)}</ul> : <p className="mt-2 text-secondary text-text-muted">Chưa có phân công khối.</p>}
+          </div>
+          <div className="rounded-lg border border-border-subtle p-4">
+            <h3 className="font-semibold text-text-strong">Nhiệm vụ được tính thưởng</h3>
+            {enabledTasks.length ? <ul className="mt-3 grid gap-2">{enabledTasks.map((task) => <li className="text-secondary text-text-default" key={task.id}>• {payrollTaskLabels[task.taskCode]} <span className="text-text-muted">· từ {formatDate(task.effectiveFrom)}</span></li>)}</ul> : <p className="mt-2 text-secondary text-text-muted">Không có nhiệm vụ bổ sung đang bật.</p>}
+          </div>
+        </div>
+
+        {profile.dailyRates.length ? (
+          <div className="mt-5 overflow-x-auto">
+            <table className="min-w-[680px] text-table-body text-text-default">
+              <caption className="sr-only">Lịch sử mức lương ngày</caption>
+              <thead><tr><RateHeader>Hiệu lực</RateHeader><RateHeader className="text-right">Offline / ngày</RateHeader><RateHeader className="text-right">Online / ngày</RateHeader><RateHeader>Lý do</RateHeader></tr></thead>
+              <tbody>{profile.dailyRates.map((rate) => <tr className="border-t border-border-subtle" key={rate.id}><RateCell>{formatDate(rate.effectiveFrom)}</RateCell><RateCell className="text-right tabular-nums font-semibold">{moneyFormatter.format(rate.offlineDailyRateVnd)}</RateCell><RateCell className="text-right tabular-nums font-semibold">{moneyFormatter.format(rate.onlineDailyRateVnd)}</RateCell><RateCell className="text-text-muted">{rate.reason}</RateCell></tr>)}</tbody>
+            </table>
+          </div>
+        ) : <EmptyPanel text="Chưa thiết lập mức lương ngày." />}
+      </section>
+
+      <section aria-labelledby="staff-bank-account" className="rounded-lg border border-border-subtle bg-surface-base p-4 md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><h2 className="text-section-title text-text-strong" id="staff-bank-account">Thông tin nhận lương</h2><p className="mt-1 text-secondary text-text-muted">Thay đổi mới cần được kế toán hoặc chủ trung tâm duyệt.</p></div>
+          {canSubmitBankAccount ? <StaffBankAccountDialog staffId={profile.staffId} /> : null}
+        </div>
+        {currentBank ? <dl className="mt-4 grid gap-4 sm:grid-cols-3"><InfoField label="Ngân hàng" value={currentBank.bankName} /><InfoField label="Số tài khoản" value={currentBank.accountNumber} /><InfoField label="Chủ tài khoản" value={currentBank.accountHolderName} /></dl> : <EmptyPanel text="Chưa có tài khoản ngân hàng đã được duyệt." />}
+        {profile.bankChangeRequests.some((request) => request.status === "pending") ? <p className="mt-4 rounded-md border border-warning-border bg-warning-bg px-3 py-3 text-secondary text-text-default">Đang có yêu cầu thay đổi thông tin ngân hàng chờ duyệt.</p> : null}
+        {canManageBankAccount ? <ul className="mt-4 grid gap-3">{profile.bankChangeRequests.filter((request) => request.status === "pending").map((request) => <li className="flex flex-col gap-3 rounded-lg border border-warning-border bg-warning-bg p-3 sm:flex-row sm:items-center sm:justify-between" key={request.id}><div><p className="font-semibold text-text-strong">{request.bankName} · {request.accountNumber}</p><p className="mt-1 text-secondary text-text-muted">{request.accountHolderName} · hiệu lực {formatDate(request.effectiveFrom)}</p></div><StaffBankAccountDecisionDialog request={request} staffId={profile.staffId} /></li>)}</ul> : null}
+      </section>
+    </>
+  );
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg border border-border-subtle bg-surface-raised p-3"><dt className="text-label text-text-muted">{label}</dt><dd className="mt-1 break-words text-body font-semibold text-text-strong">{value}</dd></div>;
 }
 
 function InfoField({ label, value, wide = false }: { label: string; value: React.ReactNode; wide?: boolean }) {
