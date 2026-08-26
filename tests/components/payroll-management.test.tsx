@@ -5,13 +5,22 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CreatePayrollDraftDialog } from "@/features/payroll/components/create-payroll-draft-dialog";
+import { PayrollImportDialog } from "@/features/payroll/components/payroll-import-dialog";
 import { PayrollManualLineDialog } from "@/features/payroll/components/payroll-manual-line-dialog";
 import { PayrollPage } from "@/features/payroll/payroll-page";
 import type { PayrollLineRead, PayrollPeriodRead } from "@/features/payroll/read-models";
 
+const mockToFile = vi.fn().mockResolvedValue(undefined);
+const mockWriteExcelFile = vi.fn().mockReturnValue({ toFile: mockToFile });
+
+vi.mock("write-excel-file/browser", () => ({
+  default: mockWriteExcelFile,
+}));
+
 const actions = vi.hoisted(() => ({
   addPayrollManualLineAction: vi.fn(),
   createPayrollDraftAction: vi.fn(),
+  createPayrollImportBatchAction: vi.fn(),
 }));
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 
@@ -292,5 +301,27 @@ describe("Payroll 1 dialogs", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(router.refresh).toHaveBeenCalledOnce();
     expect(trigger).toHaveFocus();
+  });
+
+  it("downloads excel template with correct filename when Tải tệp mẫu button is clicked", async () => {
+    render(<PayrollImportDialog />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Nhập Excel" }));
+    const dialog = screen.getByRole("dialog", { name: "Nhập dữ liệu dự phòng từ Excel" });
+    expect(dialog).toBeInTheDocument();
+
+    const downloadButton = within(dialog).getByRole("button", { name: "Tải tệp mẫu" });
+    fireEvent.click(downloadButton);
+
+    await waitFor(() => {
+      expect(mockToFile).toHaveBeenCalledWith("mau-timekeeping.xlsx");
+    });
+
+    fireEvent.change(screen.getByLabelText("Loại dữ liệu"), { target: { value: "grading" } });
+    fireEvent.click(downloadButton);
+
+    await waitFor(() => {
+      expect(mockToFile).toHaveBeenCalledWith("mau-grading.xlsx");
+    });
   });
 });

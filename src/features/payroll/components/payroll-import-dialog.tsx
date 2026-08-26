@@ -52,15 +52,25 @@ export function PayrollImportDialog() {
     setParseError(null);
     if (!nextFile) return;
     try {
-      const workbook = await readXlsxFile(nextFile);
-      const sheet = workbook[0]?.data ?? [];
+      const bytes = await nextFile.arrayBuffer();
+      const sheets = await readXlsxFile(bytes);
+      const sheet = sheets[0]?.data ?? [];
       const expected = templateHeaders[datasetType];
       const actual = (sheet[0] ?? []).map((cell) => String(cell ?? "").trim());
       if (expected.some((header, index) => actual[index] !== header)) {
         setParseError(`Sai cấu trúc cột. Hãy tải đúng tệp mẫu ${datasetLabels[datasetType]}.`);
         return;
       }
-      setRows(sheet.slice(1).filter((source) => source.some((cell) => cell !== null && String(cell).trim() !== "")).map((source, index) => normalizeRow(datasetType, expected, source, index + 2)));
+      setRows(
+        sheet
+          .slice(1)
+          .filter((source) =>
+            source.some((cell) => cell !== null && String(cell).trim() !== ""),
+          )
+          .map((source, index) =>
+            normalizeRow(datasetType, expected, source, index + 2),
+          ),
+      );
     } catch {
       setParseError("Không thể đọc tệp Excel. Hãy dùng tệp .xlsx theo mẫu.");
     }
@@ -140,5 +150,41 @@ function normalizeDate(value: unknown): string | null { const text = String(valu
 function stringOrNull(value: unknown): string | null { const text = String(value ?? "").trim(); return text || null; }
 function numberOrNull(value: unknown): number | null { if (value === null || value === "" || value === undefined) return null; const parsed = Number(String(value).replaceAll(".", "").replace(",", ".")); return Number.isFinite(parsed) ? parsed : null; }
 async function sha256(file: File): Promise<string> { const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer()); return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join(""); }
-async function downloadTemplate(datasetType: DatasetType): Promise<void> { const writeXlsxFile = (await import("write-excel-file/browser")).default as unknown as (rows: { value: string | number }[][], options: { fileName: string }) => Promise<void>; const headers = templateHeaders[datasetType]; const example = headers.map((header) => ({ value: exampleValue(header) })); await writeXlsxFile([headers.map((header) => ({ value: header })), example], { fileName: `mau-${datasetType}.xlsx` }); }
+async function downloadTemplate(datasetType: DatasetType): Promise<void> {
+  const writeExcelFile = (await import("write-excel-file/browser")).default;
+  const headers = templateHeaders[datasetType];
+  const headerRow = headers.map((header) => ({
+    align: "center" as const,
+    alignVertical: "center" as const,
+    backgroundColor: "#D9EAF7",
+    borderColor: "#AAB2BD",
+    borderStyle: "thin" as const,
+    fontWeight: "bold" as const,
+    height: 30,
+    type: String,
+    value: header,
+    wrap: true,
+  }));
+  const sampleRow = headers.map((header) => {
+    const val = exampleValue(header);
+    return typeof val === "number"
+      ? { type: Number, value: val }
+      : { type: String, value: String(val) };
+  });
+
+  const columns = headers.map(() => ({ width: 22 }));
+
+  await writeExcelFile(
+    [headerRow, sampleRow],
+    {
+      columns,
+      sheet: datasetType,
+      stickyRowsCount: 1,
+    },
+    {
+      fontFamily: "Arial",
+      fontSize: 11,
+    },
+  ).toFile(`mau-${datasetType}.xlsx`);
+}
 function exampleValue(header: string): string | number { const values: Record<string, string | number> = { amount_vnd: 2000000, event_date: "2026-07-15", evidence_url: "https://example.com/bang-chung", grade: 10, quantity: 1, source_code: "school_telesale", source_key: "DU-LIEU-001", staff_id: "00000000-0000-4000-8000-000000000001", student_id: "00000000-0000-4000-8000-000000000002", work_minutes: 540, work_mode: "offline" }; return values[header] ?? ""; }
