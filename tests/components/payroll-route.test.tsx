@@ -1,19 +1,25 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import PayrollRoute from "@/app/(app)/payroll/page";
 
 const dependencies = vi.hoisted(() => ({
   getCachedDatabasePermissions: vi.fn(),
+  getCurrentAuthUser: vi.fn(),
   getPayrollDashboardResult: vi.fn(),
+  getPayrollManagementOverviewResult: vi.fn(),
   getPayrollPeriodsWithDetailsResult: vi.fn(),
 }));
 
 vi.mock("@/lib/permissions/database-permissions", () => ({
   getCachedDatabasePermissions: dependencies.getCachedDatabasePermissions,
 }));
+vi.mock("@/features/auth/current-user", () => ({
+  getCurrentAuthUser: dependencies.getCurrentAuthUser,
+}));
 vi.mock("@/features/payroll/data", () => ({
   getPayrollDashboardResult: dependencies.getPayrollDashboardResult,
+  getPayrollManagementOverviewResult: dependencies.getPayrollManagementOverviewResult,
   getPayrollPeriodsWithDetailsResult: dependencies.getPayrollPeriodsWithDetailsResult,
 }));
 vi.mock("@/features/payroll/payroll-page", () => ({
@@ -40,6 +46,17 @@ vi.mock("@/features/payroll/payroll-page", () => ({
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+});
+
+beforeEach(() => {
+  dependencies.getCurrentAuthUser.mockResolvedValue({
+    ok: true,
+    user: { id: "11111111-1111-4111-8111-111111111111" },
+  });
+  dependencies.getPayrollManagementOverviewResult.mockResolvedValue({
+    data: { correctionRequests: [], importBatches: [], issues: [] },
+    ok: true,
+  });
 });
 
 describe("Payroll route authority", () => {

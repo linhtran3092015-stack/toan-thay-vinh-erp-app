@@ -26,31 +26,31 @@ describe("Staff rate-version presentation", () => {
   it("keeps the mounted form fields required where required and leaves note optional", () => {
     render(<StaffRateVersionDialog staffId={staffId} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Thêm phiên bản đơn giá" }));
+    fireEvent.click(screen.getByRole("button", { name: "Thêm mức lương ngày" }));
 
-    expect(screen.getByRole("dialog", { name: "Thêm phiên bản đơn giá" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Thêm mức lương ngày" })).toBeInTheDocument();
     expect(screen.getByLabelText("Hiệu lực từ")).toBeRequired();
-    expect(screen.getByLabelText("Đơn giá offline / giờ (VND)")).toBeRequired();
+    expect(screen.getByLabelText("Lương ngày offline 9 giờ (VND)")).toBeRequired();
     expect(screen.getByLabelText("Lý do thêm phiên bản")).toBeRequired();
     expect(screen.getByLabelText("Ghi chú")).not.toBeRequired();
     expect(screen.getByLabelText("Ghi chú")).toHaveAttribute("maxlength", "1000");
     expect(screen.getByLabelText("Lý do thêm phiên bản")).toHaveAttribute("maxlength", "2000");
-    const offlineRate = screen.getByLabelText("Đơn giá offline / giờ (VND)");
-    expect(offlineRate).toHaveAttribute("step", "2");
+    const offlineRate = screen.getByLabelText("Lương ngày offline 9 giờ (VND)");
+    expect(offlineRate).toHaveAttribute("step", "1");
 
-    fireEvent.click(screen.getByRole("button", { name: "Thêm phiên bản" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lưu mức lương ngày" }));
     expect(actions.createStaffRateVersionAction).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText("Hiệu lực từ"), { target: { value: "2026-09-01" } });
     fireEvent.change(screen.getByLabelText("Lý do thêm phiên bản"), { target: { value: "Bổ sung phiên bản mới." } });
     fireEvent.change(offlineRate, { target: { value: "-2" } });
     expect(offlineRate).toBeInvalid();
-    fireEvent.click(screen.getByRole("button", { name: "Thêm phiên bản" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lưu mức lương ngày" }));
     expect(actions.createStaffRateVersionAction).not.toHaveBeenCalled();
 
-    fireEvent.change(offlineRate, { target: { value: "10001" } });
+    fireEvent.change(offlineRate, { target: { value: "10000.5" } });
     expect(offlineRate).toBeInvalid();
-    fireEvent.click(screen.getByRole("button", { name: "Thêm phiên bản" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lưu mức lương ngày" }));
     expect(actions.createStaffRateVersionAction).not.toHaveBeenCalled();
   });
 
@@ -63,26 +63,26 @@ describe("Staff rate-version presentation", () => {
     actions.createStaffRateVersionAction.mockReturnValueOnce(pending.promise);
     render(<StaffRateVersionDialog staffId={staffId} />);
 
-    const trigger = screen.getByRole("button", { name: "Thêm phiên bản đơn giá" });
+    const trigger = screen.getByRole("button", { name: "Thêm mức lương ngày" });
     trigger.focus();
     fireEvent.click(trigger);
-    const dialog = screen.getByRole("dialog", { name: "Thêm phiên bản đơn giá" });
+    const dialog = screen.getByRole("dialog", { name: "Thêm mức lương ngày" });
     await waitFor(() => expect(screen.getByLabelText("Hiệu lực từ")).toHaveFocus());
 
     fireEvent.change(screen.getByLabelText("Hiệu lực từ"), { target: { value: "2026-09-01" } });
-    fireEvent.change(screen.getByLabelText("Đơn giá offline / giờ (VND)"), { target: { value: "120000" } });
+    fireEvent.change(screen.getByLabelText("Lương ngày offline 9 giờ (VND)"), { target: { value: "120000" } });
     fireEvent.change(screen.getByLabelText("Ghi chú"), { target: { value: "Áp dụng kỳ mới" } });
     fireEvent.change(screen.getByLabelText("Lý do thêm phiên bản"), { target: { value: "Điều chỉnh đơn giá theo chính sách." } });
     expect(screen.getByText(/60\.000/)).toBeInTheDocument();
-    expect(screen.queryByText(/lương|thu nhập|gross|net/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/thu nhập|gross|net/i)).not.toBeInTheDocument();
 
-    const submit = within(dialog).getByRole("button", { name: "Thêm phiên bản" });
+    const submit = within(dialog).getByRole("button", { name: "Lưu mức lương ngày" });
     fireEvent.click(submit);
 
     await waitFor(() => expect(actions.createStaffRateVersionAction).toHaveBeenCalledWith({
       effectiveFrom: "2026-09-01",
       note: "Áp dụng kỳ mới",
-      offlineHourlyRateVnd: 120_000,
+      offlineDailyRateVnd: 120_000,
       reason: "Điều chỉnh đơn giá theo chính sách.",
       staffId,
     }));
@@ -93,7 +93,7 @@ describe("Staff rate-version presentation", () => {
     fireEvent.keyDown(dialog, { key: "Escape" });
     fireEvent.mouseDown(dialog.parentElement!);
     fireEvent.click(submit);
-    expect(screen.getByRole("dialog", { name: "Thêm phiên bản đơn giá" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Thêm mức lương ngày" })).toBeInTheDocument();
     expect(actions.createStaffRateVersionAction).toHaveBeenCalledOnce();
 
     pending.resolve({
@@ -118,20 +118,20 @@ describe("Staff rate-version presentation", () => {
     actions.createStaffRateVersionAction.mockReturnValueOnce(pending.promise);
     render(<StaffRateVersionDialog staffId={staffId} />);
 
-    const trigger = screen.getByRole("button", { name: "Thêm phiên bản đơn giá" });
+    const trigger = screen.getByRole("button", { name: "Thêm mức lương ngày" });
     trigger.focus();
     fireEvent.click(trigger);
-    const dialog = screen.getByRole("dialog", { name: "Thêm phiên bản đơn giá" });
+    const dialog = screen.getByRole("dialog", { name: "Thêm mức lương ngày" });
     fireEvent.change(screen.getByLabelText("Hiệu lực từ"), { target: { value: "2026-10-01" } });
-    fireEvent.change(screen.getByLabelText("Đơn giá offline / giờ (VND)"), { target: { value: "140000" } });
+    fireEvent.change(screen.getByLabelText("Lương ngày offline 9 giờ (VND)"), { target: { value: "140000" } });
     fireEvent.change(screen.getByLabelText("Lý do thêm phiên bản"), { target: { value: "Thiết lập đơn giá kỳ mới." } });
 
-    const submit = within(dialog).getByRole("button", { name: "Thêm phiên bản" });
+    const submit = within(dialog).getByRole("button", { name: "Lưu mức lương ngày" });
     fireEvent.click(submit);
     await waitFor(() => expect(actions.createStaffRateVersionAction).toHaveBeenCalledWith({
       effectiveFrom: "2026-10-01",
       note: "",
-      offlineHourlyRateVnd: 140_000,
+      offlineDailyRateVnd: 140_000,
       reason: "Thiết lập đơn giá kỳ mới.",
       staffId,
     }));
