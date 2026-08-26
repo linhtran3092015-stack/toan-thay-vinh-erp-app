@@ -71,12 +71,15 @@ function TableCell({ children, className }: { children: ReactNode; className?: s
 function sessionHref(id: string, query: string) { return query ? `/sessions/${id}?${query}` : `/sessions/${id}`; }
 const VI_SHORT_WEEKDAYS = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"] as const;
 export function formatDate(value: string) {
-  const date = new Date(`${value}T00:00:00+07:00`);
-  const weekday = VI_SHORT_WEEKDAYS[date.getDay()];
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${weekday}, ${day}/${month}/${year}`;
+  const [yearStr, monthStr, dayStr] = value.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  const weekday = VI_SHORT_WEEKDAYS[date.getUTCDay()];
+  const formattedDay = String(day).padStart(2, "0");
+  const formattedMonth = String(month).padStart(2, "0");
+  return `${weekday}, ${formattedDay}/${formattedMonth}/${year}`;
 }
 function formatTime(value: string) { return value.slice(0, 5); }
 function formatKind(value: SessionKind) { return { additional: "Buổi bổ sung", makeup: "Buổi bù", regular: "Buổi chính" }[value]; }
