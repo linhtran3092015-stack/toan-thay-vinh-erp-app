@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -2024,51 +2024,471 @@ export type Database = {
           },
         ]
       }
+      payroll_calculation_issues: {
+        Row: {
+          calculation_run_id: string
+          created_at: string
+          details: Json
+          id: string
+          issue_code: string
+          severity: string
+          source_fact_id: string | null
+          staff_id: string | null
+        }
+        Insert: {
+          calculation_run_id: string
+          created_at?: string
+          details?: Json
+          id?: string
+          issue_code: string
+          severity?: string
+          source_fact_id?: string | null
+          staff_id?: string | null
+        }
+        Update: {
+          calculation_run_id?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          issue_code?: string
+          severity?: string
+          source_fact_id?: string | null
+          staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_calculation_issues_calculation_run_id_fkey"
+            columns: ["calculation_run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_calculation_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_calculation_issues_source_fact_id_fkey"
+            columns: ["source_fact_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_source_facts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_calculation_issues_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_calculation_runs: {
+        Row: {
+          generated_at: string
+          generated_by: string
+          id: string
+          payroll_period_id: string
+          reason: string
+          revision: number
+          status: string
+        }
+        Insert: {
+          generated_at?: string
+          generated_by: string
+          id?: string
+          payroll_period_id: string
+          reason: string
+          revision: number
+          status: string
+        }
+        Update: {
+          generated_at?: string
+          generated_by?: string
+          id?: string
+          payroll_period_id?: string
+          reason?: string
+          revision?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_calculation_runs_generated_by_fkey"
+            columns: ["generated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_calculation_runs_payroll_period_id_fkey"
+            columns: ["payroll_period_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_correction_request_items: {
+        Row: {
+          created_at: string
+          evidence_url: string | null
+          id: string
+          item_label: string
+          payroll_line_item_id: string | null
+          request_id: string
+          requested_change: string
+        }
+        Insert: {
+          created_at?: string
+          evidence_url?: string | null
+          id?: string
+          item_label: string
+          payroll_line_item_id?: string | null
+          request_id: string
+          requested_change: string
+        }
+        Update: {
+          created_at?: string
+          evidence_url?: string | null
+          id?: string
+          item_label?: string
+          payroll_line_item_id?: string | null
+          request_id?: string
+          requested_change?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_correction_request_items_payroll_line_item_id_fkey"
+            columns: ["payroll_line_item_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_line_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_correction_request_items_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_correction_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_correction_requests: {
+        Row: {
+          id: string
+          payroll_period_id: string
+          payroll_statement_id: string
+          request_message: string
+          requested_at: string
+          requested_by: string
+          resolved_at: string | null
+          resolved_by: string | null
+          response_message: string | null
+          status: string
+        }
+        Insert: {
+          id?: string
+          payroll_period_id: string
+          payroll_statement_id: string
+          request_message: string
+          requested_at?: string
+          requested_by: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          response_message?: string | null
+          status?: string
+        }
+        Update: {
+          id?: string
+          payroll_period_id?: string
+          payroll_statement_id?: string
+          request_message?: string
+          requested_at?: string
+          requested_by?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          response_message?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_correction_requests_payroll_period_id_fkey"
+            columns: ["payroll_period_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_correction_requests_payroll_statement_id_fkey"
+            columns: ["payroll_statement_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_statements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_correction_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_correction_requests_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_import_batches: {
+        Row: {
+          conflict_rows: number
+          dataset_type: string
+          error_rows: number
+          file_name: string
+          file_sha256: string
+          id: string
+          period_month: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          total_rows: number
+          uploaded_at: string
+          uploaded_by: string
+          valid_rows: number
+        }
+        Insert: {
+          conflict_rows?: number
+          dataset_type: string
+          error_rows?: number
+          file_name: string
+          file_sha256: string
+          id?: string
+          period_month: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          total_rows?: number
+          uploaded_at?: string
+          uploaded_by: string
+          valid_rows?: number
+        }
+        Update: {
+          conflict_rows?: number
+          dataset_type?: string
+          error_rows?: number
+          file_name?: string
+          file_sha256?: string
+          id?: string
+          period_month?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          total_rows?: number
+          uploaded_at?: string
+          uploaded_by?: string
+          valid_rows?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_import_batches_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_import_batches_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_import_rows: {
+        Row: {
+          batch_id: string
+          conflict_payload: Json | null
+          created_at: string
+          id: string
+          normalized_payload: Json | null
+          raw_payload: Json
+          resolution: string | null
+          resolution_reason: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          row_number: number
+          source_key: string
+          validation_errors: Json
+          validation_status: string
+        }
+        Insert: {
+          batch_id: string
+          conflict_payload?: Json | null
+          created_at?: string
+          id?: string
+          normalized_payload?: Json | null
+          raw_payload: Json
+          resolution?: string | null
+          resolution_reason?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          row_number: number
+          source_key: string
+          validation_errors?: Json
+          validation_status: string
+        }
+        Update: {
+          batch_id?: string
+          conflict_payload?: Json | null
+          created_at?: string
+          id?: string
+          normalized_payload?: Json | null
+          raw_payload?: Json
+          resolution?: string | null
+          resolution_reason?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          row_number?: number
+          source_key?: string
+          validation_errors?: Json
+          validation_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_import_rows_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_import_rows_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_lead_source_mapping_versions: {
+        Row: {
+          created_at: string
+          created_by: string
+          effective_from: string
+          id: string
+          lead_source_id: string
+          payroll_source_code: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          effective_from: string
+          id?: string
+          lead_source_id: string
+          payroll_source_code: string
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          effective_from?: string
+          id?: string
+          lead_source_id?: string
+          payroll_source_code?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_lead_source_mapping_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_lead_source_mapping_versions_lead_source_id_fkey"
+            columns: ["lead_source_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll_line_items: {
         Row: {
           amount_vnd: number
           created_at: string
           created_by: string | null
           direction: string
+          evidence_snapshot: Json
+          formula_snapshot: Json
           id: string
           line_type: string
           note: string | null
           payroll_statement_id: string
+          policy_code: string | null
+          quantity: number | null
           salary_advance_id: string | null
+          source_id: string | null
+          source_kind: string | null
           source_time_entry_id: string | null
+          staff_daily_rate_version_id: string | null
           staff_rate_version_id: string | null
           unit_count: number | null
+          unit_label: string | null
           unit_rate_vnd: number | null
+          work_minutes: number | null
         }
         Insert: {
           amount_vnd: number
           created_at?: string
           created_by?: string | null
           direction: string
+          evidence_snapshot?: Json
+          formula_snapshot?: Json
           id?: string
           line_type: string
           note?: string | null
           payroll_statement_id: string
+          policy_code?: string | null
+          quantity?: number | null
           salary_advance_id?: string | null
+          source_id?: string | null
+          source_kind?: string | null
           source_time_entry_id?: string | null
+          staff_daily_rate_version_id?: string | null
           staff_rate_version_id?: string | null
           unit_count?: number | null
+          unit_label?: string | null
           unit_rate_vnd?: number | null
+          work_minutes?: number | null
         }
         Update: {
           amount_vnd?: number
           created_at?: string
           created_by?: string | null
           direction?: string
+          evidence_snapshot?: Json
+          formula_snapshot?: Json
           id?: string
           line_type?: string
           note?: string | null
           payroll_statement_id?: string
+          policy_code?: string | null
+          quantity?: number | null
           salary_advance_id?: string | null
+          source_id?: string | null
+          source_kind?: string | null
           source_time_entry_id?: string | null
+          staff_daily_rate_version_id?: string | null
           staff_rate_version_id?: string | null
           unit_count?: number | null
+          unit_label?: string | null
           unit_rate_vnd?: number | null
+          work_minutes?: number | null
         }
         Relationships: [
           {
@@ -2100,6 +2520,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "payroll_line_items_staff_daily_rate_version_id_fkey"
+            columns: ["staff_daily_rate_version_id"]
+            isOneToOne: false
+            referencedRelation: "staff_daily_rate_versions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "payroll_line_items_staff_rate_version_id_fkey"
             columns: ["staff_rate_version_id"]
             isOneToOne: false
@@ -2112,6 +2539,10 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          current_calculation_run_id: string | null
+          feedback_closed_at: string | null
+          feedback_closed_by: string | null
+          feedback_opened_at: string
           generated_at: string
           generated_by: string
           id: string
@@ -2124,6 +2555,10 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          current_calculation_run_id?: string | null
+          feedback_closed_at?: string | null
+          feedback_closed_by?: string | null
+          feedback_opened_at?: string
           generated_at?: string
           generated_by: string
           id?: string
@@ -2136,6 +2571,10 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          current_calculation_run_id?: string | null
+          feedback_closed_at?: string | null
+          feedback_closed_by?: string | null
+          feedback_opened_at?: string
           generated_at?: string
           generated_by?: string
           id?: string
@@ -2149,6 +2588,20 @@ export type Database = {
           {
             foreignKeyName: "payroll_periods_approved_by_fkey"
             columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_periods_current_calculation_run_id_fkey"
+            columns: ["current_calculation_run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_calculation_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_periods_feedback_closed_by_fkey"
+            columns: ["feedback_closed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2169,8 +2622,143 @@ export type Database = {
           },
         ]
       }
+      payroll_policy_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          parameters: Json
+          policy_code: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          id?: string
+          parameters: Json
+          policy_code: string
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          parameters?: Json
+          policy_code?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_policy_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_source_facts: {
+        Row: {
+          amount_vnd: number | null
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          event_date: string
+          fact_type: string
+          grade: number | null
+          id: string
+          import_batch_id: string | null
+          import_row_id: string | null
+          metadata: Json
+          quantity: number | null
+          source_code: string | null
+          source_key: string
+          source_origin: string
+          staff_id: string | null
+          student_id: string | null
+        }
+        Insert: {
+          amount_vnd?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          event_date: string
+          fact_type: string
+          grade?: number | null
+          id?: string
+          import_batch_id?: string | null
+          import_row_id?: string | null
+          metadata?: Json
+          quantity?: number | null
+          source_code?: string | null
+          source_key: string
+          source_origin: string
+          staff_id?: string | null
+          student_id?: string | null
+        }
+        Update: {
+          amount_vnd?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          event_date?: string
+          fact_type?: string
+          grade?: number | null
+          id?: string
+          import_batch_id?: string | null
+          import_row_id?: string | null
+          metadata?: Json
+          quantity?: number | null
+          source_code?: string | null
+          source_key?: string
+          source_origin?: string
+          staff_id?: string | null
+          student_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_source_facts_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_source_facts_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_source_facts_import_row_id_fkey"
+            columns: ["import_row_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_import_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_source_facts_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_source_facts_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll_statements: {
         Row: {
+          calculation_run_id: string
           created_at: string
           id: string
           payroll_period_id: string
@@ -2178,9 +2766,11 @@ export type Database = {
           staff_employee_code_snapshot: string | null
           staff_id: string
           work_hours: number
+          work_minutes: number
           work_units: number
         }
         Insert: {
+          calculation_run_id: string
           created_at?: string
           id?: string
           payroll_period_id: string
@@ -2188,9 +2778,11 @@ export type Database = {
           staff_employee_code_snapshot?: string | null
           staff_id: string
           work_hours?: number
+          work_minutes?: number
           work_units?: number
         }
         Update: {
+          calculation_run_id?: string
           created_at?: string
           id?: string
           payroll_period_id?: string
@@ -2198,9 +2790,17 @@ export type Database = {
           staff_employee_code_snapshot?: string | null
           staff_id?: string
           work_hours?: number
+          work_minutes?: number
           work_units?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "payroll_statements_calculation_run_id_fkey"
+            columns: ["calculation_run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_calculation_runs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payroll_statements_payroll_period_id_fkey"
             columns: ["payroll_period_id"]
@@ -3108,6 +3708,339 @@ export type Database = {
           {
             foreignKeyName: "session_results_graded_by_fkey"
             columns: ["graded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_bank_account_change_requests: {
+        Row: {
+          account_holder_name: string
+          account_number: string
+          bank_name: string
+          effective_from: string
+          id: string
+          reason: string
+          requested_at: string
+          requested_by: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          staff_id: string
+          status: string
+        }
+        Insert: {
+          account_holder_name: string
+          account_number: string
+          bank_name: string
+          effective_from: string
+          id?: string
+          reason: string
+          requested_at?: string
+          requested_by: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          staff_id: string
+          status?: string
+        }
+        Update: {
+          account_holder_name?: string
+          account_number?: string
+          bank_name?: string
+          effective_from?: string
+          id?: string
+          reason?: string
+          requested_at?: string
+          requested_by?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          staff_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_bank_account_change_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_bank_account_change_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_bank_account_change_requests_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_bank_account_versions: {
+        Row: {
+          account_holder_name: string
+          account_number: string
+          approved_at: string
+          approved_by: string
+          bank_name: string
+          created_at: string
+          effective_from: string
+          id: string
+          source_request_id: string | null
+          staff_id: string
+        }
+        Insert: {
+          account_holder_name: string
+          account_number: string
+          approved_at?: string
+          approved_by: string
+          bank_name: string
+          created_at?: string
+          effective_from: string
+          id?: string
+          source_request_id?: string | null
+          staff_id: string
+        }
+        Update: {
+          account_holder_name?: string
+          account_number?: string
+          approved_at?: string
+          approved_by?: string
+          bank_name?: string
+          created_at?: string
+          effective_from?: string
+          id?: string
+          source_request_id?: string | null
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_bank_account_versions_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_bank_account_versions_source_request_fkey"
+            columns: ["source_request_id"]
+            isOneToOne: false
+            referencedRelation: "staff_bank_account_change_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_bank_account_versions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_daily_rate_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          migrated_from_staff_rate_version_id: string | null
+          note: string | null
+          offline_daily_rate_vnd: number
+          online_rate_basis_points: number
+          reason: string
+          staff_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          id?: string
+          migrated_from_staff_rate_version_id?: string | null
+          note?: string | null
+          offline_daily_rate_vnd: number
+          online_rate_basis_points?: number
+          reason: string
+          staff_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          migrated_from_staff_rate_version_id?: string | null
+          note?: string | null
+          offline_daily_rate_vnd?: number
+          online_rate_basis_points?: number
+          reason?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_daily_rate_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_daily_rate_versions_migrated_from_staff_rate_version_fkey"
+            columns: ["migrated_from_staff_rate_version_id"]
+            isOneToOne: false
+            referencedRelation: "staff_rate_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_daily_rate_versions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_grade_assignments: {
+        Row: {
+          created_at: string
+          created_by: string
+          effective_from: string
+          effective_to: string | null
+          grade: number
+          id: string
+          reason: string
+          staff_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          effective_from: string
+          effective_to?: string | null
+          grade: number
+          id?: string
+          reason: string
+          staff_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          effective_from?: string
+          effective_to?: string | null
+          grade?: number
+          id?: string
+          reason?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_grade_assignments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_grade_assignments_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_payroll_position_versions: {
+        Row: {
+          created_at: string
+          created_by: string
+          effective_from: string
+          id: string
+          position_code: string
+          reason: string
+          staff_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          effective_from: string
+          id?: string
+          position_code: string
+          reason: string
+          staff_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          effective_from?: string
+          id?: string
+          position_code?: string
+          reason?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_payroll_position_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_payroll_position_versions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_payroll_task_versions: {
+        Row: {
+          created_at: string
+          created_by: string
+          effective_from: string
+          id: string
+          is_enabled: boolean
+          reason: string
+          staff_id: string
+          task_code: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          effective_from: string
+          id?: string
+          is_enabled: boolean
+          reason: string
+          staff_id: string
+          task_code: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          effective_from?: string
+          id?: string
+          is_enabled?: boolean
+          reason?: string
+          staff_id?: string
+          task_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_payroll_task_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_payroll_task_versions_staff_id_fkey"
+            columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -5078,15 +6011,24 @@ export type Database = {
           created_at: string
           created_by: string | null
           direction: string
+          evidence_snapshot: Json
+          formula_snapshot: Json
           id: string
           line_type: string
           note: string | null
           payroll_statement_id: string
+          policy_code: string | null
+          quantity: number | null
           salary_advance_id: string | null
+          source_id: string | null
+          source_kind: string | null
           source_time_entry_id: string | null
+          staff_daily_rate_version_id: string | null
           staff_rate_version_id: string | null
           unit_count: number | null
+          unit_label: string | null
           unit_rate_vnd: number | null
+          work_minutes: number | null
         }
         SetofOptions: {
           from: "*"
@@ -5119,6 +6061,10 @@ export type Database = {
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          current_calculation_run_id: string | null
+          feedback_closed_at: string | null
+          feedback_closed_by: string | null
+          feedback_opened_at: string
           generated_at: string
           generated_by: string
           id: string
@@ -5202,6 +6148,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      assert_payroll_configuration_date_allowed: {
+        Args: { p_effective_from: string }
+        Returns: undefined
+      }
       assign_user_role: {
         Args: {
           assignment_reason: string
@@ -5256,6 +6206,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      bulk_transition_student_lifecycle_status: {
+        Args: {
+          p_expected_count: number
+          p_reason?: string
+          p_source_status: string
+          p_student_ids?: string[]
+          p_target_status: string
+        }
+        Returns: Json
       }
       calculate_haversine_distance_m: {
         Args: { lat1: number; lat2: number; lon1: number; lon2: number }
@@ -5419,6 +6379,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      close_payroll_feedback: {
+        Args: { p_payroll_period_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          current_calculation_run_id: string | null
+          feedback_closed_at: string | null
+          feedback_closed_by: string | null
+          feedback_opened_at: string
+          generated_at: string
+          generated_by: string
+          id: string
+          pay_date: string
+          period_month: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_periods"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       coaching_validate_question: {
         Args: { p_configuration: Json; p_question_type: string }
         Returns: boolean
@@ -5506,6 +6491,17 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      configure_staff_payroll_compensation: {
+        Args: {
+          p_effective_from: string
+          p_note: string
+          p_offline_daily_rate_vnd: number
+          p_position_code: string
+          p_reason: string
+          p_staff_id: string
+        }
+        Returns: Json
       }
       convert_crm_case_to_official_student: {
         Args: {
@@ -5862,11 +6858,54 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_manual_payroll_source_fact: {
+        Args: {
+          p_amount_vnd: number
+          p_event_date: string
+          p_fact_type: string
+          p_grade: number
+          p_metadata: Json
+          p_quantity: number
+          p_source_code: string
+          p_source_key: string
+          p_staff_id: string
+          p_student_id: string
+        }
+        Returns: {
+          amount_vnd: number | null
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          event_date: string
+          fact_type: string
+          grade: number | null
+          id: string
+          import_batch_id: string | null
+          import_row_id: string | null
+          metadata: Json
+          quantity: number | null
+          source_code: string | null
+          source_key: string
+          source_origin: string
+          staff_id: string | null
+          student_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_source_facts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_payroll_draft: {
         Args: { p_period_month: string }
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          current_calculation_run_id: string | null
+          feedback_closed_at: string | null
+          feedback_closed_by: string | null
+          feedback_opened_at: string
           generated_at: string
           generated_by: string
           id: string
@@ -5879,6 +6918,84 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "payroll_periods"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_payroll_import_batch: {
+        Args: {
+          p_dataset_type: string
+          p_file_name: string
+          p_file_sha256: string
+          p_period_month: string
+          p_rows: Json
+        }
+        Returns: {
+          conflict_rows: number
+          dataset_type: string
+          error_rows: number
+          file_name: string
+          file_sha256: string
+          id: string
+          period_month: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          total_rows: number
+          uploaded_at: string
+          uploaded_by: string
+          valid_rows: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_import_batches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_payroll_lead_source_mapping_version: {
+        Args: {
+          p_effective_from: string
+          p_lead_source_id: string
+          p_payroll_source_code: string
+          p_reason: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          effective_from: string
+          id: string
+          lead_source_id: string
+          payroll_source_code: string
+          reason: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_lead_source_mapping_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_payroll_policy_version: {
+        Args: {
+          p_effective_from: string
+          p_parameters: Json
+          p_policy_code: string
+          p_reason: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          parameters: Json
+          policy_code: string
+          reason: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_policy_versions"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -5950,6 +7067,106 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "session_balance_import_batches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_staff_daily_rate_version: {
+        Args: {
+          p_effective_from: string
+          p_note: string
+          p_offline_daily_rate_vnd: number
+          p_reason: string
+          p_staff_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          migrated_from_staff_rate_version_id: string | null
+          note: string | null
+          offline_daily_rate_vnd: number
+          online_rate_basis_points: number
+          reason: string
+          staff_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "staff_daily_rate_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_staff_grade_assignment: {
+        Args: {
+          p_effective_from: string
+          p_effective_to: string
+          p_grade: number
+          p_reason: string
+          p_staff_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          effective_from: string
+          effective_to: string | null
+          grade: number
+          id: string
+          reason: string
+          staff_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "staff_grade_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_staff_payroll_position_version: {
+        Args: {
+          p_effective_from: string
+          p_position_code: string
+          p_reason: string
+          p_staff_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          effective_from: string
+          id: string
+          position_code: string
+          reason: string
+          staff_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "staff_payroll_position_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_staff_payroll_task_version: {
+        Args: {
+          p_effective_from: string
+          p_is_enabled: boolean
+          p_reason: string
+          p_staff_id: string
+          p_task_code: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          effective_from: string
+          id: string
+          is_enabled: boolean
+          reason: string
+          staff_id: string
+          task_code: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "staff_payroll_task_versions"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -6130,6 +7347,60 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "work_shifts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      decide_payroll_import_batch: {
+        Args: { p_batch_id: string; p_decision: string; p_review_note: string }
+        Returns: {
+          conflict_rows: number
+          dataset_type: string
+          error_rows: number
+          file_name: string
+          file_sha256: string
+          id: string
+          period_month: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          total_rows: number
+          uploaded_at: string
+          uploaded_by: string
+          valid_rows: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_import_batches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      decide_staff_bank_account_change: {
+        Args: {
+          p_decision: string
+          p_request_id: string
+          p_review_note: string
+        }
+        Returns: {
+          account_holder_name: string
+          account_number: string
+          bank_name: string
+          effective_from: string
+          id: string
+          reason: string
+          requested_at: string
+          requested_by: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          staff_id: string
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "staff_bank_account_change_requests"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -6349,6 +7620,24 @@ export type Database = {
           linked_student_lifecycle_status: string
           linked_student_public_code: string
         }[]
+      }
+      generate_payroll_calculation_run: {
+        Args: { p_payroll_period_id: string; p_reason: string }
+        Returns: {
+          generated_at: string
+          generated_by: string
+          id: string
+          payroll_period_id: string
+          reason: string
+          revision: number
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_calculation_runs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       get_center_display_name: { Args: never; Returns: string }
       get_coaching_assignee_options: {
@@ -6689,6 +7978,8 @@ export type Database = {
           work_units: number
         }[]
       }
+      get_payroll_explanations: { Args: never; Returns: Json }
+      get_payroll_management_overview: { Args: never; Returns: Json }
       get_payroll_periods_with_details: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["payroll_periods_with_details_row"][]
@@ -6761,6 +8052,7 @@ export type Database = {
           student_public_code: string
         }[]
       }
+      get_staff_payroll_profile: { Args: { p_staff_id: string }; Returns: Json }
       get_time_entry_adjustment_approval_queue: {
         Args: never
         Returns: {
@@ -7343,6 +8635,29 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reset_payroll_draft: {
+        Args: {
+          p_confirmation: string
+          p_expected_revision: number
+          p_payroll_period_id: string
+          p_reason: string
+        }
+        Returns: {
+          generated_at: string
+          generated_by: string
+          id: string
+          payroll_period_id: string
+          reason: string
+          revision: number
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_calculation_runs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       reset_unlocked_class_session_before_start: {
         Args: { p_class_session_id: string; p_reason: string }
         Returns: {
@@ -7412,6 +8727,56 @@ export type Database = {
           student_enrollment_id: string
           student_id: string
         }[]
+      }
+      resolve_payroll_correction_request: {
+        Args: {
+          p_decision: string
+          p_request_id: string
+          p_response_message: string
+        }
+        Returns: {
+          id: string
+          payroll_period_id: string
+          payroll_statement_id: string
+          request_message: string
+          requested_at: string
+          requested_by: string
+          resolved_at: string | null
+          resolved_by: string | null
+          response_message: string | null
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_correction_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      resolve_payroll_import_conflict: {
+        Args: { p_reason: string; p_resolution: string; p_row_id: string }
+        Returns: {
+          batch_id: string
+          conflict_payload: Json | null
+          created_at: string
+          id: string
+          normalized_payload: Json | null
+          raw_payload: Json
+          resolution: string | null
+          resolution_reason: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          row_number: number
+          source_key: string
+          validation_errors: Json
+          validation_status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_import_rows"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       resolve_sepay_receiving_account: {
         Args: { p_signed_account_number: string; p_transaction_at: string }
@@ -7672,11 +9037,40 @@ export type Database = {
         }
         Returns: Json
       }
+      submit_payroll_correction_request: {
+        Args: {
+          p_items: Json
+          p_payroll_statement_id: string
+          p_request_message: string
+        }
+        Returns: {
+          id: string
+          payroll_period_id: string
+          payroll_statement_id: string
+          request_message: string
+          requested_at: string
+          requested_by: string
+          resolved_at: string | null
+          resolved_by: string | null
+          response_message: string | null
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_correction_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       submit_payroll_for_review: {
         Args: { p_payroll_period_id: string }
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          current_calculation_run_id: string | null
+          feedback_closed_at: string | null
+          feedback_closed_by: string | null
+          feedback_opened_at: string
           generated_at: string
           generated_by: string
           id: string
@@ -7696,6 +9090,41 @@ export type Database = {
       submit_public_coaching_form: {
         Args: { p_answers: Json; p_token: string }
         Returns: string
+      }
+      submit_staff_bank_account_change: {
+        Args: {
+          p_account_holder_name: string
+          p_account_number: string
+          p_bank_name: string
+          p_effective_from: string
+          p_reason: string
+          p_staff_id: string
+        }
+        Returns: {
+          account_holder_name: string
+          account_number: string
+          bank_name: string
+          effective_from: string
+          id: string
+          reason: string
+          requested_at: string
+          requested_by: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          staff_id: string
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "staff_bank_account_change_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      sync_payroll_order_facts: {
+        Args: { p_period_month: string }
+        Returns: number
       }
       transfer_crm_case_lead: {
         Args: {
