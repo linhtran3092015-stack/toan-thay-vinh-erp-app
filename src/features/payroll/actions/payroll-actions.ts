@@ -63,12 +63,46 @@ function getPayrollRpcErrorMessage(message: string): string {
       "Tài khoản hiện tại không có quyền đối soát bảng lương.",
     PAYROLL_MANAGE_PERMISSION_REQUIRED:
       "Tài khoản hiện tại không có quyền lập bảng lương.",
+    PAYROLL_IMPORT_BATCH_NOT_PENDING:
+      "Tệp nhập này đã được xử lý hoặc không còn chờ duyệt.",
+    PAYROLL_IMPORT_CONFLICT_NOT_PENDING:
+      "Dòng xung đột này đã được xử lý hoặc không còn chờ xử lý.",
+    PAYROLL_IMPORT_DATASET_INVALID:
+      "Loại dữ liệu trong tệp nhập không hợp lệ.",
+    PAYROLL_IMPORT_DECISION_INVALID:
+      "Quyết định duyệt tệp hoặc ghi chú duyệt không hợp lệ.",
+    PAYROLL_IMPORT_EVENT_OUTSIDE_PERIOD:
+      "Tệp có ngày dữ liệu nằm ngoài kỳ lương đã chọn.",
     PAYROLL_IMPORT_FILE_OR_SOURCE_DUPLICATE:
       "Tệp hoặc mã dòng dữ liệu này đã được nhập trước đó.",
+    PAYROLL_IMPORT_GRADING_INVALID:
+      "Tệp chấm bài có số lượng không hợp lệ.",
+    PAYROLL_IMPORT_NORMALIZED_ROW_REQUIRED:
+      "Tệp có dòng hợp lệ nhưng thiếu dữ liệu đã chuẩn hóa.",
+    PAYROLL_IMPORT_ORDER_INVALID:
+      "Tệp đơn hàng có khối lớp hoặc số tiền không hợp lệ.",
     PAYROLL_IMPORT_PAYLOAD_INVALID:
       "Nội dung tệp nhập không đúng định dạng.",
+    PAYROLL_IMPORT_PERIOD_INVALID:
+      "Kỳ lương của tệp nhập không hợp lệ.",
+    PAYROLL_IMPORT_PERMISSION_REQUIRED:
+      "Tài khoản hiện tại không có quyền nhập dữ liệu lương.",
+    PAYROLL_IMPORT_RESOLUTION_INVALID:
+      "Cách xử lý hoặc lý do xử lý xung đột không hợp lệ.",
+    PAYROLL_IMPORT_ROW_COUNT_INVALID:
+      "Tệp nhập phải có từ 1 đến 5.000 dòng dữ liệu.",
+    PAYROLL_IMPORT_ROWS_INVALID:
+      "Danh sách dòng dữ liệu trong tệp nhập không hợp lệ.",
+    PAYROLL_IMPORT_ROW_STATUS_INVALID:
+      "Tệp có trạng thái kiểm tra dòng không hợp lệ.",
     PAYROLL_IMPORT_SELF_APPROVAL_FORBIDDEN:
       "Người tải tệp không thể tự duyệt tệp đó.",
+    PAYROLL_IMPORT_SOURCE_CODE_INVALID:
+      "Tệp có mã nguồn tuyển sinh không hợp lệ.",
+    PAYROLL_IMPORT_STAFF_INVALID:
+      "Tệp có nhân sự không tồn tại trong hệ thống.",
+    PAYROLL_IMPORT_TIMEKEEPING_INVALID:
+      "Tệp chấm công có số lượng hoặc hình thức làm việc không hợp lệ.",
     PAYROLL_IMPORT_UNRESOLVED_ROWS:
       "Tệp còn dòng lỗi hoặc xung đột chưa được xử lý.",
     PAYROLL_MANUAL_LINE_AMOUNT_INVALID: "Số tiền thưởng hoặc khấu trừ không hợp lệ.",
