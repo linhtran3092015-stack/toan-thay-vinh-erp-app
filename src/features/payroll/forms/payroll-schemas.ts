@@ -28,6 +28,12 @@ export const recalculatePayrollSchema = payrollPeriodActionSchema.extend({
   reason: z.string().trim().min(1, "Bắt buộc nhập lý do tính lại.").max(2000),
 });
 
+export const resetPayrollDraftSchema = payrollPeriodActionSchema.extend({
+  confirmation: z.string().trim().min(1, "Bắt buộc nhập câu xác nhận."),
+  expectedRevision: z.number().int().positive("Phiên bản tính lương không hợp lệ."),
+  reason: z.string().trim().min(1, "Bắt buộc nhập lý do đặt lại.").max(2000),
+});
+
 export const submitPayrollCorrectionSchema = z.object({
   evidenceUrl: z.union([
     z.literal(""),

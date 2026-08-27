@@ -1,6 +1,6 @@
 begin;
 
-select plan(22);
+select plan(31);
 
 insert into auth.users (
   id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at
@@ -383,6 +383,142 @@ select results_eq(
   $$,
   $$ values (2, 1, 100000::bigint) $$,
   'the current recalculation revision contains one copy of the same advance deduction'
+);
+
+select lives_ok(
+  $$
+    select public.add_payroll_manual_line(
+      (
+        select statement.id
+        from public.payroll_periods as period
+        join public.payroll_statements as statement
+          on statement.calculation_run_id = period.current_calculation_run_id
+        where period.period_month = '2026-07-01'
+          and statement.staff_id = '91000000-0000-4000-8000-000000000002'
+      ),
+      'manual_reward',
+      50000,
+      'Incorrect manual line that must not survive a reset'
+    )
+  $$,
+  'a manual line can exist on the draft revision before reset'
+);
+
+select throws_ok(
+  $$
+    select public.reset_payroll_draft(
+      (select id from public.payroll_periods where period_month = '2026-07-01'),
+      2,
+      'Reset confirmation test',
+      'DAT LAI 06/2026'
+    )
+  $$,
+  '22023',
+  'PAYROLL_RESET_CONFIRMATION_INVALID',
+  'reset rejects a confirmation for a different payroll month'
+);
+
+select set_config('request.jwt.claim.sub', '91000000-0000-4000-8000-000000000002', true);
+
+select throws_ok(
+  $$
+    select public.reset_payroll_draft(
+      (select id from public.payroll_periods where period_month = '2026-07-01'),
+      2,
+      'Unauthorized reset test',
+      'DAT LAI 07/2026'
+    )
+  $$,
+  '42501',
+  'PAYROLL_MANAGE_PERMISSION_REQUIRED',
+  'staff without payroll management permission cannot reset a draft'
+);
+
+select set_config('request.jwt.claim.sub', '91000000-0000-4000-8000-000000000001', true);
+
+select lives_ok(
+  $$
+    select public.reset_payroll_draft(
+      (select id from public.payroll_periods where period_month = '2026-07-01'),
+      2,
+      'Rebuild July from authoritative source data',
+      'DAT LAI 07/2026'
+    )
+  $$,
+  'an authorized manager can reset a draft into a clean calculation revision'
+);
+
+select results_eq(
+  $$
+    select
+      run.revision,
+      count(line.id) filter (where line.line_type in ('manual_reward', 'manual_deduction'))::integer,
+      count(line.id) filter (where line.line_type = 'advance_deduction')::integer
+    from public.payroll_periods as period
+    join public.payroll_calculation_runs as run on run.id = period.current_calculation_run_id
+    join public.payroll_statements as statement
+      on statement.calculation_run_id = run.id
+      and statement.staff_id = '91000000-0000-4000-8000-000000000002'
+    left join public.payroll_line_items as line on line.payroll_statement_id = statement.id
+    where period.period_month = '2026-07-01'
+    group by run.revision
+  $$,
+  $$ values (3, 0, 1) $$,
+  'reset removes manual lines while recalculating source-backed advance deductions'
+);
+
+select is(
+  (
+    select count(*)
+    from public.payroll_calculation_runs as run
+    join public.payroll_statements as statement on statement.calculation_run_id = run.id
+    join public.payroll_line_items as line on line.payroll_statement_id = statement.id
+    join public.payroll_periods as period on period.id = run.payroll_period_id
+    where period.period_month = '2026-07-01'
+      and run.status = 'superseded'
+      and line.line_type = 'manual_reward'
+      and line.note = 'Incorrect manual line that must not survive a reset'
+  ),
+  1::bigint,
+  'reset retains the replaced manual line only in immutable audit history'
+);
+
+select is(
+  (
+    select count(*)
+    from public.audit_logs as log
+    join public.payroll_periods as period on period.id::text = log.entity_id
+    where period.period_month = '2026-07-01'
+      and log.action = 'payroll_draft_reset'
+  ),
+  1::bigint,
+  'reset records a dedicated payroll audit event'
+);
+
+select is(
+  (
+    select count(*)
+    from public.audit_logs as log
+    join public.payroll_periods as period on period.id::text = log.entity_id
+    where period.period_month = '2026-07-01'
+      and log.action = 'payroll_calculation_revised'
+  ),
+  2::bigint,
+  'reset does not expose its transaction-internal null pointer as extra revision events'
+);
+
+select throws_ok(
+  $$
+    select public.reset_payroll_draft(
+      (select id from public.payroll_periods where period_month = '2026-07-01'),
+      2,
+      'Stale reset must be rejected',
+      'DAT LAI 07/2026'
+    )
+  $$,
+  '40001',
+  'PAYROLL_RESET_STALE_REVISION',
+  'a stale or concurrent reset cannot replace a newer calculation revision'
 );
 
 select * from finish();

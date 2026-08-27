@@ -9,6 +9,7 @@ import { PayrollImportDialog } from "@/features/payroll/components/payroll-impor
 import {
   ClosePayrollFeedbackAction,
   RecalculatePayrollDialog,
+  ResetPayrollDraftDialog,
 } from "@/features/payroll/components/payroll-feedback-actions";
 import { PayrollPayslipDialog } from "@/features/payroll/components/payroll-payslip-dialog";
 import { PayrollPeriodTransitionAction } from "@/features/payroll/components/payroll-period-transition-action";
@@ -202,6 +203,13 @@ function PayrollPeriodSection({
           </div>
           <div className="flex flex-wrap gap-2">
             {period.status === "draft" && canManage ? <RecalculatePayrollDialog payrollPeriodId={period.id} /> : null}
+            {period.status === "draft" && canManage ? (
+              <ResetPayrollDraftDialog
+                currentRevision={period.currentRevision}
+                payrollPeriodId={period.id}
+                periodMonth={period.periodMonth}
+              />
+            ) : null}
             {period.status === "draft" && canResolveFeedback && !period.feedbackClosedAt ? <ClosePayrollFeedbackAction payrollPeriodId={period.id} /> : null}
             {period.status === "draft" && canReconcile && period.feedbackClosedAt ? (
               <PayrollPeriodTransitionAction

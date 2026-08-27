@@ -21,6 +21,7 @@ const actions = vi.hoisted(() => ({
   addPayrollManualLineAction: vi.fn(),
   createPayrollDraftAction: vi.fn(),
   createPayrollImportBatchAction: vi.fn(),
+  resetPayrollDraftAction: vi.fn(),
 }));
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 
@@ -193,6 +194,45 @@ describe("Payroll 1 presentation", () => {
 });
 
 describe("Payroll 1 dialogs", () => {
+  it("requires an explicit month confirmation before resetting a draft", async () => {
+    const pending = deferred<{ message: string; status: "success" }>();
+    actions.resetPayrollDraftAction.mockReturnValueOnce(pending.promise);
+    render(<PayrollPage canApprove={false} canManage canReconcile={false} periods={[
+      period({ periodMonth: "2026-07-01" }),
+    ]} />);
+
+    const trigger = screen.getByRole("button", { name: "Đặt lại bản nháp" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Đặt lại bản nháp bảng lương" });
+    expect(dialog).toHaveTextContent("bỏ toàn bộ khoản cộng, trừ thủ công");
+    expect(dialog).toHaveTextContent("DAT LAI 07/2026");
+
+    fireEvent.change(screen.getByLabelText("Lý do đặt lại"), {
+      target: { value: "Dữ liệu kỳ tháng 7 đang sai" },
+    });
+    fireEvent.change(screen.getByLabelText(/Nhập DAT LAI 07\/2026 để xác nhận/), {
+      target: { value: "DAT LAI 07/2026" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Đặt lại và tính từ đầu" }));
+
+    await waitFor(() => expect(actions.resetPayrollDraftAction).toHaveBeenCalledWith({
+      confirmation: "DAT LAI 07/2026",
+      expectedRevision: 1,
+      payrollPeriodId: "22222222-2222-4222-8222-222222222222",
+      reason: "Dữ liệu kỳ tháng 7 đang sai",
+    }));
+    expect(dialog).toHaveTextContent("Đang đặt lại…");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Hủy" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    pending.resolve({ message: "Đã đặt lại.", status: "success" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(router.refresh).toHaveBeenCalledOnce();
+    expect(trigger).toHaveFocus();
+  });
+
   it("serializes the create-draft month exactly and protects unresolved mutations before refreshing", async () => {
     const pending = deferred<{ message: string; status: "success" }>();
     actions.createPayrollDraftAction.mockReturnValueOnce(pending.promise);

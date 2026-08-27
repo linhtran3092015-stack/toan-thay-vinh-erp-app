@@ -10,6 +10,7 @@ import type {
   PayrollActionState,
   PayrollPeriodActionInput,
   RecalculatePayrollInput,
+  ResetPayrollDraftInput,
   ResolvePayrollCorrectionInput,
   SubmitPayrollCorrectionInput,
 } from "@/features/payroll/forms/payroll-action-types";
@@ -20,6 +21,7 @@ import {
   decidePayrollImportBatchSchema,
   payrollPeriodActionSchema,
   recalculatePayrollSchema,
+  resetPayrollDraftSchema,
   resolvePayrollCorrectionSchema,
   submitPayrollCorrectionSchema,
 } from "@/features/payroll/forms/payroll-schemas";
@@ -117,6 +119,11 @@ function getPayrollRpcErrorMessage(message: string): string {
     PAYROLL_PERIOD_NOT_REVIEW: "Kỳ lương cần được đối soát trước khi duyệt.",
     PAYROLL_RATE_VERSION_NOT_FOUND:
       "Có lượt công chưa có đơn giá hiệu lực. Hãy bổ sung rate version trước.",
+    PAYROLL_RESET_CONFIRMATION_INVALID:
+      "Câu xác nhận không khớp với kỳ lương cần đặt lại.",
+    PAYROLL_RESET_REASON_REQUIRED: "Bắt buộc nhập lý do đặt lại bản nháp.",
+    PAYROLL_RESET_STALE_REVISION:
+      "Bảng lương đã có phiên bản mới hơn. Hãy tải lại trang và kiểm tra trước khi đặt lại.",
     PAYROLL_CALCULATION_BLOCKING_ISSUES:
       "Kỳ lương còn dữ liệu thiếu cần xử lý trước khi đối soát.",
     PAYROLL_CORRECTION_REQUESTS_PENDING:
@@ -357,6 +364,33 @@ export async function recalculatePayrollAction(
   if (error) return error;
   revalidatePath("/payroll");
   return { message: "Đã tạo phiên bản tính lương mới.", status: "success" };
+}
+
+export async function resetPayrollDraftAction(
+  input: ResetPayrollDraftInput,
+): Promise<PayrollActionState> {
+  const permissionError = await requirePermission("payroll.manage");
+  if (permissionError) return createErrorState(permissionError);
+  const parsed = resetPayrollDraftSchema.safeParse(input);
+  if (!parsed.success) {
+    return createErrorState(
+      "Vui lòng kiểm tra lý do và câu xác nhận.",
+      parsed.error.flatten().fieldErrors,
+    );
+  }
+
+  const error = await runUntypedPayrollRpc("reset_payroll_draft", {
+    p_confirmation: parsed.data.confirmation,
+    p_expected_revision: parsed.data.expectedRevision,
+    p_payroll_period_id: parsed.data.payrollPeriodId,
+    p_reason: parsed.data.reason,
+  });
+  if (error) return error;
+  revalidatePath("/payroll");
+  return {
+    message: "Đã đặt lại bản nháp và tạo phiên bản tính lương sạch.",
+    status: "success",
+  };
 }
 
 export async function submitPayrollCorrectionAction(
