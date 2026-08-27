@@ -16,10 +16,12 @@ export function PayrollCorrectionDialog({
   itemLabel,
   payrollLineItemId,
   payrollStatementId,
+  triggerLabel = "Yêu cầu kiểm tra",
 }: {
   itemLabel: string;
   payrollLineItemId: string | null;
   payrollStatementId: string;
+  triggerLabel?: string;
 }) {
   const router = useRouter();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -42,7 +44,7 @@ export function PayrollCorrectionDialog({
 
   return (
     <>
-      <Button onClick={() => setIsOpen(true)} ref={triggerRef} size="sm" type="button" variant="ghost">Yêu cầu kiểm tra</Button>
+      <Button onClick={() => setIsOpen(true)} ref={triggerRef} size="sm" type="button" variant="ghost">{triggerLabel}</Button>
       <Dialog ariaDescribedBy={descriptionId} ariaLabelledBy={titleId} className="max-w-lg" initialFocusRef={firstFieldRef} isOpen={isOpen} onClose={close} returnFocusRef={triggerRef}>
         <div className="grid gap-4 p-4 sm:p-5">
           <div><h2 className="text-section-title text-text-strong" id={titleId}>Yêu cầu điều chỉnh bảng lương</h2><p className="mt-1 text-secondary text-text-muted" id={descriptionId}>Khoản cần kiểm tra: <strong>{itemLabel}</strong></p></div>

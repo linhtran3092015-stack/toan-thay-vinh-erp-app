@@ -3,7 +3,6 @@ import { PageHeader } from "@/components/patterns/page-header";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { Badge } from "@/components/ui/badge";
 import { CreatePayrollDraftDialog } from "@/features/payroll/components/create-payroll-draft-dialog";
-import { PayrollCorrectionDialog } from "@/features/payroll/components/payroll-correction-dialog";
 import { PayrollCorrectionResolutionDialog } from "@/features/payroll/components/payroll-correction-resolution-dialog";
 import { PayrollImportDecisionDialog } from "@/features/payroll/components/payroll-import-decision-dialog";
 import { PayrollImportDialog } from "@/features/payroll/components/payroll-import-dialog";
@@ -11,10 +10,16 @@ import {
   ClosePayrollFeedbackAction,
   RecalculatePayrollDialog,
 } from "@/features/payroll/components/payroll-feedback-actions";
-import { PayrollManualLineDialog } from "@/features/payroll/components/payroll-manual-line-dialog";
+import { PayrollPayslipDialog } from "@/features/payroll/components/payroll-payslip-dialog";
 import { PayrollPeriodTransitionAction } from "@/features/payroll/components/payroll-period-transition-action";
+import {
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+  formatMonth,
+  formatWorkMinutes,
+} from "@/features/payroll/payroll-presentation";
 import type {
-  PayrollLineRead,
   PayrollCalculationIssueRead,
   PayrollCorrectionRequestRead,
   PayrollImportBatchRead,
@@ -45,51 +50,6 @@ const periodStatusMetadata: Record<
   review: { label: "Chờ đối soát", tone: "warning" },
 };
 
-const lineTypeLabels: Record<string, string> = {
-  advance_deduction: "Khấu trừ tạm ứng",
-  admissions_revenue_tier_bonus: "Hoa hồng theo mức doanh thu",
-  addon_product_sales_bonus: "Thưởng bán sản phẩm phụ",
-  base_offline: "Lương công offline",
-  base_online: "Lương công online (50%)",
-  center_renewal_duty_bonus: "Thưởng quản lý và trực tin nhắn",
-  commission: "Hoa hồng",
-  daily_admin_reporting_bonus: "Thưởng nhập dòng tiền và báo cáo",
-  grading_bonus: "Thưởng chấm bài",
-  hourly_wage: "Lương theo giờ",
-  kpi_bonus: "Thưởng KPI",
-  manual_deduction: "Khấu trừ thủ công",
-  manual_reward: "Thưởng thủ công",
-  new_student_fixed_bonus: "Thưởng tuyển sinh theo nguồn",
-  new_student_revenue_bonus: "Thưởng doanh thu tuyển mới",
-  operations_grade_renewal_bonus: "Thưởng tái phí khối phụ trách",
-  payroll_processing_bonus: "Thưởng tính lương nhân sự",
-  piecework_offset: "Phần lương khoán chưa vượt cứng",
-  record_excess_bonus: "Thưởng doanh thu vượt kỷ lục",
-  revenue_bonus: "Thưởng doanh thu",
-  staff_recruitment_care_bonus: "Thưởng tuyển dụng và chăm sóc nhân sự",
-  student_coaching_bonus: "Thưởng coaching học sinh",
-  teaching_allowance: "Phụ cấp trợ giảng",
-};
-
-function formatCurrency(value: number): string {
-  return `${new Intl.NumberFormat("vi-VN").format(value)} VND`;
-}
-
-function formatMonth(value: string): string {
-  return new Intl.DateTimeFormat("vi-VN", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date(`${value}T00:00:00`));
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(`${value}T00:00:00`));
-}
-
 function issueLabel(code: string): string {
   const labels: Record<string, string> = {
     missing_advance_statement: "Tạm ứng chưa có bảng lương để khấu trừ",
@@ -116,24 +76,6 @@ function getPeriodStatus(status: string): {
     label: `Trạng thái chưa hỗ trợ: ${status}`,
     tone: "neutral",
   };
-}
-
-function getLineTypeLabel(lineType: string): string {
-  return Object.hasOwn(lineTypeLabels, lineType)
-    ? lineTypeLabels[lineType]
-    : `Loại khoản chưa hỗ trợ: ${lineType}`;
-}
-
-function getLineDirectionLabel(direction: string): string {
-  if (direction === "earning") {
-    return "Khoản cộng";
-  }
-
-  if (direction === "deduction") {
-    return "Khoản trừ";
-  }
-
-  return `Chiều khoản chưa hỗ trợ: ${direction}`;
 }
 
 /** Payroll 1 presents the authoritative Payroll 0 period/detail snapshot. */
@@ -255,7 +197,7 @@ function PayrollPeriodSection({
               Ngày trả lương: <span className="tabular-nums">{formatDate(period.payDate)}</span>
             </p>
             <p className="mt-1 text-caption text-text-muted">
-              Phiên bản tính #{period.currentRevision} · {period.feedbackClosedAt ? "Đã đóng phản hồi" : "Đang nhận phản hồi"}
+              Phiên bản tính #{period.currentRevision} · Tính lại gần nhất {period.lastCalculatedAt ? formatDateTime(period.lastCalculatedAt) : "chưa có thời điểm ghi nhận"} · {period.feedbackClosedAt ? "Đã đóng phản hồi" : "Đang nhận phản hồi"}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -296,8 +238,8 @@ function PayrollPeriodSection({
           canAddManualLine={canAddManualLine}
           currentStaffId={currentStaffId}
           feedbackOpen={period.status === "draft" && !period.feedbackClosedAt}
-          periodStatusLabel={status.label}
-          statements={period.statements}
+          period={period}
+          periodStatusTone={status.tone}
         />
       )}
     </section>
@@ -308,15 +250,17 @@ function PayrollStatements({
   canAddManualLine,
   currentStaffId,
   feedbackOpen,
-  periodStatusLabel,
-  statements,
+  period,
+  periodStatusTone,
 }: {
   canAddManualLine: boolean;
   currentStaffId: string;
   feedbackOpen: boolean;
-  periodStatusLabel: string;
-  statements: readonly PayrollStatementRead[];
+  period: PayrollPeriodRead;
+  periodStatusTone: "info" | "neutral" | "success" | "warning";
 }) {
+  const periodStatusLabel = getPeriodStatus(period.status).label;
+  const statements = period.statements;
   return (
     <div className="payroll-statement-work-area min-w-0">
       <DataTableFrame
@@ -325,6 +269,9 @@ function PayrollStatements({
             canAddManualLine={canAddManualLine}
             canRequestCorrection={feedbackOpen && statement.staffId === currentStaffId}
             key={statement.id}
+            period={period}
+            periodStatusLabel={periodStatusLabel}
+            periodStatusTone={periodStatusTone}
             statement={statement}
           />
         ))}
@@ -335,11 +282,10 @@ function PayrollStatements({
             <TableHeader>Nhân sự</TableHeader>
             <TableHeader className="text-right">Công</TableHeader>
             <TableHeader className="text-right">Giờ công</TableHeader>
-            <TableHeader className="text-right">Khoản cộng</TableHeader>
-            <TableHeader className="text-right">Khoản trừ</TableHeader>
-            <TableHeader className="text-right">Tổng thanh toán</TableHeader>
-            <TableHeader>Khoản chi tiết</TableHeader>
-            {canAddManualLine ? <TableHeader>Thao tác</TableHeader> : null}
+            <TableHeader className="text-right">Gross</TableHeader>
+            <TableHeader className="text-right">Khấu trừ</TableHeader>
+            <TableHeader className="text-right">Thực nhận</TableHeader>
+            <TableHeader>Chi tiết</TableHeader>
           </tr>
         }
         tableClassName="min-w-[980px] table-fixed text-table-body text-text-default"
@@ -354,6 +300,9 @@ function PayrollStatements({
             canAddManualLine={canAddManualLine}
             canRequestCorrection={feedbackOpen && statement.staffId === currentStaffId}
             key={statement.id}
+            period={period}
+            periodStatusLabel={periodStatusLabel}
+            periodStatusTone={periodStatusTone}
             statement={statement}
           />
         ))}
@@ -365,10 +314,16 @@ function PayrollStatements({
 function PayrollStatementTableRow({
   canAddManualLine,
   canRequestCorrection,
+  period,
+  periodStatusLabel,
+  periodStatusTone,
   statement,
 }: {
   canAddManualLine: boolean;
   canRequestCorrection: boolean;
+  period: PayrollPeriodRead;
+  periodStatusLabel: string;
+  periodStatusTone: "info" | "neutral" | "success" | "warning";
   statement: PayrollStatementRead;
 }) {
   return (
@@ -385,17 +340,19 @@ function PayrollStatementTableRow({
       <MoneyCell value={statement.totalEarningsVnd} />
       <MoneyCell value={statement.totalDeductionsVnd} />
       <MoneyCell emphasized value={statement.payableAmountVnd} />
-      <TableCell className="w-[184px]">
-        <PayrollLineDisclosure canRequestCorrection={canRequestCorrection} lines={statement.lines} payrollStatementId={statement.id} />
+      <TableCell className="w-[154px]">
+        <PayrollPayslipDialog
+          canAddManualLine={canAddManualLine}
+          canRequestCorrection={canRequestCorrection}
+          currentRevision={period.currentRevision}
+          lastCalculatedAt={period.lastCalculatedAt}
+          payDate={period.payDate}
+          periodMonth={period.periodMonth}
+          periodStatusLabel={periodStatusLabel}
+          periodStatusTone={periodStatusTone}
+          statement={statement}
+        />
       </TableCell>
-      {canAddManualLine ? (
-        <TableCell className="w-[154px]">
-          <PayrollManualLineDialog
-            payrollStatementId={statement.id}
-            staffDisplayName={statement.staffDisplayName}
-          />
-        </TableCell>
-      ) : null}
     </tr>
   );
 }
@@ -403,10 +360,16 @@ function PayrollStatementTableRow({
 function PayrollStatementRecord({
   canAddManualLine,
   canRequestCorrection,
+  period,
+  periodStatusLabel,
+  periodStatusTone,
   statement,
 }: {
   canAddManualLine: boolean;
   canRequestCorrection: boolean;
+  period: PayrollPeriodRead;
+  periodStatusLabel: string;
+  periodStatusTone: "info" | "neutral" | "success" | "warning";
   statement: PayrollStatementRead;
 }) {
   return (
@@ -416,30 +379,32 @@ function PayrollStatementRecord({
     >
       <div className="flex items-start justify-between gap-4">
         <StaffIdentity statement={statement} />
-        <p className="shrink-0 text-right tabular-nums text-body font-semibold text-text-strong">
-          {formatCurrency(statement.payableAmountVnd)}
-        </p>
+        <div className="shrink-0 text-right">
+          <p className="text-caption font-semibold text-text-muted">Thực nhận</p>
+          <p className="mt-0.5 tabular-nums text-body font-semibold text-success">{formatCurrency(statement.payableAmountVnd)}</p>
+        </div>
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-secondary text-text-muted">
-        <RecordAmount label="Khoản cộng" value={statement.totalEarningsVnd} />
-        <RecordAmount label="Khoản trừ" value={statement.totalDeductionsVnd} />
+        <RecordAmount label="Gross" value={statement.totalEarningsVnd} />
+        <RecordAmount label="Khấu trừ" value={statement.totalDeductionsVnd} />
         <RecordText label="Công" value={`${statement.workUnits} công`} />
         <RecordText label="Thời gian công" value={formatWorkMinutes(statement.workMinutes)} />
       </dl>
 
       <div className="mt-4 border-t border-border-subtle pt-3">
-        <PayrollLineDisclosure canRequestCorrection={canRequestCorrection} lines={statement.lines} payrollStatementId={statement.id} />
+        <PayrollPayslipDialog
+          canAddManualLine={canAddManualLine}
+          canRequestCorrection={canRequestCorrection}
+          currentRevision={period.currentRevision}
+          lastCalculatedAt={period.lastCalculatedAt}
+          payDate={period.payDate}
+          periodMonth={period.periodMonth}
+          periodStatusLabel={periodStatusLabel}
+          periodStatusTone={periodStatusTone}
+          statement={statement}
+        />
       </div>
-
-      {canAddManualLine ? (
-        <div className="mt-4 border-t border-border-subtle pt-3">
-          <PayrollManualLineDialog
-            payrollStatementId={statement.id}
-            staffDisplayName={statement.staffDisplayName}
-          />
-        </div>
-      ) : null}
     </article>
   );
 }
@@ -455,71 +420,6 @@ function StaffIdentity({ statement }: { statement: PayrollStatementRead }) {
       ) : null}
     </div>
   );
-}
-
-function PayrollLineDisclosure({
-  canRequestCorrection,
-  lines,
-  payrollStatementId,
-}: {
-  canRequestCorrection: boolean;
-  lines: readonly PayrollLineRead[];
-  payrollStatementId: string;
-}) {
-  if (lines.length === 0) {
-    return <p className="text-secondary text-text-muted">Chưa có khoản chi tiết.</p>;
-  }
-
-  return (
-    <details className="group">
-      <summary className="cursor-pointer text-control font-semibold text-action-link focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring">
-        Xem {lines.length} khoản chi tiết
-      </summary>
-      <ul className="mt-3 grid gap-3 border-t border-border-subtle pt-3" aria-label="Khoản lương chi tiết">
-        {lines.map((line) => <PayrollLineItem canRequestCorrection={canRequestCorrection} key={line.id} line={line} payrollStatementId={payrollStatementId} />)}
-      </ul>
-    </details>
-  );
-}
-
-function PayrollLineItem({
-  canRequestCorrection,
-  line,
-  payrollStatementId,
-}: {
-  canRequestCorrection: boolean;
-  line: PayrollLineRead;
-  payrollStatementId: string;
-}) {
-  const label = getLineTypeLabel(line.lineType);
-  return (
-    <li className="grid gap-2 rounded-md border border-border-subtle bg-surface-raised p-3 text-secondary text-text-muted">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <p className="font-medium text-text-default">{label}</p>
-        <p className="tabular-nums font-semibold text-text-strong">{formatCurrency(line.amountVnd)}</p>
-      </div>
-      <p>Chiều khoản: {getLineDirectionLabel(line.direction)}</p>
-      {line.workMinutes !== null ? <p>Thời gian: {formatWorkMinutes(line.workMinutes)}</p> : null}
-      {line.quantity !== null ? <p>Số lượng: {new Intl.NumberFormat("vi-VN").format(line.quantity)}{line.unitLabel ? ` ${line.unitLabel}` : ""}</p> : null}
-      {line.unitRateVnd !== null ? <p>Đơn giá: {formatCurrency(line.unitRateVnd)}</p> : null}
-      {line.policyCode ? <p>Chính sách: <span className="font-mono text-caption">{line.policyCode}</span></p> : null}
-      {line.note ? <p className="break-words">Ghi chú: {line.note}</p> : null}
-      {Object.keys(line.formulaSnapshot).length > 0 ? <FormulaSummary formula={line.formulaSnapshot} /> : null}
-      {canRequestCorrection ? <div><PayrollCorrectionDialog itemLabel={label} payrollLineItemId={line.id} payrollStatementId={payrollStatementId} /></div> : null}
-    </li>
-  );
-}
-
-function FormulaSummary({ formula }: { formula: Record<string, unknown> }) {
-  const entries = Object.entries(formula).filter(([, value]) => typeof value === "number" || typeof value === "string");
-  if (!entries.length) return null;
-  return <details><summary className="cursor-pointer font-medium text-action-link">Xem dữ liệu công thức</summary><dl className="mt-2 grid gap-1">{entries.map(([key, value]) => <div className="flex justify-between gap-3" key={key}><dt className="break-all font-mono text-caption">{key}</dt><dd className="tabular-nums text-right text-text-default">{typeof value === "number" ? new Intl.NumberFormat("vi-VN").format(value) : String(value)}</dd></div>)}</dl></details>;
-}
-
-function formatWorkMinutes(value: number): string {
-  const hours = Math.floor(value / 60);
-  const minutes = value % 60;
-  return minutes ? `${hours} giờ ${minutes} phút` : `${hours} giờ`;
 }
 
 function TableHeader({ children, className }: { children: ReactNode; className?: string }) {

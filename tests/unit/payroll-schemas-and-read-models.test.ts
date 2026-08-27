@@ -12,8 +12,15 @@ import {
 import {
   enrichPayrollPeriodsWithExplanations,
   normalizePayrollPeriodsWithDetailsRows,
+  type PayrollLineRead,
   type PayrollPeriodsWithDetailsRow,
 } from "@/features/payroll/read-models";
+import {
+  getEvidenceDetails,
+  getLineFormulaSummary,
+  getLineInputSummary,
+  getLineRateSummary,
+} from "@/features/payroll/payroll-presentation";
 
 describe("Payroll Validation Schemas", () => {
   describe("createPayrollDraftSchema", () => {
@@ -188,6 +195,113 @@ describe("Payroll Validation Schemas", () => {
   });
 });
 
+describe("Payroll payslip presentation", () => {
+  const line = (overrides: Partial<PayrollLineRead>): PayrollLineRead => ({
+    amountVnd: 1_000,
+    direction: "earning",
+    evidenceSnapshot: {},
+    formulaSnapshot: {},
+    id: "line-1",
+    lineType: "manual_reward",
+    note: null,
+    payrollStatementId: "statement-1",
+    policyCode: null,
+    quantity: null,
+    sourceKind: null,
+    unitCount: null,
+    unitLabel: null,
+    unitRateVnd: null,
+    workMinutes: null,
+    ...overrides,
+  });
+
+  it("renders actual attendance metadata as a Vietnamese calculation", () => {
+    const attendance = line({
+      amountVnd: 7_838_333,
+      formulaSnapshot: {
+        daily_rate_vnd: 900_000,
+        minutes_per_day: 540,
+        mode_basis_points: 10_000,
+        worked_minutes: 4_703,
+      },
+      lineType: "base_offline",
+      workMinutes: 4_703,
+    });
+
+    expect(getLineInputSummary(attendance)).toBe("78 giờ 23 phút trên chuẩn 9 giờ");
+    expect(getLineRateSummary(attendance)).toBe("900.000 VND/ngày");
+    expect(getLineFormulaSummary(attendance)).toBe(
+      "78 giờ 23 phút / 9 giờ × 900.000 VND = 7.838.333 VND",
+    );
+  });
+
+  it("renders grading pool and revenue percentage formulas from snapshots", () => {
+    const grading = line({
+      amountVnd: 5_300_000,
+      formulaSnapshot: {
+        monthly_pool_vnd: 10_000_000,
+        staff_credits: 530,
+        total_credits: 1_000,
+      },
+      lineType: "grading_bonus",
+      quantity: 530,
+      unitLabel: "bài",
+    });
+    const revenue = line({
+      amountVnd: 4_000_000,
+      formulaSnapshot: { rate_basis_points: 400, revenue_vnd: 100_000_000 },
+      lineType: "commission",
+    });
+
+    expect(getLineFormulaSummary(grading)).toBe(
+      "530 phiếu / 1.000 phiếu × 10.000.000 VND = 5.300.000 VND",
+    );
+    expect(getLineFormulaSummary(revenue)).toBe(
+      "100.000.000 VND × 4% = 4.000.000 VND",
+    );
+  });
+
+  it("turns evidence metadata into concrete source details", () => {
+    const evidence = line({
+      evidenceSnapshot: {
+        grade: 8,
+        order_value_vnd: 12_000_000,
+        source_code: "facebook",
+      },
+    });
+
+    expect(getEvidenceDetails(evidence)).toEqual([
+      { label: "Khối lớp", value: "8" },
+      { label: "Giá trị đơn hàng", value: "12.000.000 VND" },
+      { label: "Mã nguồn tuyển sinh", value: "facebook" },
+    ]);
+  });
+
+  it("keeps fixed-source and record-excess policies distinct from simple revenue formulas", () => {
+    const fixedSource = line({
+      amountVnd: 300_000,
+      evidenceSnapshot: { source_code: "facebook" },
+      formulaSnapshot: { fixed_by_source: { facebook: 300_000 } },
+      lineType: "new_student_fixed_bonus",
+      quantity: 1,
+      unitLabel: "đơn",
+      unitRateVnd: 12_000_000,
+    });
+    const recordExcess = line({
+      amountVnd: 2_000_000,
+      evidenceSnapshot: { center_renewal_revenue_vnd: 120_000_000 },
+      formulaSnapshot: { rate_basis_points: 1_000, record_revenue_vnd: 100_000_000 },
+      lineType: "record_excess_bonus",
+    });
+
+    expect(getLineFormulaSummary(fixedSource)).toBe("1 đơn × 300.000 VND = 300.000 VND");
+    expect(getLineRateSummary(fixedSource)).toBe("300.000 VND/đơn");
+    expect(getLineFormulaSummary(recordExcess)).toBe(
+      "(120.000.000 VND − 100.000.000 VND) × 10% = 2.000.000 VND",
+    );
+  });
+});
+
 describe("Payroll Read Model Normalization & Enrichment", () => {
   it("normalizes flat RPC rows into nested Period -> Statement -> Line tree", () => {
     const rows: PayrollPeriodsWithDetailsRow[] = [
@@ -304,6 +418,7 @@ describe("Payroll Read Model Normalization & Enrichment", () => {
           feedbackClosedAt: null,
           feedbackOpenedAt: "2026-07-01T00:00:00Z",
           id: "p1",
+          lastCalculatedAt: "2026-07-01T08:15:00Z",
           pendingCorrectionCount: 1,
         },
       ],
@@ -317,6 +432,7 @@ describe("Payroll Read Model Normalization & Enrichment", () => {
 
     const enriched = enrichPayrollPeriodsWithExplanations(periods, payload);
     expect(enriched[0].currentRevision).toBe(2);
+    expect(enriched[0].lastCalculatedAt).toBe("2026-07-01T08:15:00Z");
     expect(enriched[0].pendingCorrectionCount).toBe(1);
     expect(enriched[0].statements[0].workMinutes).toBe(540);
     expect(enriched[0].statements[0].lines[0].unitLabel).toBe("ngày");

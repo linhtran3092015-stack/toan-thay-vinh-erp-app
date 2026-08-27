@@ -1,0 +1,10 @@
+[
+  {
+    "date": "2026-08-27",
+    "macrostructure": "Workbench payslip",
+    "theme": "DESIGN.md operational utility",
+    "enrichment": "none",
+    "brief": "Redesign payroll overview and detailed Vietnamese payslip without changing calculation formulas.",
+    "scope": "app"
+  }
+]

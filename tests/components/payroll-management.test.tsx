@@ -54,6 +54,7 @@ const period = (overrides: Partial<PayrollPeriodRead> = {}): PayrollPeriodRead =
   feedbackClosedAt: "2026-05-20T00:00:00Z",
   feedbackOpenedAt: "2026-05-15T00:00:00Z",
   id: "22222222-2222-4222-8222-222222222222",
+  lastCalculatedAt: "2026-05-20T08:30:00Z",
   payDate: "2026-05-28",
   pendingCorrectionCount: 0,
   periodMonth: "2026-04-01",
@@ -111,7 +112,11 @@ describe("Payroll 1 presentation", () => {
     expect(screen.getAllByText("2 công")).not.toHaveLength(0);
     expect(screen.getAllByText("18 giờ")).not.toHaveLength(0);
     expect(screen.queryByRole("button", { name: /gửi đối soát|duyệt/i })).not.toBeInTheDocument();
-    fireEvent.click(screen.getAllByText("Xem 8 khoản chi tiết")[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Xem chi tiết" })[0]);
+    expect(screen.getByRole("dialog", { name: /Phiếu lương/ })).toHaveTextContent("Gross");
+    expect(screen.getByRole("dialog", { name: /Phiếu lương/ })).toHaveTextContent("Gross − Khấu trừ = Thực nhận");
+    expect(screen.getByRole("dialog", { name: /Phiếu lương/ })).toHaveTextContent("Công & giờ làm");
+    expect(screen.getByRole("dialog", { name: /Phiếu lương/ })).toHaveTextContent("Chấm bài");
     expect(screen.getAllByText("Lương theo giờ")).not.toHaveLength(0);
     expect(screen.getAllByText("Thưởng doanh thu")).not.toHaveLength(0);
     expect(screen.getAllByText("Thưởng KPI")).not.toHaveLength(0);
@@ -120,8 +125,7 @@ describe("Payroll 1 presentation", () => {
     expect(screen.getAllByText("Thưởng thủ công")).not.toHaveLength(0);
     expect(screen.getAllByText("Khấu trừ thủ công")).not.toHaveLength(0);
     expect(screen.getAllByText("Khấu trừ tạm ứng")).not.toHaveLength(0);
-    expect(screen.getAllByText("Chiều khoản: Khoản cộng")).not.toHaveLength(0);
-    expect(screen.getAllByText("Chiều khoản: Khoản trừ")).not.toHaveLength(0);
+    expect(screen.getAllByText("Đã ghi nhận")).not.toHaveLength(0);
     expect(screen.queryByText("Số lượng: 0")).not.toBeInTheDocument();
     expect(screen.queryByText("Đơn giá: 0 VND")).not.toBeInTheDocument();
   });
@@ -152,7 +156,7 @@ describe("Payroll 1 presentation", () => {
 
     expect(screen.getByText("Trạng thái chưa hỗ trợ: constructor")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /gửi đối soát|duyệt|điều chỉnh/i })).not.toBeInTheDocument();
-    fireEvent.click(screen.getAllByText("Xem 1 khoản chi tiết")[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Xem chi tiết" })[0]);
     expect(screen.getAllByText("Loại khoản chưa hỗ trợ: constructor")).not.toHaveLength(0);
     expect(screen.queryByText(/^function constructor/)).not.toBeInTheDocument();
   });
@@ -167,7 +171,9 @@ describe("Payroll 1 presentation", () => {
     expect(screen.getByText("Nháp")).toBeInTheDocument();
     expect(screen.getByText("Chờ đối soát")).toBeInTheDocument();
     expect(screen.getByText("Đã duyệt & khóa")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Điều chỉnh" })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Điều chỉnh" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Xem chi tiết" })[0]);
+    expect(screen.getByRole("button", { name: "Điều chỉnh" })).toBeInTheDocument();
   });
 
   it("keeps view-only presentation read-only and preserves the 980/982 container contract", () => {

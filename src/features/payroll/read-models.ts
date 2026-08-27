@@ -60,6 +60,7 @@ export interface PayrollPeriodRead {
   feedbackClosedAt: string | null;
   feedbackOpenedAt: string | null;
   id: string;
+  lastCalculatedAt: string | null;
   payDate: string;
   periodMonth: string;
   // Transport the stored value exactly. Payroll 0 must not coerce unknown
@@ -160,6 +161,7 @@ export function normalizePayrollPeriodsWithDetailsRows(
         feedbackClosedAt: null,
         feedbackOpenedAt: null,
         id: row.payroll_period_id,
+        lastCalculatedAt: null,
         payDate: row.pay_date,
         periodMonth: row.period_month,
         status: row.period_status,
@@ -257,6 +259,7 @@ const payrollExplanationsSchema = z.object({
     feedbackClosedAt: z.string().nullable(),
     feedbackOpenedAt: z.string().nullable(),
     id: z.string(),
+    lastCalculatedAt: z.string().nullable().optional().default(null),
     pendingCorrectionCount: z.number().int().nonnegative(),
   })),
   statements: z.array(z.object({

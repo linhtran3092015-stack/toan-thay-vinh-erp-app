@@ -22,6 +22,7 @@ const period = (overrides: Partial<PayrollPeriodRead> = {}): PayrollPeriodRead =
   feedbackClosedAt: "2026-05-20T00:00:00Z",
   feedbackOpenedAt: "2026-05-15T00:00:00Z",
   id: payrollPeriodId,
+  lastCalculatedAt: "2026-05-20T08:30:00Z",
   payDate: "2026-05-28",
   periodMonth: "2026-04-01",
   pendingCorrectionCount: 0,
