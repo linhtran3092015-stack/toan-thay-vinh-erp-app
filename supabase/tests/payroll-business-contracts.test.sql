@@ -1,6 +1,6 @@
 begin;
 
-select plan(13);
+select plan(15);
 
 -- Test Fixture Setup: Users & Profiles
 insert into auth.users (
@@ -342,6 +342,22 @@ select lives_ok(
     $block$;
   $$,
   'P1-10: After recalculation, closing feedback and submitting for review succeed'
+);
+
+select set_config('request.jwt.claim.sub', '81000000-0000-4000-8000-000000000001', true);
+
+select lives_ok(
+  $$ select public.get_payroll_explanations() $$,
+  'Payroll explanations execute against the current calculation run schema'
+);
+
+select ok(
+  coalesce(
+    (public.get_payroll_explanations()->'periods'->0->>'lastCalculatedAt')::timestamptz
+      is not null,
+    false
+  ),
+  'Payroll explanations expose the calculation generated_at timestamp'
 );
 
 select * from finish();
