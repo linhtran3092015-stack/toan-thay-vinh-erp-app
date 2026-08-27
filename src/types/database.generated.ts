@@ -7960,6 +7960,10 @@ export type Database = {
         }[]
       }
       get_my_timekeeping_status: { Args: never; Returns: Json }
+      get_owner_payroll_dashboard: {
+        Args: { p_position_code?: string; p_selected_month: string }
+        Returns: Json
+      }
       get_payroll_dashboard: {
         Args: never
         Returns: {

@@ -161,6 +161,12 @@ export const navigationDomains: readonly NavigationDomain[] = [
       },
       {
         available: true,
+        href: "/payroll/dashboard",
+        label: "Tổng quan lương",
+        permission: "payroll.dashboard.view",
+      },
+      {
+        available: true,
         href: "/payroll",
         label: "Bảng lương",
         permission: "payroll.view",

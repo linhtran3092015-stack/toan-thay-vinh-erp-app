@@ -113,6 +113,18 @@
   --status-neutral-soft: #F1F3F6;
   --status-neutral-border: #D5DCE6;
 
+  /* Payroll dashboard data visualization. These stay stable across every
+     payroll chart so a position keeps the same color within the page. */
+  --payroll-chart-1: #315FCC;
+  --payroll-chart-2: #16794C;
+  --payroll-chart-3: #8B5FBF;
+  --payroll-chart-4: #C06A1B;
+  --payroll-chart-5: #2E7D8A;
+  --payroll-chart-6: #B04462;
+  --payroll-chart-7: #667085;
+  --payroll-chart-8: #826B18;
+  --payroll-chart-area: rgba(49, 95, 204, 0.10);
+
   --nav-sidebar-bg: #24348B;
   --nav-sidebar-fg: #FFFFFF;
   --nav-sidebar-muted: rgba(255, 255, 255, 0.64);
@@ -840,6 +852,15 @@
   --status-neutral: #B8C2D2;
   --status-neutral-soft: #293243;
   --status-neutral-border: #4A566B;
+  --payroll-chart-1: #91B8FF;
+  --payroll-chart-2: #69D39A;
+  --payroll-chart-3: #C4A0F0;
+  --payroll-chart-4: #F1BB6C;
+  --payroll-chart-5: #70CBD6;
+  --payroll-chart-6: #F296AA;
+  --payroll-chart-7: #B8C2D2;
+  --payroll-chart-8: #D7C477;
+  --payroll-chart-area: rgba(145, 184, 255, 0.13);
   --nav-sidebar-bg: #151D3D;
   --nav-sidebar-fg: #F5F7FF;
   --nav-sidebar-muted: rgba(245, 247, 255, 0.64);

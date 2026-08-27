@@ -57,6 +57,7 @@ export const DATABASE_PERMISSION_CODES = [
   "advances.review",
   "advances.owner_approve",
   "payroll.view",
+  "payroll.dashboard.view",
   "payroll.manage",
   "payroll.accountant_reconcile",
   "payroll.owner_approve",
