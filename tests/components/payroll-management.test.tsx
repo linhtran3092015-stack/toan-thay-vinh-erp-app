@@ -467,4 +467,57 @@ describe("Payroll 1 dialogs", () => {
       }),
     );
   });
+
+  it("renders rich context details for payroll calculation issues", () => {
+    const testIssues = [
+      {
+        details: {
+          amount_vnd: 50000000,
+          event_date: "2026-07-02",
+          grade: 7,
+          source_key: "renewal-order-123",
+        },
+        id: "issue-1111-1111-1111-111111111111",
+        issueCode: "missing_grade_assignment",
+        payrollPeriodId: "22222222-2222-4222-8222-222222222222",
+        periodMonth: "2026-07-01",
+        revision: 1,
+        severity: "blocking" as const,
+        sourceFactId: "fact-1111-1111-1111-111111111111",
+        staffId: null,
+      },
+      {
+        details: {
+          amount_vnd: 10000000,
+          event_date: "2026-07-05",
+          source_code: "teacher_vinh_zalo_direct_referral",
+          source_key: "new-enroll-456",
+        },
+        id: "issue-2222-2222-2222-222222222222",
+        issueCode: "missing_source_mapping",
+        payrollPeriodId: "22222222-2222-4222-8222-222222222222",
+        periodMonth: "2026-07-01",
+        revision: 1,
+        severity: "blocking" as const,
+        sourceFactId: "fact-2222-2222-2222-222222222222",
+        staffId: "staff-nv13-uuid",
+      },
+    ];
+
+    render(
+      <PayrollPage
+        canApprove={false}
+        canManage
+        canReconcile={false}
+        issues={testIssues}
+        periods={[period()]}
+      />,
+    );
+
+    expect(screen.getByText("Dữ liệu cần xử lý trước khi đối soát")).toBeInTheDocument();
+    expect(screen.getByText(/Khối chưa có trợ lý vận hành phụ trách/)).toBeInTheDocument();
+    expect(screen.getByText(/Khối 7 · Ngày 2026-07-02 · 50\.000\.000 VND · Mã đơn: renewal-order-123/)).toBeInTheDocument();
+    expect(screen.getByText(/Nguồn tuyển sinh chưa được ánh xạ/)).toBeInTheDocument();
+    expect(screen.getByText(/Ngày 2026-07-05 · Nguồn: teacher_vinh_zalo_direct_referral · 10\.000\.000 VND · Mã đơn: new-enroll-456/)).toBeInTheDocument();
+  });
 });
