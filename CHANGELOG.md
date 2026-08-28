@@ -2,14 +2,6 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
-## [0.3.0.3] - 2026-08-28
-
-### Added
-- **Staff Payslip (Phiếu Lương Nhân Sự)**: Added complete payslip presentation route at `/payroll/[periodId]/statements/[statementId]/payslip` and binary PDF download endpoint at `.../payslip/pdf`.
-- **A4 & Print Design System**: Designed responsive, A4 portrait layout with Navy blue brand styling, masked bank account numbers, Vietnamese accounting number-to-words converter, and dynamic draft watermark.
-- **Security & Revision Integrity**: Enforced server-side IDOR protection (non-manager staff can only access their own statement) and automatic redirection for stale statement links to the current calculation run.
-- **Table Action Integration**: Added "Phiếu lương" action button to the payroll statements table and mobile card records.
-
 ## [0.3.0.2] - 2026-08-28
 
 ### Fixed

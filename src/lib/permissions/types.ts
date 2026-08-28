@@ -64,7 +64,6 @@ export const DATABASE_PERMISSION_CODES = [
   "payroll.policy.manage",
   "payroll.import",
   "payroll.feedback.resolve",
-  "payroll.template.manage",
   "finance.view",
   "payments.view",
   "payments.create_request",

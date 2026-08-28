@@ -189,12 +189,6 @@ export const navigationDomains: readonly NavigationDomain[] = [
         label: "Hoa hồng",
         permission: "commissions.view",
       },
-      {
-        available: true,
-        href: "/payroll/settings/payslip-templates",
-        label: "Mẫu phiếu lương",
-        permission: "payroll.template.manage",
-      },
     ],
     key: "people",
     label: "Nhân sự",

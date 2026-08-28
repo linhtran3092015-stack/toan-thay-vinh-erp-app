@@ -2756,108 +2756,12 @@ export type Database = {
           },
         ]
       }
-      payroll_payslip_templates: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          is_archived: boolean
-          is_default: boolean
-          name: string
-          slug: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_archived?: boolean
-          is_default?: boolean
-          name: string
-          slug: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_archived?: boolean
-          is_default?: boolean
-          name?: string
-          slug?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payroll_payslip_templates_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payroll_payslip_template_versions: {
-        Row: {
-          configuration: Json
-          created_at: string
-          created_by: string | null
-          id: string
-          published_at: string | null
-          schema_version: number
-          status: string
-          template_id: string
-          version_number: number
-        }
-        Insert: {
-          configuration: Json
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          published_at?: string | null
-          schema_version?: number
-          status?: string
-          template_id: string
-          version_number: number
-        }
-        Update: {
-          configuration?: Json
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          published_at?: string | null
-          schema_version?: number
-          status?: string
-          template_id?: string
-          version_number?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payroll_payslip_template_versions_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payroll_payslip_template_versions_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "payroll_payslip_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       payroll_statements: {
         Row: {
           calculation_run_id: string
           created_at: string
           id: string
           payroll_period_id: string
-          snapshot_template_version_id: string | null
           staff_display_name_snapshot: string
           staff_employee_code_snapshot: string | null
           staff_id: string
@@ -2870,7 +2774,6 @@ export type Database = {
           created_at?: string
           id?: string
           payroll_period_id: string
-          snapshot_template_version_id?: string | null
           staff_display_name_snapshot: string
           staff_employee_code_snapshot?: string | null
           staff_id: string
@@ -2883,7 +2786,6 @@ export type Database = {
           created_at?: string
           id?: string
           payroll_period_id?: string
-          snapshot_template_version_id?: string | null
           staff_display_name_snapshot?: string
           staff_employee_code_snapshot?: string | null
           staff_id?: string

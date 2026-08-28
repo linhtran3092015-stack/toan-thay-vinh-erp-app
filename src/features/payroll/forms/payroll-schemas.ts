@@ -52,23 +52,9 @@ export const resolvePayrollCorrectionSchema = z.object({
   responseMessage: z.string().trim().min(1, "Bắt buộc nhập nội dung phản hồi.").max(4000),
 });
 
-const nullableStudentIdSchema = z.preprocess(
-  (value) => {
-    if (value === null || value === undefined) return null;
-    if (typeof value !== "string") return value;
-    const normalized = value.trim();
-    return normalized === "" ? null : normalized;
-  },
-  z.string().uuid("student_id không hợp lệ.").nullable(),
-);
-
-const payrollNormalizedPayloadSchema = z.object({
-  student_id: nullableStudentIdSchema.default(null),
-}).catchall(z.unknown());
-
 const payrollImportRowSchema = z.object({
   conflictPayload: z.record(z.string(), z.unknown()).nullable(),
-  normalizedPayload: payrollNormalizedPayloadSchema,
+  normalizedPayload: z.record(z.string(), z.unknown()),
   rawPayload: z.record(z.string(), z.unknown()),
   rowNumber: z.number().int().positive(),
   sourceKey: z.string().trim().min(1).max(240),
