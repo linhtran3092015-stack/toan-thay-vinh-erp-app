@@ -370,4 +370,101 @@ describe("Payroll 1 dialogs", () => {
       expect(mockToFile).toHaveBeenCalledWith("mau-grading.xlsx");
     });
   });
+
+  it("displays clear error when adjusting a stale revision statement", async () => {
+    const pending = deferred<{ message: string; status: "error" }>();
+    actions.addPayrollManualLineAction.mockReset().mockReturnValueOnce(pending.promise);
+    render(<PayrollManualLineDialog payrollStatementId={statementId} staffDisplayName="Nguyễn Minh An" />);
+
+    const trigger = screen.getByRole("button", { name: "Điều chỉnh" });
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Điều chỉnh bảng lương" });
+    fireEvent.change(screen.getByLabelText("Số tiền (VND)"), { target: { value: "50000" } });
+    fireEvent.change(screen.getByLabelText("Nội dung"), { target: { value: "Thưởng dự án" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Ghi điều chỉnh" }));
+
+    await waitFor(() => expect(actions.addPayrollManualLineAction).toHaveBeenCalledOnce());
+
+    pending.resolve({
+      message:
+        "Chỉ có thể điều chỉnh trên bản tính lương nháp hiện tại. Hãy tải lại trang và kiểm tra trước khi thực hiện.",
+      status: "error",
+    });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "Chỉ có thể điều chỉnh trên bản tính lương nháp hiện tại. Hãy tải lại trang và kiểm tra trước khi thực hiện.",
+    );
+  });
+
+  it("displays clear error when attempting self-adjustment on own statement", async () => {
+    const pending = deferred<{ message: string; status: "error" }>();
+    actions.addPayrollManualLineAction.mockReset().mockReturnValueOnce(pending.promise);
+    render(<PayrollManualLineDialog payrollStatementId={statementId} staffDisplayName="Nguyễn Minh An" />);
+
+    const trigger = screen.getByRole("button", { name: "Điều chỉnh" });
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Điều chỉnh bảng lương" });
+    fireEvent.change(screen.getByLabelText("Số tiền (VND)"), { target: { value: "50000" } });
+    fireEvent.change(screen.getByLabelText("Nội dung"), { target: { value: "Thưởng dự án" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Ghi điều chỉnh" }));
+
+    await waitFor(() => expect(actions.addPayrollManualLineAction).toHaveBeenCalledOnce());
+
+    pending.resolve({
+      message: "Không thể tự thêm thưởng hoặc khấu trừ cho bảng lương của chính mình.",
+      status: "error",
+    });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Không thể tự thêm thưởng hoặc khấu trừ cho bảng lương của chính mình.");
+  });
+
+  it("passes CURRENT statement id from PayrollPage to addPayrollManualLineAction", async () => {
+    const currentStatementId = "fa70d806-18e0-4b04-af6e-b045156a13fa";
+    actions.addPayrollManualLineAction.mockResolvedValueOnce({ message: "Đã thêm.", status: "success" });
+
+    const currentPeriod = period({
+      feedbackClosedAt: null,
+      id: "current-period-id",
+      statements: [
+        {
+          id: currentStatementId,
+          lines: [line({ id: "current-line-1", payrollStatementId: currentStatementId })],
+          payableAmountVnd: 500000,
+          payrollPeriodId: "current-period-id",
+          staffDisplayName: "Nguyễn Minh An",
+          staffEmployeeCode: "NV17",
+          staffId: "staff-nv17",
+          totalDeductionsVnd: 0,
+          totalEarningsVnd: 500000,
+          workHours: 9,
+          workMinutes: 540,
+          workUnits: 1,
+        },
+      ],
+      status: "draft",
+    });
+
+    render(<PayrollPage canApprove={false} canManage canReconcile={false} periods={[currentPeriod]} />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Xem chi tiết" })[0]);
+    const payslipDialog = screen.getByRole("dialog", { name: /Phiếu lương/ });
+    expect(payslipDialog).toBeInTheDocument();
+
+    fireEvent.click(within(payslipDialog).getByRole("button", { name: "Điều chỉnh" }));
+    const manualDialog = screen.getByRole("dialog", { name: "Điều chỉnh bảng lương" });
+    fireEvent.change(screen.getByLabelText("Số tiền (VND)"), { target: { value: "100000" } });
+    fireEvent.change(screen.getByLabelText("Nội dung"), { target: { value: "Thưởng đúng phiên bản" } });
+    fireEvent.click(within(manualDialog).getByRole("button", { name: "Ghi điều chỉnh" }));
+
+    await waitFor(() =>
+      expect(actions.addPayrollManualLineAction).toHaveBeenCalledWith({
+        amountVnd: 100000,
+        lineType: "manual_reward",
+        note: "Thưởng đúng phiên bản",
+        payrollStatementId: currentStatementId,
+      }),
+    );
+  });
 });
