@@ -2,6 +2,12 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.3.0.1] - 2026-08-28
+
+### Fixed
+- **Payroll Statement Current Revision Selection**: Restricted `get_payroll_periods_with_details()` to only return statements matching `period.current_calculation_run_id`, preventing manual line adjustment submissions from referencing stale calculation run statement IDs.
+- **Payroll Manual Line Error Messaging**: Added Vietnamese user-facing error mappings for `PAYROLL_MANUAL_LINE_REQUIRES_CURRENT_OPEN_DRAFT` and `PAYROLL_MANUAL_LINE_SELF_CHANGE_FORBIDDEN`.
+
 ## [0.3.0.0] - 2026-08-28
 
 ### Added
