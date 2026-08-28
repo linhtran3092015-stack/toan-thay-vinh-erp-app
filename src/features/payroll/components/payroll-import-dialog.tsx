@@ -53,11 +53,15 @@ export function PayrollImportDialog() {
     if (!nextFile) return;
     try {
       const bytes = await nextFile.arrayBuffer();
-      const sheets = await readXlsxFile(bytes);
-      const sheet = sheets[0]?.data ?? [];
+      const sheets = await readXlsxFile(bytes, { trim: false });
+      const sheet = Array.isArray(sheets[0]?.data)
+        ? sheets[0].data
+        : Array.isArray(sheets)
+        ? (sheets as unknown as unknown[][])
+        : [];
       const expected = templateHeaders[datasetType];
-      const actual = (sheet[0] ?? []).map((cell) => String(cell ?? "").trim());
-      if (expected.some((header, index) => actual[index] !== header)) {
+      const actual = (sheet[0] ?? []).map((cell) => String(cell ?? "").trim().toLowerCase());
+      if (expected.some((header, index) => actual[index] !== header.toLowerCase())) {
         setParseError(`Sai cấu trúc cột. Hãy tải đúng tệp mẫu ${datasetLabels[datasetType]}.`);
         return;
       }
@@ -65,14 +69,15 @@ export function PayrollImportDialog() {
         sheet
           .slice(1)
           .filter((source) =>
-            source.some((cell) => cell !== null && String(cell).trim() !== ""),
+            source.some((cell) => cell !== null && cell !== undefined && String(cell).trim() !== ""),
           )
           .map((source, index) =>
             normalizeRow(datasetType, expected, source, index + 2),
           ),
       );
-    } catch {
-      setParseError("Không thể đọc tệp Excel. Hãy dùng tệp .xlsx theo mẫu.");
+    } catch (err) {
+      const detail = err instanceof Error ? `: ${err.message}` : "";
+      setParseError(`Không thể đọc tệp Excel. Hãy dùng tệp .xlsx theo mẫu.${detail}`);
     }
   };
 
@@ -145,10 +150,50 @@ function normalizeRow(datasetType: DatasetType, headers: readonly string[], sour
   };
 }
 
-function serializeCell(value: unknown): string | number | null { if (value instanceof Date) return value.toISOString().slice(0, 10); if (typeof value === "number" || typeof value === "string") return value; return value === null || value === undefined ? null : String(value); }
-function normalizeDate(value: unknown): string | null { const text = String(value ?? "").trim(); if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || Number.isNaN(new Date(`${text}T00:00:00`).getTime())) return null; return text; }
-function stringOrNull(value: unknown): string | null { const text = String(value ?? "").trim(); return text || null; }
-function numberOrNull(value: unknown): number | null { if (value === null || value === "" || value === undefined) return null; const parsed = Number(String(value).replaceAll(".", "").replace(",", ".")); return Number.isFinite(parsed) ? parsed : null; }
+function serializeCell(value: unknown): string | number | null {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  return value === null || value === undefined ? null : String(value).trim() || null;
+}
+
+function normalizeDate(value: unknown): string | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    const d = new Date(`${text}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : text;
+  }
+  return null;
+}
+
+function stringOrNull(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  return text || null;
+}
+
+function numberOrNull(value: unknown): number | null {
+  if (value === null || value === "" || value === undefined) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const parsed = Number(String(value).replaceAll(".", "").replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
 async function sha256(file: File): Promise<string> { const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer()); return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join(""); }
 async function downloadTemplate(datasetType: DatasetType): Promise<void> {
   const writeExcelFile = (await import("write-excel-file/browser")).default;
