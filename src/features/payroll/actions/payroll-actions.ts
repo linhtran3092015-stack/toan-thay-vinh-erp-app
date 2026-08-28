@@ -483,3 +483,29 @@ export async function decidePayrollImportBatchAction(
   revalidatePath("/payroll");
   return { message: "Đã xử lý tệp dữ liệu.", status: "success" };
 }
+
+export async function reopenPayrollPeriodAction(
+  input: PayrollPeriodActionInput & { reason: string },
+): Promise<PayrollActionState> {
+  const permissionError = await requirePermission("payroll.owner_approve");
+  if (permissionError) return createErrorState(permissionError);
+
+  const parsed = payrollPeriodActionSchema.safeParse(input);
+  if (!parsed.success) {
+    return createErrorState("Kỳ lương không hợp lệ.", parsed.error.flatten().fieldErrors);
+  }
+
+  const reason = (input.reason ?? "").trim();
+  if (reason.length < 5) {
+    return createErrorState("Vui lòng nhập lý do mở lại (ít nhất 5 ký tự).");
+  }
+
+  const error = await runUntypedPayrollRpc("reopen_payroll_period", {
+    p_payroll_period_id: parsed.data.payrollPeriodId,
+    p_reason: reason,
+  });
+  if (error) return error;
+  revalidatePath("/payroll");
+  return { message: "Đã mở lại bảng lương để đối soát.", status: "success" };
+}
+

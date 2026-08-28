@@ -13,6 +13,8 @@ import {
 } from "@/features/payroll/components/payroll-feedback-actions";
 import { PayrollPayslipDialog } from "@/features/payroll/components/payroll-payslip-dialog";
 import { PayrollPeriodTransitionAction } from "@/features/payroll/components/payroll-period-transition-action";
+import { ReopenPayrollPeriodAction } from "@/features/payroll/components/reopen-payroll-period-action";
+
 import {
   formatCurrency,
   formatDate,
@@ -252,7 +254,14 @@ function PayrollPeriodSection({
                 transition="approve"
               />
             ) : null}
+            {period.status === "approved" && canApprove ? (
+              <ReopenPayrollPeriodAction
+                payrollPeriodId={period.id}
+                periodMonth={period.periodMonth}
+              />
+            ) : null}
           </div>
+
         </div>
       </div>
 
