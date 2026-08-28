@@ -14,6 +14,8 @@ import {
 import { PayrollPayslipDialog } from "@/features/payroll/components/payroll-payslip-dialog";
 import { PayrollPeriodTransitionAction } from "@/features/payroll/components/payroll-period-transition-action";
 import { ReopenPayrollPeriodAction } from "@/features/payroll/components/reopen-payroll-period-action";
+import { ReopenPayrollToDraftAction } from "@/features/payroll/components/reopen-payroll-to-draft-action";
+
 
 import {
   formatCurrency,
@@ -254,6 +256,12 @@ function PayrollPeriodSection({
                 transition="approve"
               />
             ) : null}
+            {period.status === "review" && canReconcile ? (
+              <ReopenPayrollToDraftAction
+                payrollPeriodId={period.id}
+                periodMonth={period.periodMonth}
+              />
+            ) : null}
             {period.status === "approved" && canApprove ? (
               <ReopenPayrollPeriodAction
                 payrollPeriodId={period.id}
@@ -261,6 +269,7 @@ function PayrollPeriodSection({
               />
             ) : null}
           </div>
+
 
         </div>
       </div>
