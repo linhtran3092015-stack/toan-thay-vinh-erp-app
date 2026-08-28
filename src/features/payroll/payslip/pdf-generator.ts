@@ -55,8 +55,13 @@ export function generatePayslipPdf(data: PayslipDocumentData): Uint8Array {
   };
 
   // Draw Header
-  addHeader("TRUNG TAM TOAN THAY VINH", 50, 800, 14, true);
-  addText("Hoc Toan tu duy - Lam chu tuong lai", 50, 786, 9, false);
+  const companyName = data.templateConfig?.branding?.companyName || "TRUNG TAM TOAN THAY VINH";
+  const subtitle = data.templateConfig?.branding?.subtitle || "Hoc Toan tu duy - Lam chu tuong lai";
+
+  addHeader(companyName, 50, 800, 14, true);
+  if (subtitle) {
+    addText(subtitle, 50, 786, 9, false);
+  }
 
   addHeader(`PHIEU LUONG - ${data.period.periodMonthFormatted}`, 50, 755, 16, true);
 

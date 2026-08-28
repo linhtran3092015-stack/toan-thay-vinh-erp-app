@@ -1,3 +1,5 @@
+import type { PayslipTemplateConfiguration } from "@/features/payroll/payslip-template/types";
+
 export type PayslipPeriodStatus = "draft" | "review" | "approved";
 
 export interface PayslipBankAccountInfo {
@@ -102,6 +104,7 @@ export interface PayslipDocumentData {
   isStale: boolean;
   period: PayslipPeriodInfo;
   statementId: string;
+  templateConfig?: PayslipTemplateConfiguration;
   totals: PayslipTotals;
 }
 

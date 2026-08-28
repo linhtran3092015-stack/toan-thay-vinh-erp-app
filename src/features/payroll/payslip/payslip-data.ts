@@ -26,6 +26,7 @@ import {
   type PayrollPositionCode,
 } from "@/features/staff/payroll-profile-types";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
+import { getStatementTemplateConfigurationResult } from "@/features/payroll/payslip-template/data";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function getMonthDates(periodMonth: string): {
@@ -395,6 +396,7 @@ export async function getPayslipDocumentData(
   );
 
   const monthYearLabel = formatPeriodMonthHeader(period.periodMonth);
+  const templateConfig = await getStatementTemplateConfigurationResult(currentStatement.id);
 
   const data: PayslipDocumentData = {
     breakdowns: {
@@ -431,6 +433,7 @@ export async function getPayslipDocumentData(
       statusLabel: getPeriodStatusLabel(period.status),
     },
     statementId: currentStatement.id,
+    templateConfig,
     totals: {
       amountInWords: formatVietnameseCurrencyWords(
         currentStatement.payableAmountVnd,

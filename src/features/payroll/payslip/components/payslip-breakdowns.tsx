@@ -1,11 +1,22 @@
+import type {
+  PayslipBrandingConfig,
+} from "@/features/payroll/payslip-template/types";
 import type { PayslipDocumentData } from "@/features/payroll/payslip/types";
 import { Award, Clock, TrendingUp } from "lucide-react";
 
-export function PayslipBreakdowns({
-  breakdowns,
-}: {
+interface PayslipBreakdownsProps {
+  blockSettings?: Record<string, unknown>;
+  branding?: Partial<PayslipBrandingConfig>;
   breakdowns: PayslipDocumentData["breakdowns"];
-}) {
+  title?: string;
+}
+
+export function PayslipBreakdowns({
+  blockSettings = {},
+  branding = {},
+  breakdowns,
+  title,
+}: PayslipBreakdownsProps) {
   const hasWorkHours = breakdowns.workHours.length > 0;
   const hasGrading = breakdowns.grading !== null;
   const hasCommissions = breakdowns.commissions.length > 0;
@@ -18,10 +29,13 @@ export function PayslipBreakdowns({
     <div className="grid gap-4 md:grid-cols-2">
       {/* Work Hours Breakdown */}
       {hasWorkHours ? (
-        <div className="rounded-xl border border-blue-100 bg-white p-3.5 shadow-xs">
-          <div className="flex items-center gap-1.5 border-b border-slate-100 pb-2 text-xs font-bold text-blue-900">
-            <Clock aria-hidden="true" className="h-4 w-4 text-blue-700" />
-            <span>CHI TIẾT CÔNG & GIỜ LÀM</span>
+        <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <div
+            className="flex items-center gap-1.5 border-b border-slate-100 pb-2 text-xs font-bold uppercase"
+            style={{ color: branding.primaryColor || "#1e3a8a" }}
+          >
+            <Clock aria-hidden="true" className="h-4 w-4" />
+            <span>{title || "CHI TIẾT CÔNG & GIỜ LÀM"}</span>
           </div>
           <ul className="mt-2.5 space-y-2 text-xs">
             {breakdowns.workHours.map((wh) => (
@@ -47,10 +61,13 @@ export function PayslipBreakdowns({
 
       {/* Grading Breakdown */}
       {hasGrading && breakdowns.grading ? (
-        <div className="rounded-xl border border-blue-100 bg-white p-3.5 shadow-xs">
-          <div className="flex items-center gap-1.5 border-b border-slate-100 pb-2 text-xs font-bold text-blue-900">
-            <Award aria-hidden="true" className="h-4 w-4 text-blue-700" />
-            <span>CHI TIẾT CHẤM BÀI</span>
+        <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
+          <div
+            className="flex items-center gap-1.5 border-b border-slate-100 pb-2 text-xs font-bold uppercase"
+            style={{ color: branding.primaryColor || "#1e3a8a" }}
+          >
+            <Award aria-hidden="true" className="h-4 w-4" />
+            <span>{title || "CHI TIẾT CHẤM BÀI"}</span>
           </div>
           <div className="mt-2.5 rounded-lg bg-slate-50 p-2.5 text-xs">
             <div className="flex items-center justify-between">
@@ -75,10 +92,13 @@ export function PayslipBreakdowns({
 
       {/* Commission Breakdown */}
       {hasCommissions ? (
-        <div className="rounded-xl border border-blue-100 bg-white p-3.5 shadow-xs md:col-span-2">
-          <div className="flex items-center gap-1.5 border-b border-slate-100 pb-2 text-xs font-bold text-blue-900">
-            <TrendingUp aria-hidden="true" className="h-4 w-4 text-blue-700" />
-            <span>CHI TIẾT THƯỞNG DOANH THU & HOA HỒNG</span>
+        <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs md:col-span-2">
+          <div
+            className="flex items-center gap-1.5 border-b border-slate-100 pb-2 text-xs font-bold uppercase"
+            style={{ color: branding.primaryColor || "#1e3a8a" }}
+          >
+            <TrendingUp aria-hidden="true" className="h-4 w-4" />
+            <span>{title || "CHI TIẾT THƯỞNG DOANH THU & HOA HỒNG"}</span>
           </div>
           <div className="mt-2.5 overflow-x-auto">
             <table className="w-full text-xs">

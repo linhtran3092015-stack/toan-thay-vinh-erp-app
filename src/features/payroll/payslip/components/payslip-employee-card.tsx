@@ -1,5 +1,8 @@
+import type {
+  EmployeeInfoBlockSettings,
+  PayslipBrandingConfig,
+} from "@/features/payroll/payslip-template/types";
 import type { PayslipEmployeeInfo } from "@/features/payroll/payslip/types";
-import { User } from "lucide-react";
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -7,42 +10,73 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function PayslipEmployeeCard({
-  employee,
-}: {
+interface PayslipEmployeeCardProps {
+  blockSettings?: EmployeeInfoBlockSettings;
+  branding?: Partial<PayslipBrandingConfig>;
   employee: PayslipEmployeeInfo;
-}) {
+}
+
+export function PayslipEmployeeCard({
+  blockSettings = {},
+  branding = {},
+  employee,
+}: PayslipEmployeeCardProps) {
+  const showAvatar = blockSettings.showAvatar !== false;
+  const showEmployeeCode = blockSettings.showEmployeeCode !== false;
+  const showPosition = blockSettings.showPosition !== false;
+  const showDepartment = blockSettings.showDepartment !== false;
+  const showJoinedDate = blockSettings.showJoinedDate !== false;
+  const showBankInfo = blockSettings.showBankInfo !== false;
+
   return (
-    <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+    <div
+      className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-xs"
+      style={{
+        backgroundColor: branding.accentColor ? `${branding.accentColor}33` : "white",
+      }}
+    >
       <div className="flex items-start gap-3.5">
         {/* Avatar */}
-        {employee.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            alt={employee.displayName}
-            className="h-14 w-14 shrink-0 rounded-full border-2 border-blue-900/20 object-cover"
-            src={employee.avatarUrl}
-          />
-        ) : (
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-900">
-            <span className="text-base">{getInitials(employee.displayName)}</span>
-          </div>
-        )}
+        {showAvatar ? (
+          employee.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              alt={employee.displayName}
+              className="h-14 w-14 shrink-0 rounded-full border-2 border-slate-200 object-cover"
+              src={employee.avatarUrl}
+            />
+          ) : (
+            <div
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full font-bold text-white shadow-xs"
+              style={{ backgroundColor: branding.primaryColor || "#1e3a8a" }}
+            >
+              <span className="text-base">{getInitials(employee.displayName)}</span>
+            </div>
+          )
+        ) : null}
 
         {/* Name & Position */}
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-bold text-blue-950 sm:text-lg">
+          <h3
+            className="truncate text-base font-bold sm:text-lg"
+            style={{ color: branding.primaryColor || "#0f172a" }}
+          >
             {employee.displayName}
           </h3>
-          <p className="text-xs font-semibold text-blue-700">
-            {employee.positionLabel}
-          </p>
+          {showPosition ? (
+            <p
+              className="text-xs font-semibold"
+              style={{ color: branding.secondaryColor || "#3b82f6" }}
+            >
+              {employee.positionLabel}
+            </p>
+          ) : null}
         </div>
       </div>
 
       {/* Attributes Grid */}
       <dl className="mt-3.5 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-xs">
-        {employee.employeeCode ? (
+        {showEmployeeCode && employee.employeeCode ? (
           <div>
             <dt className="text-slate-500">Mã nhân sự</dt>
             <dd className="font-semibold text-slate-900 tabular-nums">
@@ -51,14 +85,34 @@ export function PayslipEmployeeCard({
           </div>
         ) : null}
 
-        <div>
-          <dt className="text-slate-500">Vị trí</dt>
-          <dd className="font-semibold text-slate-900">
-            {employee.positionLabel}
-          </dd>
-        </div>
+        {showPosition ? (
+          <div>
+            <dt className="text-slate-500">Vị trí</dt>
+            <dd className="font-semibold text-slate-900">
+              {employee.positionLabel}
+            </dd>
+          </div>
+        ) : null}
 
-        {employee.bankAccount ? (
+        {showDepartment && employee.department ? (
+          <div>
+            <dt className="text-slate-500">Bộ phận</dt>
+            <dd className="font-semibold text-slate-900 truncate">
+              {employee.department}
+            </dd>
+          </div>
+        ) : null}
+
+        {showJoinedDate && employee.joinedAt ? (
+          <div>
+            <dt className="text-slate-500">Ngày vào làm</dt>
+            <dd className="font-semibold text-slate-900 tabular-nums">
+              {employee.joinedAt}
+            </dd>
+          </div>
+        ) : null}
+
+        {showBankInfo && employee.bankAccount ? (
           <>
             <div>
               <dt className="text-slate-500">Số tài khoản</dt>
