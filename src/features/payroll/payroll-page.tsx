@@ -27,6 +27,8 @@ import type {
   PayrollPeriodRead,
   PayrollStatementRead,
 } from "@/features/payroll/read-models";
+import { Receipt } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 interface PayrollPageProps {
@@ -318,7 +320,7 @@ function PayrollStatements({
             <TableHeader className="text-right">Gross</TableHeader>
             <TableHeader className="text-right">Khấu trừ</TableHeader>
             <TableHeader className="text-right">Thực nhận</TableHeader>
-            <TableHeader>Chi tiết</TableHeader>
+            <TableHeader className="w-[280px]">Thao tác</TableHeader>
           </tr>
         }
         tableClassName="min-w-[980px] table-fixed text-table-body text-text-default"
@@ -373,18 +375,27 @@ function PayrollStatementTableRow({
       <MoneyCell value={statement.totalEarningsVnd} />
       <MoneyCell value={statement.totalDeductionsVnd} />
       <MoneyCell emphasized value={statement.payableAmountVnd} />
-      <TableCell className="w-[154px]">
-        <PayrollPayslipDialog
-          canAddManualLine={canAddManualLine}
-          canRequestCorrection={canRequestCorrection}
-          currentRevision={period.currentRevision}
-          lastCalculatedAt={period.lastCalculatedAt}
-          payDate={period.payDate}
-          periodMonth={period.periodMonth}
-          periodStatusLabel={periodStatusLabel}
-          periodStatusTone={periodStatusTone}
-          statement={statement}
-        />
+      <TableCell className="w-[280px]">
+        <div className="flex items-center gap-2">
+          <Link
+            className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-border-subtle bg-surface-base px-2.5 py-1.5 text-xs font-semibold text-text-strong shadow-xs hover:bg-surface-raised active:bg-interactive-pressed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            href={`/payroll/${period.id}/statements/${statement.id}/payslip`}
+          >
+            <Receipt aria-hidden="true" size={14} strokeWidth={1.8} />
+            <span>Phiếu lương</span>
+          </Link>
+          <PayrollPayslipDialog
+            canAddManualLine={canAddManualLine}
+            canRequestCorrection={canRequestCorrection}
+            currentRevision={period.currentRevision}
+            lastCalculatedAt={period.lastCalculatedAt}
+            payDate={period.payDate}
+            periodMonth={period.periodMonth}
+            periodStatusLabel={periodStatusLabel}
+            periodStatusTone={periodStatusTone}
+            statement={statement}
+          />
+        </div>
       </TableCell>
     </tr>
   );
@@ -425,7 +436,14 @@ function PayrollStatementRecord({
         <RecordText label="Thời gian công" value={formatWorkMinutes(statement.workMinutes)} />
       </dl>
 
-      <div className="mt-4 border-t border-border-subtle pt-3">
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-3">
+        <Link
+          className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-border-subtle bg-surface-base px-3 py-1.5 text-xs font-semibold text-text-strong shadow-xs hover:bg-surface-raised active:bg-interactive-pressed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          href={`/payroll/${period.id}/statements/${statement.id}/payslip`}
+        >
+          <Receipt aria-hidden="true" size={14} strokeWidth={1.8} />
+          <span>Phiếu lương</span>
+        </Link>
         <PayrollPayslipDialog
           canAddManualLine={canAddManualLine}
           canRequestCorrection={canRequestCorrection}

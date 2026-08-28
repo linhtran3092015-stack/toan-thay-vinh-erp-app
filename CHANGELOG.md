@@ -2,6 +2,11 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.3.0.3] - 2026-08-28
+
+### Added
+- **Staff Payslip Web View & PDF**: Added standalone payslip view at `/payroll/[periodId]/statements/[statementId]/payslip` and printable PDF export with Navy blue brand identity, full breakdown tables, masked bank accounts, and Vietnamese currency words.
+
 ## [0.3.0.2] - 2026-08-28
 
 ### Fixed
