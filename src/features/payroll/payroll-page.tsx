@@ -65,6 +65,27 @@ function issueLabel(code: string): string {
   return labels[code] ?? code;
 }
 
+function formatIssueContext(details: Record<string, unknown> | undefined): string | null {
+  if (!details) return null;
+  const parts: string[] = [];
+  if (typeof details.grade === "number") {
+    parts.push(`Khối ${details.grade}`);
+  }
+  if (typeof details.event_date === "string") {
+    parts.push(`Ngày ${details.event_date}`);
+  }
+  if (typeof details.source_code === "string") {
+    parts.push(`Nguồn: ${details.source_code}`);
+  }
+  if (typeof details.amount_vnd === "number") {
+    parts.push(formatCurrency(details.amount_vnd));
+  }
+  if (typeof details.source_key === "string") {
+    parts.push(`Mã đơn: ${details.source_key}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 function getPeriodStatus(status: string): {
   label: string;
   tone: "info" | "neutral" | "success" | "warning";
@@ -121,12 +142,16 @@ export function PayrollPage({
         <section className="rounded-lg border border-warning-border bg-warning-bg p-4" aria-labelledby="payroll-data-issues">
           <h2 className="text-section-title text-text-strong" id="payroll-data-issues">Dữ liệu cần xử lý trước khi đối soát</h2>
           <ul className="mt-3 grid gap-2">
-            {issues.map((issue) => (
-              <li className="rounded-md border border-warning-border bg-surface-base px-3 py-2.5" key={issue.id}>
-                <p className="font-semibold text-text-strong">{issueLabel(issue.issueCode)} · {formatMonth(issue.periodMonth)}</p>
-                <p className="mt-1 text-caption text-text-muted">Phiên bản {issue.revision}{issue.staffId ? ` · Nhân sự ${issue.staffId}` : ""}{issue.sourceFactId ? ` · Dữ liệu ${issue.sourceFactId}` : ""}</p>
-              </li>
-            ))}
+            {issues.map((issue) => {
+              const contextStr = formatIssueContext(issue.details as Record<string, unknown> | undefined);
+              return (
+                <li className="rounded-md border border-warning-border bg-surface-base px-3 py-2.5" key={issue.id}>
+                  <p className="font-semibold text-text-strong">{issueLabel(issue.issueCode)} · {formatMonth(issue.periodMonth)}</p>
+                  {contextStr ? <p className="mt-0.5 text-secondary text-text-default">{contextStr}</p> : null}
+                  <p className="mt-1 text-caption text-text-muted">Phiên bản {issue.revision}{issue.staffId ? ` · Nhân sự ${issue.staffId}` : ""}{issue.sourceFactId ? ` · Dữ liệu ${issue.sourceFactId}` : ""}</p>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}
