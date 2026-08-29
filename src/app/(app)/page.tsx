@@ -1,12 +1,22 @@
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
-import { getRoleAwareDashboardReadModel } from "@/features/dashboard/data";
+import { getCurrentAuthUser } from "@/features/auth/current-user";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
+import { getRoleAwareDashboardReadModel } from "@/features/dashboard/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
-export default async function Home() {
-  const permissionResult =
-    await getCachedDatabasePermissions();
+interface PageProps {
+  searchParams?: Promise<{
+    month?: string;
+  }>;
+}
+
+export default async function Home({ searchParams }: PageProps) {
+  const [permissionResult, authResult, resolvedSearchParams] = await Promise.all([
+    getCachedDatabasePermissions(),
+    getCurrentAuthUser(),
+    searchParams ? await searchParams : Promise.resolve(undefined),
+  ]);
 
   if (!permissionResult.ok) {
     return (
@@ -30,10 +40,19 @@ export default async function Home() {
     );
   }
 
-  const dashboard =
-    await getRoleAwareDashboardReadModel(
-      permissionResult.permissions,
-    );
+  const requestedMonth = resolvedSearchParams?.month;
 
-  return <DashboardPage dashboard={dashboard} />;
+  const dashboard = await getRoleAwareDashboardReadModel(
+    permissionResult.permissions,
+    requestedMonth,
+  );
+
+  const userDisplayName = authResult.ok ? authResult.user.displayName : null;
+
+  return (
+    <DashboardPage
+      dashboard={dashboard}
+      userDisplayName={userDisplayName}
+    />
+  );
 }

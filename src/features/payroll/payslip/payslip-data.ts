@@ -4,8 +4,6 @@ import { getCurrentAuthUser } from "@/features/auth/current-user";
 import { getPayrollPeriodsWithDetailsResult } from "@/features/payroll/data";
 import {
   formatCurrency,
-  formatDate,
-  formatMonth,
   formatWorkMinutes,
   getLineFormulaSummary,
   getLineTypeLabel,
@@ -312,10 +310,9 @@ export async function getPayslipDocumentData(
   }
 
   // Find statement in the CURRENT calculation run of this period
-  let currentStatement: PayrollStatementRead | undefined =
+  const currentStatement: PayrollStatementRead | undefined =
     period.statements.find((s) => s.id === payrollStatementId);
 
-  let isStale = false;
   let suggestedCurrentStatementId: string | undefined;
 
   if (!currentStatement) {
@@ -329,7 +326,6 @@ export async function getPayslipDocumentData(
         .maybeSingle();
 
       if (dbStatement) {
-        isStale = true;
         const matchingCurrent = period.statements.find(
           (s) => s.staffId === dbStatement.staff_id,
         );

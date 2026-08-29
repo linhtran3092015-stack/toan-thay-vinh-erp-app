@@ -1,5 +1,4 @@
 import type { PayslipEmployeeInfo } from "@/features/payroll/payslip/types";
-import { User } from "lucide-react";
 
 function getInitials(name: string | null | undefined): string {
   if (!name || !name.trim()) return "NV";
