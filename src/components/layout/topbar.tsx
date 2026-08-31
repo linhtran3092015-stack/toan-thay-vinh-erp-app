@@ -1,13 +1,13 @@
 "use client";
 
 import { Bell, Menu } from "lucide-react";
-import Link from "next/link";
 import type { RefObject } from "react";
 
 import { AuthUserMenu } from "@/features/auth/components/auth-user-menu";
 import type { AuthUser } from "@/features/auth/types";
 import { TopbarTimekeepingButton } from "@/components/layout/topbar-timekeeping-button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { NavigationLink } from "@/components/layout/navigation-link";
 
 interface TopbarProps {
   canCheckTimekeeping?: boolean;
@@ -51,7 +51,7 @@ export function Topbar({
 
         <ThemeToggle />
 
-        <Link
+        <NavigationLink
           aria-label={
             unreadNotificationCount > 0
               ? `Thông báo, ${unreadNotificationCount} chưa đọc`
@@ -67,7 +67,7 @@ export function Topbar({
               {notificationBadge}
             </span>
           ) : null}
-        </Link>
+        </NavigationLink>
         <div className="mx-1 hidden h-8 w-px bg-border-subtle sm:block" />
         <AuthUserMenu user={user} />
       </div>

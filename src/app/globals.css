@@ -1,5 +1,34 @@
 @import "tailwindcss";
 
+.navigation-pending {
+  /* Avoid a flash for cached/fast navigations; keep the actual wait unbounded. */
+  animation: navigation-pending-reveal 120ms step-end both;
+}
+
+.navigation-pending-bar {
+  animation: navigation-pending-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes navigation-pending-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes navigation-pending-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(400%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navigation-pending,
+  .navigation-pending-bar,
+  [role="status"].animate-pulse,
+  [role="status"] .animate-pulse,
+  [aria-busy="true"] .animate-pulse {
+    animation: none;
+  }
+}
+
 :root {
   --background: oklch(0.975 0.005 250);
   --foreground: oklch(0.20 0.04 255);
@@ -911,6 +940,8 @@
   --color-surface-base: var(--surface-base);
   --color-surface-raised: var(--surface-raised);
   --color-surface-sunken: var(--surface-sunken);
+  /* Compatibility for existing skeletons that use the subtle surface token. */
+  --color-surface-subtle: var(--surface-sunken);
   --color-surface-selected: var(--surface-selected);
   --color-text-strong: var(--text-strong);
   --color-text-default: var(--text-default);

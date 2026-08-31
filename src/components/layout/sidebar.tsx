@@ -1,11 +1,12 @@
 "use client";
 
 import { School, X } from "lucide-react";
-import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
 
 import type { VisibleNavigationDomain } from "@/config/navigation";
+import { NavigationLink } from "@/components/layout/navigation-link";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -23,6 +24,7 @@ export function Sidebar({
   isMobileOpen,
   onClose,
 }: SidebarProps) {
+  const pathname = usePathname();
   const mobilePanelRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -108,7 +110,10 @@ export function Sidebar({
             domains={domains}
             isMobile
             onClose={() => onClose()}
-            onNavigate={() => onClose(false)}
+            onNavigate={(href) => {
+              // Keep the clicked link mounted until Next commits the navigation.
+              if (href === pathname) onClose(false);
+            }}
           />
         </aside>
       ) : null}
@@ -122,7 +127,7 @@ interface SidebarContentsProps {
   domains: readonly VisibleNavigationDomain[];
   isMobile: boolean;
   onClose?: () => void;
-  onNavigate?: () => void;
+  onNavigate?: (href: string) => void;
 }
 
 function SidebarContents({
@@ -173,7 +178,7 @@ function SidebarContents({
                 isActive={isActive}
                 isMobile={isMobile}
                 key={domain.key}
-                onNavigate={onNavigate}
+                onNavigate={() => onNavigate?.(target.href)}
               />
             );
           })}
@@ -204,7 +209,7 @@ function DomainLink({
   const tooltipId = useId();
 
   return (
-    <Link
+    <NavigationLink
       aria-current={isActive ? "page" : undefined}
       aria-describedby={!isMobile ? tooltipId : undefined}
       aria-label={domainLabel}
@@ -231,6 +236,6 @@ function DomainLink({
           {domainLabel}
         </span>
       ) : null}
-    </Link>
+    </NavigationLink>
   );
 }

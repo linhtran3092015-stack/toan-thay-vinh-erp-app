@@ -102,7 +102,8 @@ describe("Legacy consequential Dialog migrations", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(router.push).toHaveBeenCalledWith("/coaching/record-1");
     expect(router.refresh).toHaveBeenCalledOnce();
-    expect(trigger).toHaveFocus();
+    // DOM removal can precede the effect cleanup that restores focus on CI.
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   it("unlocks Coaching create dismissal immediately after returned errors", async () => {

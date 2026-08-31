@@ -52,22 +52,20 @@ export async function AuthenticatedAppShell({
   const canCheckTimekeeping =
     permissionResult.permissions.includes("timekeeping.check");
 
-  let hasOpenTimekeepingEntry = false;
-  if (canCheckTimekeeping) {
-    const myEntriesResult = await getCachedMyTimekeepingEntries();
-    if (myEntriesResult.ok) {
-      hasOpenTimekeepingEntry = myEntriesResult.entries.some(
-        (entry) => entry.status === "open",
-      );
-    }
-  }
-
-  const [unreadNotificationCountResult, centerDisplayName] = await Promise.all([
+  // These requests are independent, but still run only after access is verified.
+  const [myEntriesResult, unreadNotificationCountResult, centerDisplayName] = await Promise.all([
+    canCheckTimekeeping
+      ? getCachedMyTimekeepingEntries()
+      : Promise.resolve(null),
     permissionResult.permissions.includes("notifications.view")
-      ? await getCachedUnreadNotificationCountResult()
+      ? getCachedUnreadNotificationCountResult()
       : Promise.resolve({ data: 0, ok: true as const }),
     getCenterDisplayName(),
   ]);
+
+  const hasOpenTimekeepingEntry = myEntriesResult?.ok
+    ? myEntriesResult.entries.some((entry) => entry.status === "open")
+    : false;
 
   const unreadNotificationCount =
     unreadNotificationCountResult.ok

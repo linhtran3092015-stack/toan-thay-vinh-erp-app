@@ -34,13 +34,19 @@ export function AppShell({
   unreadNotificationCount,
 }: AppShellProps) {
   const pathname = usePathname();
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [mobileNavPath, setMobileNavPath] = useState<string | null>(null);
+  const isMobileNavOpen = mobileNavPath === pathname;
   const mobileMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const visibleDomains = getVisibleNavigationDomains(permissions);
   const activeDomain = getActiveNavigationDomain(pathname, visibleDomains);
 
+  if (mobileNavPath !== null && mobileNavPath !== pathname) {
+    // Forget the old open menu so browser Back cannot reopen it later.
+    setMobileNavPath(null);
+  }
+
   const closeMobileNavigation = (restoreFocus = true) => {
-    setIsMobileNavOpen(false);
+    setMobileNavPath(null);
     if (restoreFocus) {
       requestAnimationFrame(() => mobileMenuTriggerRef.current?.focus());
     }
@@ -61,7 +67,7 @@ export function AppShell({
           canCheckTimekeeping={canCheckTimekeeping}
           hasOpenTimekeepingEntry={hasOpenTimekeepingEntry}
           mobileMenuTriggerRef={mobileMenuTriggerRef}
-          onMenuClick={() => setIsMobileNavOpen(true)}
+          onMenuClick={() => setMobileNavPath(pathname)}
           unreadNotificationCount={unreadNotificationCount}
           user={authUser}
         />
