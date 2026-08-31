@@ -2,6 +2,18 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.3.0.6] - 2026-08-31
+
+### Improved
+- Keep the authenticated navigation visible and interactive while modules load; show a separate shell placeholder during initial authentication.
+- Add navigation feedback and consistent, visible loading messages with responsive skeletons, dark-mode support, and reduced-motion support.
+- Load independent timekeeping, notification, and center-name requests concurrently after access checks.
+
+### Fixed
+- Restore missing skeleton surface colors and prevent loading placeholders from overflowing narrow mobile screens.
+- Keep mobile navigation feedback mounted until navigation commits, and prevent menus from reopening on browser Back.
+- Make the Coaching dialog focus-restoration test wait for effect cleanup, avoiding the existing CI timing failure without changing application behavior.
+
 ## [0.3.0.3] - 2026-08-28
 
 ### Added

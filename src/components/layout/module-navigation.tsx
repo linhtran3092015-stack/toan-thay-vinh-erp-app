@@ -1,7 +1,6 @@
 "use client";
 
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -10,6 +9,7 @@ import {
   type VisibleNavigationDomain,
 } from "@/config/navigation";
 import { cn } from "@/lib/utils";
+import { NavigationLink } from "@/components/layout/navigation-link";
 
 interface ModuleNavigationProps {
   domain?: VisibleNavigationDomain;
@@ -38,6 +38,7 @@ function ModuleNavigationContent({ domain }: { domain: VisibleNavigationDomain }
       </div>
       <div className="border-b border-border-subtle bg-surface-base px-4 py-2 md:hidden">
         <MobileModuleSelector
+          key={pathname}
           domain={domain}
           navigationLabel={navigationLabel}
           pathname={pathname}
@@ -141,7 +142,7 @@ function DesktopModuleNavigation({
             const isActive = item.href === activeItem?.href;
 
             return (
-              <Link
+              <NavigationLink
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex h-9 items-center rounded-md px-3 text-control font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring",
@@ -153,7 +154,7 @@ function DesktopModuleNavigation({
                 key={item.href}
               >
                 {item.label}
-              </Link>
+              </NavigationLink>
             );
           })}
         </div>
@@ -264,7 +265,7 @@ function MobileModuleSelector({
             const isActive = item.href === activeItem?.href;
 
             return (
-              <Link
+              <NavigationLink
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex min-h-11 items-center rounded-md px-3 text-control font-medium focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring",
@@ -274,10 +275,12 @@ function MobileModuleSelector({
                 )}
                 href={item.href}
                 key={item.href}
-                onClick={() => close(false)}
+                onClick={() => {
+                  if (item.href === pathname) close(false);
+                }}
               >
                 {item.label}
-              </Link>
+              </NavigationLink>
             );
           })}
         </div>
