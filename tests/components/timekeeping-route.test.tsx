@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import TimekeepingRoute from "@/app/(app)/timekeeping/page";
 
 const dependencies = vi.hoisted(() => ({
+  getAttendanceVerificationConfig: vi.fn(),
+  getAttendanceVerificationPolicy: vi.fn(),
   getCachedDatabasePermissions: vi.fn(),
   getMyTimeEntryAdjustmentRequests: vi.fn(),
   getMyTimekeepingAdjustableEntries: vi.fn(),
@@ -24,12 +26,14 @@ vi.mock("@/features/timekeeping/timekeeping-page", () => ({
     canApproveAdjustments,
     canCheck,
     canManage,
+    canManageVerification,
     dayEntries,
     myEntries,
   }: {
     canApproveAdjustments: boolean;
     canCheck: boolean;
     canManage: boolean;
+    canManageVerification: boolean;
     dayEntries: readonly { id: string }[];
     myEntries: readonly { id: string }[];
   }) => (
@@ -37,6 +41,7 @@ vi.mock("@/features/timekeeping/timekeeping-page", () => ({
       <p>canCheck:{String(canCheck)}</p>
       <p>canApproveAdjustments:{String(canApproveAdjustments)}</p>
       <p>canManage:{String(canManage)}</p>
+      <p>canManageVerification:{String(canManageVerification)}</p>
       <p>dayEntries:{dayEntries.length}</p>
       <p>myEntries:{myEntries.length}</p>
     </div>
@@ -44,6 +49,18 @@ vi.mock("@/features/timekeeping/timekeeping-page", () => ({
 }));
 
 function setSharedReadResults() {
+  dependencies.getAttendanceVerificationPolicy.mockResolvedValue({
+    ok: true,
+    policy: {
+      attendanceRadiusM: 100,
+      centerName: "Trung tâm",
+      configured: true,
+      continuousGpsTrackingRequired: false,
+      gpsMaxAccuracyM: 100,
+      gpsRequiredForOffline: true,
+      wifiRequiredForOffline: false,
+    },
+  });
   dependencies.getTimekeepingSchedule.mockResolvedValue({ entries: [], ok: true });
   dependencies.getTimekeepingWorkShifts.mockResolvedValue({ ok: true, workShifts: [] });
   dependencies.getTimekeepingDayEntries.mockResolvedValue({ entries: [{ id: "day-entry" }], ok: true });
@@ -175,5 +192,36 @@ describe("Timekeeping route authority", () => {
     expect(dependencies.getTimekeepingSchedule).toHaveBeenCalledOnce();
     expect(dependencies.getTimekeepingWorkShifts).toHaveBeenCalledOnce();
     expect(dependencies.getTimekeepingStaffOptions).toHaveBeenCalledOnce();
+  });
+
+  it("loads owner verification configuration only with the dedicated permission", async () => {
+    setSharedReadResults();
+    dependencies.getAttendanceVerificationConfig.mockResolvedValueOnce({
+      config: {
+        attendanceRadiusM: 100,
+        centerLatitude: 10.77,
+        centerLongitude: 106.69,
+        centerName: "Trung tâm",
+        configured: true,
+        continuousGpsTrackingRequired: false,
+        gpsMaxAccuracyM: 80,
+        gpsRequiredForOffline: true,
+        updatedAt: null,
+        wifiNetworks: [],
+        wifiRequiredForOffline: false,
+      },
+      ok: true,
+    });
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["timekeeping.manage_verification"],
+    });
+
+    render(await TimekeepingRoute());
+
+    expect(screen.getByText("canManageVerification:true")).toBeInTheDocument();
+    expect(dependencies.getAttendanceVerificationConfig).toHaveBeenCalledOnce();
+    expect(dependencies.getAttendanceVerificationPolicy).toHaveBeenCalledOnce();
+    expect(dependencies.getMyTimekeepingEntries).not.toHaveBeenCalled();
   });
 });

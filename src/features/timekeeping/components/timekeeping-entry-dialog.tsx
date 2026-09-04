@@ -18,6 +18,7 @@ import type {
   TimekeepingEntryActionState,
 } from "@/features/timekeeping/time-entry-action-types";
 import { initialTimekeepingEntryActionState } from "@/features/timekeeping/time-entry-action-types";
+import type { AttendanceVerificationPolicy } from "@/features/timekeeping/types";
 import {
   checkInTimeEntryAction,
   checkOutTimeEntryAction,
@@ -26,8 +27,19 @@ import {
 type TimekeepingEntryOperation = "check-in" | "check-out";
 
 interface TimekeepingEntryDialogProps {
+  attendancePolicy?: AttendanceVerificationPolicy;
   operation: TimekeepingEntryOperation;
 }
+
+const defaultAttendancePolicy: AttendanceVerificationPolicy = {
+  attendanceRadiusM: 100,
+  centerName: "Trung tâm",
+  configured: false,
+  continuousGpsTrackingRequired: false,
+  gpsMaxAccuracyM: 100,
+  gpsRequiredForOffline: true,
+  wifiRequiredForOffline: false,
+};
 
 const inputClassName =
   "min-h-11 w-full rounded-md border border-border-subtle bg-surface-base px-3 text-control text-text-default outline-none transition focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
@@ -45,6 +57,7 @@ function createInitialValues(): TimeEntryActionInput {
 
 /** Presentation for the existing check-in/out mutation; eligibility remains server-owned. */
 export function TimekeepingEntryDialog({
+  attendancePolicy = defaultAttendancePolicy,
   operation,
 }: TimekeepingEntryDialogProps) {
   const router = useRouter();
@@ -100,6 +113,21 @@ export function TimekeepingEntryDialog({
     setValues((current) => ({ ...current, [key]: value }));
   };
 
+  const updateMode = (mode: TimeEntryActionInput["mode"]): void => {
+    setValues((current) => mode === "online"
+      ? {
+          ...current,
+          gpsAccuracyMeters: null,
+          gpsLatitude: null,
+          gpsLongitude: null,
+          mode,
+          wifiBssid: "",
+          wifiSsid: "",
+        }
+      : { ...current, mode });
+    setLocationMessage("");
+  };
+
   const captureLocation = (): void => {
     if (!navigator.geolocation) {
       setLocationMessage("Trình duyệt hiện tại không hỗ trợ định vị.");
@@ -121,7 +149,7 @@ export function TimekeepingEntryDialog({
         setIsLocating(false);
       },
       () => {
-        setLocationMessage("Không lấy được vị trí. Bạn vẫn có thể ghi nhận không kèm GPS.");
+        setLocationMessage("Không lấy được vị trí. Hãy cấp quyền GPS hoặc chuyển sang hình thức Trực tuyến.");
         setIsLocating(false);
       },
       {
@@ -166,6 +194,7 @@ export function TimekeepingEntryDialog({
   };
 
   const hasLocation = values.gpsLatitude !== null && values.gpsLongitude !== null;
+  const isOffline = values.mode === "offline";
   const title = isCheckIn ? "Xác nhận check-in" : "Xác nhận check-out";
   const triggerLabel = isCheckIn ? "Check-in" : "Check-out";
   const pendingLabel = isLocating
@@ -212,7 +241,7 @@ export function TimekeepingEntryDialog({
                 className={inputClassName}
                 disabled={isInteractionLocked}
                 id={modeId}
-                onChange={(event) => updateValue("mode", event.target.value as TimeEntryActionInput["mode"])}
+                onChange={(event) => updateMode(event.target.value as TimeEntryActionInput["mode"])}
                 ref={modeRef}
                 value={values.mode}
               >
@@ -221,13 +250,21 @@ export function TimekeepingEntryDialog({
               </select>
             </FormField>
 
-            <fieldset
+            {isOffline && !attendancePolicy.configured ? (
+              <ResultBanner
+                description="Chủ trung tâm cần lưu tọa độ và bán kính trước khi nhân sự có thể chấm công tại Trung tâm."
+                title="Chưa cấu hình vị trí Trung tâm"
+                tone="warning"
+              />
+            ) : null}
+
+            {isOffline ? <fieldset
               aria-describedby={[gpsHelpId, gpsErrors.length > 0 ? gpsErrorId : undefined].filter(Boolean).join(" ") || undefined}
               className="grid gap-3 rounded-md border border-border-subtle p-4"
             >
               <legend className="px-1 text-label text-text-default">Dữ liệu vị trí GPS</legend>
               <p className="text-secondary text-text-muted" id={gpsHelpId}>
-                Dữ liệu vị trí chỉ được gửi kèm khi bạn chọn lấy vị trí từ thiết bị.
+                Bắt buộc khi chấm công tại Trung tâm. Vị trí phải nằm trong bán kính {attendancePolicy.attendanceRadiusM} m và sai số không quá {attendancePolicy.gpsMaxAccuracyM} m.
               </p>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Button
@@ -253,12 +290,14 @@ export function TimekeepingEntryDialog({
               ) : null}
               {locationMessage ? <p aria-live="polite" className="text-secondary text-text-muted">{locationMessage}</p> : null}
               {gpsErrors.length > 0 ? <p className="text-caption text-danger" id={gpsErrorId}>{gpsErrors.join(" ")}</p> : null}
-            </fieldset>
+            </fieldset> : null}
 
-            <fieldset aria-describedby={wifiHelpId} className="grid gap-4 rounded-md border border-border-subtle p-4">
+            {isOffline ? <fieldset aria-describedby={wifiHelpId} className="grid gap-4 rounded-md border border-border-subtle p-4">
               <legend className="px-1 text-label text-text-default">Thông tin Wi-Fi</legend>
               <p className="text-secondary text-text-muted" id={wifiHelpId}>
-                Thông tin Wi-Fi là dữ liệu bổ sung, không bắt buộc.
+                {attendancePolicy.wifiRequiredForOffline
+                  ? "Bắt buộc nhập đúng tên Wi-Fi và BSSID đã được Chủ trung tâm đăng ký."
+                  : "Thông tin Wi-Fi là dữ liệu bổ sung, không bắt buộc."}
               </p>
               <FormField error={fieldErrors.wifiSsid?.[0]} id={wifiSsidId} label="Tên mạng Wi-Fi">
                 <input
@@ -271,6 +310,7 @@ export function TimekeepingEntryDialog({
                   maxLength={128}
                   onChange={(event) => updateValue("wifiSsid", event.target.value)}
                   placeholder="Không bắt buộc"
+                  required={attendancePolicy.wifiRequiredForOffline}
                   value={values.wifiSsid}
                 />
               </FormField>
@@ -286,10 +326,11 @@ export function TimekeepingEntryDialog({
                   maxLength={17}
                   onChange={(event) => updateValue("wifiBssid", event.target.value)}
                   placeholder="AA:BB:CC:DD:EE:FF"
+                  required={attendancePolicy.wifiRequiredForOffline}
                   value={values.wifiBssid}
                 />
               </FormField>
-            </fieldset>
+            </fieldset> : null}
 
             {actionState.status === "error" ? (
               <ResultBanner

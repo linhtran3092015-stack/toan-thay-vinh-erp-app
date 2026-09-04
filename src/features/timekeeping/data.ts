@@ -1,8 +1,11 @@
 import "server-only";
 
 import { cache } from "react";
+import { z } from "zod";
 
 import type {
+  AttendanceVerificationConfigResult,
+  AttendanceVerificationPolicyResult,
   TimekeepingAdjustmentApprovalQueueResult,
   TimekeepingAdjustmentRequestsResult,
   TimekeepingAdjustableEntriesResult,
@@ -17,6 +20,105 @@ import type {
   TimekeepingWorkShiftsResult,
 } from "@/features/timekeeping/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+const attendancePolicySchema = z.object({
+  attendance_radius_m: z.number().int().positive().optional().default(100),
+  center_name: z.string().optional().default("Trung tâm"),
+  configured: z.boolean(),
+  continuous_gps_tracking_required: z.boolean().optional().default(false),
+  gps_max_accuracy_m: z.number().int().positive().optional().default(100),
+  gps_required_for_offline: z.literal(true).optional().default(true),
+  wifi_required_for_offline: z.boolean().optional().default(false),
+});
+
+const attendanceConfigSchema = attendancePolicySchema.extend({
+  center_latitude: z.number().nullable().optional().default(null),
+  center_longitude: z.number().nullable().optional().default(null),
+  updated_at: z.string().nullable().optional().default(null),
+  wifi_networks: z.array(z.object({
+    bssid: z.string(),
+    id: z.string().uuid().optional(),
+    ssid: z.string(),
+  })).optional().default([]),
+});
+
+type UntypedRpc = (
+  name: string,
+  args?: Record<string, unknown>,
+) => Promise<{ data: unknown; error: { code?: string; message: string } | null }>;
+
+const defaultAttendancePolicy = {
+  attendanceRadiusM: 100,
+  centerName: "Trung tâm",
+  configured: false,
+  continuousGpsTrackingRequired: false,
+  gpsMaxAccuracyM: 100,
+  gpsRequiredForOffline: true as const,
+  wifiRequiredForOffline: false,
+};
+
+function mapAttendancePolicy(data: z.infer<typeof attendancePolicySchema>) {
+  return {
+    attendanceRadiusM: data.attendance_radius_m,
+    centerName: data.center_name,
+    configured: data.configured,
+    continuousGpsTrackingRequired: data.continuous_gps_tracking_required,
+    gpsMaxAccuracyM: data.gps_max_accuracy_m,
+    gpsRequiredForOffline: true as const,
+    wifiRequiredForOffline: data.wifi_required_for_offline,
+  };
+}
+
+export async function getAttendanceVerificationPolicy(): Promise<AttendanceVerificationPolicyResult> {
+  const supabase = await createSupabaseServerClient();
+  const rpc = supabase.rpc as unknown as UntypedRpc;
+  const { data, error } = await rpc("get_attendance_verification_policy");
+  const parsed = attendancePolicySchema.safeParse(data);
+
+  if (error?.code === "PGRST202" || error?.message.includes("get_attendance_verification_policy")) {
+    return { ok: true, policy: defaultAttendancePolicy };
+  }
+
+  if (error || !parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "verification_policy_query_failed",
+        message: "Không thể tải điều kiện xác minh chấm công.",
+      },
+    };
+  }
+
+  return { ok: true, policy: mapAttendancePolicy(parsed.data) };
+}
+
+export async function getAttendanceVerificationConfig(): Promise<AttendanceVerificationConfigResult> {
+  const supabase = await createSupabaseServerClient();
+  const rpc = supabase.rpc as unknown as UntypedRpc;
+  const { data, error } = await rpc("get_attendance_verification_config");
+  const parsed = attendanceConfigSchema.safeParse(data);
+
+  if (error || !parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "verification_config_query_failed",
+        message: "Không thể tải cấu hình GPS và Wi-Fi của Trung tâm.",
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    config: {
+      ...mapAttendancePolicy(parsed.data),
+      centerLatitude: parsed.data.center_latitude,
+      centerLongitude: parsed.data.center_longitude,
+      updatedAt: parsed.data.updated_at,
+      wifiNetworks: parsed.data.wifi_networks,
+    },
+  };
+}
 
 function createScheduleError(
   code: TimekeepingScheduleErrorCode,

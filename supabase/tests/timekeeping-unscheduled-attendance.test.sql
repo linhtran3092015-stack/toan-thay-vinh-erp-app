@@ -23,7 +23,7 @@ values
 select set_config('request.jwt.claim.sub', '13000000-0000-0000-0000-000000000001', true);
 
 select lives_ok(
-  $$ select * from public.check_in_time_entry('offline', null, null, null, null, null) $$,
+  $$ select * from public.check_in_time_entry('online', null, null, null, null, null) $$,
   'a permitted active non-TA can check in with no effective shift'
 );
 
@@ -38,14 +38,14 @@ select ok(
 );
 
 select throws_ok(
-  $$ select * from public.check_in_time_entry('offline', null, null, null, null, null) $$,
+  $$ select * from public.check_in_time_entry('online', null, null, null, null, null) $$,
   '23505',
   'TIME_ENTRY_OPEN_ENTRY_ALREADY_EXISTS',
   'the one-open-entry guard remains active for unscheduled attendance'
 );
 
 select lives_ok(
-  $$ select * from public.check_out_time_entry('offline', null, null, null, null, null) $$,
+  $$ select * from public.check_out_time_entry('online', null, null, null, null, null) $$,
   'an unscheduled non-TA entry supports normal manual checkout'
 );
 
@@ -104,7 +104,7 @@ values (
 select set_config('request.jwt.claim.sub', '13000000-0000-0000-0000-000000000002', true);
 
 select lives_ok(
-  $$ select * from public.check_in_time_entry('offline', null, null, null, null, null) $$,
+  $$ select * from public.check_in_time_entry('online', null, null, null, null, null) $$,
   'a permitted active non-TA can check in with an effective shift'
 );
 

@@ -42,10 +42,12 @@ function getRpcErrorMessage(message: string, isCheckIn: boolean): string {
     TIME_ENTRY_CENTER_CONFIG_NOT_FOUND:
       "Hệ thống chưa được cấu hình tọa độ vị trí Trung tâm. Vui lòng liên hệ Quản trị viên.",
     TIME_ENTRY_GPS_ACCURACY_TOO_LOW:
-      "Dữ liệu vị trí GPS chưa đủ độ chính xác (sai số > 100m). Vui lòng thử lại ở vị trí thông thoáng hơn.",
+      "Dữ liệu vị trí GPS chưa đạt độ chính xác theo cấu hình Trung tâm. Vui lòng thử lại ở vị trí thông thoáng hơn.",
     TIME_ENTRY_GPS_EVIDENCE_INVALID: "Dữ liệu GPS chưa hợp lệ.",
     TIME_ENTRY_GPS_REQUIRED_FOR_TEACHING_ASSISTANT:
       "Trợ giảng cần bật định vị GPS để thực hiện chấm công tại Trung tâm.",
+    TIME_ENTRY_GPS_REQUIRED_FOR_OFFLINE:
+      "Cần lấy vị trí GPS trước khi chấm công tại Trung tâm.",
     TIME_ENTRY_MODE_INVALID: "Hình thức chấm công chưa hợp lệ.",
     TIME_ENTRY_OPEN_ENTRY_ALREADY_EXISTS:
       "Bạn đang có một lượt chấm công chưa kết thúc.",
@@ -57,6 +59,10 @@ function getRpcErrorMessage(message: string, isCheckIn: boolean): string {
     TIME_ENTRY_TEACHING_ASSISTANT_CHECKIN_CUTOFF_REACHED:
       "Trợ giảng không thể bắt đầu chấm công sau 23:30.",
     TIME_ENTRY_WIFI_EVIDENCE_INVALID: "Dữ liệu Wi-Fi chưa hợp lệ.",
+    TIME_ENTRY_WIFI_NOT_ALLOWED:
+      "Wi-Fi không khớp danh sách mạng Trung tâm đã đăng ký.",
+    TIME_ENTRY_WIFI_REQUIRED_FOR_OFFLINE:
+      "Cần nhập tên Wi-Fi và BSSID trước khi chấm công tại Trung tâm.",
   };
 
   for (const [databaseMessage, userMessage] of Object.entries(knownMessages)) {

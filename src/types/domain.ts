@@ -81,6 +81,7 @@ export type PermissionCode =
   | "students.view"
   | "timekeeping.approve_adjustment"
   | "timekeeping.check"
+  | "timekeeping.manage_verification"
   | "timekeeping.view"
   | "users.manage";
 

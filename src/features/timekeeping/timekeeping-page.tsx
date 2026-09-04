@@ -3,6 +3,7 @@ import { StaffShiftEndAction } from "@/features/timekeeping/components/staff-shi
 import { StaffShiftReplaceAction } from "@/features/timekeeping/components/staff-shift-replace-action";
 import { TimekeepingAdjustmentApprovalQueue } from "@/features/timekeeping/components/timekeeping-adjustment-approval-queue";
 import { TimekeepingAdjustmentRequests } from "@/features/timekeeping/components/timekeeping-adjustment-requests";
+import { AttendanceVerificationSettings } from "@/features/timekeeping/components/attendance-verification-settings";
 import { MyTimekeepingPanel } from "@/features/timekeeping/components/my-timekeeping-panel";
 import { TimekeepingDayEntries } from "@/features/timekeeping/components/timekeeping-day-entries";
 import { WorkShiftDialog } from "@/features/timekeeping/components/work-shift-dialog";
@@ -11,6 +12,8 @@ import { DataTableFrame } from "@/components/patterns/data-table-frame";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { Badge } from "@/components/ui/badge";
 import type {
+  AttendanceVerificationConfig,
+  AttendanceVerificationPolicy,
   TimekeepingAdjustableEntry,
   TimekeepingAdjustmentApprovalQueueEntry,
   TimekeepingAdjustmentRequest,
@@ -22,8 +25,11 @@ import type {
 } from "@/features/timekeeping/types";
 
 interface TimekeepingPageProps {
+  attendanceConfig?: AttendanceVerificationConfig | null;
+  attendancePolicy?: AttendanceVerificationPolicy;
   canCheck: boolean;
   canManage: boolean;
+  canManageVerification?: boolean;
   canApproveAdjustments: boolean;
   canView?: boolean;
   adjustmentEntries: readonly TimekeepingAdjustableEntry[];
@@ -99,8 +105,19 @@ function EffectivePeriod({ entry }: { entry: TimekeepingScheduleEntry }) {
 }
 
 export function TimekeepingPage({
+  attendanceConfig = null,
+  attendancePolicy = {
+    attendanceRadiusM: 100,
+    centerName: "Trung tâm",
+    configured: false,
+    continuousGpsTrackingRequired: false,
+    gpsMaxAccuracyM: 100,
+    gpsRequiredForOffline: true,
+    wifiRequiredForOffline: false,
+  },
   canCheck,
   canManage,
+  canManageVerification = false,
   canApproveAdjustments,
   canView = true,
   adjustmentApprovalQueue = [],
@@ -156,7 +173,17 @@ export function TimekeepingPage({
         </section>
       ) : null}
 
-      {canCheck ? <MyTimekeepingPanel canCheck={canCheck} entries={myEntries} /> : null}
+      {canManageVerification && attendanceConfig ? (
+        <AttendanceVerificationSettings initialConfig={attendanceConfig} />
+      ) : null}
+
+      {canCheck ? (
+        <MyTimekeepingPanel
+          attendancePolicy={attendancePolicy}
+          canCheck={canCheck}
+          entries={myEntries}
+        />
+      ) : null}
 
       {canCheck ? (
         <TimekeepingAdjustmentRequests

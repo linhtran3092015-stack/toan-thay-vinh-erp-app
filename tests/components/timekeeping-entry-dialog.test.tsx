@@ -44,7 +44,6 @@ describe("Timekeeping entry dialog", () => {
     expect(screen.getByLabelText("BSSID")).toBeInTheDocument();
     expect(screen.queryByText(/vị trí hợp lệ|wi-fi hợp lệ|đủ điều kiện chấm công/i)).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Hình thức"), { target: { value: "online" } });
     fireEvent.change(screen.getByLabelText("Tên mạng Wi-Fi"), { target: { value: "Campus" } });
     fireEvent.change(screen.getByLabelText("BSSID"), { target: { value: "AA:BB:CC:DD:EE:FF" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận check-in" }));
@@ -53,7 +52,7 @@ describe("Timekeeping entry dialog", () => {
       gpsAccuracyMeters: null,
       gpsLatitude: null,
       gpsLongitude: null,
-      mode: "online",
+      mode: "offline",
       wifiBssid: "AA:BB:CC:DD:EE:FF",
       wifiSsid: "Campus",
     }));
@@ -178,7 +177,33 @@ describe("Timekeeping entry dialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
     fireEvent.click(screen.getByRole("button", { name: "Lấy vị trí hiện tại" }));
 
-    expect(screen.getByText("Không lấy được vị trí. Bạn vẫn có thể ghi nhận không kèm GPS.")).toBeInTheDocument();
+    expect(screen.getByText("Không lấy được vị trí. Hãy cấp quyền GPS hoặc chuyển sang hình thức Trực tuyến.")).toBeInTheDocument();
     expect(screen.queryByText(/gps không hợp lệ|vị trí không hợp lệ|sai vị trí|không đủ điều kiện chấm công/i)).not.toBeInTheDocument();
+  });
+
+  it("shows configured offline requirements and hides evidence fields for online attendance", () => {
+    render(
+      <TimekeepingEntryDialog
+        attendancePolicy={{
+          attendanceRadiusM: 150,
+          centerName: "Cơ sở chính",
+          configured: true,
+          continuousGpsTrackingRequired: false,
+          gpsMaxAccuracyM: 60,
+          gpsRequiredForOffline: true,
+          wifiRequiredForOffline: true,
+        }}
+        operation="check-in"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+    expect(screen.getByText(/bán kính 150 m và sai số không quá 60 m/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Tên mạng Wi-Fi")).toBeRequired();
+    expect(screen.getByLabelText("BSSID")).toBeRequired();
+
+    fireEvent.change(screen.getByLabelText("Hình thức"), { target: { value: "online" } });
+    expect(screen.queryByText("Dữ liệu vị trí GPS")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Tên mạng Wi-Fi")).not.toBeInTheDocument();
   });
 });

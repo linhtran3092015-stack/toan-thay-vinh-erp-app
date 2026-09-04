@@ -2,6 +2,15 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.3.0.7] - 2026-09-04
+
+### Added
+- **Owner-Managed Attendance Verification**:
+  - Center owners can now configure attendance geofence (coordinates, radius 20–2,000m, max GPS accuracy 20–200m) directly on the Timekeeping page.
+  - Configurable Wi-Fi check-in and check-out verification with up to 20 SSID/BSSID pairs.
+  - Granular permission `timekeeping.manage_verification` defaulted to owner role with full audit logging.
+  - Persist Wi-Fi check-out metadata and align "My Timekeeping" block with Vietnam timezone today filter.
+
 ## [0.3.0.6] - 2026-08-31
 
 ### Improved

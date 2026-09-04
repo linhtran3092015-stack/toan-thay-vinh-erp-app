@@ -1,6 +1,8 @@
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import {
+  getAttendanceVerificationConfig,
+  getAttendanceVerificationPolicy,
   getMyTimeEntryAdjustmentRequests,
   getMyTimekeepingAdjustableEntries,
   getMyTimekeepingEntries,
@@ -27,8 +29,11 @@ export default async function TimekeepingRoute() {
 
   const canView = permissionResult.permissions.includes("timekeeping.view");
   const canCheck = permissionResult.permissions.includes("timekeeping.check");
+  const canManageVerification = permissionResult.permissions.includes(
+    "timekeeping.manage_verification",
+  );
 
-  if (!canView && !canCheck) {
+  if (!canView && !canCheck && !canManageVerification) {
     return (
       <PermissionDeniedState
         description="Tài khoản hiện tại không có quyền truy cập chấm công (yêu cầu timekeeping.check hoặc timekeeping.view)."
@@ -50,6 +55,8 @@ export default async function TimekeepingRoute() {
     staffOptionsResult,
     myEntriesResult,
     dayEntriesResult,
+    verificationPolicyResult,
+    verificationConfigResult,
   ] = await Promise.all([
     canCheck ? getMyTimekeepingAdjustableEntries() : Promise.resolve(null),
     canApproveAdjustments
@@ -61,7 +68,31 @@ export default async function TimekeepingRoute() {
     canManage ? getTimekeepingStaffOptions() : Promise.resolve(null),
     canCheck ? getMyTimekeepingEntries() : Promise.resolve(null),
     canView ? getTimekeepingDayEntries() : Promise.resolve(null),
+    canCheck || canManageVerification
+      ? getAttendanceVerificationPolicy()
+      : Promise.resolve(null),
+    canManageVerification
+      ? getAttendanceVerificationConfig()
+      : Promise.resolve(null),
   ]);
+
+  if (verificationPolicyResult && !verificationPolicyResult.ok) {
+    return (
+      <ErrorState
+        description={verificationPolicyResult.error.message}
+        title="Không tải được điều kiện xác minh chấm công"
+      />
+    );
+  }
+
+  if (verificationConfigResult && !verificationConfigResult.ok) {
+    return (
+      <ErrorState
+        description={verificationConfigResult.error.message}
+        title="Không tải được cấu hình GPS và Wi-Fi"
+      />
+    );
+  }
 
   if (adjustmentEntriesResult && !adjustmentEntriesResult.ok) {
     return (
@@ -141,9 +172,12 @@ export default async function TimekeepingRoute() {
         adjustmentApprovalQueueResult?.ok ? adjustmentApprovalQueueResult.requests : []
       }
       adjustmentEntries={adjustmentEntriesResult?.ok ? adjustmentEntriesResult.entries : []}
+      attendanceConfig={verificationConfigResult?.ok ? verificationConfigResult.config : null}
+      attendancePolicy={verificationPolicyResult?.ok ? verificationPolicyResult.policy : undefined}
       canApproveAdjustments={canApproveAdjustments}
       canCheck={canCheck}
       canManage={canManage}
+      canManageVerification={canManageVerification}
       canView={canView}
       dayEntries={dayEntriesResult?.ok ? dayEntriesResult.entries : []}
       entries={scheduleResult?.ok ? scheduleResult.entries : []}

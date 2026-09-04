@@ -73,6 +73,37 @@ export type TimekeepingStaffOptionsResult =
 
 export type TimeEntryMode = "online" | "offline";
 
+export interface AttendanceWifiNetwork {
+  bssid: string;
+  id?: string;
+  ssid: string;
+}
+
+export interface AttendanceVerificationPolicy {
+  attendanceRadiusM: number;
+  centerName: string;
+  configured: boolean;
+  continuousGpsTrackingRequired: boolean;
+  gpsMaxAccuracyM: number;
+  gpsRequiredForOffline: true;
+  wifiRequiredForOffline: boolean;
+}
+
+export interface AttendanceVerificationConfig extends AttendanceVerificationPolicy {
+  centerLatitude: number | null;
+  centerLongitude: number | null;
+  updatedAt: string | null;
+  wifiNetworks: readonly AttendanceWifiNetwork[];
+}
+
+export type AttendanceVerificationConfigResult =
+  | { ok: true; config: AttendanceVerificationConfig }
+  | { ok: false; error: { code: "verification_config_query_failed"; message: string } };
+
+export type AttendanceVerificationPolicyResult =
+  | { ok: true; policy: AttendanceVerificationPolicy }
+  | { ok: false; error: { code: "verification_policy_query_failed"; message: string } };
+
 export type TimeEntryStatus = "open" | "checked_out" | "auto_ended";
 
 export type ClockOutReason = "manual" | "left_geofence" | "location_lost" | "daily_cutoff";

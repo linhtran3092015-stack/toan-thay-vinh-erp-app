@@ -52,6 +52,7 @@ export const DATABASE_PERMISSION_CODES = [
   "timekeeping.view",
   "timekeeping.check",
   "timekeeping.approve_adjustment",
+  "timekeeping.manage_verification",
   "advances.view",
   "advances.request",
   "advances.review",

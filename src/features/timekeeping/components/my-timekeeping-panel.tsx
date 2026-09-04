@@ -11,7 +11,10 @@ import {
   getTimekeepingEntryStatusPresentation,
   getTimekeepingModeLabel,
 } from "@/features/timekeeping/timekeeping-entry-presentation";
-import type { TimekeepingMyEntry } from "@/features/timekeeping/types";
+import type {
+  AttendanceVerificationPolicy,
+  TimekeepingMyEntry,
+} from "@/features/timekeeping/types";
 
 export {
   getClockOutReasonLabel,
@@ -21,6 +24,7 @@ export {
 } from "@/features/timekeeping/timekeeping-entry-presentation";
 
 interface MyTimekeepingPanelProps {
+  attendancePolicy?: AttendanceVerificationPolicy;
   canCheck: boolean;
   entries: readonly TimekeepingMyEntry[];
 }
@@ -47,6 +51,15 @@ function formatElapsedTime(checkInAt: string): string {
 }
 
 export function MyTimekeepingPanel({
+  attendancePolicy = {
+    attendanceRadiusM: 100,
+    centerName: "Trung tâm",
+    configured: false,
+    continuousGpsTrackingRequired: false,
+    gpsMaxAccuracyM: 100,
+    gpsRequiredForOffline: true,
+    wifiRequiredForOffline: false,
+  },
   canCheck,
   entries,
 }: MyTimekeepingPanelProps) {
@@ -76,7 +89,11 @@ export function MyTimekeepingPanel({
 
   const { distanceM, serverMessage, statusLabel } = useAttendanceHeartbeat({
     activeSessionId: openEntry?.id ?? null,
-    enabled: Boolean(openEntry),
+    enabled: Boolean(
+      openEntry
+      && openEntry.checkInMode === "offline"
+      && attendancePolicy.continuousGpsTrackingRequired
+    ),
   });
 
   return (
@@ -104,9 +121,9 @@ export function MyTimekeepingPanel({
 
         {canCheck ? (
           openEntry ? (
-            <TimekeepingEntryDialog operation="check-out" />
+            <TimekeepingEntryDialog attendancePolicy={attendancePolicy} operation="check-out" />
           ) : (
-            <TimekeepingEntryDialog operation="check-in" />
+            <TimekeepingEntryDialog attendancePolicy={attendancePolicy} operation="check-in" />
           )
         ) : (
           <p className="text-secondary text-text-muted">
@@ -125,8 +142,11 @@ export function MyTimekeepingPanel({
             <div>
               <span className="text-caption text-text-muted">Trạng thái định vị GPS</span>
               <p className="text-body font-medium text-text-default">
-                {statusLabel}
-                {distanceM !== null ? ` (khoảng ${distanceM}m từ Trung tâm)` : ""}
+                {openEntry.checkInMode === "online"
+                  ? "Không áp dụng cho chấm công Trực tuyến"
+                  : attendancePolicy.continuousGpsTrackingRequired
+                    ? `${statusLabel}${distanceM !== null ? ` (khoảng ${distanceM}m từ Trung tâm)` : ""}`
+                    : "Đã xác minh tại thời điểm check-in"}
               </p>
             </div>
           </div>
@@ -134,7 +154,10 @@ export function MyTimekeepingPanel({
             <p className="mt-2 text-caption text-danger">{serverMessage}</p>
           ) : null}
           <p className="mt-3 rounded bg-surface-base p-2.5 text-caption text-text-muted border border-border-subtle">
-            ℹ️ <strong>Hướng dẫn:</strong> Trong thời gian chấm công, vui lòng duy trì quyền truy cập vị trí và kết nối mạng. Nếu hệ thống không xác minh được vị trí trong thời gian quy định, phiên chấm công có thể tự động kết thúc.
+            ℹ️ <strong>Hướng dẫn:</strong>{" "}
+            {openEntry.checkInMode === "offline" && attendancePolicy.continuousGpsTrackingRequired
+              ? "Trong thời gian chấm công, vui lòng duy trì quyền truy cập vị trí và kết nối mạng. Nếu hệ thống không xác minh được vị trí trong thời gian quy định, phiên chấm công có thể tự động kết thúc."
+              : "Hệ thống sẽ xác minh lại điều kiện phù hợp khi bạn thực hiện check-out."}
           </p>
         </div>
       ) : null}
