@@ -99,6 +99,16 @@ export async function getAttendanceVerificationConfig(): Promise<AttendanceVerif
   const parsed = attendanceConfigSchema.safeParse(data);
 
   if (error || !parsed.success) {
+    console.error("Attendance verification config query failed", {
+      databaseCode: error?.code ?? null,
+      databaseMessage: error?.message ?? null,
+      validationIssues: parsed.success
+        ? []
+        : parsed.error.issues.map((issue) => ({
+            code: issue.code,
+            path: issue.path.join("."),
+          })),
+    });
     return {
       ok: false,
       error: {
