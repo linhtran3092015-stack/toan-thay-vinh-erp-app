@@ -71,7 +71,7 @@ function mapAttendancePolicy(data: z.infer<typeof attendancePolicySchema>) {
 
 export async function getAttendanceVerificationPolicy(): Promise<AttendanceVerificationPolicyResult> {
   const supabase = await createSupabaseServerClient();
-  const rpc = supabase.rpc as unknown as UntypedRpc;
+  const rpc = supabase.rpc.bind(supabase) as unknown as UntypedRpc;
   const { data, error } = await rpc("get_attendance_verification_policy");
   const parsed = attendancePolicySchema.safeParse(data);
 
@@ -94,7 +94,7 @@ export async function getAttendanceVerificationPolicy(): Promise<AttendanceVerif
 
 export async function getAttendanceVerificationConfig(): Promise<AttendanceVerificationConfigResult> {
   const supabase = await createSupabaseServerClient();
-  const rpc = supabase.rpc as unknown as UntypedRpc;
+  const rpc = supabase.rpc.bind(supabase) as unknown as UntypedRpc;
   const { data, error } = await rpc("get_attendance_verification_config");
   const parsed = attendanceConfigSchema.safeParse(data);
 

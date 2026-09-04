@@ -159,7 +159,7 @@ export async function submitAttendanceHeartbeatAction(
 
   try {
     const supabase = await createSupabaseServerClient();
-    const rpcFn = supabase.rpc as unknown as (
+    const rpcFn = supabase.rpc.bind(supabase) as unknown as (
       name: string,
       args: Record<string, unknown>,
     ) => Promise<{ data: unknown; error: { message: string } | null }>;
