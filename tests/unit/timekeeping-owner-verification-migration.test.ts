@@ -11,6 +11,14 @@ const migration = readFileSync(
   "utf8",
 );
 
+const coalesceFixMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase/migrations/20260904020000_fix_attendance_verification_coalesce.sql",
+  ),
+  "utf8",
+);
+
 describe("owner-managed attendance verification migration", () => {
   it("grants a dedicated management permission only to the owner by default", () => {
     expect(migration).toContain("'timekeeping.manage_verification'");
@@ -41,5 +49,19 @@ describe("owner-managed attendance verification migration", () => {
   it("scopes the teaching-assistant watchdog to on-site sessions", () => {
     expect(migration).toMatch(/entry\.check_in_mode = 'offline'/);
     expect(migration).toContain("'gps_verification_required', false");
+  });
+
+  it("recreates every attendance routine that incorrectly schema-qualified COALESCE", () => {
+    expect(coalesceFixMigration).toContain(
+      "function public.get_attendance_verification_config",
+    );
+    expect(coalesceFixMigration).toContain(
+      "function public.set_attendance_verification_config",
+    );
+    expect(coalesceFixMigration).toContain(
+      "function public.run_teaching_assistant_timekeeping_watchdog",
+    );
+    expect(coalesceFixMigration).not.toContain("pg_catalog.coalesce");
+    expect(coalesceFixMigration.match(/\bcoalesce\(/g)).toHaveLength(6);
   });
 });
