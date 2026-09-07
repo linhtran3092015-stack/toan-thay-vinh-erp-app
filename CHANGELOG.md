@@ -2,6 +2,13 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.4.0.2] - 2026-09-07
+
+### Fixed
+- Auto-end stale open time entries across all staff roles (including assistant manager) at the 23:30 VN daily cutoff.
+- Update personal timekeeping read model to include any open entries across dates so active attendance is never hidden.
+- Automatically clean up historical unclosed time entries.
+
 ## [0.4.0.1] - 2026-09-07
 
 ### Fixed
