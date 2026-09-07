@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.17"
-  }
   public: {
     Tables: {
       academic_years: {
@@ -235,10 +230,13 @@ export type Database = {
           code: string
           created_at: string
           created_by: string | null
+          gps_max_accuracy_m: number
           id: string
           is_active: boolean
           name: string
           updated_at: string
+          updated_by: string | null
+          wifi_verification_enabled: boolean
         }
         Insert: {
           attendance_radius_m?: number
@@ -247,10 +245,13 @@ export type Database = {
           code: string
           created_at?: string
           created_by?: string | null
+          gps_max_accuracy_m?: number
           id?: string
           is_active?: boolean
           name: string
           updated_at?: string
+          updated_by?: string | null
+          wifi_verification_enabled?: boolean
         }
         Update: {
           attendance_radius_m?: number
@@ -259,14 +260,72 @@ export type Database = {
           code?: string
           created_at?: string
           created_by?: string | null
+          gps_max_accuracy_m?: number
           id?: string
           is_active?: boolean
           name?: string
           updated_at?: string
+          updated_by?: string | null
+          wifi_verification_enabled?: boolean
         }
         Relationships: [
           {
             foreignKeyName: "center_attendance_configs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "center_attendance_configs_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      center_attendance_wifi_networks: {
+        Row: {
+          bssid: string
+          center_config_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          ssid: string
+          updated_at: string
+        }
+        Insert: {
+          bssid: string
+          center_config_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          ssid: string
+          updated_at?: string
+        }
+        Update: {
+          bssid?: string
+          center_config_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          ssid?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "center_attendance_wifi_networks_center_config_id_fkey"
+            columns: ["center_config_id"]
+            isOneToOne: false
+            referencedRelation: "center_attendance_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "center_attendance_wifi_networks_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -2375,7 +2434,7 @@ export type Database = {
       payroll_lead_source_mapping_versions: {
         Row: {
           created_at: string
-          created_by: string
+          created_by: string | null
           effective_from: string
           id: string
           lead_source_id: string
@@ -2384,7 +2443,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by: string
+          created_by?: string | null
           effective_from: string
           id?: string
           lead_source_id: string
@@ -2393,7 +2452,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           effective_from?: string
           id?: string
           lead_source_id?: string
@@ -3178,6 +3237,7 @@ export type Database = {
           effective_to: string | null
           id: string
           purpose: string
+          sepay_bank_account_id: string | null
           signed_account_number: string | null
           status: string
         }
@@ -3194,6 +3254,7 @@ export type Database = {
           effective_to?: string | null
           id?: string
           purpose: string
+          sepay_bank_account_id?: string | null
           signed_account_number?: string | null
           status?: string
         }
@@ -3210,6 +3271,7 @@ export type Database = {
           effective_to?: string | null
           id?: string
           purpose?: string
+          sepay_bank_account_id?: string | null
           signed_account_number?: string | null
           status?: string
         }
@@ -3230,6 +3292,84 @@ export type Database = {
           },
         ]
       }
+      sepay_sync_runs: {
+        Row: {
+          account_version_id: string
+          completed_at: string | null
+          date_from: string
+          date_to: string
+          duplicate_count: number
+          error_code: string | null
+          failed_count: number
+          id: string
+          linked_count: number
+          manual_review_count: number
+          pages_processed: number
+          recorded_count: number
+          requested_by: string
+          started_at: string
+          status: string
+          sync_session_id: string
+          total_available: number
+          total_seen: number
+        }
+        Insert: {
+          account_version_id: string
+          completed_at?: string | null
+          date_from: string
+          date_to: string
+          duplicate_count?: number
+          error_code?: string | null
+          failed_count?: number
+          id?: string
+          linked_count?: number
+          manual_review_count?: number
+          pages_processed?: number
+          recorded_count?: number
+          requested_by: string
+          started_at?: string
+          status?: string
+          sync_session_id: string
+          total_available?: number
+          total_seen?: number
+        }
+        Update: {
+          account_version_id?: string
+          completed_at?: string | null
+          date_from?: string
+          date_to?: string
+          duplicate_count?: number
+          error_code?: string | null
+          failed_count?: number
+          id?: string
+          linked_count?: number
+          manual_review_count?: number
+          pages_processed?: number
+          recorded_count?: number
+          requested_by?: string
+          started_at?: string
+          status?: string
+          sync_session_id?: string
+          total_available?: number
+          total_seen?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sepay_sync_runs_account_version_id_fkey"
+            columns: ["account_version_id"]
+            isOneToOne: false
+            referencedRelation: "sepay_receiving_account_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sepay_sync_runs_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sepay_transactions: {
         Row: {
           account_number: string
@@ -3239,14 +3379,19 @@ export type Database = {
           bank_transaction_id: string
           created_at: string
           id: string
+          ingestion_source: string
           match_status: string
           matched_at: string | null
           matched_by: string | null
           matched_payment_request_id: string | null
           matched_student_id: string | null
+          reference_number: string | null
+          sepay_v2_id: string | null
           sepay_webhook_id: string | null
+          source_payloads: Json
           transaction_at: string
           transfer_content: string
+          transfer_type: string | null
         }
         Insert: {
           account_number: string
@@ -3256,14 +3401,19 @@ export type Database = {
           bank_transaction_id: string
           created_at?: string
           id?: string
+          ingestion_source?: string
           match_status?: string
           matched_at?: string | null
           matched_by?: string | null
           matched_payment_request_id?: string | null
           matched_student_id?: string | null
+          reference_number?: string | null
+          sepay_v2_id?: string | null
           sepay_webhook_id?: string | null
+          source_payloads?: Json
           transaction_at: string
           transfer_content: string
+          transfer_type?: string | null
         }
         Update: {
           account_number?: string
@@ -3273,14 +3423,19 @@ export type Database = {
           bank_transaction_id?: string
           created_at?: string
           id?: string
+          ingestion_source?: string
           match_status?: string
           matched_at?: string | null
           matched_by?: string | null
           matched_payment_request_id?: string | null
           matched_student_id?: string | null
+          reference_number?: string | null
+          sepay_v2_id?: string | null
           sepay_webhook_id?: string | null
+          source_payloads?: Json
           transaction_at?: string
           transfer_content?: string
+          transfer_type?: string | null
         }
         Relationships: [
           {
@@ -6963,7 +7118,7 @@ export type Database = {
         }
         Returns: {
           created_at: string
-          created_by: string
+          created_by: string | null
           effective_from: string
           id: string
           lead_source_id: string
@@ -7008,6 +7163,7 @@ export type Database = {
           p_effective_from: string
           p_purpose: string
           p_reason: string
+          p_sepay_bank_account_id?: string
         }
         Returns: {
           account_display_name: string
@@ -7022,6 +7178,7 @@ export type Database = {
           effective_to: string | null
           id: string
           purpose: string
+          sepay_bank_account_id: string | null
           signed_account_number: string | null
           status: string
         }
@@ -7639,6 +7796,8 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_attendance_verification_config: { Args: never; Returns: Json }
+      get_attendance_verification_policy: { Args: never; Returns: Json }
       get_center_display_name: { Args: never; Returns: string }
       get_coaching_assignee_options: {
         Args: never
@@ -7849,6 +8008,20 @@ export type Database = {
           p_source?: string
         }
         Returns: Json
+      }
+      search_sepay_reconciliation_candidates: {
+        Args: {
+          p_limit?: number
+          p_search?: string
+          p_sepay_transaction_id: string
+        }
+        Returns: {
+          expected_amount_vnd: number
+          public_code: string
+          request_id: string
+          student_full_name: string
+          topup_type: string
+        }[]
       }
       get_grading_credits_dashboard: {
         Args: { p_limit?: number }
@@ -8134,6 +8307,60 @@ export type Database = {
         Args: { required_permission: string }
         Returns: boolean
       }
+      ingest_sepay_api_v2_transaction: {
+        Args: {
+          p_account_number: string
+          p_amount_in: number
+          p_amount_out: number
+          p_body_raw?: Json
+          p_code: string
+          p_content: string
+          p_gateway: string
+          p_reference_number?: string
+          p_sepay_v2_id: string
+          p_transaction_date: string
+          p_transfer_type: string
+        }
+        Returns: Json
+      }
+      ingest_sepay_api_v2_transactions_batch: {
+        Args: { p_transactions: Json }
+        Returns: Json
+      }
+      ingest_sepay_api_v2_sync_page: {
+        Args: {
+          p_expected_page: number
+          p_has_more: boolean
+          p_sync_run_id: string
+          p_total_available: number
+          p_transactions: Json
+        }
+        Returns: Json
+      }
+      ingest_sepay_transaction_record: {
+        Args: {
+          p_account_number: string
+          p_account_purpose: string
+          p_amount_in: number
+          p_amount_out: number
+          p_code: string
+          p_content: string
+          p_external_transaction_id: string
+          p_gateway: string
+          p_ingestion_source: string
+          p_reference_number: string
+          p_sepay_v2_id: string
+          p_sepay_webhook_id: string
+          p_source_payload: Json
+          p_transaction_date: string
+          p_transfer_type: string
+        }
+        Returns: {
+          current_match_status: string
+          identity_status: string
+          transaction_id: string
+        }[]
+      }
       is_active_owner: { Args: never; Returns: boolean }
       is_user_teaching_assistant: {
         Args: { p_user_id: string }
@@ -8245,6 +8472,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      match_sepay_historical_transaction_to_payment_request: {
+        Args: {
+          p_payment_request_id: string
+          p_reason: string
+          p_sepay_transaction_id: string
+        }
+        Returns: Json
       }
       materialize_class_sessions: {
         Args: {
@@ -8467,6 +8702,56 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "tuition_collection_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reopen_payroll_period: {
+        Args: { p_payroll_period_id: string; p_reason: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          current_calculation_run_id: string | null
+          feedback_closed_at: string | null
+          feedback_closed_by: string | null
+          feedback_opened_at: string
+          generated_at: string
+          generated_by: string
+          id: string
+          pay_date: string
+          period_month: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_periods"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reopen_payroll_to_draft: {
+        Args: { p_payroll_period_id: string; p_reason: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          current_calculation_run_id: string | null
+          feedback_closed_at: string | null
+          feedback_closed_by: string | null
+          feedback_opened_at: string
+          generated_at: string
+          generated_by: string
+          id: string
+          pay_date: string
+          period_month: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_periods"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -8782,6 +9067,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      resolve_sepay_historical_transaction: {
+        Args: {
+          p_reason: string
+          p_resolution: string
+          p_sepay_transaction_id: string
+        }
+        Returns: Json
+      }
       resolve_sepay_receiving_account: {
         Args: { p_signed_account_number: string; p_transaction_at: string }
         Returns: {
@@ -8844,6 +9137,7 @@ export type Database = {
           effective_to: string | null
           id: string
           purpose: string
+          sepay_bank_account_id: string | null
           signed_account_number: string | null
           status: string
         }
@@ -8975,6 +9269,18 @@ export type Database = {
           version_number: number
         }[]
       }
+      set_attendance_verification_config: {
+        Args: {
+          p_attendance_radius_m: number
+          p_center_latitude: number
+          p_center_longitude: number
+          p_center_name: string
+          p_gps_max_accuracy_m: number
+          p_wifi_networks: Json
+          p_wifi_required_for_offline: boolean
+        }
+        Returns: Json
+      }
       set_finance_order_review: {
         Args: { p_is_checked: boolean; p_source_cashflow_record_id: string }
         Returns: Json
@@ -8986,6 +9292,36 @@ export type Database = {
           target_role_id: string
         }
         Returns: number
+      }
+      set_sepay_receiving_account_api_identity: {
+        Args: {
+          p_account_version_id: string
+          p_reason: string
+          p_sepay_bank_account_id: string
+        }
+        Returns: {
+          account_display_name: string
+          account_number: string
+          audit_metadata: Json
+          bank_code: string
+          changed_at: string | null
+          changed_by: string | null
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          purpose: string
+          sepay_bank_account_id: string | null
+          signed_account_number: string | null
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sepay_receiving_account_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       set_user_roles: {
         Args: {
@@ -9379,6 +9715,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      validate_offline_attendance_evidence: {
+        Args: {
+          p_gps_accuracy_meters: number
+          p_gps_latitude: number
+          p_gps_longitude: number
+          p_wifi_bssid: string
+          p_wifi_ssid: string
+        }
+        Returns: number
       }
       validate_student_import_rows: { Args: { p_rows: Json }; Returns: Json }
     }

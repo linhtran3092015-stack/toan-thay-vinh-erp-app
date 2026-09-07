@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  getSepayApiV2Env,
   getSepayWebhookEnv,
   getSupabaseServiceRoleEnv,
 } from "@/lib/env";
@@ -69,6 +70,36 @@ describe("Decoupled environment validation for Supabase service-role & SePay web
 
       expect(() => getSepayWebhookEnv()).toThrowError(
         "SePay webhook environment is not configured correctly.",
+      );
+    });
+  });
+
+  describe("getSepayApiV2Env", () => {
+    it("keeps the API token server-side and defaults to the production v2 endpoint", () => {
+      process.env.SEPAY_API_TOKEN = "sepay-api-v2-token";
+      delete process.env.SEPAY_API_BASE_URL;
+
+      expect(getSepayApiV2Env()).toEqual({
+        baseUrl: "https://userapi.sepay.vn/v2",
+        token: "sepay-api-v2-token",
+      });
+    });
+
+    it("accepts the isolated HTTPS sandbox endpoint", () => {
+      process.env.SEPAY_API_TOKEN = "sepay-api-v2-token";
+      process.env.SEPAY_API_BASE_URL = "https://userapi-sandbox.sepay.vn/v2/";
+
+      expect(getSepayApiV2Env()).toEqual({
+        baseUrl: "https://userapi-sandbox.sepay.vn/v2",
+        token: "sepay-api-v2-token",
+      });
+    });
+
+    it("fails closed when the API token is missing", () => {
+      delete process.env.SEPAY_API_TOKEN;
+
+      expect(() => getSepayApiV2Env()).toThrowError(
+        "SePay API v2 environment is not configured correctly.",
       );
     });
   });

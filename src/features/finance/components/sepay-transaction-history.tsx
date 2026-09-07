@@ -8,9 +8,17 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { getSepayAccountPurposeQuery, type SepayAccountPurposeFilter } from "@/features/finance/sepay-transaction-url-state";
 import type { SepayTransactionReadModel } from "@/features/finance/read-models";
+import { SepayReconciliationActions, type SepayReconciliationCandidateView } from "@/features/finance/components/sepay-reconciliation-actions";
 
 interface SepayTransactionHistoryProps {
   accountPurposeFilter?: SepayAccountPurposeFilter;
+  canReconcile?: boolean;
+  candidates?: SepayReconciliationCandidateView[];
+  managementPanel?: ReactNode;
+  page?: number;
+  pageSize?: number;
+  reconciliationError?: boolean;
+  total?: number;
   transactions: SepayTransactionReadModel[];
 }
 
@@ -49,15 +57,28 @@ export function getSepayMatchPresentation(
       return { label: "Sai số tiền – cần đối soát", tone: "warning" };
     case "account_purpose_mismatch":
       return { label: "Sai tài khoản nhận – cần đối soát", tone: "warning" };
+    case "identity_conflict":
+      return { label: "Trùng nhận diện – cần đối soát", tone: "warning" };
+    case "historical_accounted":
+      return { label: "Đã hạch toán trước đây", tone: "info" };
+    case "ignored":
+      return { label: "Đã bỏ qua", tone: "neutral" };
     case "unmatched":
       return { label: "Chưa khớp", tone: "neutral" };
   }
 }
 
-/** Read-only presentation of the existing 100-row SePay transaction read. */
+/** Paginated SePay transaction history with permission-gated reconciliation. */
 export function SepayTransactionHistory({
   accountPurposeFilter = "",
+  canReconcile = false,
+  candidates = [],
+  managementPanel,
+  page = 1,
+  pageSize = 50,
+  reconciliationError = false,
   transactions,
+  total = transactions.length,
 }: SepayTransactionHistoryProps) {
   return (
     <div className="grid min-w-0 gap-5">
@@ -66,6 +87,14 @@ export function SepayTransactionHistory({
           Lịch sử giao dịch ngân hàng được SePay ghi nhận.
         </p>
       </PageHeader>
+
+      {managementPanel}
+
+      {reconciliationError ? (
+        <p className="rounded-md border border-danger-border bg-danger-bg px-4 py-3 text-secondary text-danger" role="alert">
+          Không tải được danh sách yêu cầu thanh toán để đối soát. Các thao tác đối soát đang tạm khóa; vui lòng tải lại trang.
+        </p>
+      ) : null}
 
       <section
         aria-labelledby="sepay-transaction-result-context"
@@ -82,7 +111,7 @@ export function SepayTransactionHistory({
           className="text-secondary text-text-muted"
           id="sepay-transaction-result-context"
         >
-          Hiển thị {transactions.length} giao dịch SePay mới nhất (tối đa 100).
+          Hiển thị {transactions.length} trong tổng số {total} giao dịch.
         </p>
 
         {transactions.length === 0 ? (
@@ -91,21 +120,24 @@ export function SepayTransactionHistory({
             title="Chưa có giao dịch SePay"
           />
         ) : (
-          <SepayTransactionTable transactions={transactions} />
+          <SepayTransactionTable canReconcile={canReconcile} candidates={candidates} transactions={transactions} />
         )}
+        <SepayPagination accountPurposeFilter={accountPurposeFilter} page={page} pageSize={pageSize} total={total} />
       </section>
     </div>
   );
 }
 
 function SepayTransactionTable({
+  canReconcile,
+  candidates,
   transactions,
-}: Pick<SepayTransactionHistoryProps, "transactions">) {
+}: Pick<SepayTransactionHistoryProps, "canReconcile" | "candidates" | "transactions">) {
   return (
     <div className="sepay-transaction-results-work-area">
       <DataTableFrame
         body={transactions.map((transaction) => (
-          <SepayTransactionTableRow key={transaction.id} transaction={transaction} />
+          <SepayTransactionTableRow canReconcile={canReconcile} candidates={candidates} key={transaction.id} transaction={transaction} />
         ))}
         caption="Danh sách giao dịch SePay mới nhất"
         className="sepay-transaction-directory-table"
@@ -119,6 +151,7 @@ function SepayTransactionTable({
             <TableHeader className="text-right">Số tiền</TableHeader>
             <TableHeader>Trạng thái khớp</TableHeader>
             <TableHeader>Tham chiếu hiện có</TableHeader>
+            {canReconcile ? <TableHeader>Thao tác</TableHeader> : null}
           </tr>
         }
         tableClassName="min-w-[1340px] table-fixed text-table-body text-text-default"
@@ -129,7 +162,7 @@ function SepayTransactionTable({
         label="Danh sách giao dịch SePay mới nhất"
       >
         {transactions.map((transaction) => (
-          <SepayTransactionRecord key={transaction.id} transaction={transaction} />
+          <SepayTransactionRecord canReconcile={canReconcile} candidates={candidates} key={transaction.id} transaction={transaction} />
         ))}
       </ResponsiveRecordList>
     </div>
@@ -137,14 +170,20 @@ function SepayTransactionTable({
 }
 
 function SepayTransactionTableRow({
+  canReconcile,
+  candidates,
   transaction,
 }: {
+  canReconcile?: boolean;
+  candidates?: SepayReconciliationCandidateView[];
   transaction: SepayTransactionReadModel;
 }) {
   return (
     <tr className="hover:bg-[var(--table-row-hover)]">
       <TableCell className="w-[142px] font-mono text-caption font-semibold text-text-muted">
         {transaction.bankTransactionId}
+        <span className="mt-1 block font-sans font-normal text-text-muted">{getSourceLabel(transaction.ingestionSource)}</span>
+        {transaction.referenceNumber ? <span className="mt-1 block break-all font-sans font-normal">Ref: {transaction.referenceNumber}</span> : null}
       </TableCell>
       <TableCell className="w-[132px] tabular-nums text-secondary text-text-muted">
         {formatDateTime(transaction.transactionAt)}
@@ -168,13 +207,18 @@ function SepayTransactionTableRow({
       <TableCell className="w-[170px] text-secondary text-text-muted">
         <SepayReference transaction={transaction} />
       </TableCell>
+      {canReconcile ? <TableCell className="w-[260px]"><SepayReconciliationActions candidates={candidates ?? []} transaction={transaction} /></TableCell> : null}
     </tr>
   );
 }
 
 function SepayTransactionRecord({
+  canReconcile,
+  candidates,
   transaction,
 }: {
+  canReconcile?: boolean;
+  candidates?: SepayReconciliationCandidateView[];
   transaction: SepayTransactionReadModel;
 }) {
   return (
@@ -192,6 +236,7 @@ function SepayTransactionRecord({
         <p className="font-mono text-caption font-semibold text-text-default">
           {transaction.bankTransactionId}
         </p>
+        <p>Nguồn: {getSourceLabel(transaction.ingestionSource)}{transaction.referenceNumber ? ` · Ref: ${transaction.referenceNumber}` : ""}</p>
         <p className="tabular-nums text-caption">
           {formatDateTime(transaction.transactionAt)}
         </p>
@@ -199,6 +244,7 @@ function SepayTransactionRecord({
           <span className="font-medium text-text-default">Ngân hàng · STK:</span>{" "}
           {transaction.bankBrand} · {transaction.accountNumber}
         </p>
+        {canReconcile ? <SepayReconciliationActions candidates={candidates ?? []} transaction={transaction} /> : null}
         <p><span className="font-medium text-text-default">Tài khoản nhận:</span> <SepayAccountPurposeBadge purpose={transaction.accountPurpose} /></p>
         <p className="break-words font-mono text-caption text-text-default">
           {transaction.transferContent}
@@ -209,6 +255,44 @@ function SepayTransactionRecord({
         </p>
       </div>
     </article>
+  );
+}
+
+function getSourceLabel(source: SepayTransactionReadModel["ingestionSource"]): string {
+  switch (source) {
+    case "api_v2": return "Lịch sử API";
+    case "reconciled": return "Webhook + API";
+    case "webhook": return "Webhook";
+  }
+}
+
+function SepayPagination({
+  accountPurposeFilter,
+  page,
+  pageSize,
+  total,
+}: {
+  accountPurposeFilter: SepayAccountPurposeFilter;
+  page: number;
+  pageSize: number;
+  total: number;
+}) {
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  if (pageCount <= 1) return null;
+
+  const href = (target: number) => {
+    const params = new URLSearchParams();
+    if (accountPurposeFilter) params.set("accountPurpose", accountPurposeFilter);
+    params.set("page", String(target));
+    return `/finance/sepay?${params.toString()}`;
+  };
+
+  return (
+    <nav aria-label="Phân trang giao dịch SePay" className="flex items-center justify-end gap-2">
+      {page > 1 ? <Link className="rounded-md border border-border-subtle px-3 py-2 text-control font-semibold" href={href(page - 1)}>Trang trước</Link> : null}
+      <span className="text-secondary text-text-muted">Trang {page}/{pageCount}</span>
+      {page < pageCount ? <Link className="rounded-md border border-border-subtle px-3 py-2 text-control font-semibold" href={href(page + 1)}>Trang sau</Link> : null}
+    </nav>
   );
 }
 

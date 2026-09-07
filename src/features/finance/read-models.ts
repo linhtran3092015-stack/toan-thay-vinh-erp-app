@@ -35,18 +35,40 @@ export interface SepayTransactionReadModel {
   bankTransactionId: string;
   createdAt: string;
   id: string;
+  ingestionSource: "webhook" | "api_v2" | "reconciled";
   matchStatus:
     | "unmatched"
     | "auto_matched"
     | "manual_matched"
     | "split_allocated"
     | "amount_mismatch"
-    | "account_purpose_mismatch";
+    | "account_purpose_mismatch"
+    | "identity_conflict"
+    | "historical_accounted"
+    | "ignored";
   matchedAt: string | null;
   matchedPaymentRequestCode: string | null;
   matchedStudentFullName: string | null;
+  referenceNumber: string | null;
+  sepayV2Id: string | null;
   transactionAt: string;
+  transferType: "in" | "out" | null;
   transferContent: string;
+}
+
+export interface SepayTransactionsPageReadModel {
+  page: number;
+  pageSize: number;
+  total: number;
+  transactions: SepayTransactionReadModel[];
+}
+
+export interface SepayReconciliationCandidateReadModel {
+  expectedAmountVnd: number;
+  id: string;
+  publicCode: string;
+  studentFullName: string;
+  topupType: "new" | "renewal";
 }
 
 export interface FinanceOrderFiltersState {

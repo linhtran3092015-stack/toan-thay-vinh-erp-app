@@ -21,11 +21,15 @@ const transaction: SepayTransactionReadModel = {
   bankTransactionId: "SEPAY-001",
   createdAt: "2026-08-10T03:00:00.000Z",
   id: "sepay-1",
+  ingestionSource: "webhook",
   matchStatus: "auto_matched",
   matchedAt: "2026-08-10T03:05:00.000Z",
   matchedPaymentRequestCode: "YC-001",
   matchedStudentFullName: "Nguyễn Minh An",
+  referenceNumber: "REF-001",
+  sepayV2Id: null,
   transactionAt: "2026-08-10T03:00:00.000Z",
+  transferType: "in",
   transferContent: "TTVC YC001 Nguyen Minh An nap hoc phi",
 };
 
@@ -33,7 +37,7 @@ describe("SePay transaction history presentation", () => {
   it("keeps the mounted history read-only while allowing a server-driven account-purpose filter", () => {
     render(<SepayTransactionHistory transactions={[transaction]} />);
 
-    expect(screen.getByText("Hiển thị 1 giao dịch SePay mới nhất (tối đa 100).")).toBeInTheDocument();
+    expect(screen.getByText("Hiển thị 1 trong tổng số 1 giao dịch.")).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Tất cả tài khoản" })).toHaveAttribute("href", "/finance/sepay");
@@ -49,6 +53,7 @@ describe("SePay transaction history presentation", () => {
     expect(getSepayMatchPresentation("split_allocated")).toEqual({ label: "Đã phân bổ nhiều học viên", tone: "info" });
     expect(getSepayMatchPresentation("amount_mismatch")).toEqual({ label: "Sai số tiền – cần đối soát", tone: "warning" });
     expect(getSepayMatchPresentation("account_purpose_mismatch")).toEqual({ label: "Sai tài khoản nhận – cần đối soát", tone: "warning" });
+    expect(getSepayMatchPresentation("identity_conflict")).toEqual({ label: "Trùng nhận diện – cần đối soát", tone: "warning" });
     expect(getSepayAccountPurposePresentation("new_enrollment")).toEqual({ label: "Tuyển mới", tone: "success" });
     expect(getSepayAccountPurposePresentation("renewal")).toEqual({ label: "Tái phí", tone: "info" });
     expect(getSepayAccountPurposePresentation("unknown")).toEqual({ label: "Chưa xác định", tone: "warning" });
@@ -105,5 +110,16 @@ describe("SePay transaction history presentation", () => {
     expect(screen.getByText("Chưa có giao dịch SePay")).toBeInTheDocument();
     expect(screen.getByText("Chưa có giao dịch SePay nào được ghi nhận.")).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("surfaces candidate-loading failures and locks reconciliation controls", () => {
+    render(<SepayTransactionHistory
+      canReconcile={false}
+      reconciliationError
+      transactions={[{ ...transaction, ingestionSource: "api_v2", matchStatus: "unmatched", sepayV2Id: "95000000-0000-0000-0000-000000000001" }]}
+    />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/Không tải được danh sách yêu cầu thanh toán/);
+    expect(screen.queryByText("Đối soát")).not.toBeInTheDocument();
   });
 });

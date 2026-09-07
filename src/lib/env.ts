@@ -54,6 +54,21 @@ export interface SepayWebhookEnv {
   webhookSecret: string;
 }
 
+const sepayApiV2EnvSchema = z.object({
+  SEPAY_API_BASE_URL: z
+    .string()
+    .trim()
+    .url()
+    .refine((value) => value.startsWith("https://"), "must use https")
+    .default("https://userapi.sepay.vn/v2"),
+  SEPAY_API_TOKEN: z.string().trim().min(1),
+});
+
+export interface SepayApiV2Env {
+  baseUrl: string;
+  token: string;
+}
+
 function readSupabasePublicEnv() {
   return {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -116,5 +131,22 @@ export function getSepayWebhookEnv(): SepayWebhookEnv {
 
   return {
     webhookSecret: result.data.SEPAY_WEBHOOK_SECRET,
+  };
+}
+
+export function getSepayApiV2Env(): SepayApiV2Env {
+  const result = sepayApiV2EnvSchema.safeParse({
+    SEPAY_API_BASE_URL:
+      process.env.SEPAY_API_BASE_URL || undefined,
+    SEPAY_API_TOKEN: process.env.SEPAY_API_TOKEN,
+  });
+
+  if (!result.success) {
+    throw new Error("SePay API v2 environment is not configured correctly.");
+  }
+
+  return {
+    baseUrl: result.data.SEPAY_API_BASE_URL.replace(/\/$/, ""),
+    token: result.data.SEPAY_API_TOKEN,
   };
 }

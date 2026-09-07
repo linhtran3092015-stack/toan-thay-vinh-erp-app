@@ -8,7 +8,9 @@ import type {
   FinanceOrdersDashboardReadModel,
   FinanceOverviewReadModel,
   PaymentRequestReadModel,
+  SepayReconciliationCandidateReadModel,
   SepayTransactionReadModel,
+  SepayTransactionsPageReadModel,
 } from "./read-models";
 
 export type FinanceReadResult<T> =
@@ -76,11 +78,15 @@ function toSepayTransactionReadModel(transaction: {
   bank_transaction_id: string;
   created_at: string;
   id: string;
+  ingestion_source: string;
   match_status: string;
   matched_at: string | null;
   matched_request: unknown;
   matched_student: unknown;
+  reference_number: string | null;
+  sepay_v2_id: string | null;
   transaction_at: string;
+  transfer_type: string | null;
   transfer_content: string;
 }): SepayTransactionReadModel {
   return {
@@ -91,11 +97,15 @@ function toSepayTransactionReadModel(transaction: {
     bankTransactionId: transaction.bank_transaction_id,
     createdAt: transaction.created_at,
     id: transaction.id,
+    ingestionSource: transaction.ingestion_source as SepayTransactionReadModel["ingestionSource"],
     matchStatus: transaction.match_status as SepayTransactionReadModel["matchStatus"],
     matchedAt: transaction.matched_at,
     matchedPaymentRequestCode: (transaction.matched_request as { public_code: string } | null)?.public_code ?? null,
     matchedStudentFullName: (transaction.matched_student as { full_name: string } | null)?.full_name ?? null,
+    referenceNumber: transaction.reference_number,
+    sepayV2Id: transaction.sepay_v2_id,
     transactionAt: transaction.transaction_at,
+    transferType: transaction.transfer_type as SepayTransactionReadModel["transferType"],
     transferContent: transaction.transfer_content,
   };
 }
@@ -159,6 +169,10 @@ export async function getFinanceOverviewResult(): Promise<
         amount_vnd,
         transfer_content,
         transaction_at,
+        transfer_type,
+        reference_number,
+        sepay_v2_id,
+        ingestion_source,
         match_status,
         matched_at,
         created_at,
@@ -279,11 +293,15 @@ export async function getFinanceOverview(): Promise<FinanceOverviewReadModel> {
 
 export async function getSepayTransactionsResult(
   accountPurpose: "" | SepayTransactionReadModel["accountPurpose"] = "",
+  page = 1,
 ): Promise<
-  FinanceReadResult<SepayTransactionReadModel[]>
+  FinanceReadResult<SepayTransactionsPageReadModel>
 > {
   try {
     const supabase = await createSupabaseServerClient();
+    const pageSize = 50;
+    const safePage = Math.max(1, Math.floor(page));
+    const from = (safePage - 1) * pageSize;
     let query = supabase
       .from("sepay_transactions")
       .select(
@@ -296,28 +314,38 @@ export async function getSepayTransactionsResult(
       amount_vnd,
       transfer_content,
       transaction_at,
+      transfer_type,
+      reference_number,
+      sepay_v2_id,
+      ingestion_source,
       match_status,
       matched_at,
       created_at,
       matched_student:students(full_name),
       matched_request:student_payment_requests(public_code)
         `,
+        { count: "exact" },
       )
       .order("transaction_at", { ascending: false })
-      .limit(100);
+      .range(from, from + pageSize - 1);
 
     if (accountPurpose) {
       query = query.eq("account_purpose", accountPurpose);
     }
 
-    const { data, error } = await query;
+    const { count, data, error } = await query;
 
     if (error) {
       return { ok: false };
     }
 
     return {
-      data: (data ?? []).map((transaction) => toSepayTransactionReadModel(transaction)),
+      data: {
+        page: safePage,
+        pageSize,
+        total: count ?? 0,
+        transactions: (data ?? []).map((transaction) => toSepayTransactionReadModel(transaction)),
+      },
       ok: true,
     };
   } catch {
@@ -327,7 +355,59 @@ export async function getSepayTransactionsResult(
 
 export async function getSepayTransactions(): Promise<SepayTransactionReadModel[]> {
   const result = await getSepayTransactionsResult();
-  return result.ok ? result.data : [];
+  return result.ok ? result.data.transactions : [];
+}
+
+export async function getSepayReconciliationCandidatesResult(
+  transactions: SepayTransactionReadModel[],
+): Promise<
+  FinanceReadResult<SepayReconciliationCandidateReadModel[]>
+> {
+  try {
+    const relevantTransactions = transactions.filter((transaction) => (
+      transaction.sepayV2Id
+      && transaction.transferType === "in"
+      && transaction.matchStatus === "unmatched"
+      && transaction.accountPurpose !== "unknown"
+    ));
+    if (relevantTransactions.length === 0) return { data: [], ok: true };
+
+    const representativeTransactions = [...new Map(
+      relevantTransactions.map((transaction) => [
+        `${transaction.accountPurpose}:${transaction.amountVnd}`,
+        transaction,
+      ]),
+    ).values()];
+    const supabase = await createSupabaseServerClient();
+    const results = await Promise.all(representativeTransactions.map((transaction) => (
+      supabase.rpc("search_sepay_reconciliation_candidates", {
+        p_limit: 50,
+        p_sepay_transaction_id: transaction.id,
+      })
+    )));
+    if (results.some((result) => result.error)) return { ok: false };
+
+    const candidates = [...new Map(results.flatMap((result) => result.data ?? []).map((request) => [
+      request.request_id,
+      request,
+    ])).values()];
+
+    return {
+      data: candidates.flatMap((request): SepayReconciliationCandidateReadModel[] => {
+        if (request.topup_type !== "new" && request.topup_type !== "renewal") return [];
+        return [{
+          expectedAmountVnd: Number(request.expected_amount_vnd),
+          id: request.request_id,
+          publicCode: request.public_code,
+          studentFullName: request.student_full_name,
+          topupType: request.topup_type,
+        }];
+      }),
+      ok: true,
+    };
+  } catch {
+    return { ok: false };
+  }
 }
 
 export async function getFinanceOrdersDashboardResult(

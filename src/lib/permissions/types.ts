@@ -72,6 +72,7 @@ export const DATABASE_PERMISSION_CODES = [
   "sepay.view",
   "sepay.allocate",
   "sepay.webhook_manage",
+  "sepay.sync_history.manage",
   "refunds.manage",
   "cashflow.view",
   "commissions.view",
