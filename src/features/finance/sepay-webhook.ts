@@ -9,23 +9,38 @@ const SEPAY_MAX_TIMESTAMP_AGE_SECONDS = 5 * 60;
 
 const sepayWebhookPayloadSchema = z
   .object({
-    accountNumber: z.string().trim().min(1),
+    accountNumber: z.coerce.string().trim().min(1, "accountNumber is required"),
     code: z.string().trim().nullable().optional(),
-    content: z.string().trim().min(1),
-    gateway: z.string().trim().min(1),
-    id: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    content: z.string().trim().optional().default(""),
+    description: z.string().trim().nullable().optional(),
+    gateway: z.string().trim().optional().default("UNKNOWN"),
+    id: z.coerce.number().int().nonnegative("id must be >= 0").max(Number.MAX_SAFE_INTEGER),
     referenceCode: z.string().trim().nullable().optional(),
-    transactionDate: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/),
-    transferAmount: z
+    transactionDate: z.string().trim().min(1, "transactionDate is required"),
+    transferAmount: z.coerce
       .number()
       .int()
-      .nonnegative()
-      .max(Number.MAX_SAFE_INTEGER),
-    transferType: z.enum(["in", "out"]),
+      .nonnegative("transferAmount must be >= 0")
+      .max(Number.MAX_SAFE_INTEGER)
+      .optional()
+      .default(0),
+    transferType: z.preprocess(
+      (val) => {
+        if (typeof val === "string") {
+          const lower = val.toLowerCase().trim();
+          if (lower === "credit" || lower === "in") return "in";
+          if (lower === "debit" || lower === "out") return "out";
+        }
+        return val ?? "in";
+      },
+      z.enum(["in", "out"]).default("in"),
+    ),
   })
-  .passthrough();
+  .passthrough()
+  .transform((data) => ({
+    ...data,
+    content: data.content || data.description || "Giao dịch SePay",
+  }));
 
 export type SepayWebhookPayload = z.infer<
   typeof sepayWebhookPayloadSchema
@@ -68,28 +83,60 @@ export function verifySepayWebhookSignature({
   );
 }
 
+export function parseSepayWebhookPayloadDetailed(
+  rawBody: string,
+): { ok: true; data: SepayWebhookPayload } | { ok: false; error: string } {
+  try {
+    const json = JSON.parse(rawBody);
+    const result = sepayWebhookPayloadSchema.safeParse(json);
+
+    if (!result.success) {
+      const details = result.error.issues
+        .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+        .join("; ");
+      return { ok: false, error: details };
+    }
+
+    return { ok: true, data: result.data };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Invalid JSON" };
+  }
+}
+
 export function parseSepayWebhookPayload(
   rawBody: string,
 ): SepayWebhookPayload | null {
-  try {
-    const result = sepayWebhookPayloadSchema.safeParse(
-      JSON.parse(rawBody),
-    );
-
-    return result.success ? result.data : null;
-  } catch {
+  const result = parseSepayWebhookPayloadDetailed(rawBody);
+  if (!result.ok) {
+    console.error("SEPAY_WEBHOOK_PAYLOAD_PARSE_FAILED:", result.error, "body:", rawBody);
     return null;
   }
+  return result.data;
 }
 
 export function toSepayTransactionTimestamp(
   transactionDate: string,
 ): string | null {
-  const timestamp = Date.parse(
-    `${transactionDate.replace(" ", "T")}+07:00`,
-  );
+  if (!transactionDate || typeof transactionDate !== "string") {
+    return null;
+  }
 
-  return Number.isNaN(timestamp)
-    ? null
-    : new Date(timestamp).toISOString();
+  const trimmed = transactionDate.trim();
+  if (!trimmed) return null;
+
+  // Check if it already has timezone offset or Z
+  if (/([+-]\d{2}:?\d{2}|Z)$/i.test(trimmed)) {
+    const parsed = Date.parse(trimmed);
+    return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
+  }
+
+  // Handle "YYYY-MM-DD HH:mm:ss" or "YYYY-MM-DDTHH:mm:ss" without tz -> assume Vietnam (+07:00)
+  const normalized = trimmed.replace(" ", "T");
+  const withTz = Date.parse(`${normalized}+07:00`);
+  if (!Number.isNaN(withTz)) {
+    return new Date(withTz).toISOString();
+  }
+
+  const fallback = Date.parse(trimmed);
+  return Number.isNaN(fallback) ? null : new Date(fallback).toISOString();
 }

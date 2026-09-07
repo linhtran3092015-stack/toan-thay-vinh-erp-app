@@ -2,6 +2,14 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.4.0.1] - 2026-09-07
+
+### Fixed
+- Acknowledge SePay test webhook pings (`id: 0`) immediately with HTTP 200 without attempting database transaction processing.
+- Make SePay webhook payload schema resilient by accepting string coercion for `id`, `accountNumber`, and `transferAmount`, defaulting missing transfer amount to 0, mapping credit/debit aliases, and falling back to description when content is absent.
+- Support both Vietnam standard timestamp (`YYYY-MM-DD HH:mm:ss`) and ISO 8601 strings with timezone offsets in webhook date parser.
+- Return explicit validation failure details in HTTP 400 responses to aid diagnostics from the SePay webhook dashboard.
+
 ## [0.4.0.0] - 2026-09-07
 
 ### Added

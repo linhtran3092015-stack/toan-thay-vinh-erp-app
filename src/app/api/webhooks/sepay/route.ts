@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
-  parseSepayWebhookPayload,
+  parseSepayWebhookPayloadDetailed,
   toSepayTransactionTimestamp,
   verifySepayWebhookSignature,
 } from "@/features/finance/sepay-webhook";
@@ -60,13 +60,30 @@ export async function POST(request: Request) {
     return webhookResponse(false, 401);
   }
 
-  const payload = parseSepayWebhookPayload(rawBody);
-  const transactionTimestamp = payload
-    ? toSepayTransactionTimestamp(payload.transactionDate)
-    : null;
+  const detailedResult = parseSepayWebhookPayloadDetailed(rawBody);
+  if (!detailedResult.ok) {
+    console.error("SEPAY_WEBHOOK_VALIDATION_FAILED:", detailedResult.error, "rawBody:", rawBody);
+    return NextResponse.json(
+      { error: detailedResult.error, success: false },
+      { headers: { "Cache-Control": "no-store" }, status: 400 },
+    );
+  }
 
-  if (!payload || !transactionTimestamp) {
-    return webhookResponse(false, 400);
+  const payload = detailedResult.data;
+  const transactionTimestamp = toSepayTransactionTimestamp(payload.transactionDate);
+
+  if (!transactionTimestamp) {
+    console.error("SEPAY_WEBHOOK_INVALID_DATE:", payload.transactionDate);
+    return NextResponse.json(
+      { error: `Invalid transactionDate: ${payload.transactionDate}`, success: false },
+      { headers: { "Cache-Control": "no-store" }, status: 400 },
+    );
+  }
+
+  // Handle SePay test webhook ping (mock payload with id: 0)
+  if (payload.id === 0) {
+    console.log("SEPAY_TEST_WEBHOOK_PING_VERIFIED:", payload);
+    return webhookResponse(true, 200);
   }
 
   let supabase: ReturnType<typeof createSupabaseServiceRoleClient>;

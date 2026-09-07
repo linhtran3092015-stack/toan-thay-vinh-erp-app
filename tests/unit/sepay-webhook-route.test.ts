@@ -6,6 +6,20 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock("@/features/finance/sepay-webhook", () => ({
+  parseSepayWebhookPayloadDetailed: vi.fn(() => ({
+    data: {
+      accountNumber: "1900123456",
+      code: null,
+      content: "TTV PAY-ABC",
+      gateway: "VCB",
+      id: 42,
+      referenceCode: null,
+      transactionDate: "2026-08-31 23:00:00",
+      transferAmount: 1_200_000,
+      transferType: "in",
+    },
+    ok: true,
+  })),
   parseSepayWebhookPayload: vi.fn(() => ({ accountNumber: "1900123456", code: null, content: "TTV PAY-ABC", gateway: "VCB", id: 42, referenceCode: null, transactionDate: "2026-08-31 23:00:00", transferAmount: 1_200_000, transferType: "in" })),
   toSepayTransactionTimestamp: vi.fn(() => "2026-08-31T16:00:00.000Z"),
   verifySepayWebhookSignature: vi.fn(() => true),
@@ -24,6 +38,7 @@ vi.mock("@/lib/supabase/service-role", () => ({
 }));
 
 import { POST } from "@/app/api/webhooks/sepay/route";
+import { parseSepayWebhookPayloadDetailed } from "@/features/finance/sepay-webhook";
 import { getSepayWebhookEnv } from "@/lib/env";
 
 describe("SePay webhook account-purpose integration", () => {
@@ -82,4 +97,51 @@ describe("SePay webhook account-purpose integration", () => {
     expect(body).toEqual({ success: false });
     expect(harness.rpc).not.toHaveBeenCalled();
   });
+
+  it("acknowledges SePay test ping with id: 0 immediately with HTTP 200 without database processing", async () => {
+    vi.mocked(parseSepayWebhookPayloadDetailed).mockReturnValueOnce({
+      data: {
+        accountNumber: "1900123456",
+        code: null,
+        content: "Test sepay",
+        gateway: "VCB",
+        id: 0,
+        referenceCode: null,
+        transactionDate: "2026-09-07 17:00:00",
+        transferAmount: 0,
+        transferType: "in",
+      },
+      ok: true,
+    });
+
+    const response = await POST(new Request("http://localhost/api/webhooks/sepay", {
+      body: JSON.stringify({ id: 0 }),
+      headers: { "content-type": "application/json", "x-sepay-signature": "sha256=test", "x-sepay-timestamp": "1" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual({ success: true });
+    expect(harness.rpc).not.toHaveBeenCalled();
+    expect(harness.resolve).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 with error details when payload validation fails", async () => {
+    vi.mocked(parseSepayWebhookPayloadDetailed).mockReturnValueOnce({
+      error: "accountNumber is required",
+      ok: false,
+    });
+
+    const response = await POST(new Request("http://localhost/api/webhooks/sepay", {
+      body: "{}",
+      headers: { "content-type": "application/json", "x-sepay-signature": "sha256=test", "x-sepay-timestamp": "1" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body).toEqual({ error: "accountNumber is required", success: false });
+  });
 });
+
