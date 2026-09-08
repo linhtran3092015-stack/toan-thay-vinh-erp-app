@@ -11,6 +11,7 @@ import {
 import { ModuleNavigation } from "@/components/layout/module-navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { AttendanceHeartbeatWatcher } from "@/features/timekeeping/components/attendance-heartbeat-watcher";
 import type { AuthUser } from "@/features/auth/types";
 import type { PermissionCode } from "@/lib/permissions/types";
 
@@ -20,6 +21,7 @@ interface AppShellProps {
   centerDisplayName: string;
   children: ReactNode;
   hasOpenTimekeepingEntry?: boolean;
+  openOfflineEntryId?: string | null;
   permissions: readonly PermissionCode[];
   unreadNotificationCount: number;
 }
@@ -30,6 +32,7 @@ export function AppShell({
   centerDisplayName,
   children,
   hasOpenTimekeepingEntry = false,
+  openOfflineEntryId = null,
   permissions,
   unreadNotificationCount,
 }: AppShellProps) {
@@ -76,6 +79,7 @@ export function AppShell({
         <main className="mx-auto max-w-[1600px] px-4 py-4 sm:px-5 lg:px-6">
           {children}
         </main>
+        <AttendanceHeartbeatWatcher activeSessionId={openOfflineEntryId} />
       </div>
     </div>
   );

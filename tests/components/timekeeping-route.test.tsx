@@ -7,6 +7,8 @@ const dependencies = vi.hoisted(() => ({
   getAttendanceVerificationConfig: vi.fn(),
   getAttendanceVerificationPolicy: vi.fn(),
   getCachedDatabasePermissions: vi.fn(),
+  getCenterMonthlyTimekeepingOverview: vi.fn(),
+  getMyMonthlyTimekeepingEntries: vi.fn(),
   getMyTimeEntryAdjustmentRequests: vi.fn(),
   getMyTimekeepingAdjustableEntries: vi.fn(),
   getMyTimekeepingEntries: vi.fn(),
@@ -65,6 +67,8 @@ function setSharedReadResults() {
   dependencies.getTimekeepingWorkShifts.mockResolvedValue({ ok: true, workShifts: [] });
   dependencies.getTimekeepingDayEntries.mockResolvedValue({ entries: [{ id: "day-entry" }], ok: true });
   dependencies.getTimekeepingStaffOptions.mockResolvedValue({ ok: true, staffOptions: [] });
+  dependencies.getMyMonthlyTimekeepingEntries.mockResolvedValue({ entries: [], ok: true });
+  dependencies.getCenterMonthlyTimekeepingOverview.mockResolvedValue({ ok: true, overview: [] });
 }
 
 afterEach(() => {

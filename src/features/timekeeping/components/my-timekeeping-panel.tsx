@@ -27,6 +27,7 @@ interface MyTimekeepingPanelProps {
   attendancePolicy?: AttendanceVerificationPolicy;
   canCheck: boolean;
   entries: readonly TimekeepingMyEntry[];
+  onSessionClosed?: () => void;
 }
 
 function formatTime(value: string): string {
@@ -62,6 +63,7 @@ export function MyTimekeepingPanel({
   },
   canCheck,
   entries,
+  onSessionClosed,
 }: MyTimekeepingPanelProps) {
   const openEntry = entries.find((entry) => entry.status === "open");
   const entry = openEntry ?? entries[0];
@@ -90,10 +92,9 @@ export function MyTimekeepingPanel({
   const { distanceM, serverMessage, statusLabel } = useAttendanceHeartbeat({
     activeSessionId: openEntry?.id ?? null,
     enabled: Boolean(
-      openEntry
-      && openEntry.checkInMode === "offline"
-      && attendancePolicy.continuousGpsTrackingRequired
+      openEntry && openEntry.checkInMode === "offline"
     ),
+    onSessionClosed,
   });
 
   return (
@@ -144,9 +145,7 @@ export function MyTimekeepingPanel({
               <p className="text-body font-medium text-text-default">
                 {openEntry.checkInMode === "online"
                   ? "Không áp dụng cho chấm công Trực tuyến"
-                  : attendancePolicy.continuousGpsTrackingRequired
-                    ? `${statusLabel}${distanceM !== null ? ` (khoảng ${distanceM}m từ Trung tâm)` : ""}`
-                    : "Đã xác minh tại thời điểm check-in"}
+                  : `${statusLabel}${distanceM !== null ? ` (khoảng ${distanceM}m từ Trung tâm)` : ""}`}
               </p>
             </div>
           </div>

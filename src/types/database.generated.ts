@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   public: {
     Tables: {
       academic_years: {
@@ -6192,6 +6197,74 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_adjust_time_entry: {
+        Args: {
+          p_check_in_at: string
+          p_check_out_at: string
+          p_reason: string
+          p_time_entry_id: string
+        }
+        Returns: {
+          auto_ended_at: string | null
+          check_in_at: string
+          check_in_mode: string
+          check_out_at: string | null
+          check_out_mode: string | null
+          clock_out_reason: string | null
+          created_at: string
+          id: string
+          last_latitude: number | null
+          last_location_accuracy: number | null
+          last_location_at: string | null
+          last_longitude: number | null
+          staff_id: string
+          staff_shift_assignment_id: string | null
+          status: string
+          updated_at: string
+          work_date: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "time_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_create_time_entry: {
+        Args: {
+          p_check_in_at: string
+          p_check_out_at: string
+          p_mode: string
+          p_notes: string
+          p_staff_id: string
+          p_work_date: string
+        }
+        Returns: {
+          auto_ended_at: string | null
+          check_in_at: string
+          check_in_mode: string
+          check_out_at: string | null
+          check_out_mode: string | null
+          clock_out_reason: string | null
+          created_at: string
+          id: string
+          last_latitude: number | null
+          last_location_accuracy: number | null
+          last_location_at: string | null
+          last_longitude: number | null
+          staff_id: string
+          staff_shift_assignment_id: string | null
+          status: string
+          updated_at: string
+          work_date: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "time_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       advance_coaching_status: {
         Args: {
           p_coaching_record_id: string
@@ -7799,6 +7872,20 @@ export type Database = {
       get_attendance_verification_config: { Args: never; Returns: Json }
       get_attendance_verification_policy: { Args: never; Returns: Json }
       get_center_display_name: { Args: never; Returns: string }
+      get_center_monthly_timekeeping_overview: {
+        Args: { p_month: number; p_year: number }
+        Returns: {
+          auto_ended_count: number
+          pending_adjustment_count: number
+          primary_role_name: string
+          staff_display_name: string
+          staff_employee_code: string
+          staff_id: string
+          total_entries: number
+          total_hours: number
+          total_work_days: number
+        }[]
+      }
       get_coaching_assignee_options: {
         Args: never
         Returns: {
@@ -8009,20 +8096,6 @@ export type Database = {
         }
         Returns: Json
       }
-      search_sepay_reconciliation_candidates: {
-        Args: {
-          p_limit?: number
-          p_search?: string
-          p_sepay_transaction_id: string
-        }
-        Returns: {
-          expected_amount_vnd: number
-          public_code: string
-          request_id: string
-          student_full_name: string
-          topup_type: string
-        }[]
-      }
       get_grading_credits_dashboard: {
         Args: { p_limit?: number }
         Returns: {
@@ -8063,6 +8136,31 @@ export type Database = {
           student_id: string
           student_name: string
           test_score: number
+        }[]
+      }
+      get_my_monthly_timekeeping_entries: {
+        Args: { p_month: number; p_year: number }
+        Returns: {
+          adjusted_check_in_at: string
+          adjusted_check_out_at: string
+          adjustment_status: string
+          auto_ended_at: string
+          check_in_at: string
+          check_in_mode: string
+          check_out_at: string
+          check_out_mode: string
+          clock_out_reason: string
+          entry_id: string
+          entry_status: string
+          has_check_in_gps_evidence: boolean
+          has_check_in_wifi_evidence: boolean
+          has_check_out_gps_evidence: boolean
+          has_check_out_wifi_evidence: boolean
+          is_unscheduled: boolean
+          total_minutes: number
+          work_date: string
+          work_shift_code: string
+          work_shift_name: string
         }[]
       }
       get_my_permissions: {
@@ -8229,6 +8327,31 @@ export type Database = {
           student_public_code: string
         }[]
       }
+      get_staff_monthly_timekeeping_entries: {
+        Args: { p_month: number; p_staff_id: string; p_year: number }
+        Returns: {
+          adjusted_check_in_at: string
+          adjusted_check_out_at: string
+          adjustment_status: string
+          auto_ended_at: string
+          check_in_at: string
+          check_in_mode: string
+          check_out_at: string
+          check_out_mode: string
+          clock_out_reason: string
+          entry_id: string
+          entry_status: string
+          has_check_in_gps_evidence: boolean
+          has_check_in_wifi_evidence: boolean
+          has_check_out_gps_evidence: boolean
+          has_check_out_wifi_evidence: boolean
+          is_unscheduled: boolean
+          total_minutes: number
+          work_date: string
+          work_shift_code: string
+          work_shift_name: string
+        }[]
+      }
       get_staff_payroll_profile: { Args: { p_staff_id: string }; Returns: Json }
       get_time_entry_adjustment_approval_queue: {
         Args: never
@@ -8307,6 +8430,16 @@ export type Database = {
         Args: { required_permission: string }
         Returns: boolean
       }
+      ingest_sepay_api_v2_sync_page: {
+        Args: {
+          p_expected_page: number
+          p_has_more: boolean
+          p_sync_run_id: string
+          p_total_available: number
+          p_transactions: Json
+        }
+        Returns: Json
+      }
       ingest_sepay_api_v2_transaction: {
         Args: {
           p_account_number: string
@@ -8325,16 +8458,6 @@ export type Database = {
       }
       ingest_sepay_api_v2_transactions_batch: {
         Args: { p_transactions: Json }
-        Returns: Json
-      }
-      ingest_sepay_api_v2_sync_page: {
-        Args: {
-          p_expected_page: number
-          p_has_more: boolean
-          p_sync_run_id: string
-          p_total_available: number
-          p_transactions: Json
-        }
         Returns: Json
       }
       ingest_sepay_transaction_record: {
@@ -9269,6 +9392,20 @@ export type Database = {
           version_number: number
         }[]
       }
+      search_sepay_reconciliation_candidates: {
+        Args: {
+          p_limit?: number
+          p_search?: string
+          p_sepay_transaction_id: string
+        }
+        Returns: {
+          expected_amount_vnd: number
+          public_code: string
+          request_id: string
+          student_full_name: string
+          topup_type: string
+        }[]
+      }
       set_attendance_verification_config: {
         Args: {
           p_attendance_radius_m: number
@@ -9766,12 +9903,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -9795,11 +9932,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -9820,11 +9957,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -9845,11 +9982,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -9862,11 +9999,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

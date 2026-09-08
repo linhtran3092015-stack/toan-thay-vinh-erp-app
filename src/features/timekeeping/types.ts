@@ -144,7 +144,9 @@ export type TimekeepingEntriesErrorCode =
   | "my_entries_query_failed"
   | "adjustable_entries_query_failed"
   | "my_adjustment_requests_query_failed"
-  | "adjustment_approval_queue_query_failed";
+  | "adjustment_approval_queue_query_failed"
+  | "monthly_entries_query_failed"
+  | "center_monthly_overview_failed";
 
 export interface TimekeepingEntriesError {
   code: TimekeepingEntriesErrorCode;
@@ -254,3 +256,59 @@ export type TimekeepingAdjustmentApprovalQueueResult =
       ok: false;
       error: TimekeepingEntriesError;
     };
+
+export interface TimekeepingMonthlyEntry {
+  adjustedCheckInAt: string | null;
+  adjustedCheckOutAt: string | null;
+  adjustmentStatus: TimekeepingAdjustmentStatus | "none";
+  autoEndedAt: string | null;
+  checkInAt: string;
+  checkInMode: TimeEntryMode;
+  checkOutAt: string | null;
+  checkOutMode: TimeEntryMode | "auto_end" | null;
+  clockOutReason: ClockOutReason | null;
+  hasCheckInGpsEvidence: boolean;
+  hasCheckInWifiEvidence: boolean;
+  hasCheckOutGpsEvidence: boolean;
+  hasCheckOutWifiEvidence: boolean;
+  id: string;
+  isUnscheduled: boolean;
+  status: TimeEntryStatus;
+  totalMinutes: number | null;
+  workDate: string;
+  workShiftCode: string | null;
+  workShiftName: string | null;
+}
+
+export type TimekeepingMonthlyEntriesResult =
+  | {
+      ok: true;
+      entries: readonly TimekeepingMonthlyEntry[];
+    }
+  | {
+      ok: false;
+      error: TimekeepingEntriesError;
+    };
+
+export interface TimekeepingCenterMonthlyOverviewEntry {
+  autoEndedCount: number;
+  pendingAdjustmentCount: number;
+  primaryRoleName: string;
+  staffDisplayName: string;
+  staffEmployeeCode: string | null;
+  staffId: string;
+  totalEntries: number;
+  totalHours: number;
+  totalWorkDays: number;
+}
+
+export type TimekeepingCenterMonthlyOverviewResult =
+  | {
+      ok: true;
+      overview: readonly TimekeepingCenterMonthlyOverviewEntry[];
+    }
+  | {
+      ok: false;
+      error: TimekeepingEntriesError;
+    };
+

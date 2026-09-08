@@ -3,6 +3,8 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import {
   getAttendanceVerificationConfig,
   getAttendanceVerificationPolicy,
+  getCenterMonthlyTimekeepingOverview,
+  getMyMonthlyTimekeepingEntries,
   getMyTimeEntryAdjustmentRequests,
   getMyTimekeepingAdjustableEntries,
   getMyTimekeepingEntries,
@@ -46,6 +48,15 @@ export default async function TimekeepingRoute() {
   const canApproveAdjustments = permissionResult.permissions.includes(
     "timekeeping.approve_adjustment",
   );
+
+  const now = new Date();
+  const currentMonth = Number(
+    new Intl.DateTimeFormat("en-CA", { month: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(now),
+  );
+  const currentYear = Number(
+    new Intl.DateTimeFormat("en-CA", { year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(now),
+  );
+
   const [
     adjustmentEntriesResult,
     adjustmentApprovalQueueResult,
@@ -57,6 +68,8 @@ export default async function TimekeepingRoute() {
     dayEntriesResult,
     verificationPolicyResult,
     verificationConfigResult,
+    myMonthlyEntriesResult,
+    centerMonthlyOverviewResult,
   ] = await Promise.all([
     canCheck ? getMyTimekeepingAdjustableEntries() : Promise.resolve(null),
     canApproveAdjustments
@@ -65,7 +78,9 @@ export default async function TimekeepingRoute() {
     canCheck ? getMyTimeEntryAdjustmentRequests() : Promise.resolve(null),
     canView ? getTimekeepingSchedule() : Promise.resolve(null),
     canView ? getTimekeepingWorkShifts() : Promise.resolve(null),
-    canManage ? getTimekeepingStaffOptions() : Promise.resolve(null),
+    canManage || canApproveAdjustments
+      ? getTimekeepingStaffOptions()
+      : Promise.resolve(null),
     canCheck ? getMyTimekeepingEntries() : Promise.resolve(null),
     canView ? getTimekeepingDayEntries() : Promise.resolve(null),
     canCheck || canManageVerification
@@ -73,6 +88,12 @@ export default async function TimekeepingRoute() {
       : Promise.resolve(null),
     canManageVerification
       ? getAttendanceVerificationConfig()
+      : Promise.resolve(null),
+    canCheck
+      ? getMyMonthlyTimekeepingEntries(currentMonth, currentYear)
+      : Promise.resolve(null),
+    canManage || canApproveAdjustments
+      ? getCenterMonthlyTimekeepingOverview(currentMonth, currentYear)
       : Promise.resolve(null),
   ]);
 
@@ -166,6 +187,24 @@ export default async function TimekeepingRoute() {
     );
   }
 
+  if (myMonthlyEntriesResult && !myMonthlyEntriesResult.ok) {
+    return (
+      <ErrorState
+        description={myMonthlyEntriesResult.error.message}
+        title="Không tải được bảng công tháng cá nhân"
+      />
+    );
+  }
+
+  if (centerMonthlyOverviewResult && !centerMonthlyOverviewResult.ok) {
+    return (
+      <ErrorState
+        description={centerMonthlyOverviewResult.error.message}
+        title="Không tải được bảng tổng hợp công toàn trung tâm"
+      />
+    );
+  }
+
   return (
     <TimekeepingPage
       adjustmentApprovalQueue={
@@ -179,10 +218,18 @@ export default async function TimekeepingRoute() {
       canManage={canManage}
       canManageVerification={canManageVerification}
       canView={canView}
+      centerMonthlyOverview={
+        centerMonthlyOverviewResult?.ok ? centerMonthlyOverviewResult.overview : []
+      }
+      currentMonth={currentMonth}
+      currentYear={currentYear}
       dayEntries={dayEntriesResult?.ok ? dayEntriesResult.entries : []}
       entries={scheduleResult?.ok ? scheduleResult.entries : []}
       myAdjustmentRequests={adjustmentRequestsResult?.ok ? adjustmentRequestsResult.requests : []}
       myEntries={myEntriesResult?.ok ? myEntriesResult.entries : []}
+      myMonthlyEntries={
+        myMonthlyEntriesResult?.ok ? myMonthlyEntriesResult.entries : []
+      }
       staffOptions={staffOptionsResult?.ok ? staffOptionsResult.staffOptions : []}
       workShifts={workShiftsResult?.ok ? workShiftsResult.workShifts : []}
     />

@@ -67,6 +67,12 @@ export async function AuthenticatedAppShell({
     ? myEntriesResult.entries.some((entry) => entry.status === "open")
     : false;
 
+  const openOfflineEntry = myEntriesResult?.ok
+    ? myEntriesResult.entries.find(
+        (entry) => entry.status === "open" && entry.checkInMode === "offline",
+      )
+    : null;
+
   const unreadNotificationCount =
     unreadNotificationCountResult.ok
       ? unreadNotificationCountResult.data
@@ -78,6 +84,7 @@ export async function AuthenticatedAppShell({
       canCheckTimekeeping={canCheckTimekeeping}
       centerDisplayName={centerDisplayName}
       hasOpenTimekeepingEntry={hasOpenTimekeepingEntry}
+      openOfflineEntryId={openOfflineEntry?.id ?? null}
       permissions={permissionResult.permissions}
       unreadNotificationCount={unreadNotificationCount}
     >

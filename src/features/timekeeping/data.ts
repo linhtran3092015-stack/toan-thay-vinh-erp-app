@@ -12,6 +12,8 @@ import type {
   TimekeepingDayEntriesResult,
   TimekeepingEntriesError,
   TimekeepingEntriesErrorCode,
+  TimekeepingMonthlyEntriesResult,
+  TimekeepingCenterMonthlyOverviewResult,
   TimekeepingMyEntriesResult,
   TimekeepingScheduleError,
   TimekeepingScheduleErrorCode,
@@ -169,6 +171,8 @@ function createEntriesError(
     my_adjustment_requests_query_failed:
       "Không thể tải lịch sử yêu cầu điều chỉnh công.",
     my_entries_query_failed: "Không thể tải dữ liệu chấm công của bạn.",
+    monthly_entries_query_failed: "Không thể tải bảng công theo tháng.",
+    center_monthly_overview_failed: "Không thể tải bảng công toàn trung tâm theo tháng.",
   };
 
   return { code, message: messages[code] };
@@ -427,3 +431,118 @@ export async function getTimeEntryAdjustmentApprovalQueue(): Promise<Timekeeping
     })),
   };
 }
+
+export async function getMyMonthlyTimekeepingEntries(
+  month: number,
+  year: number,
+): Promise<TimekeepingMonthlyEntriesResult> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("get_my_monthly_timekeeping_entries", {
+    p_month: month,
+    p_year: year,
+  });
+
+  if (error) {
+    return { ok: false, error: createEntriesError("monthly_entries_query_failed") };
+  }
+
+  return {
+    ok: true,
+    entries: data.map((entry) => ({
+      adjustedCheckInAt: entry.adjusted_check_in_at,
+      adjustedCheckOutAt: entry.adjusted_check_out_at,
+      adjustmentStatus: entry.adjustment_status as "pending" | "approved" | "rejected" | "none",
+      autoEndedAt: entry.auto_ended_at,
+      checkInAt: entry.check_in_at,
+      checkInMode: entry.check_in_mode as "online" | "offline",
+      checkOutAt: entry.check_out_at,
+      checkOutMode: entry.check_out_mode as "online" | "offline" | "auto_end" | null,
+      clockOutReason: entry.clock_out_reason as "manual" | "left_geofence" | "location_lost" | "daily_cutoff" | null,
+      hasCheckInGpsEvidence: entry.has_check_in_gps_evidence,
+      hasCheckInWifiEvidence: entry.has_check_in_wifi_evidence,
+      hasCheckOutGpsEvidence: entry.has_check_out_gps_evidence,
+      hasCheckOutWifiEvidence: entry.has_check_out_wifi_evidence,
+      id: entry.entry_id,
+      isUnscheduled: entry.is_unscheduled,
+      status: entry.entry_status as "open" | "checked_out" | "auto_ended",
+      totalMinutes: entry.total_minutes,
+      workDate: entry.work_date,
+      workShiftCode: entry.work_shift_code,
+      workShiftName: entry.work_shift_name,
+    })),
+  };
+}
+
+export async function getCenterMonthlyTimekeepingOverview(
+  month: number,
+  year: number,
+): Promise<TimekeepingCenterMonthlyOverviewResult> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("get_center_monthly_timekeeping_overview", {
+    p_month: month,
+    p_year: year,
+  });
+
+  if (error) {
+    return { ok: false, error: createEntriesError("center_monthly_overview_failed") };
+  }
+
+  return {
+    ok: true,
+    overview: data.map((row) => ({
+      autoEndedCount: row.auto_ended_count,
+      pendingAdjustmentCount: row.pending_adjustment_count,
+      primaryRoleName: row.primary_role_name,
+      staffDisplayName: row.staff_display_name,
+      staffEmployeeCode: row.staff_employee_code,
+      staffId: row.staff_id,
+      totalEntries: row.total_entries,
+      totalHours: Number(row.total_hours),
+      totalWorkDays: row.total_work_days,
+    })),
+  };
+}
+
+export async function getStaffMonthlyTimekeepingEntries(
+  staffId: string,
+  month: number,
+  year: number,
+): Promise<TimekeepingMonthlyEntriesResult> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("get_staff_monthly_timekeeping_entries", {
+    p_month: month,
+    p_staff_id: staffId,
+    p_year: year,
+  });
+
+  if (error) {
+    return { ok: false, error: createEntriesError("monthly_entries_query_failed") };
+  }
+
+  return {
+    ok: true,
+    entries: data.map((entry) => ({
+      adjustedCheckInAt: entry.adjusted_check_in_at,
+      adjustedCheckOutAt: entry.adjusted_check_out_at,
+      adjustmentStatus: entry.adjustment_status as "pending" | "approved" | "rejected" | "none",
+      autoEndedAt: entry.auto_ended_at,
+      checkInAt: entry.check_in_at,
+      checkInMode: entry.check_in_mode as "online" | "offline",
+      checkOutAt: entry.check_out_at,
+      checkOutMode: entry.check_out_mode as "online" | "offline" | "auto_end" | null,
+      clockOutReason: entry.clock_out_reason as "manual" | "left_geofence" | "location_lost" | "daily_cutoff" | null,
+      hasCheckInGpsEvidence: entry.has_check_in_gps_evidence,
+      hasCheckInWifiEvidence: entry.has_check_in_wifi_evidence,
+      hasCheckOutGpsEvidence: entry.has_check_out_gps_evidence,
+      hasCheckOutWifiEvidence: entry.has_check_out_wifi_evidence,
+      id: entry.entry_id,
+      isUnscheduled: entry.is_unscheduled,
+      status: entry.entry_status as "open" | "checked_out" | "auto_ended",
+      totalMinutes: entry.total_minutes,
+      workDate: entry.work_date,
+      workShiftCode: entry.work_shift_code,
+      workShiftName: entry.work_shift_name,
+    })),
+  };
+}
+

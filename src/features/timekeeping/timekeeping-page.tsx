@@ -6,6 +6,8 @@ import { TimekeepingAdjustmentRequests } from "@/features/timekeeping/components
 import { AttendanceVerificationSettings } from "@/features/timekeeping/components/attendance-verification-settings";
 import { MyTimekeepingPanel } from "@/features/timekeeping/components/my-timekeeping-panel";
 import { TimekeepingDayEntries } from "@/features/timekeeping/components/timekeeping-day-entries";
+import { MyMonthlyTimesheetPanel } from "@/features/timekeeping/components/my-monthly-timesheet-panel";
+import { CenterMonthlyTimesheetManagement } from "@/features/timekeeping/components/center-monthly-timesheet-management";
 import { WorkShiftDialog } from "@/features/timekeeping/components/work-shift-dialog";
 import { WorkShiftRetireAction } from "@/features/timekeeping/components/work-shift-retire-action";
 import { DataTableFrame } from "@/components/patterns/data-table-frame";
@@ -17,7 +19,9 @@ import type {
   TimekeepingAdjustableEntry,
   TimekeepingAdjustmentApprovalQueueEntry,
   TimekeepingAdjustmentRequest,
+  TimekeepingCenterMonthlyOverviewEntry,
   TimekeepingDayEntry,
+  TimekeepingMonthlyEntry,
   TimekeepingMyEntry,
   TimekeepingScheduleEntry,
   TimekeepingStaffOption,
@@ -34,9 +38,13 @@ interface TimekeepingPageProps {
   canView?: boolean;
   adjustmentEntries: readonly TimekeepingAdjustableEntry[];
   adjustmentApprovalQueue: readonly TimekeepingAdjustmentApprovalQueueEntry[];
+  centerMonthlyOverview?: readonly TimekeepingCenterMonthlyOverviewEntry[];
+  currentMonth?: number;
+  currentYear?: number;
   dayEntries: readonly TimekeepingDayEntry[];
   entries: readonly TimekeepingScheduleEntry[];
   myEntries: readonly TimekeepingMyEntry[];
+  myMonthlyEntries?: readonly TimekeepingMonthlyEntry[];
   myAdjustmentRequests: readonly TimekeepingAdjustmentRequest[];
   staffOptions: readonly TimekeepingStaffOption[];
   workShifts: readonly TimekeepingWorkShift[];
@@ -122,9 +130,13 @@ export function TimekeepingPage({
   canView = true,
   adjustmentApprovalQueue = [],
   adjustmentEntries = [],
+  centerMonthlyOverview = [],
+  currentMonth,
+  currentYear,
   dayEntries = [],
   entries = [],
   myEntries = [],
+  myMonthlyEntries = [],
   myAdjustmentRequests = [],
   staffOptions = [],
   workShifts = [],
@@ -182,6 +194,26 @@ export function TimekeepingPage({
           attendancePolicy={attendancePolicy}
           canCheck={canCheck}
           entries={myEntries}
+        />
+      ) : null}
+
+      {canCheck ? (
+        <MyMonthlyTimesheetPanel
+          canCheck={canCheck}
+          initialEntries={myMonthlyEntries}
+          initialMonth={currentMonth}
+          initialYear={currentYear}
+        />
+      ) : null}
+
+      {(canManage || canApproveAdjustments) ? (
+        <CenterMonthlyTimesheetManagement
+          canApproveAdjustments={canApproveAdjustments}
+          canManage={canManage}
+          initialMonth={currentMonth}
+          initialOverview={centerMonthlyOverview}
+          initialYear={currentYear}
+          staffOptions={staffOptions}
         />
       ) : null}
 
