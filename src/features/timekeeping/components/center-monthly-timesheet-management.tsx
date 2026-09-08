@@ -82,6 +82,7 @@ export function CenterMonthlyTimesheetManagement({
   // Modal create entry
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState<boolean>(false);
   const [createForStaffId, setCreateForStaffId] = useState<string | undefined>(undefined);
+  const [createDialogResetKey, setCreateDialogResetKey] = useState<number>(0);
 
   // Drilldown modal state
   const [activeStaff, setActiveStaff] = useState<TimekeepingCenterMonthlyOverviewEntry | null>(
@@ -94,16 +95,21 @@ export function CenterMonthlyTimesheetManagement({
   const [entryToAdjust, setEntryToAdjust] = useState<TimekeepingMonthlyEntry | null>(null);
 
   const loadOverview = (month: number, year: number) => {
+    setOverview([]);
     setSelectedMonth(month);
     setSelectedYear(year);
     setErrorMessage(null);
 
     startTransition(async () => {
-      const result = await fetchCenterMonthlyOverviewAction(month, year);
-      if (result.ok) {
-        setOverview(result.overview);
-      } else {
-        setErrorMessage(result.error.message);
+      try {
+        const result = await fetchCenterMonthlyOverviewAction(month, year);
+        if (result.ok) {
+          setOverview(result.overview);
+        } else {
+          setErrorMessage(result.error.message);
+        }
+      } catch {
+        setErrorMessage("Không thể tải bảng công. Vui lòng thử lại.");
       }
     });
   };
@@ -111,15 +117,22 @@ export function CenterMonthlyTimesheetManagement({
   const openStaffDetail = (staff: TimekeepingCenterMonthlyOverviewEntry) => {
     setActiveStaff(staff);
     setStaffEntries([]);
+    setErrorMessage(null);
 
     startStaffDetailTransition(async () => {
-      const result = await fetchStaffMonthlyTimesheetAction(
-        staff.staffId,
-        selectedMonth,
-        selectedYear,
-      );
-      if (result.ok) {
-        setStaffEntries(result.entries);
+      try {
+        const result = await fetchStaffMonthlyTimesheetAction(
+          staff.staffId,
+          selectedMonth,
+          selectedYear,
+        );
+        if (result.ok) {
+          setStaffEntries(result.entries);
+        } else {
+          setErrorMessage(result.error.message);
+        }
+      } catch {
+        setErrorMessage("Không thể tải bảng công. Vui lòng thử lại.");
       }
     });
   };
@@ -128,20 +141,32 @@ export function CenterMonthlyTimesheetManagement({
     if (!activeStaff) return;
     // Refresh both staff detail and the overview table
     startStaffDetailTransition(async () => {
-      const result = await fetchStaffMonthlyTimesheetAction(
-        activeStaff.staffId,
-        selectedMonth,
-        selectedYear,
-      );
-      if (result.ok) {
-        setStaffEntries(result.entries);
+      try {
+        const result = await fetchStaffMonthlyTimesheetAction(
+          activeStaff.staffId,
+          selectedMonth,
+          selectedYear,
+        );
+        if (result.ok) {
+          setStaffEntries(result.entries);
+        } else {
+          setErrorMessage(result.error.message);
+        }
+      } catch {
+        setErrorMessage("Không thể tải bảng công. Vui lòng thử lại.");
       }
     });
 
     startTransition(async () => {
-      const result = await fetchCenterMonthlyOverviewAction(selectedMonth, selectedYear);
-      if (result.ok) {
-        setOverview(result.overview);
+      try {
+        const result = await fetchCenterMonthlyOverviewAction(selectedMonth, selectedYear);
+        if (result.ok) {
+          setOverview(result.overview);
+        } else {
+          setErrorMessage(result.error.message);
+        }
+      } catch {
+        setErrorMessage("Không thể tải bảng công. Vui lòng thử lại.");
       }
     });
   };
@@ -228,6 +253,7 @@ export function CenterMonthlyTimesheetManagement({
             <Button
               onClick={() => {
                 setCreateForStaffId(undefined);
+                setCreateDialogResetKey((k) => k + 1);
                 setIsCreateDialogOpen(true);
               }}
               size="sm"
@@ -472,6 +498,7 @@ export function CenterMonthlyTimesheetManagement({
           isOpen={Boolean(activeStaff)}
           onClose={() => setActiveStaff(null)}
         >
+          {errorMessage ? <p role="alert" className="text-danger">{errorMessage}</p> : null}
           <div className="flex flex-col gap-4 border-b border-hairline pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3
@@ -491,6 +518,7 @@ export function CenterMonthlyTimesheetManagement({
               <Button
                 onClick={() => {
                   setCreateForStaffId(activeStaff.staffId);
+                  setCreateDialogResetKey((k) => k + 1);
                   setIsCreateDialogOpen(true);
                 }}
                 size="sm"
@@ -641,6 +669,7 @@ export function CenterMonthlyTimesheetManagement({
 
       {/* Create Manual Entry Dialog */}
       <AdminCreateTimeEntryDialog
+        key={createDialogResetKey}
         isOpen={isCreateDialogOpen}
         onClose={() => {
           setIsCreateDialogOpen(false);

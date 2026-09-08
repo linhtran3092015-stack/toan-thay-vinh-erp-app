@@ -36,8 +36,8 @@ const weekdayNames: Record<number, string> = {
 };
 
 function formatWeekday(dateStr: string): string {
-  const date = new Date(`${dateStr}T00:00:00+07:00`);
-  return weekdayNames[date.getDay()] ?? "";
+  const date = new Date(`${dateStr}T00:00:00Z`);
+  return weekdayNames[date.getUTCDay()] ?? "";
 }
 
 function formatMinutesToHours(minutes: number | null): string {
@@ -80,11 +80,17 @@ export function MyMonthlyTimesheetPanel({
     setFetchError(null);
 
     startTransition(async () => {
-      const result = await fetchMyMonthlyTimesheetAction(month, year);
-      if (result.ok) {
-        setEntries(result.entries);
-      } else {
-        setFetchError(result.error.message);
+      try {
+        const result = await fetchMyMonthlyTimesheetAction(month, year);
+        if (result.ok) {
+          setEntries(result.entries);
+        } else {
+          setEntries([]);
+          setFetchError(result.error.message);
+        }
+      } catch {
+        setEntries([]);
+        setFetchError("Không thể tải bảng công. Vui lòng chọn lại tháng để thử lại.");
       }
     });
   };

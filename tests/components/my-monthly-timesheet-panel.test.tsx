@@ -1,7 +1,8 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MyMonthlyTimesheetPanel } from "@/features/timekeeping/components/my-monthly-timesheet-panel";
+import { fetchMyMonthlyTimesheetAction } from "@/features/timekeeping/timekeeping-admin-actions";
 import type { TimekeepingMonthlyEntry } from "@/features/timekeeping/types";
 
 vi.mock("next/navigation", () => ({
@@ -139,3 +140,14 @@ describe("MyMonthlyTimesheetPanel", () => {
     expect(screen.getByText("Đã duyệt sửa giờ")).toBeInTheDocument();
   });
 });
+
+ it("keeps the page usable when a monthly server action rejects and permits retry", async () => {
+   vi.mocked(fetchMyMonthlyTimesheetAction).mockRejectedValueOnce(new Error("network"));
+   render(<MyMonthlyTimesheetPanel canCheck initialEntries={mockEntries} initialMonth={9} initialYear={2026} />);
+   fireEvent.change(screen.getByLabelText("Chọn tháng"), { target: { value: "8" } });
+   expect(await screen.findByText("Không thể tải bảng công. Vui lòng chọn lại tháng để thử lại.")).toBeInTheDocument();
+   expect(screen.queryByText("25.5")).not.toBeInTheDocument();
+   vi.mocked(fetchMyMonthlyTimesheetAction).mockResolvedValueOnce({ ok: true, entries: mockEntries });
+   fireEvent.change(screen.getByLabelText("Chọn tháng"), { target: { value: "9" } });
+   expect(await screen.findByText("25.5")).toBeInTheDocument();
+ });

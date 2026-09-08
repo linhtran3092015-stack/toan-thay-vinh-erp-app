@@ -206,4 +206,15 @@ describe("Timekeeping entry dialog", () => {
     expect(screen.queryByText("Dữ liệu vị trí GPS")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Tên mạng Wi-Fi")).not.toBeInTheDocument();
   });
+  it.each(["check-in", "check-out"] as const)("keeps %s transport failures inside the dialog", async (operation) => {
+    const action = operation === "check-in" ? actions.checkInTimeEntryAction : actions.checkOutTimeEntryAction;
+    action.mockRejectedValueOnce(new Error("transport unavailable"));
+    render(<TimekeepingEntryDialog operation={operation} />);
+    fireEvent.click(screen.getByRole("button", { name: operation === "check-in" ? "Check-in" : "Check-out" }));
+    fireEvent.click(screen.getByRole("button", { name: `Xác nhận ${operation}` }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Không thể kết nối tới hệ thống chấm công");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
 });

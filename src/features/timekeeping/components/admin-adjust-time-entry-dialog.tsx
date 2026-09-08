@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import {
   adminAdjustTimeEntryAction,
+} from "@/features/timekeeping/timekeeping-admin-actions";
+import {
   type AdminTimekeepingActionState,
   initialAdminTimekeepingActionState,
-} from "@/features/timekeeping/timekeeping-admin-actions";
+} from "@/features/timekeeping/timekeeping-admin-action-types";
 import {
   formatVietnamDate,
   formatVietnamDateTimeInput,
@@ -97,21 +99,25 @@ function AdminAdjustTimeEntryForm({
     }
 
     startTransition(async () => {
-      const result = await adminAdjustTimeEntryAction({
-        checkInAt: vietnamDatetimeInputToIso(checkInInput),
-        checkOutAt: vietnamDatetimeInputToIso(checkOutInput),
-        reason: reason.trim(),
-        timeEntryId: entry.id,
-      });
+      try {
+        const result = await adminAdjustTimeEntryAction({
+          checkInAt: vietnamDatetimeInputToIso(checkInInput),
+          checkOutAt: vietnamDatetimeInputToIso(checkOutInput),
+          reason: reason.trim(),
+          timeEntryId: entry.id,
+        });
 
-      setActionState(result);
-      if (result.status === "success") {
-        if (onSuccess) {
-          onSuccess();
+        setActionState(result);
+        if (result.status === "success") {
+          if (onSuccess) {
+            onSuccess();
+          }
+          setTimeout(() => {
+            onClose();
+          }, 1200);
         }
-        setTimeout(() => {
-          onClose();
-        }, 1200);
+      } catch {
+        setActionState({ status: "error", message: "Không thể kết nối tới hệ thống chấm công. Vui lòng thử lại." });
       }
     });
   };

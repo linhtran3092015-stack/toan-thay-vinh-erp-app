@@ -21,16 +21,7 @@ import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import type { PermissionCode } from "@/lib/permissions/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export interface AdminTimekeepingActionState {
-  fieldErrors?: Record<string, string[] | undefined>;
-  message: string;
-  status: "idle" | "success" | "error";
-}
-
-export const initialAdminTimekeepingActionState: AdminTimekeepingActionState = {
-  message: "",
-  status: "idle",
-};
+import type { AdminTimekeepingActionState } from "@/features/timekeeping/timekeeping-admin-action-types";
 
 function createErrorState(
   message: string,
@@ -176,63 +167,93 @@ export async function fetchStaffMonthlyTimesheetAction(
   month: number,
   year: number,
 ): Promise<TimekeepingMonthlyEntriesResult> {
-  const hasPermission = await hasAnyPermission([
-    "timekeeping.view",
-    "timekeeping.approve_adjustment",
-    "staff.manage",
-  ]);
+  try {
+    const hasPermission = await hasAnyPermission([
+      "timekeeping.view",
+      "timekeeping.approve_adjustment",
+      "staff.manage",
+    ]);
 
-  if (!hasPermission) {
+    if (!hasPermission) {
+      return {
+        error: {
+          code: "monthly_entries_query_failed",
+          message: "Bạn không có quyền xem chi tiết bảng công của nhân sự này.",
+        },
+        ok: false,
+      };
+    }
+
+    return getStaffMonthlyTimekeepingEntries(staffId, month, year);
+  } catch {
     return {
       error: {
         code: "monthly_entries_query_failed",
-        message: "Bạn không có quyền xem chi tiết bảng công của nhân sự này.",
+        message: "Không thể tải chi tiết chấm công. Vui lòng thử lại.",
       },
       ok: false,
     };
   }
-
-  return getStaffMonthlyTimekeepingEntries(staffId, month, year);
 }
 
 export async function fetchCenterMonthlyOverviewAction(
   month: number,
   year: number,
 ): Promise<TimekeepingCenterMonthlyOverviewResult> {
-  const hasPermission = await hasAnyPermission([
-    "timekeeping.view",
-    "timekeeping.approve_adjustment",
-    "staff.manage",
-  ]);
+  try {
+    const hasPermission = await hasAnyPermission([
+      "timekeeping.view",
+      "timekeeping.approve_adjustment",
+      "staff.manage",
+    ]);
 
-  if (!hasPermission) {
+    if (!hasPermission) {
+      return {
+        error: {
+          code: "center_monthly_overview_failed",
+          message: "Bạn không có quyền xem bảng tổng hợp công toàn trung tâm.",
+        },
+        ok: false,
+      };
+    }
+
+    return getCenterMonthlyTimekeepingOverview(month, year);
+  } catch {
     return {
       error: {
         code: "center_monthly_overview_failed",
-        message: "Bạn không có quyền xem bảng tổng hợp công toàn trung tâm.",
+        message: "Không thể tải bảng công toàn trung tâm. Vui lòng thử lại.",
       },
       ok: false,
     };
   }
-
-  return getCenterMonthlyTimekeepingOverview(month, year);
 }
 
 export async function fetchMyMonthlyTimesheetAction(
   month: number,
   year: number,
 ): Promise<TimekeepingMonthlyEntriesResult> {
-  const hasPermission = await hasAnyPermission(["timekeeping.check"]);
+  try {
+    const hasPermission = await hasAnyPermission(["timekeeping.check"]);
 
-  if (!hasPermission) {
+    if (!hasPermission) {
+      return {
+        error: {
+          code: "monthly_entries_query_failed",
+          message: "Bạn không có quyền chấm công hoặc xem bảng công cá nhân.",
+        },
+        ok: false,
+      };
+    }
+
+    return getMyMonthlyTimekeepingEntries(month, year);
+  } catch {
     return {
       error: {
         code: "monthly_entries_query_failed",
-        message: "Bạn không có quyền chấm công hoặc xem bảng công cá nhân.",
+        message: "Không thể tải bảng công cá nhân. Vui lòng thử lại.",
       },
       ok: false,
     };
   }
-
-  return getMyMonthlyTimekeepingEntries(month, year);
 }

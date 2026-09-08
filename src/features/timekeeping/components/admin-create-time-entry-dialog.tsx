@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import {
   adminCreateTimeEntryAction,
+} from "@/features/timekeeping/timekeeping-admin-actions";
+import {
   type AdminTimekeepingActionState,
   initialAdminTimekeepingActionState,
-} from "@/features/timekeeping/timekeeping-admin-actions";
+} from "@/features/timekeeping/timekeeping-admin-action-types";
 import { vietnamDatetimeInputToIso } from "@/features/timekeeping/timekeeping-adjustment-utils";
 import { getVietnamBusinessDate } from "@/features/timekeeping/timekeeping-client-utils";
 import type { TimekeepingStaffOption } from "@/features/timekeeping/types";
@@ -102,23 +104,27 @@ function AdminCreateTimeEntryForm({
     }
 
     startTransition(async () => {
-      const result = await adminCreateTimeEntryAction({
-        checkInAt: vietnamDatetimeInputToIso(checkInInput),
-        checkOutAt: vietnamDatetimeInputToIso(checkOutInput),
-        mode,
-        notes: notes.trim(),
-        staffId,
-        workDate,
-      });
+      try {
+        const result = await adminCreateTimeEntryAction({
+          checkInAt: vietnamDatetimeInputToIso(checkInInput),
+          checkOutAt: vietnamDatetimeInputToIso(checkOutInput),
+          mode,
+          notes: notes.trim(),
+          staffId,
+          workDate,
+        });
 
-      setActionState(result);
-      if (result.status === "success") {
-        if (onSuccess) {
-          onSuccess();
+        setActionState(result);
+        if (result.status === "success") {
+          if (onSuccess) {
+            onSuccess();
+          }
+          setTimeout(() => {
+            onClose();
+          }, 1200);
         }
-        setTimeout(() => {
-          onClose();
-        }, 1200);
+      } catch {
+        setActionState({ status: "error", message: "Không thể kết nối tới hệ thống chấm công. Vui lòng thử lại." });
       }
     });
   };

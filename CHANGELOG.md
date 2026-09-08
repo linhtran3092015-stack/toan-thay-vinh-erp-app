@@ -2,6 +2,14 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.4.4.0] - 2026-09-08
+
+### Fixed
+- Restore timekeeping actions, monthly filters and staff timesheet detail loading after server action requests crashed the page.
+- Open manual attendance forms without showing an error before submission.
+- Keep connection errors inside timesheet panels and attendance forms; clear stale monthly results after changing filters.
+- Display weekdays consistently across browser time zones.
+
 ## [0.4.0.2] - 2026-09-07
 
 ### Fixed

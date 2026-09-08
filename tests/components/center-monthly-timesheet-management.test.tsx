@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CenterMonthlyTimesheetManagement } from "@/features/timekeeping/components/center-monthly-timesheet-management";
@@ -147,4 +147,18 @@ describe("CenterMonthlyTimesheetManagement", () => {
       screen.getByText(/Chi tiết chấm công: Nguyễn Văn A/i),
     ).toBeInTheDocument();
   });
+  it("opens manual entry without an initial error banner", () => {
+    render(<CenterMonthlyTimesheetManagement canApproveAdjustments canManage initialMonth={9} initialOverview={mockOverview} initialYear={2026} staffOptions={mockStaffOptions} />);
+    fireEvent.click(screen.getByRole("button", { name: "Bổ sung công bù" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.queryByText("Không thể thêm công")).not.toBeInTheDocument();
+  });
+
+  it("shows a rejected detail request inside the dialog instead of crashing", async () => {
+    dependencies.fetchStaffMonthlyTimesheetAction.mockRejectedValueOnce(new Error("transport failed"));
+    render(<CenterMonthlyTimesheetManagement canApproveAdjustments canManage initialMonth={9} initialOverview={mockOverview} initialYear={2026} staffOptions={mockStaffOptions} />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Chi tiết bảng công" })[0]);
+    expect(await within(screen.getByRole("dialog")).findByRole("alert")).toHaveTextContent("Không thể tải bảng công");
+  });
+
 });

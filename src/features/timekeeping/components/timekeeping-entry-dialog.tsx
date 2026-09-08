@@ -180,15 +180,19 @@ export function TimekeepingEntryDialog({
     setActionState(initialTimekeepingEntryActionState);
 
     startTransition(async () => {
-      const result = isCheckIn
-        ? await checkInTimeEntryAction(values)
-        : await checkOutTimeEntryAction(values);
+      try {
+        const result = isCheckIn
+          ? await checkInTimeEntryAction(values)
+          : await checkOutTimeEntryAction(values);
 
-      setActionState(result);
+        setActionState(result);
 
-      if (result.status === "success") {
-        setIsOpen(false);
-        router.refresh();
+        if (result.status === "success") {
+          setIsOpen(false);
+          router.refresh();
+        }
+      } catch {
+        setActionState({ status: "error", message: "Không thể kết nối tới hệ thống chấm công. Vui lòng thử lại." });
       }
     });
   };
