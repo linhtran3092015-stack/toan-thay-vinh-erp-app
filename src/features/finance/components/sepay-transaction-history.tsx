@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 
 import { DataTableFrame } from "@/components/patterns/data-table-frame";
@@ -9,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { getSepayAccountPurposeQuery, type SepayAccountPurposeFilter } from "@/features/finance/sepay-transaction-url-state";
 import type { SepayTransactionReadModel } from "@/features/finance/read-models";
 import { SepayReconciliationActions, type SepayReconciliationCandidateView } from "@/features/finance/components/sepay-reconciliation-actions";
+import { SepayReconciliationDialog } from "@/features/finance/components/sepay-reconciliation-dialog";
 
 interface SepayTransactionHistoryProps {
   accountPurposeFilter?: SepayAccountPurposeFilter;
@@ -80,6 +83,21 @@ export function SepayTransactionHistory({
   transactions,
   total = transactions.length,
 }: SepayTransactionHistoryProps) {
+  const [reconcilingTransaction, setReconcilingTransaction] = useState<SepayTransactionReadModel | null>(null);
+  const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleOpenReconciliation = (
+    transaction: SepayTransactionReadModel,
+    trigger: HTMLElement | null,
+  ) => {
+    triggerButtonRef.current = trigger as HTMLButtonElement | null;
+    setReconcilingTransaction(transaction);
+  };
+
+  const handleCloseReconciliation = () => {
+    setReconcilingTransaction(null);
+  };
+
   return (
     <div className="grid min-w-0 gap-5">
       <PageHeader title="Giao dịch SePay">
@@ -120,10 +138,25 @@ export function SepayTransactionHistory({
             title="Chưa có giao dịch SePay"
           />
         ) : (
-          <SepayTransactionTable canReconcile={canReconcile} candidates={candidates} transactions={transactions} />
+          <SepayTransactionTable
+            canReconcile={canReconcile}
+            candidates={candidates}
+            onOpenReconciliation={handleOpenReconciliation}
+            transactions={transactions}
+          />
         )}
         <SepayPagination accountPurposeFilter={accountPurposeFilter} page={page} pageSize={pageSize} total={total} />
       </section>
+
+      {canReconcile ? (
+        <SepayReconciliationDialog
+          candidates={candidates}
+          isOpen={reconcilingTransaction !== null}
+          onClose={handleCloseReconciliation}
+          returnFocusRef={triggerButtonRef}
+          transaction={reconcilingTransaction}
+        />
+      ) : null}
     </div>
   );
 }
@@ -131,13 +164,22 @@ export function SepayTransactionHistory({
 function SepayTransactionTable({
   canReconcile,
   candidates,
+  onOpenReconciliation,
   transactions,
-}: Pick<SepayTransactionHistoryProps, "canReconcile" | "candidates" | "transactions">) {
+}: Pick<SepayTransactionHistoryProps, "canReconcile" | "candidates" | "transactions"> & {
+  onOpenReconciliation: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
+}) {
   return (
     <div className="sepay-transaction-results-work-area">
       <DataTableFrame
         body={transactions.map((transaction) => (
-          <SepayTransactionTableRow canReconcile={canReconcile} candidates={candidates} key={transaction.id} transaction={transaction} />
+          <SepayTransactionTableRow
+            canReconcile={canReconcile}
+            candidates={candidates}
+            key={transaction.id}
+            onOpenReconciliation={onOpenReconciliation}
+            transaction={transaction}
+          />
         ))}
         caption="Danh sách giao dịch SePay mới nhất"
         className="sepay-transaction-directory-table"
@@ -162,7 +204,13 @@ function SepayTransactionTable({
         label="Danh sách giao dịch SePay mới nhất"
       >
         {transactions.map((transaction) => (
-          <SepayTransactionRecord canReconcile={canReconcile} candidates={candidates} key={transaction.id} transaction={transaction} />
+          <SepayTransactionRecord
+            canReconcile={canReconcile}
+            candidates={candidates}
+            key={transaction.id}
+            onOpenReconciliation={onOpenReconciliation}
+            transaction={transaction}
+          />
         ))}
       </ResponsiveRecordList>
     </div>
@@ -172,10 +220,12 @@ function SepayTransactionTable({
 function SepayTransactionTableRow({
   canReconcile,
   candidates,
+  onOpenReconciliation,
   transaction,
 }: {
   canReconcile?: boolean;
   candidates?: SepayReconciliationCandidateView[];
+  onOpenReconciliation: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
   transaction: SepayTransactionReadModel;
 }) {
   return (
@@ -207,7 +257,15 @@ function SepayTransactionTableRow({
       <TableCell className="w-[170px] text-secondary text-text-muted">
         <SepayReference transaction={transaction} />
       </TableCell>
-      {canReconcile ? <TableCell className="w-[260px]"><SepayReconciliationActions candidates={candidates ?? []} transaction={transaction} /></TableCell> : null}
+      {canReconcile ? (
+        <TableCell className="w-[130px]">
+          <SepayReconciliationActions
+            candidates={candidates ?? []}
+            onOpenDialog={onOpenReconciliation}
+            transaction={transaction}
+          />
+        </TableCell>
+      ) : null}
     </tr>
   );
 }
@@ -215,10 +273,12 @@ function SepayTransactionTableRow({
 function SepayTransactionRecord({
   canReconcile,
   candidates,
+  onOpenReconciliation,
   transaction,
 }: {
   canReconcile?: boolean;
   candidates?: SepayReconciliationCandidateView[];
+  onOpenReconciliation: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
   transaction: SepayTransactionReadModel;
 }) {
   return (
@@ -244,7 +304,6 @@ function SepayTransactionRecord({
           <span className="font-medium text-text-default">Ngân hàng · STK:</span>{" "}
           {transaction.bankBrand} · {transaction.accountNumber}
         </p>
-        {canReconcile ? <SepayReconciliationActions candidates={candidates ?? []} transaction={transaction} /> : null}
         <p><span className="font-medium text-text-default">Tài khoản nhận:</span> <SepayAccountPurposeBadge purpose={transaction.accountPurpose} /></p>
         <p className="break-words font-mono text-caption text-text-default">
           {transaction.transferContent}
@@ -253,6 +312,16 @@ function SepayTransactionRecord({
           <span className="font-medium text-text-default">Tham chiếu:</span>{" "}
           <SepayReference transaction={transaction} />
         </p>
+        {canReconcile ? (
+          <div className="mt-2 flex items-center justify-between border-t border-border-subtle pt-2">
+            <span className="text-caption text-text-muted">Thao tác:</span>
+            <SepayReconciliationActions
+              candidates={candidates ?? []}
+              onOpenDialog={onOpenReconciliation}
+              transaction={transaction}
+            />
+          </div>
+        ) : null}
       </div>
     </article>
   );

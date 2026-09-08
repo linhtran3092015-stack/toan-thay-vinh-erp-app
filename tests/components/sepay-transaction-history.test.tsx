@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -121,5 +121,33 @@ describe("SePay transaction history presentation", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent(/Không tải được danh sách yêu cầu thanh toán/);
     expect(screen.queryByText("Đối soát")).not.toBeInTheDocument();
+  });
+
+  it("renders trigger buttons in table and card list without expanding in-row forms", () => {
+    const reconcilableTransaction: SepayTransactionReadModel = {
+      ...transaction,
+      ingestionSource: "api_v2",
+      matchStatus: "unmatched",
+      sepayV2Id: "95000000-0000-0000-0000-000000000001",
+    };
+
+    render(<SepayTransactionHistory
+      canReconcile
+      transactions={[reconcilableTransaction]}
+    />);
+
+    // Should have 2 "Đối soát" buttons: one in table row, one in mobile card
+    const buttons = screen.getAllByRole("button", { name: "Đối soát" });
+    expect(buttons).toHaveLength(2);
+
+    // No dialog or forms should be inside table
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/Nêu căn cứ đối soát/)).not.toBeInTheDocument();
+
+    // Clicking the table trigger opens dialog
+    fireEvent.click(buttons[0]);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Nêu căn cứ đối soát/)).toBeInTheDocument();
+    expect(screen.getByText("SEPAY-001")).toBeInTheDocument();
   });
 });
