@@ -3,13 +3,17 @@ import { Suspense, use } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigation = vi.hoisted(() => ({ pathname: "/students", pending: false }));
-vi.mock("next/navigation", () => ({ usePathname: () => navigation.pathname }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => navigation.pathname,
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
+}));
 vi.mock("next/link", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next/link")>();
   return { ...actual, useLinkStatus: () => ({ pending: navigation.pending }) };
 });
 vi.mock("@/features/auth/auth-actions", () => ({ signOutAction: vi.fn() }));
 vi.mock("@/components/layout/topbar-timekeeping-button", () => ({ TopbarTimekeepingButton: () => null }));
+vi.mock("@/features/timekeeping/components/attendance-heartbeat-watcher", () => ({ AttendanceHeartbeatWatcher: () => null }));
 
 import ModuleLoading from "@/app/(app)/loading";
 import { AppShell } from "@/components/layout/app-shell";
