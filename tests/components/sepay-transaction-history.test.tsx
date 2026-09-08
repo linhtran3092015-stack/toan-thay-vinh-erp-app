@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({
@@ -154,8 +154,9 @@ describe("SePay transaction history presentation", () => {
 
     // Clicking the table trigger opens dialog
     fireEvent.click(buttons[0]);
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Nêu căn cứ đối soát/)).toBeInTheDocument();
-    expect(screen.getByText("SEPAY-001")).toBeInTheDocument();
+    expect(within(dialog).getByText("SEPAY-001")).toBeInTheDocument();
   });
 });
