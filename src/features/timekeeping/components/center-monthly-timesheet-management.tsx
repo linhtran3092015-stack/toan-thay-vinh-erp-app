@@ -1,18 +1,15 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import {
   AlertTriangle,
-  Calendar,
   Clock,
   Eye,
   FileSpreadsheet,
-  MapPin,
   Plus,
   Search,
   UserCheck,
   Users,
-  Wifi,
   X,
 } from "lucide-react";
 

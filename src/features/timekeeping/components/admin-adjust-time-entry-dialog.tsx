@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition, type FormEvent } from "react";
-import { Clock, Edit3, X } from "lucide-react";
+import { useState, useTransition, type FormEvent } from "react";
+import { Edit3, X } from "lucide-react";
 
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,9 @@ import {
   initialAdminTimekeepingActionState,
 } from "@/features/timekeeping/timekeeping-admin-actions";
 import {
+  formatVietnamDate,
   formatVietnamDateTimeInput,
   vietnamDatetimeInputToIso,
-  formatVietnamDate,
 } from "@/features/timekeeping/timekeeping-adjustment-utils";
 import type { TimekeepingMonthlyEntry } from "@/features/timekeeping/types";
 
@@ -36,26 +36,52 @@ export function AdminAdjustTimeEntryDialog({
   onSuccess,
   staffDisplayName,
 }: AdminAdjustTimeEntryDialogProps) {
+  if (!entry || !isOpen) return null;
+
+  return (
+    <Dialog
+      ariaDescribedBy="admin-adjust-time-entry-desc"
+      ariaLabelledBy="admin-adjust-time-entry-title"
+      className="max-w-lg p-6"
+      isOpen={isOpen}
+      onClose={onClose}
+    >
+      <AdminAdjustTimeEntryForm
+        entry={entry}
+        key={entry.id}
+        onClose={onClose}
+        onSuccess={onSuccess}
+        staffDisplayName={staffDisplayName}
+      />
+    </Dialog>
+  );
+}
+
+function AdminAdjustTimeEntryForm({
+  entry,
+  onClose,
+  onSuccess,
+  staffDisplayName,
+}: {
+  entry: TimekeepingMonthlyEntry;
+  onClose: () => void;
+  onSuccess?: () => void;
+  staffDisplayName?: string;
+}) {
+  const initialIn = entry.adjustedCheckInAt || entry.checkInAt;
+  const initialOut = entry.adjustedCheckOutAt || entry.checkOutAt || entry.checkInAt;
+
   const [isPending, startTransition] = useTransition();
-  const [checkInInput, setCheckInInput] = useState<string>("");
-  const [checkOutInput, setCheckOutInput] = useState<string>("");
+  const [checkInInput, setCheckInInput] = useState<string>(() =>
+    formatVietnamDateTimeInput(initialIn),
+  );
+  const [checkOutInput, setCheckOutInput] = useState<string>(() =>
+    formatVietnamDateTimeInput(initialOut),
+  );
   const [reason, setReason] = useState<string>("");
   const [actionState, setActionState] = useState<AdminTimekeepingActionState>(
     initialAdminTimekeepingActionState,
   );
-
-  useEffect(() => {
-    if (entry && isOpen) {
-      const initialIn = entry.adjustedCheckInAt || entry.checkInAt;
-      const initialOut = entry.adjustedCheckOutAt || entry.checkOutAt || entry.checkInAt;
-      setCheckInInput(formatVietnamDateTimeInput(initialIn));
-      setCheckOutInput(formatVietnamDateTimeInput(initialOut));
-      setReason("");
-      setActionState(initialAdminTimekeepingActionState);
-    }
-  }, [entry, isOpen]);
-
-  if (!entry) return null;
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -93,15 +119,7 @@ export function AdminAdjustTimeEntryDialog({
   const fieldErrors = actionState.fieldErrors ?? {};
 
   return (
-    <Dialog
-      ariaDescribedBy="admin-adjust-time-entry-desc"
-      ariaLabelledBy="admin-adjust-time-entry-title"
-      className="max-w-lg p-6"
-      isOpen={isOpen}
-      onClose={() => {
-        if (!isPending) onClose();
-      }}
-    >
+    <>
       <div className="flex items-start justify-between gap-4 border-b border-hairline pb-4">
         <div className="flex items-center gap-2.5">
           <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -211,6 +229,6 @@ export function AdminAdjustTimeEntryDialog({
           </Button>
         </div>
       </form>
-    </Dialog>
+    </>
   );
 }

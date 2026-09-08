@@ -2,11 +2,7 @@
 
 import { useState, useTransition } from "react";
 import {
-  AlertCircle,
   Calendar,
-  CheckCircle2,
-  Clock,
-  HelpCircle,
   MapPin,
   Wifi,
 } from "lucide-react";
@@ -14,13 +10,9 @@ import {
 import { DataTableFrame } from "@/components/patterns/data-table-frame";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { fetchMyMonthlyTimesheetAction } from "@/features/timekeeping/timekeeping-admin-actions";
 import { TimekeepingAdjustmentRequestDialog } from "@/features/timekeeping/components/timekeeping-adjustment-request-dialog";
-import {
-  formatVietnamDate,
-  formatVietnamDateTime,
-} from "@/features/timekeeping/timekeeping-adjustment-utils";
+import { formatVietnamDate } from "@/features/timekeeping/timekeeping-adjustment-utils";
 import type {
   TimekeepingAdjustableEntry,
   TimekeepingMonthlyEntry,

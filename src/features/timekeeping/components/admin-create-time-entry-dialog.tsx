@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import { PlusCircle, X } from "lucide-react";
 
 import { ResultBanner } from "@/components/shared/result-banner";
@@ -11,10 +11,7 @@ import {
   type AdminTimekeepingActionState,
   initialAdminTimekeepingActionState,
 } from "@/features/timekeeping/timekeeping-admin-actions";
-import {
-  formatVietnamDateTimeInput,
-  vietnamDatetimeInputToIso,
-} from "@/features/timekeeping/timekeeping-adjustment-utils";
+import { vietnamDatetimeInputToIso } from "@/features/timekeeping/timekeeping-adjustment-utils";
 import { getVietnamBusinessDate } from "@/features/timekeeping/timekeeping-client-utils";
 import type { TimekeepingStaffOption } from "@/features/timekeeping/types";
 
@@ -36,31 +33,53 @@ export function AdminCreateTimeEntryDialog({
   preselectedStaffId,
   staffOptions,
 }: AdminCreateTimeEntryDialogProps) {
+  if (!isOpen) return null;
+
+  return (
+    <Dialog
+      ariaDescribedBy="admin-create-time-entry-desc"
+      ariaLabelledBy="admin-create-time-entry-title"
+      className="max-w-lg p-6"
+      isOpen={isOpen}
+      onClose={onClose}
+    >
+      <AdminCreateTimeEntryForm
+        key={preselectedStaffId ?? "new"}
+        onClose={onClose}
+        onSuccess={onSuccess}
+        preselectedStaffId={preselectedStaffId}
+        staffOptions={staffOptions}
+      />
+    </Dialog>
+  );
+}
+
+function AdminCreateTimeEntryForm({
+  onClose,
+  onSuccess,
+  preselectedStaffId,
+  staffOptions,
+}: {
+  onClose: () => void;
+  onSuccess?: () => void;
+  preselectedStaffId?: string;
+  staffOptions: readonly TimekeepingStaffOption[];
+}) {
+  const todayDate = getVietnamBusinessDate();
+
   const [isPending, startTransition] = useTransition();
-  const [staffId, setStaffId] = useState<string>("");
-  const [workDate, setWorkDate] = useState<string>("");
-  const [checkInInput, setCheckInInput] = useState<string>("");
-  const [checkOutInput, setCheckOutInput] = useState<string>("");
+  const [staffId, setStaffId] = useState<string>(
+    () => preselectedStaffId || staffOptions[0]?.id || "",
+  );
+  const [workDate, setWorkDate] = useState<string>(() => todayDate);
+  const [checkInInput, setCheckInInput] = useState<string>(() => `${todayDate}T08:00`);
+  const [checkOutInput, setCheckOutInput] = useState<string>(() => `${todayDate}T17:00`);
   const [mode, setMode] = useState<"offline" | "online">("offline");
-  const [notes, setNotes] = useState<string>("");
+  const [notes, setNotes] = useState<string>("Chủ trung tâm bổ sung công bù");
   const [actionState, setActionState] = useState<AdminTimekeepingActionState>(
     initialAdminTimekeepingActionState,
   );
 
-  useEffect(() => {
-    if (isOpen) {
-      const todayDate = getVietnamBusinessDate();
-      setStaffId(preselectedStaffId || staffOptions[0]?.id || "");
-      setWorkDate(todayDate);
-      setCheckInInput(`${todayDate}T08:00`);
-      setCheckOutInput(`${todayDate}T17:00`);
-      setMode("offline");
-      setNotes("Chủ trung tâm bổ sung công bù");
-      setActionState(initialAdminTimekeepingActionState);
-    }
-  }, [isOpen, preselectedStaffId, staffOptions]);
-
-  // When workDate changes, update the date part of check-in and check-out
   const handleDateChange = (newDate: string) => {
     setWorkDate(newDate);
     const inTime = checkInInput.split("T")[1] || "08:00";
@@ -107,15 +126,7 @@ export function AdminCreateTimeEntryDialog({
   const fieldErrors = actionState.fieldErrors ?? {};
 
   return (
-    <Dialog
-      ariaDescribedBy="admin-create-time-entry-desc"
-      ariaLabelledBy="admin-create-time-entry-title"
-      className="max-w-lg p-6"
-      isOpen={isOpen}
-      onClose={() => {
-        if (!isPending) onClose();
-      }}
-    >
+    <>
       <div className="flex items-start justify-between gap-4 border-b border-hairline pb-4">
         <div className="flex items-center gap-2.5">
           <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
@@ -277,6 +288,6 @@ export function AdminCreateTimeEntryDialog({
           </Button>
         </div>
       </form>
-    </Dialog>
+    </>
   );
 }

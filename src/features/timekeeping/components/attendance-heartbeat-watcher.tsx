@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 
 import { useAttendanceHeartbeat } from "@/features/timekeeping/hooks/use-attendance-heartbeat";
@@ -22,7 +22,7 @@ export function AttendanceHeartbeatWatcher({
   const isTimekeepingPage = pathname === "/timekeeping";
   const shouldTrack = Boolean(activeSessionId) && !isTimekeepingPage;
 
-  const { status } = useAttendanceHeartbeat({
+  useAttendanceHeartbeat({
     activeSessionId: shouldTrack ? activeSessionId : null,
     enabled: shouldTrack,
     onSessionClosed: (result) => {
