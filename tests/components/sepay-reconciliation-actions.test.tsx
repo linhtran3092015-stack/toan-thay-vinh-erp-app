@@ -85,7 +85,7 @@ describe("SePay reconciliation UI and dialog interactions", () => {
     expect(screen.getByText("92000000-0000-4000-8000-000000000001")).toBeInTheDocument();
     expect(screen.getByText(/VCB ·/)).toBeInTheDocument();
     expect(screen.getByText("1001")).toBeInTheDocument();
-    expect(screen.getByText("Lịch sử API")).toBeInTheDocument();
+    expect(screen.getByText(/Lịch sử API/)).toBeInTheDocument();
   });
 
   it("matches only a same-purpose, same-amount pending request after a valid reason is entered", async () => {
