@@ -20,6 +20,8 @@ export function SettingsNavigation({
   const items = [
     { href: "/settings", label: "Tổng quan", visible: true },
     { href: "/settings/general", label: "Trung tâm", visible: canViewSettings },
+    { href: "/settings/branding", label: "Thương hiệu & Giao diện", visible: canViewSettings },
+    { href: "/settings/website", label: "Trang web công khai", visible: canViewSettings },
     {
       href: "/settings/users",
       label: "Người dùng & vai trò",

@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 
+import { readAppBranding } from "@/features/website/data";
+import { BrandingProvider } from "@/features/website/appearance";
 import { AppShell } from "@/components/layout/app-shell";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getCurrentAuthUser } from "@/features/auth/current-user";
@@ -53,7 +55,7 @@ export async function AuthenticatedAppShell({
     permissionResult.permissions.includes("timekeeping.check");
 
   // These requests are independent, but still run only after access is verified.
-  const [myEntriesResult, unreadNotificationCountResult, centerDisplayName] = await Promise.all([
+  const [myEntriesResult, unreadNotificationCountResult, centerDisplayName, branding] = await Promise.all([
     canCheckTimekeeping
       ? getCachedMyTimekeepingEntries()
       : Promise.resolve(null),
@@ -61,6 +63,7 @@ export async function AuthenticatedAppShell({
       ? getCachedUnreadNotificationCountResult()
       : Promise.resolve({ data: 0, ok: true as const }),
     getCenterDisplayName(),
+    readAppBranding(),
   ]);
 
   const hasOpenTimekeepingEntry = myEntriesResult?.ok
@@ -79,7 +82,7 @@ export async function AuthenticatedAppShell({
       : 0;
 
   return (
-    <AppShell
+    <BrandingProvider branding={branding}><AppShell
       authUser={authResult.user}
       canCheckTimekeeping={canCheckTimekeeping}
       centerDisplayName={centerDisplayName}
@@ -89,6 +92,6 @@ export async function AuthenticatedAppShell({
       unreadNotificationCount={unreadNotificationCount}
     >
       {children}
-    </AppShell>
+    </AppShell></BrandingProvider>
   );
 }

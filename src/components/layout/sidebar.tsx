@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandLogo } from "@/features/website/appearance";
 import { School, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef } from "react";
@@ -144,7 +145,7 @@ function SidebarContents({
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex h-16 items-center border-b border-[var(--nav-sidebar-border)] px-3 xl:px-4">
         <div className="flex min-w-0 items-center gap-3">
-          <School aria-hidden="true" className="h-5 w-5 flex-none" strokeWidth={1.8} />
+          <BrandLogo fallback={<School aria-hidden="true" className="h-5 w-5 flex-none" strokeWidth={1.8} />} />
           <div className={cn("min-w-0", !isMobile && "hidden xl:block")}>
             <p className="truncate text-sm font-semibold tracking-[0.01em]">{centerDisplayName}</p>
             <p className="mt-0.5 text-caption text-[var(--nav-sidebar-muted)]">ERP vận hành</p>

@@ -1,0 +1,178 @@
+[
+  {
+    "key": "dashboard",
+    "label": "Tổng quan",
+    "items": [
+      {
+        "href": "/",
+        "label": "Tổng quan",
+        "permission": "dashboard.view"
+      }
+    ]
+  },
+  {
+    "key": "academics",
+    "label": "Học vụ",
+    "items": [
+      {
+        "href": "/students",
+        "label": "Học viên",
+        "permission": "students.view"
+      },
+      {
+        "href": "/classes",
+        "label": "Lớp học",
+        "permission": "classes.view"
+      },
+      {
+        "href": "/sessions",
+        "label": "Buổi học",
+        "permission": "sessions.view"
+      },
+      {
+        "href": "/learning-results",
+        "label": "Kết quả học tập",
+        "permission": "results.view"
+      },
+      {
+        "href": "/coaching",
+        "label": "Coaching",
+        "permission": "coaching.view"
+      }
+    ]
+  },
+  {
+    "key": "admissions",
+    "label": "Tuyển sinh",
+    "items": [
+      {
+        "href": "/crm",
+        "label": "CRM",
+        "permission": "crm.view"
+      }
+    ]
+  },
+  {
+    "key": "finance",
+    "label": "Tài chính",
+    "items": [
+      {
+        "href": "/finance",
+        "label": "Học phí & Công nợ",
+        "permission": "finance.view"
+      },
+      {
+        "href": "/finance/payment-requests",
+        "label": "Yêu cầu thanh toán",
+        "permission": "payments.view"
+      },
+      {
+        "href": "/finance/sepay",
+        "label": "Giao dịch SePay",
+        "permission": "sepay.view"
+      },
+      {
+        "href": "/finance/orders",
+        "label": "Đơn hàng",
+        "permission": "finance.view"
+      },
+      {
+        "href": "/finance/session-ledger",
+        "label": "Sổ cái số buổi",
+        "permission": "session_ledger.view"
+      },
+      {
+        "href": "/finance/tuition-periods",
+        "label": "Kỳ thu học phí",
+        "permission": "tuition_periods.view"
+      },
+      {
+        "href": "/finance/receiving-accounts",
+        "label": "Tài khoản nhận SePay",
+        "permission": "settings.sepay_receiving_accounts.manage"
+      }
+    ]
+  },
+  {
+    "key": "people",
+    "label": "Nhân sự",
+    "items": [
+      {
+        "href": "/staff",
+        "label": "Nhân sự",
+        "permission": "staff.view"
+      },
+      {
+        "href": "/timekeeping",
+        "label": "Chấm công",
+        "permission": "timekeeping.view"
+      },
+      {
+        "href": "/payroll/dashboard",
+        "label": "Tổng quan lương",
+        "permission": "payroll.dashboard.view"
+      },
+      {
+        "href": "/payroll",
+        "label": "Bảng lương",
+        "permission": "payroll.view"
+      },
+      {
+        "href": "/advances",
+        "label": "Tạm ứng lương",
+        "permission": "advances.view"
+      },
+      {
+        "href": "/grading-credits",
+        "label": "Tín chỉ chấm bài",
+        "permission": "grading_credits.view"
+      },
+      {
+        "href": "/commissions",
+        "label": "Hoa hồng",
+        "permission": "commissions.view"
+      }
+    ]
+  },
+  {
+    "key": "administration",
+    "label": "Quản trị",
+    "items": [
+      {
+        "href": "/imports/students",
+        "label": "Import học viên",
+        "permission": "imports.students"
+      },
+      {
+        "href": "/imports/session-balances",
+        "label": "Import số dư buổi",
+        "permission": "imports.session_balances"
+      },
+      {
+        "href": "/imports/classes",
+        "label": "Import lớp & lịch học",
+        "permission": "imports.classes"
+      },
+      {
+        "href": "/imports/enrollments",
+        "label": "Import ghi danh",
+        "permission": "imports.enrollments"
+      },
+      {
+        "href": "/reports",
+        "label": "Báo cáo & Xuất dữ liệu",
+        "permission": "reports.view"
+      },
+      {
+        "href": "/settings",
+        "label": "Cài đặt hệ thống",
+        "permission": "staff.roles.view"
+      },
+      {
+        "href": "/audit",
+        "label": "Nhật ký hệ thống",
+        "permission": "audit.view"
+      }
+    ]
+  }
+]

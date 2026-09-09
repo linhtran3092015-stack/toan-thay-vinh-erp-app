@@ -21,7 +21,7 @@ const PUBLIC_PATHS = new Set([
 ]);
 
 function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.has(pathname) || pathname.startsWith("/coaching/form/");
+  return PUBLIC_PATHS.has(pathname) || pathname.startsWith("/coaching/form/") || pathname === "/site" || /^\/site\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(pathname);
 }
 
 function hasAuthCookie(request: NextRequest): boolean {

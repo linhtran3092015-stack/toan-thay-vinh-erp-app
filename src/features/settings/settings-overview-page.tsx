@@ -27,6 +27,10 @@ export function SettingsOverviewPage({
 
   return (
     <div className="grid gap-5">
+      <section className="grid gap-4 md:grid-cols-2" aria-label="Thương hiệu và website">
+        <Link href="/settings/branding" className="brand-panel"><h2>Thương hiệu &amp; Giao diện</h2><p className="mt-2 text-sm text-text-muted">Logo, favicon, màu thương hiệu và giao diện ERP.</p></Link>
+        <Link href="/settings/website" className="brand-panel"><h2>Trang web công khai</h2><p className="mt-2 text-sm text-text-muted">Soạn trang giới thiệu, xếp khối nội dung, xem trước và quản lý bản đăng.</p></Link>
+      </section>
       <section
         aria-label="Tổng quan cấu hình truy cập"
         className="grid grid-cols-2 gap-3 xl:grid-cols-4"

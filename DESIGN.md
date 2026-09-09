@@ -1,5 +1,9 @@
 # Design System — Toán Thầy Vinh ERP
 
+## Update approved 2026-09-09
+
+The user selected warm red, soft corners, and a closer Stumana feel. The ERP now defaults to terracotta (#B83C30), a warm light canvas, and configurable corner radii. This supersedes the navy visual anchor below; existing module structure, permissions, operational density, and semantic status colors remain authoritative. Settings → Thương hiệu & Giao diện controls center appearance; browser-local palette choice overrides the center default. Settings → Trang web công khai edits explicit public content with separate saved drafts and published snapshots.
+
 ## Product context
 
 - **What this is:** A Vietnamese-first operational ERP for an education center: students, classes, sessions, attendance, results, finance, people, and administration.

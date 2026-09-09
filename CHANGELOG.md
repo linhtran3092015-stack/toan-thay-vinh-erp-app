@@ -2,6 +2,18 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.5.0.0] - 2026-09-09
+
+### Added
+- Cài đặt Thương hiệu & Giao diện (/settings/branding): Logo, Favicon, mô tả, màu website, bảng màu ERP mặc định và bo góc mềm; hỗ trợ cá nhân hóa giao diện lưu trên trình duyệt.
+- Cài đặt Trang web công khai (/settings/website): Soạn tối đa 12 trang, 20 khối/trang (hero, nội dung, hình ảnh, liên hệ), sắp xếp khối, menu, xem trước inline.
+- Phân tách bản nháp (draft) và bản xuất bản (published) với kiểm tra phiên bản chống ghi đè đồng thời (optimistic concurrency).
+- Trang web công khai tại /site và /site/[slug] chỉ hiển thị bản đã đăng, an toàn không truy vấn dữ liệu vận hành nội bộ.
+- Migration cơ sở dữ liệu `20260909140000_branding_public_website.sql` với bảng `website_configuration` và các RPC hàm bảo mật.
+
+### Changed
+- Cập nhật giao diện ERP mặc định sang tông đỏ ấm Terracotta (#B83C30), nền canvas sáng ấm (#FAF9F6) và bo góc mềm theo nhận diện Stumana.
+
 ## [0.4.4.0] - 2026-09-08
 
 ### Fixed

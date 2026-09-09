@@ -5963,6 +5963,30 @@ export type Database = {
           },
         ]
       }
+      website_configuration: {
+        Row: {
+          draft: Json | null
+          id: boolean
+          published: Json | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          draft?: Json | null
+          id?: boolean
+          published?: Json | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          draft?: Json | null
+          id?: boolean
+          published?: Json | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       work_shifts: {
         Row: {
           break_minutes: number
@@ -8729,6 +8753,9 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      read_app_branding: { Args: never; Returns: Json }
+      read_published_website: { Args: never; Returns: Json }
+      read_website_configuration: { Args: never; Returns: Json }
       reconcile_session_balance_import_batch: {
         Args: { p_batch_id: string; p_reason: string }
         Returns: {
@@ -9864,6 +9891,10 @@ export type Database = {
         Returns: number
       }
       validate_student_import_rows: { Args: { p_rows: Json }; Returns: Json }
+      write_website_configuration: {
+        Args: { p_draft: Json; p_operation: string; p_version: number }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
