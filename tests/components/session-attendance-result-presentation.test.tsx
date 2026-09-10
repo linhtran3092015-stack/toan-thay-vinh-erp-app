@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -165,5 +165,67 @@ describe("Session attendance and result presentation", () => {
     expect(globals).toMatch(/\.session-attendance-work-area,[\s\S]*container-type: inline-size/);
     expect(globals).toMatch(/@container \(min-width: 960px\)[\s\S]*\.session-attendance-table/);
     expect(globals).toMatch(/@container \(min-width: 1120px\)[\s\S]*\.session-result-table/);
+  });
+});
+
+
+describe("Fast attendance workflow", () => {
+  it("searches names without accents including Đ and filters unmarked students", () => {
+    render(<SessionAttendanceManagement {...attendanceProps({ participants: [
+      { ...participant, studentName: "Đặng Bảo Ngọc", attendanceStatus: null },
+      { ...participant, studentId: "student-2", studentName: "Trần An", attendanceId: "att-2" },
+    ] })} />);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "dang ngoc" } });
+    expect(screen.getAllByText("Đặng Bảo Ngọc")).toHaveLength(2);
+    expect(screen.queryByText("Trần An")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Chưa điểm danh" }));
+    expect(screen.queryByText("Trần An")).not.toBeInTheDocument();
+  });
+
+  it("marks present in one click with the registered learning mode", async () => {
+    attendanceActions.markSessionAttendanceAction.mockResolvedValueOnce({ status: "success", message: "Đã ghi điểm danh.", attendanceId: "att-1", classSessionId: "session-1" });
+    render(<SessionAttendanceManagement {...attendanceProps({ participants: [{ ...participant, actualLearningMode: null, registeredMode: "online", attendanceStatus: null }] })} />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Ghi có mặt cho học viên" })[0]);
+    await waitFor(() => expect(attendanceActions.markSessionAttendanceAction).toHaveBeenCalledWith({ classSessionId: "session-1", studentId: "student-1", attendanceStatus: "present", actualLearningMode: "online", notes: null }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("does not overwrite existing attendance with the quick action", () => {
+    render(<SessionAttendanceManagement {...attendanceProps({ participants: [{ ...participant, attendanceId: "att-1" }] })} />);
+    expect(screen.queryByRole("button", { name: "Ghi có mặt cho học viên" })).not.toBeInTheDocument();
+  });
+
+  it("keeps identity masked in the editor and search", () => {
+    render(<SessionAttendanceManagement {...attendanceProps({ canViewStudents: false })} />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Điểm danh cho học viên" })[0]);
+    expect(within(screen.getByRole("dialog")).queryByText(participant.studentName!)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Hủy" }));
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Nguyễn" } });
+    expect(screen.queryByText("Học viên 1")).not.toBeInTheDocument();
+  });
+
+  it("advances results only after saving and skips students who were absent", async () => {
+    resultActions.recordSessionResultAction.mockResolvedValueOnce({ status: "success", message: "Đã lưu.", resultId: "result-1", classSessionId: "session-1" });
+    render(<SessionResultManagement {...resultProps({ participants: [participant,
+      { ...participant, studentId: "absent", studentName: "Vắng", attendanceStatus: "excused_absence" },
+      { ...participant, studentId: "next", studentName: "Đặng Bảo Ngọc" },
+    ] })} />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Nhập kết quả cho học viên" })[0]);
+    fireEvent.change(screen.getByLabelText("Điểm kiểm tra cuối buổi"), { target: { value: "8.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Lưu và học viên tiếp theo" }));
+    await waitFor(() => expect(within(screen.getByRole("dialog")).getByText("Đặng Bảo Ngọc")).toBeInTheDocument());
+    expect(resultActions.recordSessionResultAction).toHaveBeenCalledWith(expect.objectContaining({ studentId: "student-1", testScore: 8.5 }));
+    expect(screen.getByLabelText("Điểm kiểm tra cuối buổi")).toHaveValue(null);
+  });
+
+  it("retains result draft when the network fails", async () => {
+    resultActions.recordSessionResultAction.mockRejectedValueOnce(new Error("offline"));
+    render(<SessionResultManagement {...resultProps()} />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Nhập kết quả cho học viên" })[0]);
+    fireEvent.change(screen.getByLabelText("Điểm kiểm tra cuối buổi"), { target: { value: "7" } });
+    fireEvent.click(screen.getByRole("button", { name: "Lưu và học viên tiếp theo" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Chưa lưu được kết quả"));
+    expect(screen.getByLabelText("Điểm kiểm tra cuối buổi")).toHaveValue(7);
   });
 });

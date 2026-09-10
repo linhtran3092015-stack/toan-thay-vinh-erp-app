@@ -6,8 +6,8 @@ import {
   isValidElement,
   type ReactElement,
   type ReactNode,
-  useEffect,
   useId,
+  useEffect,
   useRef,
 } from "react";
 import {
@@ -16,6 +16,9 @@ import {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
+
+import { Dialog } from "@/components/ui/dialog";
+import { RosterSearch, matchesRosterSearch } from "@/features/sessions/components/roster-search";
 
 import { Badge } from "@/components/ui/badge";
 import { DataTableFrame } from "@/components/patterns/data-table-frame";
@@ -82,7 +85,14 @@ export function SessionResultManagement({
   const [isPending, startTransition] =
     useTransition();
 
-  const feedbackRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const editorTitleId = useId();
+  const [search, setSearch] = useState("");
+  const [onlyMissing, setOnlyMissing] = useState(false);
+  const visibleParticipants = participants.filter((participant, index) =>
+    matchesRosterSearch(participant, index, search, canViewStudents) &&
+    (!onlyMissing || (isResultEligible(participant) && (!participant.resultId || participant.testScore === null)))
+  );
 
   const canEdit =
     canManageResults &&
@@ -139,15 +149,10 @@ export function SessionResultManagement({
       ? actionState.fieldErrors ?? {}
       : {};
 
-  useEffect(() => {
-    if (actionState?.status === "success") {
-      feedbackRef.current?.focus();
-    }
-  }, [actionState]);
-
   const openEditor = (
     participant: SessionParticipantReadModel,
   ) => {
+    triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setActionState(null);
 
     setEditor({
@@ -214,8 +219,8 @@ export function SessionResultManagement({
     );
   };
 
-  const submitResult = () => {
-    if (!editor) {
+  const submitResult = (continueToNext = false) => {
+    if (!editor || !canEdit || isPending) {
       return;
     }
 
@@ -239,6 +244,7 @@ export function SessionResultManagement({
     };
 
     startTransition(async () => {
+      try {
       const result = editor.resultId
         ? await updateSessionResultAction({
             ...commonInput,
@@ -254,8 +260,23 @@ export function SessionResultManagement({
       setActionState(result);
 
       if (result.status === "success") {
-        setEditor(null);
+        const currentIndex = visibleParticipants.findIndex((item) => item.studentId === editor.studentId);
+        const next = continueToNext
+          ? visibleParticipants.slice(currentIndex + 1).find(isResultEligible)
+          : null;
+        if (next) {
+          // Keep the original row as the return-focus target while advancing.
+          const originalTrigger = triggerRef.current;
+          openEditor(next);
+          triggerRef.current = originalTrigger;
+          setActionState(result);
+        } else {
+          setEditor(null);
+        }
         router.refresh();
+      }
+      } catch {
+        setActionState({ status: "error", message: "Chưa lưu được kết quả. Dữ liệu đang nhập được giữ lại, vui lòng thử lại." });
       }
     });
   };
@@ -300,13 +321,15 @@ export function SessionResultManagement({
         />
 
         {actionState?.status === "success" ? (
-          <div ref={feedbackRef} tabIndex={-1}>
+          <div role="status">
             <ResultBanner title={actionState.message} tone="success" />
           </div>
         ) : null}
 
+        <Dialog ariaLabelledBy={editorTitleId} className="max-w-2xl" isOpen={editor !== null && canEdit} onClose={closeEditor} returnFocusRef={triggerRef}>
         {editor && selectedParticipant ? (
           <ResultEditor
+            titleId={editorTitleId}
             actionState={actionState}
             editor={editor}
             fieldErrors={fieldErrors}
@@ -316,12 +339,25 @@ export function SessionResultManagement({
             onNotebookStatusChange={
               updateNotebookStatus
             }
-            onSubmit={submitResult}
+            onSubmit={() => submitResult()}
+            onSaveNext={() => submitResult(true)}
             participant={
-              selectedParticipant
+              canViewStudents ? selectedParticipant : { ...selectedParticipant, studentName: `Học viên ${participants.indexOf(selectedParticipant) + 1}`, studentCode: null }
             }
           />
         ) : null}
+        </Dialog>
+
+        <RosterSearch
+          search={search}
+          onSearchChange={setSearch}
+          onlyMissing={onlyMissing}
+          onOnlyMissingChange={setOnlyMissing}
+          missingLabel="Chưa đủ kết quả"
+          visibleCount={visibleParticipants.length}
+          totalCount={participants.length}
+        />
+        {visibleParticipants.length === 0 && participants.length > 0 ? <p className="py-6 text-center text-text-muted">Không có học viên phù hợp. Thử đổi từ khóa hoặc bỏ bộ lọc.</p> : null}
 
         {participants.length === 0 ? (
           <div className="rounded-md border border-dashed border-border-subtle p-6 text-center">
@@ -337,11 +373,11 @@ export function SessionResultManagement({
         ) : (
           <div className="session-result-work-area">
           <DataTableFrame
-            body={participants.map((participant, index) => (
+            body={visibleParticipants.map((participant) => (
               <ResultTableRow
                 canEdit={canEdit}
                 canViewStudents={canViewStudents}
-                index={index}
+                index={participants.indexOf(participant)}
                 isPending={isPending}
                 key={participant.studentId}
                 onEdit={openEditor}
@@ -364,11 +400,11 @@ export function SessionResultManagement({
           />
 
           <ResponsiveRecordList className="session-result-record-list" label="Danh sách kết quả cuối buổi">
-            {participants.map((participant, index) => (
+            {visibleParticipants.map((participant) => (
               <ResultRecord
                 canEdit={canEdit}
                 canViewStudents={canViewStudents}
-                index={index}
+                index={participants.indexOf(participant)}
                 isPending={isPending}
                 key={participant.studentId}
                 onEdit={openEditor}
@@ -497,6 +533,7 @@ function TableCell({ children, className }: { children: ReactNode; className?: s
 }
 
 function ResultEditor({
+  titleId,
   actionState,
   editor,
   fieldErrors,
@@ -505,8 +542,10 @@ function ResultEditor({
   onChange,
   onNotebookStatusChange,
   onSubmit,
+  onSaveNext,
   participant,
 }: {
+  titleId: string;
   actionState:
     | SessionResultActionState
     | null;
@@ -527,15 +566,25 @@ function ResultEditor({
     status: SessionNotebookStatus,
   ) => void;
   onSubmit: () => void;
+  onSaveNext: () => void;
   participant: SessionParticipantReadModel;
 }) {
   const isUpdate =
     editor.resultId !== null;
+  const scoreRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    scoreRef.current?.focus({ preventScroll: true });
+  }, [editor.studentId]);
 
   return (
-    <div className="grid gap-4 rounded-md border border-border-subtle bg-surface-raised p-4">
+    <div className="grid gap-4 rounded-md border border-border-subtle bg-surface-raised p-4" onKeyDown={(event) => {
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !isPending && (!isUpdate || editor.reason.trim().length >= 3)) {
+        event.preventDefault();
+        onSaveNext();
+      }
+    }}>
       <div>
-        <h3 className="text-section-title font-semibold text-text-strong">
+        <h3 id={titleId} className="text-section-title font-semibold text-text-strong">
           {isUpdate
             ? "Cập nhật kết quả"
             : "Nhập kết quả"}
@@ -565,6 +614,7 @@ function ResultEditor({
           <input
             className={inputClassName}
             disabled={isPending}
+            ref={scoreRef}
             inputMode="decimal"
             max="10"
             min="0"
@@ -706,7 +756,8 @@ function ResultEditor({
 
       {actionState?.status === "error" ? <ResultBanner title={actionState.message} tone="error" /> : null}
 
-      <div className="flex flex-wrap justify-end gap-2">
+      {actionState?.status === "success" ? <p role="status" className="text-success">Đã lưu học viên trước. Tiếp tục nhập cho học viên bên trên.</p> : null}
+      <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 bg-surface-raised py-2">
         <Button
           disabled={isPending}
           onClick={onCancel}
@@ -714,6 +765,15 @@ function ResultEditor({
           variant="ghost"
         >
           Hủy
+        </Button>
+
+        <Button
+          disabled={isPending || (isUpdate && editor.reason.trim().length < 3)}
+          onClick={onSaveNext}
+          type="button"
+          variant="secondary"
+        >
+          Lưu và học viên tiếp theo
         </Button>
 
         <Button
