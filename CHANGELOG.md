@@ -2,6 +2,17 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.5.2.0] - 2026-09-10
+
+### Added
+- Tính năng Tạo buổi học hàng loạt giống ClassIn (/sessions/batch):
+  - Hỗ trợ tạo buổi theo lịch cố định của lớp (`class_schedule_templates`) hoặc tùy chỉnh ngày trong tuần.
+  - Hỗ trợ linh hoạt theo số lượng N buổi (ClassIn style) hoặc theo khoảng thời gian.
+  - Quy tắc đặt tên và đánh số thứ tự buổi học tự động (`Buổi {n}`) dựa trên số buổi hiện có của lớp.
+  - Bảng xem trước thông minh (Smart Preview): Cho phép tick/bỏ tick từng buổi để loại trừ ngày nghỉ lễ, Tết; phát hiện và cảnh báo trùng lịch; cho phép sửa nhanh giờ học trực tiếp trên bảng.
+  - Server action `createBatchSessionsAction` với kiểm tra quyền `sessions.manage`, kiểm tra năm học active, batch insert an toàn và ghi audit log đầy đủ.
+  - Điểm truy cập thuận tiện: Nút "Tạo hàng loạt" trên trang Buổi học (/sessions) và trang Chi tiết lớp học (/classes/[classId]).
+
 ## [0.5.1.0] - 2026-09-10
 
 ### Added

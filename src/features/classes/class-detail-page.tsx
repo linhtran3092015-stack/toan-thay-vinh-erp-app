@@ -159,10 +159,18 @@ export function ClassDetailPage({
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle>
                 Lịch học đang hiệu lực
               </CardTitle>
+              {detail.status === "active" ? (
+                <Link
+                  className="inline-flex min-h-8 items-center justify-center rounded-md border border-border-subtle bg-surface-base px-3 text-caption font-semibold text-action-link hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+                  href={`/sessions/batch?classId=${detail.id}${directoryQuery ? `&${directoryQuery}` : ""}`}
+                >
+                  Tạo buổi học hàng loạt
+                </Link>
+              ) : null}
             </CardHeader>
 
             <CardContent className="grid gap-4">
