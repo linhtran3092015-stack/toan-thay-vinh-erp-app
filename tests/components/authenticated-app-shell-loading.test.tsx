@@ -51,7 +51,8 @@ describe("Authenticated shell loading", () => {
     }
 
     const result = await shell;
-    expect(result.props).toMatchObject({
+    const appShell = result.props.children;
+    expect(appShell.props).toMatchObject({
       children: "module content", hasOpenTimekeepingEntry: true,
       unreadNotificationCount: 3, centerDisplayName: "Trung tâm",
     });
@@ -70,7 +71,8 @@ describe("Authenticated shell loading", () => {
     const result = await AuthenticatedAppShell({ children: "content" });
     expect(mocks.entries).not.toHaveBeenCalled();
     expect(mocks.notifications).not.toHaveBeenCalled();
-    expect(result.props).toMatchObject({ hasOpenTimekeepingEntry: false, unreadNotificationCount: 0 });
+    const appShell = result.props.children;
+    expect(appShell.props).toMatchObject({ hasOpenTimekeepingEntry: false, unreadNotificationCount: 0 });
   });
 
   it("preserves sign-in redirects without starting supplementary reads", async () => {
