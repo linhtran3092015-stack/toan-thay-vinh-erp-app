@@ -6,7 +6,6 @@ import {
   isValidElement,
   type ReactElement,
   type ReactNode,
-  useEffect,
   useId,
   useRef,
 } from "react";
@@ -16,6 +15,9 @@ import {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
+
+import { Dialog } from "@/components/ui/dialog";
+import { RosterSearch, matchesRosterSearch } from "@/features/sessions/components/roster-search";
 
 import { Badge } from "@/components/ui/badge";
 import { DataTableFrame } from "@/components/patterns/data-table-frame";
@@ -92,7 +94,14 @@ export function SessionAttendanceManagement({
   const [isPending, startTransition] =
     useTransition();
 
-  const feedbackRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const editorTitleId = useId();
+  const [search, setSearch] = useState("");
+  const [onlyMissing, setOnlyMissing] = useState(false);
+  const visibleParticipants = participants.filter((participant, index) =>
+    matchesRosterSearch(participant, index, search, canViewStudents) &&
+    (!onlyMissing || !participant.attendanceStatus)
+  );
 
   const canEdit =
     canMarkAttendance &&
@@ -146,15 +155,10 @@ export function SessionAttendanceManagement({
       ? actionState.fieldErrors ?? {}
       : {};
 
-  useEffect(() => {
-    if (actionState?.status === "success") {
-      feedbackRef.current?.focus();
-    }
-  }, [actionState]);
-
   const openEditor = (
     participant: SessionParticipantReadModel,
   ) => {
+    triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setActionState(null);
 
     setEditor({
@@ -202,14 +206,35 @@ export function SessionAttendanceManagement({
     );
   };
 
+  const quickPresent = (participant: SessionParticipantReadModel) => {
+    if (!canEdit || isPending || participant.attendanceId) return;
+    setActionState(null);
+    startTransition(async () => {
+      try {
+        const result = await markSessionAttendanceAction({
+          classSessionId: sessionId,
+          studentId: participant.studentId,
+          attendanceStatus: "present",
+          actualLearningMode: getInitialLearningMode(participant, defaultLearningMode),
+          notes: null,
+        });
+        setActionState(result);
+        if (result.status === "success") router.refresh();
+      } catch {
+        setActionState({ status: "error", message: "Chưa lưu được điểm danh. Vui lòng thử lại." });
+      }
+    });
+  };
+
   const submitAttendance = () => {
-    if (!editor) {
+    if (!editor || !canEdit || isPending) {
       return;
     }
 
     setActionState(null);
 
     startTransition(async () => {
+      try {
       const result = editor.attendanceId
         ? await updateSessionAttendanceAction({
             actualLearningMode:
@@ -238,6 +263,9 @@ export function SessionAttendanceManagement({
       if (result.status === "success") {
         setEditor(null);
         router.refresh();
+      }
+      } catch {
+        setActionState({ status: "error", message: "Chưa lưu được điểm danh. Dữ liệu đang nhập được giữ lại, vui lòng thử lại." });
       }
     });
   };
@@ -316,13 +344,15 @@ export function SessionAttendanceManagement({
         ) : null}
 
         {actionState?.status === "success" ? (
-          <div ref={feedbackRef} tabIndex={-1}>
+          <div role="status">
             <ResultBanner title={actionState.message} tone="success" />
           </div>
         ) : null}
 
+        <Dialog ariaLabelledBy={editorTitleId} className="max-w-2xl" isOpen={editor !== null && canEdit} onClose={closeEditor} returnFocusRef={triggerRef}>
         {editor && selectedParticipant ? (
           <AttendanceEditor
+            titleId={editorTitleId}
             actionState={actionState}
             editor={editor}
             fieldErrors={fieldErrors}
@@ -331,10 +361,24 @@ export function SessionAttendanceManagement({
             onChange={updateEditor}
             onSubmit={submitAttendance}
             participant={
-              selectedParticipant
+              canViewStudents ? selectedParticipant : { ...selectedParticipant, studentName: `Học viên ${participants.indexOf(selectedParticipant) + 1}`, studentCode: null }
             }
           />
         ) : null}
+        </Dialog>
+
+        {actionState?.status === "error" && !editor ? <ResultBanner title={actionState.message} tone="error" /> : null}
+        <p className="text-secondary text-text-muted">Bấm Có mặt để lưu ngay theo hình thức đăng ký. Chọn Điểm danh để ghi vắng, đổi hình thức hoặc thêm ghi chú.</p>
+        <RosterSearch
+          search={search}
+          onSearchChange={setSearch}
+          onlyMissing={onlyMissing}
+          onOnlyMissingChange={setOnlyMissing}
+          missingLabel="Chưa điểm danh"
+          visibleCount={visibleParticipants.length}
+          totalCount={participants.length}
+        />
+        {visibleParticipants.length === 0 && participants.length > 0 ? <p className="py-6 text-center text-text-muted">Không có học viên phù hợp. Thử đổi từ khóa hoặc bỏ bộ lọc.</p> : null}
 
         {participants.length === 0 ? (
           <div className="rounded-md border border-dashed border-border-subtle p-6 text-center">
@@ -351,13 +395,14 @@ export function SessionAttendanceManagement({
         ) : (
           <div className="session-attendance-work-area">
             <DataTableFrame
-              body={participants.map((participant, index) => (
+              body={visibleParticipants.map((participant) => (
                 <AttendanceTableRow
                   canEdit={canEdit}
                   canViewStudents={canViewStudents}
-                  index={index}
+                  index={participants.indexOf(participant)}
                   isPending={isPending}
                   key={participant.studentId}
+                  onQuickPresent={quickPresent}
                   onEdit={openEditor}
                   participant={participant}
                 />
@@ -368,13 +413,14 @@ export function SessionAttendanceManagement({
               tableClassName="min-w-[960px] table-fixed text-table-body text-text-default"
             />
             <ResponsiveRecordList className="session-attendance-record-list" label="Danh sách điểm danh buổi học">
-              {participants.map((participant, index) => (
+              {visibleParticipants.map((participant) => (
                 <AttendanceRecord
                   canEdit={canEdit}
                   canViewStudents={canViewStudents}
-                  index={index}
+                  index={participants.indexOf(participant)}
                   isPending={isPending}
                   key={participant.studentId}
+                  onQuickPresent={quickPresent}
                   onEdit={openEditor}
                   participant={participant}
                 />
@@ -392,6 +438,7 @@ function AttendanceTableRow({
   canViewStudents,
   index,
   isPending,
+  onQuickPresent,
   onEdit,
   participant,
 }: {
@@ -399,6 +446,7 @@ function AttendanceTableRow({
   canViewStudents: boolean;
   index: number;
   isPending: boolean;
+  onQuickPresent: (participant: SessionParticipantReadModel) => void;
   onEdit: (participant: SessionParticipantReadModel) => void;
   participant: SessionParticipantReadModel;
 }) {
@@ -411,7 +459,7 @@ function AttendanceTableRow({
       <TableCell className="w-[170px]"><AttendanceBadge status={participant.attendanceStatus} />{participant.isLateUpdate ? <p className="mt-1 text-caption font-semibold text-warning">Cập nhật muộn</p> : null}</TableCell>
       <TableCell className="w-[145px] text-secondary text-text-muted">{formatActualMode(participant.actualLearningMode)}</TableCell>
       <TableCell className="max-w-[260px] text-secondary text-text-muted">{participant.attendanceNotes ?? "Chưa có ghi chú"}</TableCell>
-      <TableCell className="w-[132px] text-right"><AttendanceAction canEdit={canEdit} isPending={isPending} onEdit={onEdit} participant={participant} /></TableCell>
+      <TableCell className="w-[132px] text-right"><AttendanceAction onQuickPresent={onQuickPresent} canEdit={canEdit} isPending={isPending} onEdit={onEdit} participant={participant} /></TableCell>
     </tr>
   );
 }
@@ -421,6 +469,7 @@ function AttendanceRecord({
   canViewStudents,
   index,
   isPending,
+  onQuickPresent,
   onEdit,
   participant,
 }: {
@@ -428,6 +477,7 @@ function AttendanceRecord({
   canViewStudents: boolean;
   index: number;
   isPending: boolean;
+  onQuickPresent: (participant: SessionParticipantReadModel) => void;
   onEdit: (participant: SessionParticipantReadModel) => void;
   participant: SessionParticipantReadModel;
 }) {
@@ -435,7 +485,7 @@ function AttendanceRecord({
     <article className="rounded-lg border border-border-subtle bg-surface-base px-4 py-3" role="listitem">
       <div className="flex items-start justify-between gap-3"><ParticipantIdentity canViewStudents={canViewStudents} index={index} participant={participant} /><AttendanceBadge status={participant.attendanceStatus} /></div>
       <div className="mt-3 grid gap-1.5 text-secondary text-text-muted"><p>Đăng ký: {formatRegisteredMode(participant.registeredMode)} · Thực tế: {formatActualMode(participant.actualLearningMode)}</p><p>{participant.attendanceNotes ?? "Chưa có ghi chú"}</p>{participant.isLateUpdate ? <p className="font-semibold text-warning">Cập nhật muộn</p> : null}</div>
-      <div className="mt-3"><AttendanceAction canEdit={canEdit} fullWidth isPending={isPending} onEdit={onEdit} participant={participant} /></div>
+      <div className="mt-3"><AttendanceAction onQuickPresent={onQuickPresent} canEdit={canEdit} fullWidth isPending={isPending} onEdit={onEdit} participant={participant} /></div>
     </article>
   );
 }
@@ -444,10 +494,13 @@ function ParticipantIdentity({ canViewStudents, index, participant }: { canViewS
   return <div className="min-w-0"><p className="text-body font-semibold text-text-strong">{canViewStudents ? participant.studentName ?? "Chưa có tên học viên" : `Học viên ${index + 1}`}</p>{canViewStudents && participant.studentCode ? <p className="mt-0.5 font-mono text-caption text-text-muted">{participant.studentCode}</p> : null}</div>;
 }
 
-function AttendanceAction({ canEdit, fullWidth = false, isPending, onEdit, participant }: { canEdit: boolean; fullWidth?: boolean; isPending: boolean; onEdit: (participant: SessionParticipantReadModel) => void; participant: SessionParticipantReadModel }) {
+function AttendanceAction({ canEdit, fullWidth = false, isPending, onEdit, onQuickPresent, participant }: { canEdit: boolean; fullWidth?: boolean; isPending: boolean; onEdit: (participant: SessionParticipantReadModel) => void; onQuickPresent: (participant: SessionParticipantReadModel) => void; participant: SessionParticipantReadModel }) {
   if (!canEdit) return <span className="text-caption text-text-muted">Chỉ đọc</span>;
   const action = participant.attendanceId ? "Sửa điểm danh" : "Điểm danh";
-  return <Button aria-label={`${action} cho học viên`} className={fullWidth ? "min-h-11 w-full" : undefined} disabled={isPending} onClick={() => onEdit(participant)} size={fullWidth ? "md" : "sm"} type="button" variant="ghost">{action}</Button>;
+  return <div className={`flex flex-wrap gap-1 ${fullWidth ? "" : "justify-end"}`}>
+    {!participant.attendanceId ? <Button aria-label="Ghi có mặt cho học viên" disabled={isPending} onClick={() => onQuickPresent(participant)} size="sm" type="button" variant="secondary">Có mặt</Button> : null}
+    <Button aria-label={`${action} cho học viên`} className={fullWidth ? "min-h-11" : undefined} disabled={isPending} onClick={() => onEdit(participant)} size={fullWidth ? "md" : "sm"} type="button" variant="ghost">{action}</Button>
+  </div>;
 }
 
 function TableHeader({ children, className }: { children: ReactNode; className?: string }) {
@@ -825,10 +878,12 @@ function normalizeSearch(
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLocaleLowerCase("vi")
+    .replace(/đ/g, "d")
     .trim();
 }
 
 function AttendanceEditor({
+  titleId,
   actionState,
   editor,
   fieldErrors,
@@ -838,6 +893,7 @@ function AttendanceEditor({
   onSubmit,
   participant,
 }: {
+  titleId: string;
   actionState: AttendanceActionState | null;
   editor: AttendanceEditorState;
   fieldErrors: Record<
@@ -861,7 +917,7 @@ function AttendanceEditor({
   return (
     <div className="grid gap-4 rounded-md border border-border-subtle bg-surface-raised p-4">
       <div>
-        <h3 className="text-section-title font-semibold text-text-strong">
+        <h3 id={titleId} className="text-section-title font-semibold text-text-strong">
           {isUpdate
             ? "Cập nhật điểm danh"
             : "Ghi điểm danh"}

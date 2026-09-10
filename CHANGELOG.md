@@ -2,6 +2,18 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.5.1.0] - 2026-09-10
+
+### Added
+- Không gian làm việc buổi học (Session Workspace): Tích hợp tab chuyển đổi "Đầu giờ · Điểm danh" và "Cuối giờ · Kết quả", giữ nguyên bản nháp và hỗ trợ điều hướng phím (Home/End/Mũi tên).
+- Tìm kiếm danh sách học viên nhanh (Roster Search): Hỗ trợ gõ không dấu (kể cả chữ Đ), lọc học viên chưa điểm danh hoặc chưa có kết quả kèm bộ đếm số lượng hiển thị.
+- Điểm danh nhanh 1 chạm: Ghi có mặt tức thì theo hình thức học đã đăng ký của học sinh mà không cần mở hộp thoại chỉnh sửa.
+- Tự động chuyển học viên khi nhập điểm: Nút "Lưu và học viên tiếp theo" lưu kết quả hiện tại và chuyển tiếp ngay sang học viên tiếp theo có đi học (bỏ qua học sinh vắng), giữ lại bản nháp nếu lỗi mạng.
+- Luồng tạo và bắt đầu buổi học nhanh: Tùy chọn "Bắt đầu ngay" khi tạo buổi để vào thẳng màn hình điểm danh; cơ chế thử lại nếu chưa đến giờ mà không tạo trùng buổi học.
+
+### Fixed
+- Cập nhật test shell xác thực đồng bộ với BrandingProvider mới.
+
 ## [0.5.0.0] - 2026-09-09
 
 ### Added

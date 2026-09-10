@@ -20,7 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { createSessionAction } from "@/features/sessions/actions/session-lifecycle-actions";
+import { createSessionAction, startSessionAction } from "@/features/sessions/actions/session-lifecycle-actions";
 import type {
   CancelledSessionOption,
   SessionCreationClassOption,
@@ -76,6 +76,26 @@ export function SessionCreateForm({
   directoryQuery = "",
 }: SessionCreateFormProps) {
   const router = useRouter();
+  const [startImmediately, setStartImmediately] = useState(false);
+  const [createdSessionId, setCreatedSessionId] = useState<string | null>(null);
+
+  const goToSession = (sessionId: string) => {
+    router.push(`/sessions/${sessionId}${directoryQuery ? `?${directoryQuery}` : ""}`);
+    router.refresh();
+  };
+
+  const startCreatedSession = async (sessionId: string) => {
+    try {
+      const started = await startSessionAction({ sessionId });
+      if (started.status === "success") {
+        goToSession(sessionId);
+      } else {
+        setActionState({ ...started, message: `Buổi học đã được tạo nhưng chưa bắt đầu: ${started.message}` });
+      }
+    } catch {
+      setActionState({ status: "error", message: "Buổi học đã được tạo. Chưa xác nhận được trạng thái bắt đầu; hãy mở buổi học để kiểm tra." });
+    }
+  };
 
   const [form, setForm] =
     useState<FormState>(
@@ -251,6 +271,7 @@ export function SessionCreateForm({
     event: FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault();
+    if (isPending || createdSessionId) return;
     setActionState(null);
 
     startTransition(async () => {
@@ -311,15 +332,12 @@ export function SessionCreateForm({
       setActionState(result);
 
       if (result.status === "success") {
-        const redirectTo =
-          result.redirectTo ??
-          `/sessions/${result.sessionId}`;
-        router.push(
-          directoryQuery
-            ? `${redirectTo}?${directoryQuery}`
-            : redirectTo,
-        );
-        router.refresh();
+        setCreatedSessionId(result.sessionId);
+        if (startImmediately) {
+          await startCreatedSession(result.sessionId);
+        } else {
+          goToSession(result.sessionId);
+        }
       }
     });
   };
@@ -351,7 +369,15 @@ export function SessionCreateForm({
         </PageHeader>
       </section>
 
-      {classes.length === 0 ? (
+      {createdSessionId ? (
+        <Card><CardContent className="grid gap-3 p-5">
+          <p role={actionState?.status === "error" ? "alert" : "status"}>{actionState?.message ?? "Đã tạo buổi học."}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={isPending || !createdSessionId} onClick={() => startTransition(async () => { if (createdSessionId) await startCreatedSession(createdSessionId); })}>Thử bắt đầu lại</Button>
+            <Button variant="secondary" disabled={isPending} onClick={() => goToSession(createdSessionId)}>Mở buổi học đã tạo</Button>
+          </div>
+        </CardContent></Card>
+      ) : classes.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center">
             <h2 className="font-semibold text-ink">
@@ -815,6 +841,10 @@ export function SessionCreateForm({
               </div>
             ) : null}
 
+            <label className="flex items-start gap-3 rounded-lg border border-border-subtle bg-surface-base p-4 text-body">
+              <input type="checkbox" checked={startImmediately} onChange={(event) => setStartImmediately(event.target.checked)} className="mt-1" />
+              <span><strong>Bắt đầu ngay và vào điểm danh</strong><span className="mt-1 block text-text-muted">Dùng khi buổi học đã đến giờ. Bỏ chọn nếu chỉ lên lịch cho buổi sau.</span></span>
+            </label>
             <div className="flex flex-wrap justify-end gap-2 rounded-lg border border-border-subtle bg-surface-base p-4">
               <Link
                 className="inline-flex min-h-10 items-center justify-center rounded-md border border-border-strong bg-surface-base px-4 text-control font-semibold text-text-strong transition hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
@@ -829,7 +859,7 @@ export function SessionCreateForm({
               >
                 {isPending
                   ? "Đang tạo..."
-                  : "Tạo buổi học"}
+                  : startImmediately ? "Tạo và vào điểm danh" : "Tạo buổi học"}
               </Button>
             </div>
           </fieldset>

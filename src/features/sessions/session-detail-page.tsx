@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { SessionWorkspace } from "@/features/sessions/components/session-workspace";
 import { SessionAttendanceManagement } from "@/features/sessions/components/session-attendance-management";
 import { SessionResultManagement } from "@/features/sessions/components/session-result-management";
 import { SessionLockActions } from "@/features/sessions/components/session-lock-actions";
@@ -96,7 +97,8 @@ export function SessionDetailPage({
         />
       ) : null}
 
-      {canViewAttendance ||
+      <SessionWorkspace
+      attendance={canViewAttendance ||
       canMarkAttendance ? (
         <SessionAttendanceManagement
           additionalStudyCandidates={
@@ -120,7 +122,7 @@ export function SessionDetailPage({
         />
       ) : null}
 
-      {canViewResults ||
+      results={canViewResults ||
       canManageResults ? (
         <SessionResultManagement
           canManageResults={
@@ -137,6 +139,8 @@ export function SessionDetailPage({
           sessionStatus={detail.status}
         />
       ) : null}
+
+      />
 
       {canLockSession ? (
         <SessionLockActions
