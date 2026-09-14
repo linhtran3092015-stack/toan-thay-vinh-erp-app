@@ -6,7 +6,7 @@ import { readAppBranding } from "@/features/website/data";
 import { BrandingProvider } from "@/features/website/appearance";
 import { AppShell } from "@/components/layout/app-shell";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
-import { getCurrentAuthUser } from "@/features/auth/current-user";
+import { getCachedCurrentAuthUser } from "@/features/auth/current-user";
 import { getCachedUnreadNotificationCountResult } from "@/features/notifications/data";
 import { getCenterDisplayName } from "@/features/settings/system-settings-data";
 import { getCachedMyTimekeepingEntries } from "@/features/timekeeping/data";
@@ -21,7 +21,7 @@ export async function AuthenticatedAppShell({
 }: AuthenticatedAppShellProps) {
   await connection();
 
-  const authResult = await getCurrentAuthUser();
+  const authResult = await getCachedCurrentAuthUser();
 
   if (!authResult.ok) {
     redirect(`/login?error=${authResult.error}`);
@@ -33,6 +33,8 @@ export async function AuthenticatedAppShell({
     if (permissionResult.error.code === "not_authenticated") {
       redirect("/login?error=session_expired");
     }
+
+    console.error("[app-shell] Permission load failed:", permissionResult.error.code, permissionResult.error.message);
 
     return (
       <PermissionDeniedState

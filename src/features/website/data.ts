@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { brandingSchema, createDefaultWebsite, defaultBranding, websiteSchema } from "./schema";
 import { getCenterDisplayName } from "@/features/settings/system-settings-data";
@@ -23,7 +24,15 @@ export async function readPublishedWebsite() {
   if (error) throw new Error("Không tải được website công khai.");
   return websiteSchema.safeParse(data);
 }
-export async function readAppBranding() {
+
+async function _readAppBranding() {
   try { const { data } = await websiteRpc("read_app_branding"); const parsed = brandingSchema.safeParse(data); return parsed.success ? parsed.data : defaultBranding; }
   catch { return defaultBranding; }
 }
+
+/**
+ * Per-request memoized version of readAppBranding.
+ * Prevents duplicate RPC calls if multiple server components in the same
+ * render pass both read the branding configuration.
+ */
+export const readAppBranding = cache(_readAppBranding);

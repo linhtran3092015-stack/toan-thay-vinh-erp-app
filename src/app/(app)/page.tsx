@@ -1,6 +1,6 @@
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
-import { getCurrentAuthUser } from "@/features/auth/current-user";
+import { getCachedCurrentAuthUser } from "@/features/auth/current-user";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { getRoleAwareDashboardReadModel } from "@/features/dashboard/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
@@ -14,7 +14,7 @@ interface PageProps {
 export default async function Home({ searchParams }: PageProps) {
   const [permissionResult, authResult, resolvedSearchParams] = await Promise.all([
     getCachedDatabasePermissions(),
-    getCurrentAuthUser(),
+    getCachedCurrentAuthUser(),
     searchParams ? await searchParams : Promise.resolve(undefined),
   ]);
 

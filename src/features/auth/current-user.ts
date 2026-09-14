@@ -1,7 +1,10 @@
+import { cache } from "react";
+
 import { getAllowedEmailsConfiguration, isEmailAllowed } from "@/features/auth/allowed-emails";
 import type { AuthUser, CurrentAuthUserResult } from "@/features/auth/types";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
 
 function getDisplayName(
   email: string,
@@ -97,3 +100,11 @@ export async function getCurrentAuthUser(): Promise<CurrentAuthUserResult> {
     return { ok: false, error: "session_expired" };
   }
 }
+
+/**
+ * Per-request memoized version of getCurrentAuthUser.
+ * React.cache deduplicates repeated calls within the same render pass,
+ * preventing the double getUser() race that triggers Supabase HTTP 400
+ * (single-use refresh token consumed twice when layout + page both call it).
+ */
+export const getCachedCurrentAuthUser = cache(getCurrentAuthUser);

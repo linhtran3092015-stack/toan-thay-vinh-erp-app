@@ -40,6 +40,7 @@ function isPermissionCode(value: string): value is PermissionCode {
 
 export async function getDatabasePermissions(): Promise<DatabasePermissionsResult> {
   if (!isSupabaseConfigured()) {
+    console.error("[permissions] configuration_missing: Supabase env vars not set.");
     return {
       ok: false,
       error: createPermissionError("configuration_missing"),
@@ -51,6 +52,10 @@ export async function getDatabasePermissions(): Promise<DatabasePermissionsResul
     const { data: userData, error: userError } = await supabase.auth.getUser();
 
     if (userError || !userData.user) {
+      // not_authenticated is normal for unauthenticated visitors — log only real errors.
+      if (userError) {
+        console.error("[permissions] not_authenticated — getUser failed:", userError.message, userError.status);
+      }
       return {
         ok: false,
         error: createPermissionError("not_authenticated"),
@@ -60,6 +65,7 @@ export async function getDatabasePermissions(): Promise<DatabasePermissionsResul
     const { data, error } = await supabase.rpc("get_my_permissions");
 
     if (error) {
+      console.error("[permissions] query_failed — get_my_permissions RPC error:", error.message, error.code, error.details);
       return {
         ok: false,
         error: createPermissionError("query_failed"),
@@ -69,6 +75,7 @@ export async function getDatabasePermissions(): Promise<DatabasePermissionsResul
     const parsedRows = permissionRowsSchema.safeParse(data ?? []);
 
     if (!parsedRows.success) {
+      console.error("[permissions] invalid_response — schema parse failed:", parsedRows.error.message);
       return {
         ok: false,
         error: createPermissionError("invalid_response"),
@@ -78,6 +85,8 @@ export async function getDatabasePermissions(): Promise<DatabasePermissionsResul
     const permissions = parsedRows.data.map((row) => row.permission_code);
 
     if (!permissions.every(isPermissionCode)) {
+      const unknown = permissions.filter((p) => !isPermissionCode(p));
+      console.error("[permissions] invalid_response — unknown permission codes:", unknown);
       return {
         ok: false,
         error: createPermissionError("invalid_response"),
@@ -88,7 +97,8 @@ export async function getDatabasePermissions(): Promise<DatabasePermissionsResul
       ok: true,
       permissions: [...new Set(permissions)],
     };
-  } catch {
+  } catch (err) {
+    console.error("[permissions] query_failed — unexpected exception:", err);
     return {
       ok: false,
       error: createPermissionError("query_failed"),
