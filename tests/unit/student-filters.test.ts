@@ -58,6 +58,25 @@ describe("student directory helpers", () => {
     expect(
       filterStudents(students, { ...defaultStudentFilters, search: "0901234567" }),
     ).toEqual([students[0]]);
+
+    // Matches with and without Vietnamese diacritics including đ/d
+    expect(
+      filterStudents(students, { ...defaultStudentFilters, search: "duc anh" }),
+    ).toEqual([students[1]]);
+
+    expect(
+      filterStudents(students, { ...defaultStudentFilters, search: "đức anh" }),
+    ).toEqual([students[1]]);
+
+    // Multi-word search in any order
+    expect(
+      filterStudents(students, { ...defaultStudentFilters, search: "vy nguyen" }),
+    ).toEqual([students[0]]);
+
+    // Search by guardian name
+    expect(
+      filterStudents(students, { ...defaultStudentFilters, search: "le minh" }),
+    ).toEqual([students[0]]);
   });
 
   it("clamps pagination at both ends and gives an empty directory a stable first page", () => {

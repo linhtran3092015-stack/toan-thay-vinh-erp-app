@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent, ReactNode, RefObject } from "react";
+import { useRef, useState, type ChangeEvent, type ReactNode, type RefObject } from "react";
 import { X } from "lucide-react";
 
 import { FilterBar } from "@/components/patterns/filter-bar";
@@ -24,6 +24,9 @@ interface StudentFiltersProps {
   onCloseMobile: () => void;
   onReset: () => void;
   returnFocusRef: RefObject<HTMLElement | null>;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  onSearchSubmit?: () => void;
 }
 
 export function StudentFilters({
@@ -35,10 +38,31 @@ export function StudentFilters({
   onCloseMobile,
   onReset,
   returnFocusRef,
+  searchValue,
+  onSearchChange,
+  onSearchSubmit,
 }: StudentFiltersProps) {
-  const updateFilter = (
+  const [internalSearch, setInternalSearch] = useState(filters.search);
+
+  // Sync internal search when external filters.search changes and no controlled searchValue is provided
+  if (searchValue === undefined && internalSearch !== filters.search) {
+    setInternalSearch(filters.search);
+  }
+
+  const currentSearch = searchValue !== undefined ? searchValue : internalSearch;
+
+  const handleSearchInput = (value: string) => {
+    if (onSearchChange) {
+      onSearchChange(value);
+    } else {
+      setInternalSearch(value);
+      onFilterChange("search", value);
+    }
+  };
+
+  const handleSelectChange = (
     key: keyof StudentDirectoryFiltersState,
-    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    event: ChangeEvent<HTMLSelectElement>,
   ) => {
     onFilterChange(key, event.target.value);
   };
@@ -48,7 +72,10 @@ export function StudentFilters({
       classNames={classNames}
       filters={filters}
       onReset={onReset}
-      onUpdate={updateFilter}
+      onSearchChange={handleSearchInput}
+      onSearchSubmit={onSearchSubmit}
+      onSelectChange={handleSelectChange}
+      searchValue={currentSearch}
       scope={scope}
     />
   );
@@ -96,10 +123,13 @@ interface FilterFieldsProps {
   classNames: string[];
   filters: StudentDirectoryFiltersState;
   onReset: () => void;
-  onUpdate: (
+  onSearchChange: (value: string) => void;
+  onSearchSubmit?: () => void;
+  onSelectChange: (
     key: keyof StudentDirectoryFiltersState,
-    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    event: ChangeEvent<HTMLSelectElement>,
   ) => void;
+  searchValue: string;
   scope: "desktop" | "mobile";
 }
 
@@ -107,26 +137,47 @@ function FilterFields({
   classNames,
   filters,
   onReset,
-  onUpdate,
+  onSearchChange,
+  onSearchSubmit,
+  onSelectChange,
+  searchValue,
   scope,
 }: FilterFieldsProps) {
+  const isComposingRef = useRef(false);
+
   return (
     <div className="students-filter-fields grid gap-3">
       <label className="grid gap-1.5 text-label font-medium text-text-muted">
         Tìm kiếm
         <input
+          autoComplete="off"
+          autoCorrect="off"
           className="h-10 rounded-md border border-border-subtle bg-field-bg px-3 text-body text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring"
           data-testid={`${scope}-student-search`}
-          onChange={(event) => onUpdate("search", event)}
+          onChange={(event) => onSearchChange(event.target.value)}
+          onCompositionStart={() => {
+            isComposingRef.current = true;
+          }}
+          onCompositionEnd={(event) => {
+            isComposingRef.current = false;
+            onSearchChange(event.currentTarget.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !isComposingRef.current) {
+              event.preventDefault();
+              onSearchSubmit?.();
+            }
+          }}
           placeholder="Tên, mã, phụ huynh hoặc SĐT"
+          spellCheck={false}
           type="search"
-          value={filters.search}
+          value={searchValue}
         />
       </label>
 
       <FilterSelect
         label="Trạng thái"
-        onChange={(event) => onUpdate("status", event)}
+        onChange={(event) => onSelectChange("status", event)}
         testId={`${scope}-student-status`}
         value={filters.status}
       >
@@ -138,7 +189,7 @@ function FilterFields({
 
       <FilterSelect
         label="Lớp chính"
-        onChange={(event) => onUpdate("className", event)}
+        onChange={(event) => onSelectChange("className", event)}
         testId={`${scope}-student-class`}
         value={filters.className}
       >
@@ -150,7 +201,7 @@ function FilterFields({
 
       <FilterSelect
         label="Khối"
-        onChange={(event) => onUpdate("grade", event)}
+        onChange={(event) => onSelectChange("grade", event)}
         testId={`${scope}-student-grade`}
         value={filters.grade}
       >
@@ -162,7 +213,7 @@ function FilterFields({
 
       <FilterSelect
         label="Mức"
-        onChange={(event) => onUpdate("learningLevel", event)}
+        onChange={(event) => onSelectChange("learningLevel", event)}
         testId={`${scope}-student-level`}
         value={filters.learningLevel}
       >
@@ -174,7 +225,7 @@ function FilterFields({
 
       <FilterSelect
         label="Hình thức"
-        onChange={(event) => onUpdate("registeredMode", event)}
+        onChange={(event) => onSelectChange("registeredMode", event)}
         testId={`${scope}-student-mode`}
         value={filters.registeredMode}
       >
@@ -183,7 +234,7 @@ function FilterFields({
         <option value="offline">Offline</option>
       </FilterSelect>
 
-      {hasActiveStudentFilters(filters) ? (
+      {hasActiveStudentFilters({ ...filters, search: searchValue }) ? (
         <div className="flex items-end">
           <Button
             className="min-h-10 w-full"

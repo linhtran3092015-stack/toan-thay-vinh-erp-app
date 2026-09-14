@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useDeferredValue, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
@@ -16,18 +16,18 @@ import type {
   StudentDirectoryItem,
 } from "./read-models";
 import {
-  filterStudents,
+  createStudentSearchIndex,
+  filterIndexedStudents,
   hasActiveStudentFilters,
   countActiveStudentFilters,
   paginateStudents,
 } from "./student-filters";
 import {
-  areStudentDirectoryFiltersEqual,
   getStudentDirectoryHref,
   getStudentDirectoryQuery,
-  mergePendingStudentDirectoryFilter,
   parseStudentDirectoryViewState,
   resetStudentDirectoryViewState,
+  serializeStudentDirectoryViewState,
 } from "./student-directory-url-state";
 import type { StudentLifecycleStatus } from "@/types/domain";
 
@@ -47,7 +47,6 @@ export function StudentListPage({
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [isBulkTransitionOpen, setIsBulkTransitionOpen] = useState(false);
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
-  const pendingFiltersRef = useRef<StudentDirectoryFiltersState | null>(null);
 
   const classNames = useMemo(
     () =>
@@ -64,72 +63,133 @@ export function StudentListPage({
     [students],
   );
 
-  const viewState = useMemo(
-    () => parseStudentDirectoryViewState(searchParams, classNames),
-    [classNames, searchParams],
+  const [filters, setFilters] = useState<StudentDirectoryFiltersState>(() => {
+    return parseStudentDirectoryViewState(searchParams, classNames).filters;
+  });
+  const [page, setPage] = useState<number>(() => {
+    return parseStudentDirectoryViewState(searchParams, classNames).page;
+  });
+
+  const debouncedUrlSyncRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync URL in address bar without triggering Next.js server component revalidation
+  const syncUrlState = (
+    nextFilters: StudentDirectoryFiltersState,
+    nextPage: number,
+    immediate = false,
+  ) => {
+    if (debouncedUrlSyncRef.current) {
+      clearTimeout(debouncedUrlSyncRef.current);
+      debouncedUrlSyncRef.current = null;
+    }
+
+    const apply = () => {
+      if (typeof window === "undefined") return;
+      const currentParams = new URLSearchParams(window.location.search);
+      const nextHref = getStudentDirectoryHref(currentParams, {
+        filters: nextFilters,
+        page: nextPage,
+      });
+      window.history.replaceState(window.history.state, "", nextHref);
+    };
+
+    if (immediate) {
+      apply();
+    } else {
+      debouncedUrlSyncRef.current = setTimeout(apply, 300);
+    }
+  };
+
+  // Support browser Back / Forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window === "undefined") return;
+      const currentParams = new URLSearchParams(window.location.search);
+      const parsed = parseStudentDirectoryViewState(currentParams, classNames);
+      setFilters(parsed.filters);
+      setPage(parsed.page);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      if (debouncedUrlSyncRef.current) {
+        clearTimeout(debouncedUrlSyncRef.current);
+      }
+    };
+  }, [classNames]);
+
+  const indexedStudents = useMemo(
+    () => createStudentSearchIndex(students),
+    [students],
   );
 
-  useEffect(() => {
-    if (
-      pendingFiltersRef.current === null ||
-      areStudentDirectoryFiltersEqual(
-        pendingFiltersRef.current,
-        viewState.filters,
-      )
-    ) {
-      pendingFiltersRef.current = viewState.filters;
-    }
-  }, [viewState.filters]);
+  const deferredFilters = useDeferredValue(filters);
 
   const filteredStudents = useMemo(
-    () => filterStudents(students, viewState.filters),
-    [students, viewState.filters],
+    () => filterIndexedStudents(indexedStudents, deferredFilters),
+    [indexedStudents, deferredFilters],
   );
 
   const pagination = useMemo(
-    () => paginateStudents(filteredStudents, viewState.page),
-    [filteredStudents, viewState.page],
+    () => paginateStudents(filteredStudents, page),
+    [filteredStudents, page],
   );
 
   const updateFilter = (
     key: keyof StudentDirectoryFiltersState,
     value: string,
   ) => {
-    const filters = mergePendingStudentDirectoryFilter(
-      pendingFiltersRef.current,
-      viewState.filters,
-      key,
-      value,
-    );
-    pendingFiltersRef.current = filters;
+    const nextFilters = { ...filters, [key]: value };
+    setFilters(nextFilters);
+    setPage(1);
+    syncUrlState(nextFilters, 1, true);
+  };
 
-    router.replace(
-      getStudentDirectoryHref(searchParams, { filters, page: 1 }),
-      { scroll: false },
-    );
+  const handleSearchChange = (value: string) => {
+    const nextFilters = { ...filters, search: value };
+    setFilters(nextFilters);
+    setPage(1);
+    syncUrlState(nextFilters, 1, false);
+  };
+
+  const handleSearchSubmit = () => {
+    syncUrlState(filters, page, true);
   };
 
   const resetFilters = () => {
-    const viewState = resetStudentDirectoryViewState();
-    pendingFiltersRef.current = viewState.filters;
+    if (debouncedUrlSyncRef.current) {
+      clearTimeout(debouncedUrlSyncRef.current);
+      debouncedUrlSyncRef.current = null;
+    }
+    const nextViewState = resetStudentDirectoryViewState();
+    setFilters(nextViewState.filters);
+    setPage(1);
+    syncUrlState(nextViewState.filters, 1, true);
+  };
 
-    router.replace(getStudentDirectoryHref(searchParams, viewState), {
-      scroll: false,
+  const updatePage = (newPage: number) => {
+    setPage(newPage);
+    if (typeof window !== "undefined") {
+      const currentParams = new URLSearchParams(window.location.search);
+      const nextHref = getStudentDirectoryHref(currentParams, {
+        filters,
+        page: newPage,
+      });
+      window.history.pushState(window.history.state, "", nextHref);
+    }
+  };
+
+  const directoryQuery = useMemo(() => {
+    const params = serializeStudentDirectoryViewState(new URLSearchParams(), {
+      filters,
+      page,
     });
-  };
+    return getStudentDirectoryQuery(params);
+  }, [filters, page]);
 
-  const updatePage = (page: number) => {
-    router.push(
-      getStudentDirectoryHref(searchParams, {
-        filters: viewState.filters,
-        page,
-      }),
-      { scroll: false },
-    );
-  };
-
-  const directoryQuery = getStudentDirectoryQuery(searchParams);
-  const activeFilterCount = countActiveStudentFilters(viewState.filters);
+  const activeFilterCount = countActiveStudentFilters(filters);
+  const hasActiveFilters = hasActiveStudentFilters(filters);
   const createHref = directoryQuery
     ? `/students/new?${directoryQuery}`
     : "/students/new";
@@ -151,17 +211,20 @@ export function StudentListPage({
       <StudentFilters
         activeFilterCount={activeFilterCount}
         classNames={classNames}
-        filters={viewState.filters}
+        filters={filters}
         isMobileOpen={isMobileFiltersOpen}
-        onFilterChange={updateFilter}
         onCloseMobile={() => setIsMobileFiltersOpen(false)}
+        onFilterChange={updateFilter}
         onReset={resetFilters}
+        onSearchChange={handleSearchChange}
+        onSearchSubmit={handleSearchSubmit}
         returnFocusRef={filterTriggerRef}
+        searchValue={filters.search}
       />
 
       {filteredStudents.length === 0 ? (
         <StudentListEmptyState
-          hasActiveFilters={hasActiveStudentFilters(viewState.filters)}
+          hasActiveFilters={hasActiveFilters}
         />
       ) : (
         <>
@@ -200,8 +263,8 @@ export function StudentListPage({
 
       <BulkStatusTransitionDialog
         initialSourceStatus={
-          viewState.filters.status !== "all"
-            ? (viewState.filters.status as StudentLifecycleStatus)
+          filters.status !== "all"
+            ? (filters.status as StudentLifecycleStatus)
             : "interested"
         }
         isOpen={isBulkTransitionOpen}

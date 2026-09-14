@@ -55,69 +55,137 @@ export const studentStatusMeta: Record<
   waiting_class: { label: "Chờ chọn lớp", tone: "info" },
 };
 
+export function normalizeStudentSearch(value: string): string {
+  return value
+    .trim()
+    .toLocaleLowerCase("vi")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d");
+}
+
+export function normalizeStudentPhone(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+export interface IndexedStudentItem {
+  className: string;
+  gradeString: string;
+  learningLevel: string | null;
+  lifecycleStatus: string;
+  normalizedPhone: string;
+  registeredMode: string | null;
+  searchCorpus: string;
+  student: StudentDirectoryItem;
+}
+
+export function createStudentSearchIndex(
+  students: readonly StudentDirectoryItem[],
+): IndexedStudentItem[] {
+  return students.map((student) => {
+    const guardian = student.primaryGuardian;
+    const activeClass = student.activeEnrollment?.classInfo;
+    const className = activeClass?.name ?? "";
+    const learningLevel = activeClass?.level ?? student.learningLevel;
+    const registeredMode =
+      student.activeEnrollment?.registeredMode ?? student.registeredMode;
+
+    const parts = [
+      student.fullName,
+      student.publicCode,
+      student.nickname ?? "",
+      guardian?.fullName ?? "",
+    ];
+    const searchCorpus = parts
+      .map((part) => normalizeStudentSearch(part))
+      .filter((s) => s.length > 0)
+      .join(" ");
+
+    const normalizedPhone = guardian
+      ? normalizeStudentPhone(guardian.phone)
+      : "";
+
+    return {
+      className,
+      gradeString: String(student.currentGrade),
+      learningLevel,
+      lifecycleStatus: student.lifecycleStatus,
+      normalizedPhone,
+      registeredMode,
+      searchCorpus,
+      student,
+    };
+  });
+}
+
+export function filterIndexedStudents(
+  indexedStudents: readonly IndexedStudentItem[],
+  filters: StudentDirectoryFiltersState,
+): StudentDirectoryItem[] {
+  const rawSearch = filters.search.trim();
+  const hasSearch = rawSearch.length > 0;
+  const normalizedSearch = hasSearch ? normalizeStudentSearch(rawSearch) : "";
+  const normalizedPhoneSearch = hasSearch ? normalizeStudentPhone(rawSearch) : "";
+  const searchWords =
+    normalizedSearch.length > 0
+      ? normalizedSearch.split(/\s+/).filter((word) => word.length > 0)
+      : [];
+
+  const results: StudentDirectoryItem[] = [];
+
+  for (let i = 0; i < indexedStudents.length; i++) {
+    const item = indexedStudents[i];
+
+    if (filters.grade !== "all" && item.gradeString !== filters.grade) {
+      continue;
+    }
+    if (filters.className !== "all" && item.className !== filters.className) {
+      continue;
+    }
+    if (filters.status !== "all" && item.lifecycleStatus !== filters.status) {
+      continue;
+    }
+    if (filters.learningLevel !== "all" && item.learningLevel !== filters.learningLevel) {
+      continue;
+    }
+    if (filters.registeredMode !== "all" && item.registeredMode !== filters.registeredMode) {
+      continue;
+    }
+
+    if (hasSearch) {
+      const matchesPhone =
+        normalizedPhoneSearch.length > 0 &&
+        item.normalizedPhone.length > 0 &&
+        item.normalizedPhone.includes(normalizedPhoneSearch);
+
+      if (!matchesPhone) {
+        if (searchWords.length > 0) {
+          let matchesAllWords = true;
+          for (let j = 0; j < searchWords.length; j++) {
+            if (!item.searchCorpus.includes(searchWords[j])) {
+              matchesAllWords = false;
+              break;
+            }
+          }
+          if (!matchesAllWords) {
+            continue;
+          }
+        }
+      }
+    }
+
+    results.push(item.student);
+  }
+
+  return results;
+}
+
 export function filterStudents(
   students: StudentDirectoryItem[],
   filters: StudentDirectoryFiltersState,
 ): StudentDirectoryItem[] {
-  const normalizedSearch = normalize(filters.search);
-  const normalizedPhoneSearch = normalizePhone(filters.search);
-
-  return students.filter((student) => {
-    const guardian = student.primaryGuardian;
-    const activeClass = student.activeEnrollment?.classInfo;
-    const className = activeClass?.name ?? "";
-    const learningLevel =
-      activeClass?.level ?? student.learningLevel;
-    const registeredMode =
-      student.activeEnrollment?.registeredMode ??
-      student.registeredMode;
-
-    const matchesPhoneSearch =
-      normalizedPhoneSearch.length > 0 &&
-      guardian !== null &&
-      normalizePhone(guardian.phone).includes(
-        normalizedPhoneSearch,
-      );
-
-    const matchesSearch =
-      normalizedSearch.length === 0 ||
-      normalize(student.fullName).includes(normalizedSearch) ||
-      normalize(student.publicCode).includes(normalizedSearch) ||
-      normalize(student.nickname ?? "").includes(normalizedSearch) ||
-      normalize(guardian?.fullName ?? "").includes(
-        normalizedSearch,
-      ) ||
-      matchesPhoneSearch;
-
-    const matchesGrade =
-      filters.grade === "all" ||
-      String(student.currentGrade) === filters.grade;
-
-    const matchesClass =
-      filters.className === "all" ||
-      className === filters.className;
-
-    const matchesStatus =
-      filters.status === "all" ||
-      student.lifecycleStatus === filters.status;
-
-    const matchesLevel =
-      filters.learningLevel === "all" ||
-      learningLevel === filters.learningLevel;
-
-    const matchesMode =
-      filters.registeredMode === "all" ||
-      registeredMode === filters.registeredMode;
-
-    return (
-      matchesSearch &&
-      matchesGrade &&
-      matchesClass &&
-      matchesStatus &&
-      matchesLevel &&
-      matchesMode
-    );
-  });
+  const indexed = createStudentSearchIndex(students);
+  return filterIndexedStudents(indexed, filters);
 }
 
 export function paginateStudents(
@@ -163,16 +231,4 @@ export function countActiveStudentFilters(
 
     return value !== "all";
   }).length;
-}
-
-function normalize(value: string): string {
-  return value
-    .trim()
-    .toLocaleLowerCase("vi")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-function normalizePhone(value: string): string {
-  return value.replace(/\D/g, "");
 }
