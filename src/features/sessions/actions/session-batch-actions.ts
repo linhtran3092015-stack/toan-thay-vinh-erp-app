@@ -174,9 +174,8 @@ export async function createBatchSessionsAction(
       };
     }
 
-    // 6. Build batch insert payload
+    // 6. Build batch payload for RPC
     const recordsToInsert = nonDuplicateSessions.map((s) => ({
-      class_id: classId,
       session_date: s.sessionDate,
       start_time: s.startTime.length === 5 ? `${s.startTime}:00` : s.startTime,
       end_time: s.endTime.length === 5 ? `${s.endTime}:00` : s.endTime,
@@ -187,46 +186,101 @@ export async function createBatchSessionsAction(
       room_name: s.roomName ?? null,
       meeting_url: s.meetingUrl ?? null,
       notes: s.notes ?? null,
-      status: "scheduled",
-      created_by: userRes.user.id,
     }));
 
-    const { data: insertedSessions, error: insertErr } = await supabase
-      .from("class_sessions")
-      .insert(recordsToInsert)
-      .select("id, session_date, start_time");
+    let createdCount = 0;
+    let createdSessionIds: string[] = [];
 
-    if (insertErr) {
-      return {
-        status: "error",
-        message: `Lỗi khi lưu buổi học vào cơ sở dữ liệu: ${insertErr.message}`,
-      };
+    // 7. Try invoking the security-definer RPC function
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: rpcData, error: rpcErr } = await (supabase.rpc as any)(
+      "create_batch_class_sessions",
+      {
+        p_class_id: classId,
+        p_sessions: recordsToInsert,
+        p_reason: reason || "Tạo buổi học hàng loạt",
+      },
+    );
+
+    if (!rpcErr && rpcData) {
+      createdCount = (rpcData as { created_count?: number })?.created_count ?? 0;
+      createdSessionIds = (rpcData as { session_ids?: string[] })?.session_ids ?? [];
+    } else {
+      // Fallback to service role client (bypasses direct table write restrictions)
+      try {
+        const { createSupabaseServiceRoleClient } = await import(
+          "@/lib/supabase/service-role"
+        );
+        const serviceClient = createSupabaseServiceRoleClient();
+
+        const serviceRecords = nonDuplicateSessions.map((s) => ({
+          class_id: classId,
+          session_date: s.sessionDate,
+          start_time: s.startTime.length === 5 ? `${s.startTime}:00` : s.startTime,
+          end_time: s.endTime.length === 5 ? `${s.endTime}:00` : s.endTime,
+          learning_mode: s.learningMode,
+          session_kind: s.scheduleTemplateId ? "regular" : "additional",
+          schedule_template_id: s.scheduleTemplateId ?? null,
+          component_code: s.componentCode ?? null,
+          room_name: s.roomName ?? null,
+          meeting_url: s.meetingUrl ?? null,
+          notes: s.notes ?? null,
+          status: "scheduled",
+          created_by: userRes.user.id,
+        }));
+
+        const { data: serviceSessions, error: serviceErr } = await serviceClient
+          .from("class_sessions")
+          .insert(serviceRecords)
+          .select("id, session_date, start_time");
+
+        if (serviceErr) {
+          return {
+            status: "error",
+            message: `Lỗi khi lưu buổi học vào cơ sở dữ liệu: ${serviceErr.message}`,
+          };
+        }
+
+        const createdList = serviceSessions ?? [];
+        createdCount = createdList.length;
+        createdSessionIds = createdList.map((r) => r.id);
+
+        await serviceClient.from("audit_logs").insert({
+          actor_user_id: userRes.user.id,
+          module: "sessions",
+          action: "batch_sessions_created",
+          entity_type: "class",
+          entity_id: classId,
+          new_data: {
+            class_id: classId,
+            class_code: classRow.code,
+            created_count: createdCount,
+            session_ids: createdSessionIds,
+          },
+          reason: reason || "Tạo buổi học hàng loạt",
+          metadata: {
+            source: "batch_session_creation",
+            total_requested: sessions.length,
+            total_created: createdCount,
+            skipped_duplicates: sessions.length - createdCount,
+          },
+        });
+      } catch {
+        return {
+          status: "error",
+          message: rpcErr
+            ? `Lỗi khi lưu buổi học: ${rpcErr.message}`
+            : "Không thể lưu buổi học vào cơ sở dữ liệu.",
+        };
+      }
     }
 
-    const createdList = insertedSessions ?? [];
-    const createdCount = createdList.length;
-
-    // 7. Write audit log
-    await supabase.from("audit_logs").insert({
-      actor_user_id: userRes.user.id,
-      module: "sessions",
-      action: "batch_sessions_created",
-      entity_type: "class",
-      entity_id: classId,
-      new_data: {
-        class_id: classId,
-        class_code: classRow.code,
-        created_count: createdCount,
-        session_ids: createdList.map((r) => r.id),
-      },
-      reason: reason || "Tạo buổi học hàng loạt giống ClassIn",
-      metadata: {
-        source: "batch_session_creation",
-        total_requested: sessions.length,
-        total_created: createdCount,
-        skipped_duplicates: sessions.length - createdCount,
-      },
-    });
+    if (createdCount === 0 && nonDuplicateSessions.length > 0) {
+      return {
+        status: "error",
+        message: "Không có buổi học nào được tạo thành công.",
+      };
+    }
 
     // 8. Revalidate paths
     revalidatePath("/sessions");
@@ -241,7 +295,7 @@ export async function createBatchSessionsAction(
       status: "success",
       message: `Đã tạo thành công ${createdCount} buổi học cho lớp ${classRow.code}${skippedMsg}.`,
       createdCount,
-      sessionIds: createdList.map((r) => r.id),
+      sessionIds: createdSessionIds,
     };
   } catch {
     return {
