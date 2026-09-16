@@ -90,9 +90,10 @@ export function useAttendanceHeartbeat({
           setServerMessage(null);
         } else if (result.signalDegraded) {
           setStatus("signal_lost");
-          if ("message_vi" in result && typeof result.message_vi === "string") {
-            setServerMessage(result.message_vi);
-          }
+          setServerMessage(result.messageVi ?? "Chưa xác minh được vị trí hoặc kết nối. Vui lòng thử lại.");
+        } else if (result.ambiguousSample) {
+          setStatus("locating");
+          setServerMessage(result.messageVi ?? "Vị trí đang ở vùng ranh giới Trung tâm.");
         }
       } catch {
         setStatus("signal_lost");

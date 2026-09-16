@@ -77,6 +77,13 @@ afterEach(() => {
 });
 
 describe("Timekeeping route authority", () => {
+  it("loads only the normalized week selected in the URL", async () => {
+    setSharedReadResults();
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({ ok: true, permissions: ["timekeeping.view"] });
+    render(await TimekeepingRoute({ searchParams: Promise.resolve({ week: "2027-01-03" }) }));
+    expect(dependencies.getTimekeepingSchedule).toHaveBeenCalledWith("2026-12-28");
+  });
+
   it("keeps timekeeping.view-only users on current-day audit without loading adjustment readers or approval queue", async () => {
     setSharedReadResults();
     dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
@@ -84,7 +91,7 @@ describe("Timekeeping route authority", () => {
       permissions: ["timekeeping.view"],
     });
 
-    render(await TimekeepingRoute());
+    render(await TimekeepingRoute({}));
 
     expect(screen.getByText("canCheck:false")).toBeInTheDocument();
     expect(screen.getByText("canManage:false")).toBeInTheDocument();
@@ -112,7 +119,7 @@ describe("Timekeeping route authority", () => {
     dependencies.getMyTimekeepingAdjustableEntries.mockResolvedValueOnce({ entries: [], ok: true });
     dependencies.getMyTimeEntryAdjustmentRequests.mockResolvedValueOnce({ ok: true, requests: [] });
 
-    render(await TimekeepingRoute());
+    render(await TimekeepingRoute({}));
 
     expect(screen.getByText("canCheck:true")).toBeInTheDocument();
     expect(screen.getByText("canApproveAdjustments:false")).toBeInTheDocument();
@@ -132,7 +139,7 @@ describe("Timekeeping route authority", () => {
     });
     dependencies.getTimeEntryAdjustmentApprovalQueue.mockResolvedValueOnce({ ok: true, requests: [] });
 
-    render(await TimekeepingRoute());
+    render(await TimekeepingRoute({}));
 
     expect(screen.getByText("canCheck:false")).toBeInTheDocument();
     expect(screen.getByText("canApproveAdjustments:true")).toBeInTheDocument();
@@ -152,7 +159,7 @@ describe("Timekeeping route authority", () => {
     dependencies.getMyTimekeepingAdjustableEntries.mockResolvedValueOnce({ entries: [], ok: true });
     dependencies.getMyTimeEntryAdjustmentRequests.mockResolvedValueOnce({ ok: true, requests: [] });
 
-    render(await TimekeepingRoute());
+    render(await TimekeepingRoute({}));
 
     expect(screen.getByText("canCheck:true")).toBeInTheDocument();
     expect(screen.getByText("myEntries:1")).toBeInTheDocument();
@@ -176,7 +183,7 @@ describe("Timekeeping route authority", () => {
       permissions: [],
     });
 
-    render(await TimekeepingRoute());
+    render(await TimekeepingRoute({}));
 
     expect(screen.getByText("Không có quyền truy cập chấm công")).toBeInTheDocument();
     expect(dependencies.getMyTimekeepingEntries).not.toHaveBeenCalled();
@@ -190,7 +197,7 @@ describe("Timekeeping route authority", () => {
       permissions: ["timekeeping.view", "staff.manage"],
     });
 
-    render(await TimekeepingRoute());
+    render(await TimekeepingRoute({}));
 
     expect(screen.getByText("canManage:true")).toBeInTheDocument();
     expect(dependencies.getTimekeepingSchedule).toHaveBeenCalledOnce();
@@ -221,7 +228,7 @@ describe("Timekeeping route authority", () => {
       permissions: ["timekeeping.manage_verification"],
     });
 
-    render(await TimekeepingRoute());
+    render(await TimekeepingRoute({}));
 
     expect(screen.getByText("canManageVerification:true")).toBeInTheDocument();
     expect(dependencies.getAttendanceVerificationConfig).toHaveBeenCalledOnce();

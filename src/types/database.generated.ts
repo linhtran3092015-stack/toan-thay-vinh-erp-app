@@ -4268,6 +4268,7 @@ export type Database = {
           staff_id: string
           supersedes_staff_shift_assignment_id: string | null
           updated_at: string
+          week_start: string | null
           weekday: number
           work_shift_id: string
         }
@@ -4283,6 +4284,7 @@ export type Database = {
           staff_id: string
           supersedes_staff_shift_assignment_id?: string | null
           updated_at?: string
+          week_start?: string | null
           weekday: number
           work_shift_id: string
         }
@@ -4298,6 +4300,7 @@ export type Database = {
           staff_id?: string
           supersedes_staff_shift_assignment_id?: string | null
           updated_at?: string
+          week_start?: string | null
           weekday?: number
           work_shift_id?: string
         }
@@ -8421,6 +8424,22 @@ export type Database = {
           work_shift_code: string
           work_shift_name: string
         }[]
+      }
+      get_weekly_shift_schedule: {
+        Args: { p_week_start: string }
+        Returns: Json
+      }
+      save_weekly_shift_assignment: {
+        Args: {
+          p_week_start: string
+          p_weekday: number
+          p_staff_id: string
+          p_work_shift_id: string | null
+          p_expected_assignment_id: string | null
+          p_expected_updated_at: string | null
+          p_reason: string
+        }
+        Returns: string
       }
       get_timekeeping_schedule: {
         Args: never

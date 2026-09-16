@@ -1,4 +1,9 @@
 export interface TimekeepingScheduleEntry {
+  workDate?: string;
+  weekStart?: string | null;
+  updatedAt?: string;
+  isActive?: boolean;
+  isLocked?: boolean;
   assignmentId: string;
   breakMinutes: number;
   crossesMidnight: boolean;
@@ -80,6 +85,7 @@ export interface AttendanceWifiNetwork {
 }
 
 export interface AttendanceVerificationPolicy {
+  exceptionReviewEnabled?: boolean;
   attendanceRadiusM: number;
   centerName: string;
   configured: boolean;
@@ -311,4 +317,3 @@ export type TimekeepingCenterMonthlyOverviewResult =
       ok: false;
       error: TimekeepingEntriesError;
     };
-

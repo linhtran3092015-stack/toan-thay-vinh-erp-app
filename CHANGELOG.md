@@ -2,6 +2,16 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.0.0] - 2026-09-16
+
+### Added
+- Phân công trợ giảng theo từng tuần: chọn tuần, xem lại lịch sử, mỗi tuần lưu phân công riêng.
+- Thêm, đổi hoặc hủy ca theo ngày; khóa lịch đã có chấm công và ngăn ghi đè đồng thời.
+- RPC `get_weekly_shift_schedule`, `save_weekly_shift_assignment` với optimistic concurrency.
+
+### Fixed
+- Chấm công ca qua đêm sử dụng lịch của ngày bắt đầu ca (kể cả ca Chủ nhật sang thứ Hai).
+
 ## [0.5.2.0] - 2026-09-10
 
 ### Added

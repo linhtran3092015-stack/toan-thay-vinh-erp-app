@@ -37,6 +37,7 @@ export type AttendanceHeartbeatResult =
       distanceM?: number;
       sessionActive: true;
       signalDegraded?: boolean;
+      messageVi?: string;
       verifiedInside?: boolean;
     }
   | {
@@ -45,4 +46,3 @@ export type AttendanceHeartbeatResult =
       reason?: string;
       sessionActive: false;
     };
-

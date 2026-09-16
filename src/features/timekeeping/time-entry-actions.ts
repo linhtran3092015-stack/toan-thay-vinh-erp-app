@@ -9,6 +9,7 @@ import type {
   TimekeepingEntryActionState,
 } from "@/features/timekeeping/time-entry-action-types";
 import { timeEntryActionSchema } from "@/features/timekeeping/time-entry-schemas";
+import { parseAttendanceHeartbeatResult } from "@/features/timekeeping/attendance-heartbeat-result";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -154,7 +155,7 @@ export async function submitAttendanceHeartbeatAction(
   const permissionError = await getPermissionError();
 
   if (permissionError) {
-    return { messageVi: permissionError, reason: permissionError, sessionActive: false };
+    return { messageVi: permissionError, signalDegraded: true, sessionActive: true };
   }
 
   try {
@@ -173,7 +174,7 @@ export async function submitAttendanceHeartbeatAction(
       return { sessionActive: true, signalDegraded: true };
     }
 
-    return (data as unknown as AttendanceHeartbeatResult) ?? { sessionActive: true };
+    return parseAttendanceHeartbeatResult(data);
   } catch {
     return { sessionActive: true, signalDegraded: true };
   }

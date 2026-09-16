@@ -92,7 +92,7 @@ export function MyTimekeepingPanel({
   const { distanceM, serverMessage, statusLabel } = useAttendanceHeartbeat({
     activeSessionId: openEntry?.id ?? null,
     enabled: Boolean(
-      openEntry && openEntry.checkInMode === "offline"
+      openEntry && openEntry.checkInMode === "offline" && attendancePolicy.continuousGpsTrackingRequired
     ),
     onSessionClosed,
   });
@@ -122,7 +122,7 @@ export function MyTimekeepingPanel({
 
         {canCheck ? (
           openEntry ? (
-            <TimekeepingEntryDialog attendancePolicy={attendancePolicy} operation="check-out" />
+            <TimekeepingEntryDialog attendancePolicy={attendancePolicy} operation="check-out" timeEntryId={openEntry.id} />
           ) : (
             <TimekeepingEntryDialog attendancePolicy={attendancePolicy} operation="check-in" />
           )
@@ -145,7 +145,9 @@ export function MyTimekeepingPanel({
               <p className="text-body font-medium text-text-default">
                 {openEntry.checkInMode === "online"
                   ? "Không áp dụng cho chấm công Trực tuyến"
-                  : `${statusLabel}${distanceM !== null ? ` (khoảng ${distanceM}m từ Trung tâm)` : ""}`}
+                  : !attendancePolicy.continuousGpsTrackingRequired
+                    ? "Xác minh khi check-in và check-out"
+                    : `${statusLabel}${distanceM !== null ? ` (khoảng ${distanceM}m từ Trung tâm)` : ""}`}
               </p>
             </div>
           </div>

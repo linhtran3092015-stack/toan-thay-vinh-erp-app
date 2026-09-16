@@ -177,7 +177,7 @@ describe("Timekeeping entry dialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
     fireEvent.click(screen.getByRole("button", { name: "Lấy vị trí hiện tại" }));
 
-    expect(screen.getByText("Không lấy được vị trí. Hãy cấp quyền GPS hoặc chuyển sang hình thức Trực tuyến.")).toBeInTheDocument();
+    expect(screen.getByText("Trình duyệt chưa được cấp quyền vị trí. Hãy cấp quyền hoặc gửi chấm công chờ duyệt.")).toBeInTheDocument();
     expect(screen.queryByText(/gps không hợp lệ|vị trí không hợp lệ|sai vị trí|không đủ điều kiện chấm công/i)).not.toBeInTheDocument();
   });
 

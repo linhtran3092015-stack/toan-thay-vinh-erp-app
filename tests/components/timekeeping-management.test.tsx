@@ -42,16 +42,16 @@ function open(name: string) { fireEvent.click(screen.getByRole("button", { name 
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); });
 
 describe("Timekeeping 3 management", () => {
-  it("keeps the active assignment directory and full shift catalogue reader-owned, with management controls gated", () => {
+  it("keeps the weekly assignment directory and full shift catalogue reader-owned, with management controls gated", () => {
     const { rerender } = render(<TimekeepingPage adjustmentApprovalQueue={[]} adjustmentEntries={[]} canApproveAdjustments={false} canCheck={false} canManage={false} dayEntries={[]} entries={[entry]} myAdjustmentRequests={[]} myEntries={[]} staffOptions={[staff]} workShifts={[shift, retiredShift]} />);
-    expect(screen.getByRole("table", { name: "Lịch phân công ca đang hoạt động" })).toHaveTextContent("Nguyễn Minh An");
+    expect(screen.getByRole("table", { name: "Bảng phân công theo tuần" })).toHaveTextContent("Nguyễn Minh An");
     expect(screen.getByRole("table", { name: "Danh mục ca làm" })).toHaveTextContent("Ca cũ");
     expect(screen.getAllByText("Đã ngừng dùng")).not.toHaveLength(0);
     expect(screen.queryByRole("button", { name: /thêm ca làm|phân công lịch|thay ca|kết thúc lịch|sửa ca|ngừng dùng/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/lịch sử phân công|toàn bộ phân công/i)).not.toBeInTheDocument();
     rerender(<TimekeepingPage adjustmentApprovalQueue={[]} adjustmentEntries={[]} canApproveAdjustments={false} canCheck={false} canManage dayEntries={[]} entries={[entry]} myAdjustmentRequests={[]} myEntries={[]} staffOptions={[staff]} workShifts={[shift, retiredShift]} />);
-    expect(screen.getAllByRole("button", { name: "Thay ca" })).not.toHaveLength(0);
-    expect(screen.getAllByRole("button", { name: "Kết thúc lịch" })).not.toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Phân công lịch" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Kết thúc lịch" })).not.toBeInTheDocument();
   });
 
   it("preserves exact create and update shift payloads", async () => {
@@ -118,7 +118,7 @@ describe("Timekeeping 3 management", () => {
 
   it("keeps both management surfaces container-responsive and excludes payroll vocabulary", () => {
     render(<TimekeepingPage adjustmentApprovalQueue={[]} adjustmentEntries={[]} canApproveAdjustments={false} canCheck={false} canManage={false} dayEntries={[]} entries={[entry]} myAdjustmentRequests={[]} myEntries={[]} staffOptions={[]} workShifts={[shift]} />);
-    expect(screen.getByRole("table", { name: "Lịch phân công ca đang hoạt động" }).closest(".timekeeping-assignment-work-area")).not.toBeNull(); expect(screen.getByRole("list", { name: "Lịch phân công ca đang hoạt động" })).toBeInTheDocument(); expect(screen.getByRole("table", { name: "Danh mục ca làm" }).closest(".timekeeping-shift-catalogue-work-area")).not.toBeNull(); expect(screen.getByRole("list", { name: "Danh mục ca làm" })).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Bảng phân công theo tuần" }).closest(".timekeeping-assignment-work-area")).not.toBeNull(); expect(screen.getByRole("list", { name: "Bảng phân công theo tuần" })).toBeInTheDocument(); expect(screen.getByRole("table", { name: "Danh mục ca làm" }).closest(".timekeeping-shift-catalogue-work-area")).not.toBeNull(); expect(screen.getByRole("list", { name: "Danh mục ca làm" })).toBeInTheDocument();
     const globals = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf8"); expect(globals).toMatch(/@container \(min-width: 1042px\)[\s\S]*\.timekeeping-assignment-table/); expect(globals).toMatch(/@container \(min-width: 962px\)[\s\S]*\.timekeeping-shift-catalogue-table/); expect(globals).not.toMatch(/timekeeping-assignment-table[\s\S]*lg:block/); expect(screen.queryByText(/payroll|lương|wage|payable hours|work units/i)).not.toBeInTheDocument();
   });
 });

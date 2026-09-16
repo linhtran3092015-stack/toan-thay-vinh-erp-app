@@ -21,9 +21,11 @@ import type {
   TimekeepingStaffOptionsResult,
   TimekeepingWorkShiftsResult,
 } from "@/features/timekeeping/types";
+import { resolveScheduleWeek, weeklyScheduleResponseSchema } from "@/features/timekeeping/weekly-schedule";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const attendancePolicySchema = z.object({
+  exception_review_enabled: z.boolean().optional(),
   attendance_radius_m: z.number().int().positive().optional().default(100),
   center_name: z.string().optional().default("Trung tâm"),
   configured: z.boolean(),
@@ -61,6 +63,7 @@ const defaultAttendancePolicy = {
 
 function mapAttendancePolicy(data: z.infer<typeof attendancePolicySchema>) {
   return {
+    ...(data.exception_review_enabled === undefined ? {} : { exceptionReviewEnabled: data.exception_review_enabled }),
     attendanceRadiusM: data.attendance_radius_m,
     centerName: data.center_name,
     configured: data.configured,
@@ -136,7 +139,7 @@ function createScheduleError(
   code: TimekeepingScheduleErrorCode,
 ): TimekeepingScheduleError {
   const messages: Record<TimekeepingScheduleErrorCode, string> = {
-    schedule_query_failed: "Không thể tải lịch phân công hiện tại.",
+    schedule_query_failed: "Không thể tải lịch phân công của tuần đã chọn.",
   };
 
   return {
@@ -178,37 +181,29 @@ function createEntriesError(
   return { code, message: messages[code] };
 }
 
-export async function getTimekeepingSchedule(): Promise<TimekeepingScheduleResult> {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("get_timekeeping_schedule");
-
-  if (error) {
+export async function getTimekeepingSchedule(weekStart = resolveScheduleWeek(undefined)): Promise<TimekeepingScheduleResult> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.rpc("get_weekly_shift_schedule", { p_week_start: weekStart });
+    const parsed = weeklyScheduleResponseSchema.safeParse(data);
+    if (error || !parsed.success) return { ok: false, error: createScheduleError("schedule_query_failed") };
     return {
-      ok: false,
-      error: createScheduleError("schedule_query_failed"),
+      ok: true,
+      entries: parsed.data.map((entry) => ({
+        assignmentId: entry.assignment_id, breakMinutes: entry.break_minutes,
+        crossesMidnight: entry.crosses_midnight, effectiveFrom: entry.effective_from,
+        effectiveTo: entry.effective_to, endTime: entry.end_time,
+        staffDisplayName: entry.staff_display_name, staffEmployeeCode: entry.staff_employee_code,
+        staffEmploymentStatus: entry.staff_employment_status, staffId: entry.staff_id,
+        startTime: entry.start_time, weekday: entry.weekday, workShiftCode: entry.work_shift_code,
+        workShiftId: entry.work_shift_id, workShiftName: entry.work_shift_name,
+        workDate: entry.work_date, weekStart: entry.week_start, updatedAt: entry.updated_at,
+        isActive: entry.is_active, isLocked: entry.is_locked,
+      })),
     };
+  } catch {
+    return { ok: false, error: createScheduleError("schedule_query_failed") };
   }
-
-  return {
-    ok: true,
-    entries: data.map((entry) => ({
-      assignmentId: entry.assignment_id,
-      breakMinutes: entry.break_minutes,
-      crossesMidnight: entry.crosses_midnight,
-      effectiveFrom: entry.effective_from,
-      effectiveTo: entry.effective_to,
-      endTime: entry.end_time,
-      staffDisplayName: entry.staff_display_name,
-      staffEmployeeCode: entry.staff_employee_code,
-      staffEmploymentStatus: entry.staff_employment_status,
-      staffId: entry.staff_id,
-      startTime: entry.start_time,
-      weekday: entry.weekday,
-      workShiftCode: entry.work_shift_code,
-      workShiftId: entry.work_shift_id,
-      workShiftName: entry.work_shift_name,
-    })),
-  };
 }
 
 export async function getTimekeepingWorkShifts(): Promise<TimekeepingWorkShiftsResult> {
@@ -557,4 +552,3 @@ export async function getStaffMonthlyTimekeepingEntries(
     return { ok: false, error: createEntriesError("monthly_entries_query_failed") };
   }
 }
-

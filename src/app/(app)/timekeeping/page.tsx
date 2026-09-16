@@ -1,3 +1,4 @@
+import { resolveScheduleWeek } from "@/features/timekeeping/weekly-schedule";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import {
@@ -17,7 +18,10 @@ import {
 import { TimekeepingPage } from "@/features/timekeeping/timekeeping-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
-export default async function TimekeepingRoute() {
+export default async function TimekeepingRoute({ searchParams }: {
+  searchParams?: Promise<{ week?: string | string[] }>;
+}) {
+  const weekStart = resolveScheduleWeek((await searchParams)?.week);
   const permissionResult = await getCachedDatabasePermissions();
 
   if (!permissionResult.ok) {
@@ -76,7 +80,7 @@ export default async function TimekeepingRoute() {
       ? getTimeEntryAdjustmentApprovalQueue()
       : Promise.resolve(null),
     canCheck ? getMyTimeEntryAdjustmentRequests() : Promise.resolve(null),
-    canView ? getTimekeepingSchedule() : Promise.resolve(null),
+    canView ? getTimekeepingSchedule(weekStart) : Promise.resolve(null),
     canView ? getTimekeepingWorkShifts() : Promise.resolve(null),
     canManage || canApproveAdjustments
       ? getTimekeepingStaffOptions()
@@ -221,6 +225,7 @@ export default async function TimekeepingRoute() {
       centerMonthlyOverview={
         centerMonthlyOverviewResult?.ok ? centerMonthlyOverviewResult.overview : []
       }
+      scheduleWeek={weekStart}
       currentMonth={currentMonth}
       currentYear={currentYear}
       dayEntries={dayEntriesResult?.ok ? dayEntriesResult.entries : []}

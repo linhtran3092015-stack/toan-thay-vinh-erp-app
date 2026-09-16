@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { requestAttendanceExceptionAction } from "@/features/timekeeping/attendance-exception-actions";
 
 import { Button } from "@/components/ui/button";
 import { ResultBanner } from "@/components/shared/result-banner";
@@ -29,6 +30,7 @@ type TimekeepingEntryOperation = "check-in" | "check-out";
 interface TimekeepingEntryDialogProps {
   attendancePolicy?: AttendanceVerificationPolicy;
   operation: TimekeepingEntryOperation;
+  timeEntryId?: string;
 }
 
 const defaultAttendancePolicy: AttendanceVerificationPolicy = {
@@ -59,6 +61,7 @@ function createInitialValues(): TimeEntryActionInput {
 export function TimekeepingEntryDialog({
   attendancePolicy = defaultAttendancePolicy,
   operation,
+  timeEntryId,
 }: TimekeepingEntryDialogProps) {
   const router = useRouter();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -71,6 +74,10 @@ export function TimekeepingEntryDialog({
   const wifiSsidId = useId();
   const wifiBssidId = useId();
   const gpsErrorId = useId();
+  const [reviewReason, setReviewReason] = useState("");
+  const [submittedMessage, setSubmittedMessage] = useState("");
+  const requestIdRef = useRef<string | null>(null);
+  const sampledAtRef = useRef<number | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isLocating, setIsLocating] = useState(false);
@@ -91,6 +98,10 @@ export function TimekeepingEntryDialog({
   const isInteractionLocked = isLocating || isMutationInteractionLocked;
 
   const openDialog = (): void => {
+    requestIdRef.current = crypto.randomUUID();
+    sampledAtRef.current = null;
+    setReviewReason("");
+    setSubmittedMessage("");
     setValues(createInitialValues());
     setLocationMessage("");
     setActionState(initialTimekeepingEntryActionState);
@@ -129,6 +140,8 @@ export function TimekeepingEntryDialog({
   };
 
   const captureLocation = (): void => {
+    sampledAtRef.current = null;
+    setValues((current) => ({ ...current, gpsAccuracyMeters: null, gpsLatitude: null, gpsLongitude: null }));
     if (!navigator.geolocation) {
       setLocationMessage("Trình duyệt hiện tại không hỗ trợ định vị.");
       return;
@@ -139,6 +152,7 @@ export function TimekeepingEntryDialog({
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        sampledAtRef.current = Date.now();
         setValues((current) => ({
           ...current,
           gpsAccuracyMeters: Math.max(0, Math.round(position.coords.accuracy)),
@@ -148,8 +162,12 @@ export function TimekeepingEntryDialog({
         setLocationMessage("Đã lấy dữ liệu vị trí từ thiết bị.");
         setIsLocating(false);
       },
-      () => {
-        setLocationMessage("Không lấy được vị trí. Hãy cấp quyền GPS hoặc chuyển sang hình thức Trực tuyến.");
+      (error) => {
+        setLocationMessage(error.code === 1
+          ? "Trình duyệt chưa được cấp quyền vị trí. Hãy cấp quyền hoặc gửi chấm công chờ duyệt."
+          : error.code === 3
+            ? "Lấy vị trí quá thời gian chờ. Hãy thử lại hoặc gửi chấm công chờ duyệt."
+            : "Thiết bị chưa xác định được vị trí. Hãy thử lại hoặc gửi chấm công chờ duyệt.");
         setIsLocating(false);
       },
       {
@@ -177,6 +195,13 @@ export function TimekeepingEntryDialog({
       return;
     }
 
+    if (values.mode === "offline" && sampledAtRef.current !== null && Date.now() - sampledAtRef.current > 60_000) {
+      clearLocation();
+      sampledAtRef.current = null;
+      setLocationMessage("Vị trí đã quá 60 giây. Vui lòng lấy lại vị trí trước khi xác nhận.");
+      return;
+    }
+
     setActionState(initialTimekeepingEntryActionState);
 
     startTransition(async () => {
@@ -198,6 +223,23 @@ export function TimekeepingEntryDialog({
   };
 
   const hasLocation = values.gpsLatitude !== null && values.gpsLongitude !== null;
+  const submitForReview = () => {
+    if (isInteractionLocked || !requestIdRef.current) return;
+    const requestId = requestIdRef.current;
+    startTransition(async () => {
+      try {
+        const result = await requestAttendanceExceptionAction({ operation, reason: reviewReason, requestId, timeEntryId: timeEntryId ?? null });
+        setActionState(result);
+        if (result.status === "success") {
+          setSubmittedMessage(result.message);
+          setIsOpen(false);
+          router.refresh();
+        }
+      } catch {
+        setActionState({ status: "error", message: "Chưa có xác nhận từ hệ thống. Vui lòng thử gửi lại khi có mạng." });
+      }
+    });
+  };
   const isOffline = values.mode === "offline";
   const title = isCheckIn ? "Xác nhận check-in" : "Xác nhận check-out";
   const triggerLabel = isCheckIn ? "Check-in" : "Check-out";
@@ -209,6 +251,7 @@ export function TimekeepingEntryDialog({
 
   return (
     <>
+      {submittedMessage ? <p role="status" className="text-secondary">{submittedMessage}</p> : null}
       <Button
         className="min-h-11"
         onClick={openDialog}
@@ -343,6 +386,15 @@ export function TimekeepingEntryDialog({
                 tone="error"
               />
             ) : null}
+
+            {isOffline && attendancePolicy.exceptionReviewEnabled ? <fieldset className="grid gap-2 rounded-md border border-border-subtle p-4">
+              <legend className="px-1 font-medium">Không xác minh được vị trí?</legend>
+              <p className="text-secondary text-text-muted">Bạn có thể ghi nhận giờ vào/ra để quản lý duyệt. Công này chưa được cộng vào tổng đã xác minh.</p>
+              <label className="grid gap-1">Lý do cần duyệt
+                <textarea className={`${inputClassName} min-h-20 py-2`} disabled={isInteractionLocked} maxLength={2000} value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} />
+              </label>
+              <Button type="button" variant="outline" disabled={isInteractionLocked || !reviewReason.trim() || (!isCheckIn && !timeEntryId)} onClick={submitForReview}>Gửi chấm công chờ duyệt</Button>
+            </fieldset> : null}
 
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button className="min-h-11" disabled={isInteractionLocked} onClick={closeDialog} type="button" variant="ghost">
