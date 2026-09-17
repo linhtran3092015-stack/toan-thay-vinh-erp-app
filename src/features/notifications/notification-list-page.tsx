@@ -49,6 +49,12 @@ function getEventLabel(eventCode: string): string {
   const eventName = eventCode.split(".").pop();
 
   const labels: Record<string, string> = {
+    initialized: "Danh sách chăm sóc đã sẵn sàng",
+    detected: "Học viên cần hỗ trợ",
+    overdue: "Chăm sóc quá hạn",
+    escalated: "Cần điều phối",
+    assigned: "Đã phân công",
+    monthly_due: "Coaching đến hạn",
     approved: "Đã duyệt",
     rejected: "Từ chối",
     requested: "Yêu cầu mới",
@@ -65,6 +71,8 @@ function getEventLabel(eventCode: string): string {
 }
 
 function getEventTone(eventCode: string): NotificationTone {
+  if (eventCode === "student_care.escalated") return "danger";
+  if (eventCode === "student_care.overdue" || eventCode === "student_care.detected") return "warning";
   if (eventCode.endsWith(".approved")) {
     return "success";
   }

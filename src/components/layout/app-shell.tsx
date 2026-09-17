@@ -11,6 +11,7 @@ import {
 import { ModuleNavigation } from "@/components/layout/module-navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { StudentCareRefresh } from "@/features/student-care/refresh";
 import type { AuthUser } from "@/features/auth/types";
 import type { PermissionCode } from "@/lib/permissions/types";
 
@@ -55,6 +56,7 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-surface-canvas text-text-strong">
+      {permissions.includes("student_care.view") ? <StudentCareRefresh /> : null}
       <Sidebar
         activeDomainKey={activeDomain?.key}
         centerDisplayName={centerDisplayName}

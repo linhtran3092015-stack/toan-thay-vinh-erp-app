@@ -1,4 +1,6 @@
 import { ErrorState } from "@/components/shared/error-state";
+import { Suspense } from "react";
+import { StudentCareDashboardCard } from "@/features/student-care/dashboard-card";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getCachedCurrentAuthUser } from "@/features/auth/current-user";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
@@ -50,9 +52,12 @@ export default async function Home({ searchParams }: PageProps) {
   const userDisplayName = authResult.ok ? authResult.user.displayName : null;
 
   return (
+    <div className="space-y-5">
+    <Suspense fallback={<p>Đang tải chăm sóc học viên…</p>}><StudentCareDashboardCard /></Suspense>
     <DashboardPage
       dashboard={dashboard}
       userDisplayName={userDisplayName}
     />
+    </div>
   );
 }
