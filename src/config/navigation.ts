@@ -78,6 +78,12 @@ export const navigationDomains: readonly NavigationDomain[] = [
         label: "Coaching",
         permission: "coaching.view",
       },
+      {
+        available: true,
+        href: "/student-care",
+        label: "Chăm sóc học viên",
+        permission: "student_care.view",
+      },
     ],
     key: "academics",
     label: "Học vụ",

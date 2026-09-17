@@ -1,4 +1,6 @@
 import { EmptyState } from "@/components/shared/empty-state";
+import { Suspense } from "react";
+import { StudentCareDashboardCard } from "@/features/student-care/dashboard-card";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getStudentDetail } from "@/features/students/data";
@@ -122,6 +124,8 @@ export default async function StudentDetailRoute({
   const tuitionProfile = await getStudentTuitionProfile(studentId);
 
   return (
+    <div className="space-y-5">
+    <Suspense fallback={<p>Đang tải chăm sóc học viên…</p>}><StudentCareDashboardCard studentId={studentId} /></Suspense>
     <DatabaseStudentDetailPage
       canUpdateStudent={canUpdateStudent}
       canViewClasses={canViewClasses}
@@ -136,5 +140,6 @@ export default async function StudentDetailRoute({
       ledgerSummary={ledgerSummary}
       tuitionProfile={tuitionProfile}
     />
+    </div>
   );
 }

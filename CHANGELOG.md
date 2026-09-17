@@ -2,6 +2,18 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.1.0] - 2026-09-17
+
+### Added
+- **Phân hệ Chăm sóc học viên** (`/student-care`): trang danh sách, trang chi tiết công việc, thẻ tóm tắt trên dashboard và phần cảnh báo trong hồ sơ học viên.
+- Cảnh báo sớm tự động theo ba quy tắc: vắng 2 buổi liên tiếp, vắng 3 buổi trong tháng dương lịch, điểm kiểm tra cuối buổi dưới 6 trong hai bài gần nhất.
+- Coaching hằng tháng: mỗi học viên đang học có một nhiệm vụ mỗi tháng, trợ lý phụ trách ổn định, hạn hoàn thành trước ngày 25.
+- Luồng nhận việc chống hai trợ lý nhận đồng thời (optimistic concurrency); ghi lịch sử liên hệ, chuyển người phụ trách và liên kết Coaching.
+- Nhắc hạn hằng ngày (08:00 giờ Việt Nam), báo chủ trung tâm sau 72 giờ nếu cảnh báo chưa được nhận xử lý.
+- Thông báo tổng hợp khi kích hoạt lần đầu; không gửi dồn từng cảnh báo lịch sử.
+- Ba migration nền tảng: `student_care_tasks`, `student_care_events`, `student_care_settings`, `student_care_evaluation_queue`, RPC đọc/ghi, trigger tự động và cron job.
+- Tài liệu vận hành `STUDENT_CARE_OPERATIONS.md` với hướng dẫn triển khai, giám sát và xử lý lỗi.
+
 ## [0.6.0.0] - 2026-09-16
 
 ### Added

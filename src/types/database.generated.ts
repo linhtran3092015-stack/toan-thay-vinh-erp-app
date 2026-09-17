@@ -6158,6 +6158,22 @@ export type Database = {
       }
     }
     Functions: {
+      get_student_care_dashboard: {
+        Args: { p_filter?: Json }
+        Returns: Json
+      }
+      get_student_care_detail: {
+        Args: { p_task_id: string }
+        Returns: Json
+      }
+      get_student_care_students: {
+        Args: { p_search?: string; p_page?: number; p_inactive?: boolean }
+        Returns: Json
+      }
+      mutate_student_care: {
+        Args: { p_command: Json }
+        Returns: Json
+      }
       accept_my_account_invitation: { Args: never; Returns: boolean }
       activate_academic_year: {
         Args: { p_academic_year_id: string; p_reason: string }

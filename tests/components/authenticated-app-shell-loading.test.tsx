@@ -11,7 +11,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/server", () => ({ connection: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw new Error(`redirect:${url}`); } }));
 vi.mock("@/components/layout/app-shell", () => ({ AppShell: () => null }));
-vi.mock("@/features/auth/current-user", () => ({ getCurrentAuthUser: mocks.auth }));
+vi.mock("@/features/website/data", () => ({ readAppBranding: async () => null }));
+vi.mock("@/features/auth/current-user", () => ({ getCachedCurrentAuthUser: mocks.auth }));
 vi.mock("@/lib/permissions/database-permissions", () => ({ getCachedDatabasePermissions: mocks.permissions }));
 vi.mock("@/features/timekeeping/data", () => ({ getCachedMyTimekeepingEntries: mocks.entries }));
 vi.mock("@/features/notifications/data", () => ({ getCachedUnreadNotificationCountResult: mocks.notifications }));

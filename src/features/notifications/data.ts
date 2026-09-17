@@ -24,7 +24,7 @@ function normalizeInternalHref(value: string | null): string | null {
   return value;
 }
 
-export async function getNotificationsResult(): Promise<
+export async function getNotificationsResult(page = 1): Promise<
   NotificationReadResult<readonly NotificationEntry[]>
 > {
   try {
@@ -35,7 +35,7 @@ export async function getNotificationsResult(): Promise<
       .select(NOTIFICATION_COLUMNS)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
-      .limit(50);
+      .range((Math.max(1, Math.min(100000, page)) - 1) * 50, Math.max(1, Math.min(100000, page)) * 50 - 1);
 
     if (error || !data) {
       return { ok: false };
