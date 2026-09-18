@@ -687,7 +687,6 @@ begin
   floor_offsets as (
     select
       summary.staff_id,
-      summary.position_code,
       'piecework_offset' as line_type,
       'deduction' as direction,
       least(
