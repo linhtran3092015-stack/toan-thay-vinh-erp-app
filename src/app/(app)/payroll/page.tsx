@@ -1,8 +1,8 @@
-import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getCurrentAuthUser } from "@/features/auth/current-user";
 import { getPayrollManagementOverviewResult, getPayrollPeriodsWithDetailsResult } from "@/features/payroll/data";
+import { getMyPayrollEstimateResult } from "@/features/payroll/estimate/data";
 import { PayrollPage } from "@/features/payroll/payroll-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -39,10 +39,18 @@ export default async function PayrollRoute() {
     "payroll.owner_approve",
   );
   const canViewManagement = canManage || canReconcile || canApprove;
-  const [payrollResult, authUserResult, correctionsResult] = await Promise.all([
+  const now = new Date();
+  const currentMonth = `${new Intl.DateTimeFormat("en-CA", {
+    month: "2-digit",
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+  }).format(now).slice(0, 7)}-01`;
+
+  const [payrollResult, authUserResult, correctionsResult, estimateResult] = await Promise.all([
     getPayrollPeriodsWithDetailsResult(),
     getCurrentAuthUser(),
     canViewManagement ? getPayrollManagementOverviewResult() : Promise.resolve({ data: { correctionRequests: [], importBatches: [], issues: [] }, ok: true } as const),
+    getMyPayrollEstimateResult(currentMonth),
   ]);
 
   if (!payrollResult.ok || !authUserResult.ok || !correctionsResult.ok) {
@@ -54,15 +62,6 @@ export default async function PayrollRoute() {
     );
   }
 
-  if (payrollResult.data.length === 0 && !canManage) {
-    return (
-      <EmptyState
-        description="Chưa có bảng lương nào thuộc phạm vi tài khoản hiện tại."
-        title="Chưa có bảng lương"
-      />
-    );
-  }
-
   return (
     <PayrollPage
       canApprove={canApprove}
@@ -70,9 +69,11 @@ export default async function PayrollRoute() {
       canManage={canManage}
       canReconcile={canReconcile}
       canResolveFeedback={canResolveFeedback}
-      currentStaffId={authUserResult.user.id}
       correctionRequests={correctionsResult.data.correctionRequests}
+      currentMonth={currentMonth}
+      currentStaffId={authUserResult.user.id}
       importBatches={correctionsResult.data.importBatches}
+      initialEstimate={estimateResult.ok ? estimateResult.data : null}
       issues={correctionsResult.data.issues}
       periods={payrollResult.data}
     />

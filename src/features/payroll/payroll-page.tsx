@@ -35,15 +35,20 @@ import { Receipt } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import type { StaffPayrollEstimate } from "@/features/payroll/estimate/types";
+import { StaffLiveEstimateCard } from "@/features/payroll/estimate/components/staff-live-estimate-card";
+
 interface PayrollPageProps {
   canApprove: boolean;
   canImport?: boolean;
   canManage: boolean;
   canReconcile: boolean;
   canResolveFeedback?: boolean;
+  currentMonth?: string;
   currentStaffId?: string;
   correctionRequests?: readonly PayrollCorrectionRequestRead[];
   importBatches?: readonly PayrollImportBatchRead[];
+  initialEstimate?: StaffPayrollEstimate | null;
   issues?: readonly PayrollCalculationIssueRead[];
   periods: readonly PayrollPeriodRead[];
 }
@@ -113,9 +118,11 @@ export function PayrollPage({
   canManage,
   canReconcile,
   canResolveFeedback = false,
+  currentMonth,
   currentStaffId = "",
   correctionRequests = [],
   importBatches = [],
+  initialEstimate,
   issues = [],
   periods,
 }: PayrollPageProps) {
@@ -169,26 +176,38 @@ export function PayrollPage({
         </section>
       ) : null}
 
-      {periods.length === 0 ? (
-        <section className="rounded-lg border border-dashed border-border-strong bg-surface-base px-6 py-12 text-center">
-          <h2 className="text-section-title text-text-strong">Chưa có bảng lương</h2>
-          <p className="mx-auto mt-2 max-w-lg text-secondary leading-6 text-text-muted">
-            Chưa có kỳ lương nào trong phạm vi dữ liệu của tài khoản hiện tại.
-          </p>
-        </section>
-      ) : (
-        periods.map((period) => (
-          <PayrollPeriodSection
-            canApprove={canApprove}
-            canManage={canManage}
-            canReconcile={canReconcile}
-            canResolveFeedback={canResolveFeedback}
-            currentStaffId={currentStaffId}
-            key={period.id}
-            period={period}
-          />
-        ))
-      )}
+      {/* Thẻ lương tạm tính tháng hiện tại */}
+      <StaffLiveEstimateCard
+        initialEstimate={initialEstimate}
+        month={currentMonth ?? "2026-09-01"}
+      />
+
+      <div className="mt-2 border-t border-border-subtle pt-6">
+        <h2 className="mb-4 text-section-title font-bold text-text-strong">
+          Lịch sử bảng lương
+        </h2>
+
+        {periods.length === 0 ? (
+          <section className="rounded-lg border border-dashed border-border-strong bg-surface-base px-6 py-10 text-center">
+            <h3 className="text-subtitle font-semibold text-text-strong">Chưa có bảng lương lịch sử</h3>
+            <p className="mx-auto mt-2 max-w-lg text-secondary leading-6 text-text-muted">
+              Chưa có kỳ lương chính thức nào được chốt trong phạm vi dữ liệu của tài khoản hiện tại.
+            </p>
+          </section>
+        ) : (
+          periods.map((period) => (
+            <PayrollPeriodSection
+              canApprove={canApprove}
+              canManage={canManage}
+              canReconcile={canReconcile}
+              canResolveFeedback={canResolveFeedback}
+              currentStaffId={currentStaffId}
+              key={period.id}
+              period={period}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }

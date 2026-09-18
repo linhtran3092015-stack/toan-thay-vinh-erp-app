@@ -2,6 +2,17 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.2.0] - 2026-09-18
+
+### Added
+- **Lương tạm tính cập nhật theo phát sinh** tích hợp trực tiếp vào phân hệ Bảng lương (`/payroll` và `/payroll/dashboard`).
+- Thẻ lương tạm tính cho nhân sự (`StaffLiveEstimateCard`) hiển thị số tiền tạm tính tính đến hiện tại, phân tích chi tiết theo công, phụ cấp, thưởng/hoa hồng và trừ tạm ứng.
+- Cảnh báo minh bạch cho các ca làm việc đang chờ xác minh công và ca đang mở (chưa checkout).
+- Tổng quan điều hành cho chủ trung tâm (`OwnerLiveEstimateOverview`) với 4 chỉ số KPI chính: tổng thu nhập, lương tạm tính phải trả, nhân sự phát sinh công và tỷ lệ chi phí lương / học phí thực thu net.
+- Kiến trúc CSDL 3 lớp: nguồn dữ liệu chuẩn hóa, hàm chiếu thuần túy `compute_payroll_projection`, adapter ghi bảng lương chính thức `generate_payroll_calculation_run` kết hợp khóa phân tán `pg_advisory_xact_lock` theo tháng.
+- Bảng chỉ thị đồng bộ siêu nhẹ `payroll_live_revisions` theo dõi thay đổi từ chấm công, xác minh công và tạm ứng; tích hợp Supabase Realtime với debounce 400ms và fallback polling 30s.
+- 2 RPC bảo mật: `get_my_payroll_estimate` và `get_owner_payroll_estimate` cùng 2 Route Handlers `GET /api/payroll/estimate` và `GET /api/payroll/owner-estimate`.
+
 ## [0.6.1.0] - 2026-09-17
 
 ### Added
