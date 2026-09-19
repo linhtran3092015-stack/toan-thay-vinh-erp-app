@@ -132,13 +132,11 @@ begin
       entry.check_in_at,
       entry.check_out_at,
       entry.status,
-      review.status as exception_review_status,
+      not public.time_entry_is_verified(entry.id) as is_pending_verification,
       adjustment.requested_check_in_at,
       adjustment.requested_check_in_mode,
       adjustment.requested_check_out_at
     from public.time_entries as entry
-    left join public.attendance_exception_reviews as review
-      on review.time_entry_id = entry.id
     left join lateral (
       select request.requested_check_in_at, request.requested_check_in_mode, request.requested_check_out_at
       from public.time_entry_adjustment_requests as request
@@ -156,8 +154,14 @@ begin
       -- Filter by verification mode:
       and (
         case
-          when v_is_final then (review.status is null or review.status = 'approved')
-          else (review.status is null or review.status in ('approved', 'pending'))
+          when v_is_final then public.time_entry_is_verified(entry.id)
+          else (
+            public.time_entry_is_verified(entry.id)
+            or exists (
+              select 1 from public.attendance_exception_reviews as r
+              where r.time_entry_id = entry.id and r.status = 'pending'
+            )
+          )
         end
       )
   ),
@@ -178,7 +182,7 @@ begin
       ) as worked_minutes,
       entry.check_in_at,
       entry.check_out_at,
-      (entry.exception_review_status = 'pending') as is_pending_verification,
+      entry.is_pending_verification,
       rate.id as daily_rate_version_id,
       rate.offline_daily_rate_vnd,
       rate.online_rate_basis_points
@@ -292,6 +296,12 @@ begin
         select 1 from public.staff_payroll_position_versions as position
         where position.staff_id = fact.staff_id and position.position_code = 'teaching_assistant'
           and position.effective_from <= fact.event_date
+          and not exists (
+            select 1 from public.staff_payroll_position_versions as newer
+            where newer.staff_id = position.staff_id
+              and newer.effective_from <= fact.event_date
+              and newer.effective_from > position.effective_from
+          )
       )
   ),
   -- Grading pool credits (must compute all staff to calculate ratio, then filter)
@@ -331,6 +341,12 @@ begin
       select 1 from public.staff_payroll_position_versions as position
       where position.staff_id = grader.grader_id and position.position_code = 'teaching_assistant'
         and position.effective_from <= v_month_end
+        and not exists (
+          select 1 from public.staff_payroll_position_versions as newer
+          where newer.staff_id = position.staff_id
+            and newer.effective_from <= v_month_end
+            and newer.effective_from > position.effective_from
+        )
     )
   ),
   grading_policy as (
@@ -399,38 +415,47 @@ begin
       fact.metadata,
       fact.source_key,
       fact.student_id,
-      coalesce(
-        fact.grade,
-        (
-          select class_row.grade
-          from public.student_enrollments as enrollment
-          join public.classes as class_row on class_row.id = enrollment.class_id
-          where enrollment.student_id = fact.student_id
-            and enrollment.effective_from <= fact.event_date
-            and (enrollment.effective_to is null or enrollment.effective_to >= fact.event_date)
-          order by enrollment.effective_from desc, enrollment.id desc
-          limit 1
-        ),
-        (select student.current_grade from public.students as student where student.id = fact.student_id)
-      ) as resolved_grade,
-      case
-        when fact.fact_type = 'renewal_order' then coalesce(
+      resolved_grade.grade as resolved_grade,
+      resolved_staff.staff_id as resolved_staff_id,
+      resolved_source.source_code as resolved_source_code
+    from public.payroll_source_facts as fact
+    cross join lateral (
+      select
+        coalesce(
+          fact.grade,
           (
-            select assignment.staff_id
-            from public.staff_grade_assignments as assignment
-            where assignment.grade = coalesce(fact.grade, (
-              select class_row.grade from public.student_enrollments as enr join public.classes as class_row on class_row.id = enr.class_id where enr.student_id = fact.student_id order by enr.effective_from desc limit 1
-            ))
-              and assignment.effective_from <= fact.event_date
-              and (assignment.effective_to is null or assignment.effective_to >= fact.event_date)
-            order by assignment.effective_from desc, assignment.id desc
+            select class_row.grade
+            from public.student_enrollments as enrollment
+            join public.classes as class_row on class_row.id = enrollment.class_id
+            where enrollment.student_id = fact.student_id
+              and enrollment.effective_from <= fact.event_date
+              and (enrollment.effective_to is null or enrollment.effective_to >= fact.event_date)
+            order by enrollment.effective_from desc, enrollment.id desc
             limit 1
           ),
-          fact.staff_id
-        )
-        else fact.staff_id
-      end as resolved_staff_id,
-      coalesce(
+          (select student.current_grade from public.students as student where student.id = fact.student_id)
+        ) as grade
+    ) as resolved_grade
+    cross join lateral (
+      select
+        case
+          when fact.fact_type = 'renewal_order' then coalesce(
+            (
+              select assignment.staff_id
+              from public.staff_grade_assignments as assignment
+              where assignment.grade = resolved_grade.grade
+                and assignment.effective_from <= fact.event_date
+                and (assignment.effective_to is null or assignment.effective_to >= fact.event_date)
+              order by assignment.effective_from desc, assignment.id desc
+              limit 1
+            ),
+            fact.staff_id
+          )
+          else fact.staff_id
+        end as staff_id
+    ) as resolved_staff
+    cross join lateral (
+      select coalesce(
         fact.source_code,
         (
           select mapping.payroll_source_code
@@ -443,8 +468,8 @@ begin
           order by mapping.effective_from desc
           limit 1
         )
-      ) as resolved_source_code
-    from public.payroll_source_facts as fact
+      ) as source_code
+    ) as resolved_source
     where fact.event_date >= v_norm_month
       and fact.event_date <= v_month_end
       and fact.event_date <= v_cutoff_date
@@ -481,6 +506,12 @@ begin
         select 1 from public.staff_payroll_position_versions as pos
         where pos.staff_id = fact.resolved_staff_id and pos.position_code = 'operations_assistant'
           and pos.effective_from <= fact.event_date
+          and not exists (
+            select 1 from public.staff_payroll_position_versions as newer
+            where newer.staff_id = pos.staff_id
+              and newer.effective_from <= fact.event_date
+              and newer.effective_from > pos.effective_from
+          )
       )
   ),
   -- Operations: New Enrollment Bonus
@@ -521,6 +552,12 @@ begin
         select 1 from public.staff_payroll_position_versions as pos
         where pos.staff_id = fact.resolved_staff_id and pos.position_code = 'operations_assistant'
           and pos.effective_from <= fact.event_date
+          and not exists (
+            select 1 from public.staff_payroll_position_versions as newer
+            where newer.staff_id = pos.staff_id
+              and newer.effective_from <= fact.event_date
+              and newer.effective_from > pos.effective_from
+          )
       )
   ),
   -- Admissions: New Enrollment Fixed Bonus
@@ -556,6 +593,12 @@ begin
         select 1 from public.staff_payroll_position_versions as pos
         where pos.staff_id = fact.resolved_staff_id and pos.position_code = 'admissions_manager'
           and pos.effective_from <= fact.event_date
+          and not exists (
+            select 1 from public.staff_payroll_position_versions as newer
+            where newer.staff_id = pos.staff_id
+              and newer.effective_from <= fact.event_date
+              and newer.effective_from > pos.effective_from
+          )
       )
   ),
   -- Admissions: Monthly Revenue Tiers
@@ -568,6 +611,12 @@ begin
         select 1 from public.staff_payroll_position_versions as pos
         where pos.staff_id = fact.resolved_staff_id and pos.position_code = 'admissions_manager'
           and pos.effective_from <= fact.event_date
+          and not exists (
+            select 1 from public.staff_payroll_position_versions as newer
+            where newer.staff_id = pos.staff_id
+              and newer.effective_from <= fact.event_date
+              and newer.effective_from > pos.effective_from
+          )
       )
     group by fact.resolved_staff_id
   ),
@@ -621,11 +670,24 @@ begin
         select 1 from public.staff_payroll_position_versions as pos
         where pos.staff_id = coaching.assistant_owner_id and pos.position_code = 'operations_assistant'
           and pos.effective_from <= fact.event_date
+          and not exists (
+            select 1 from public.staff_payroll_position_versions as newer
+            where newer.staff_id = pos.staff_id
+              and newer.effective_from <= fact.event_date
+              and newer.effective_from > pos.effective_from
+          )
       )
       and exists (
         select 1 from public.staff_payroll_task_versions as task
         where task.staff_id = coaching.assistant_owner_id and task.task_code = 'student_coaching'
           and task.effective_from <= fact.event_date and task.is_enabled
+          and not exists (
+            select 1 from public.staff_payroll_task_versions as newer
+            where newer.staff_id = task.staff_id
+              and newer.task_code = task.task_code
+              and newer.effective_from <= fact.event_date
+              and newer.effective_from > task.effective_from
+          )
       )
     group by coaching.assistant_owner_id
   ),
@@ -760,35 +822,155 @@ begin
     union all
     select * from advance_deductions
   ),
-  -- Statement totals per staff
+  -- Statement totals per staff (decoupled to eliminate multi-join cartesian fanout)
+  staff_entry_aggregates as (
+    select
+      entry.staff_id,
+      coalesce(pg_catalog.sum(entry.worked_minutes), 0)::integer as worked_minutes,
+      coalesce(pg_catalog.count(distinct entry.time_entry_id) filter (where entry.is_pending_verification), 0)::integer as pending_verification_count
+    from effective_time_entries as entry
+    group by entry.staff_id
+  ),
+  staff_line_aggregates as (
+    select
+      line.staff_id,
+      coalesce(pg_catalog.sum(line.amount_vnd) filter (where line.direction = 'earning'), 0)::bigint as total_earnings_vnd,
+      coalesce(pg_catalog.sum(line.amount_vnd) filter (where line.direction = 'deduction'), 0)::bigint as total_deductions_vnd,
+      coalesce(pg_catalog.sum(line.amount_vnd) filter (where line.line_type = 'advance_deduction'), 0)::bigint as advance_deductions_vnd
+    from all_lines as line
+    group by line.staff_id
+  ),
   statement_aggregates as (
     select
       profile.staff_id,
       profile.staff_display_name,
       profile.staff_employee_code,
       profile.position_code,
-      coalesce(pg_catalog.sum(entry.worked_minutes), 0)::integer as worked_minutes,
-      pg_catalog.floor(coalesce(pg_catalog.sum(entry.worked_minutes), 0)::numeric / 540)::integer as work_units,
-      pg_catalog.round(coalesce(pg_catalog.sum(entry.worked_minutes), 0)::numeric / 60)::integer as work_hours,
-      coalesce(pg_catalog.sum(line.amount_vnd) filter (where line.direction = 'earning'), 0)::bigint as total_earnings_vnd,
-      coalesce(pg_catalog.sum(line.amount_vnd) filter (where line.direction = 'deduction'), 0)::bigint as total_deductions_vnd,
-      coalesce(pg_catalog.sum(line.amount_vnd) filter (where line.line_type = 'advance_deduction'), 0)::bigint as advance_deductions_vnd,
+      coalesce(entry_agg.worked_minutes, 0)::integer as worked_minutes,
+      pg_catalog.floor(coalesce(entry_agg.worked_minutes, 0)::numeric / 540)::integer as work_units,
+      pg_catalog.round(coalesce(entry_agg.worked_minutes, 0)::numeric / 60)::integer as work_hours,
+      coalesce(line_agg.total_earnings_vnd, 0)::bigint as total_earnings_vnd,
+      coalesce(line_agg.total_deductions_vnd, 0)::bigint as total_deductions_vnd,
+      coalesce(line_agg.advance_deductions_vnd, 0)::bigint as advance_deductions_vnd,
       (
-        coalesce(pg_catalog.sum(line.amount_vnd) filter (where line.direction = 'earning'), 0)
-        - coalesce(pg_catalog.sum(line.amount_vnd) filter (where line.direction = 'deduction'), 0)
+        coalesce(line_agg.total_earnings_vnd, 0)
+        - coalesce(line_agg.total_deductions_vnd, 0)
       )::bigint as payable_vnd,
-      coalesce(pg_catalog.count(distinct entry.time_entry_id) filter (where entry.is_pending_verification), 0)::integer as pending_verification_count
+      coalesce(entry_agg.pending_verification_count, 0)::integer as pending_verification_count
     from eligible_profiles as profile
-    left join effective_time_entries as entry on entry.staff_id = profile.staff_id
-    left join all_lines as line on line.staff_id = profile.staff_id
-    group by profile.staff_id, profile.staff_display_name, profile.staff_employee_code, profile.position_code
+    left join staff_entry_aggregates as entry_agg on entry_agg.staff_id = profile.staff_id
+    left join staff_line_aggregates as line_agg on line_agg.staff_id = profile.staff_id
+  ),
+  -- Order fact issues
+  order_fact_issues as (
+    select
+      evaluated.issue_code,
+      evaluated.staff_id,
+      fact.fact_id as source_fact_id,
+      pg_catalog.jsonb_build_object(
+        'source_key', fact.source_key,
+        'fact_type', fact.fact_type,
+        'event_date', fact.event_date,
+        'amount_vnd', fact.amount_vnd,
+        'grade', fact.resolved_grade,
+        'source_code', fact.resolved_source_code
+      ) as details
+    from resolved_order_facts as fact
+    cross join lateral (
+      select
+        case
+          when fact.fact_type = 'renewal_order' and fact.resolved_grade is null then 'missing_grade'
+          when fact.fact_type = 'renewal_order' and (
+            fact.resolved_staff_id is null
+            or not exists (
+              select 1
+              from public.staff_payroll_position_versions as position
+              where position.staff_id = fact.resolved_staff_id
+                and position.position_code = 'operations_assistant'
+                and position.effective_from <= fact.event_date
+                and not exists (
+                  select 1 from public.staff_payroll_position_versions as newer
+                  where newer.staff_id = position.staff_id
+                    and newer.effective_from <= fact.event_date
+                    and newer.effective_from > position.effective_from
+                )
+            )
+          ) then 'missing_grade_assignment'
+          when fact.fact_type = 'new_enrollment_order' and fact.resolved_staff_id is null then 'missing_recruiter'
+          when fact.fact_type = 'new_enrollment_order' and (
+            fact.resolved_source_code is null
+            or not exists (
+              select 1
+              from public.staff_payroll_position_versions as position
+              join lateral (
+                select policy.parameters
+                from public.payroll_policy_versions as policy
+                where policy.policy_code = case position.position_code
+                  when 'operations_assistant' then 'operations_new_enrollment'
+                  when 'admissions_manager' then 'admissions_new_enrollment'
+                end
+                  and policy.effective_from <= fact.event_date
+                order by policy.effective_from desc
+                limit 1
+              ) as policy on position.position_code in ('operations_assistant', 'admissions_manager')
+              where position.staff_id = fact.resolved_staff_id
+                and position.effective_from <= fact.event_date
+                and policy.parameters->'fixed_by_source' ? fact.resolved_source_code
+                and not exists (
+                  select 1 from public.staff_payroll_position_versions as newer
+                  where newer.staff_id = position.staff_id
+                    and newer.effective_from <= fact.event_date
+                    and newer.effective_from > position.effective_from
+                )
+            )
+          ) then 'missing_source_mapping'
+          else null
+        end as issue_code,
+        fact.resolved_staff_id as staff_id
+    ) as evaluated
+    where evaluated.issue_code is not null
+  ),
+  -- Timekeeping facts from excel
+  timekeeping_fact_issues as (
+    select
+      'missing_payroll_position' as issue_code,
+      fact.staff_id,
+      fact.id as source_fact_id,
+      pg_catalog.jsonb_build_object('work_date', fact.event_date, 'source', 'excel') as details
+    from public.payroll_source_facts as fact
+    where fact.fact_type = 'timekeeping'
+      and fact.event_date >= v_norm_month
+      and fact.event_date <= v_month_end
+      and fact.event_date <= v_cutoff_date
+      and fact.staff_id is not null
+      and not exists (
+        select 1 from public.staff_payroll_position_versions as position
+        where position.staff_id = fact.staff_id and position.effective_from <= fact.event_date
+      )
+    union all
+    select
+      'missing_daily_rate' as issue_code,
+      fact.staff_id,
+      fact.id as source_fact_id,
+      pg_catalog.jsonb_build_object('work_date', fact.event_date, 'source', 'excel') as details
+    from public.payroll_source_facts as fact
+    where fact.fact_type = 'timekeeping'
+      and fact.event_date >= v_norm_month
+      and fact.event_date <= v_month_end
+      and fact.event_date <= v_cutoff_date
+      and fact.staff_id is not null
+      and not exists (
+        select 1 from public.staff_daily_rate_versions as rate
+        where rate.staff_id = fact.staff_id and rate.effective_from <= fact.event_date
+      )
   ),
   -- Issues
   detected_issues as (
-    -- Missing daily rate
+    -- Missing daily rate from verified time entries
     select distinct
       'missing_daily_rate' as issue_code,
       entry.staff_id,
+      null::uuid as source_fact_id,
       pg_catalog.jsonb_build_object('work_date', entry.work_date) as details
     from raw_time_entries as entry
     where not exists (
@@ -796,16 +978,21 @@ begin
       where rate.staff_id = entry.staff_id and rate.effective_from <= entry.work_date
     )
     union all
-    -- Missing payroll position
+    -- Missing payroll position from verified time entries
     select distinct
       'missing_payroll_position' as issue_code,
       entry.staff_id,
+      null::uuid as source_fact_id,
       pg_catalog.jsonb_build_object('work_date', entry.work_date) as details
     from raw_time_entries as entry
     where not exists (
       select 1 from public.staff_payroll_position_versions as pos
       where pos.staff_id = entry.staff_id and pos.effective_from <= entry.work_date
     )
+    union all
+    select * from timekeeping_fact_issues
+    union all
+    select * from order_fact_issues
   ),
   latest_work as (
     select pg_catalog.max(check_out_at) as latest_completed_work_at
@@ -856,6 +1043,7 @@ begin
       select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
         'issueCode', i.issue_code,
         'staffId', i.staff_id,
+        'sourceFactId', i.source_fact_id,
         'details', i.details
       ))
       from detected_issues as i
@@ -1427,10 +1615,11 @@ begin
   for i_row in select * from jsonb_array_elements(v_projection->'issues')
   loop
     insert into public.payroll_calculation_issues (
-      calculation_run_id, issue_code, staff_id, details
+      calculation_run_id, issue_code, source_fact_id, staff_id, details
     ) values (
       created_run.id,
       i_row->>'issueCode',
+      (i_row->>'sourceFactId')::uuid,
       (i_row->>'staffId')::uuid,
       i_row->'details'
     );
