@@ -25,7 +25,7 @@ export function OwnerLiveEstimateOverview({
   month,
   positionCode,
 }: OwnerLiveEstimateOverviewProps) {
-  const { connectionState, data, isLoading, lastRefreshedAt, refetch } =
+  const { connectionState, data, hasAttemptedFetch, isLoading, lastRefreshedAt, refetch } =
     usePayrollLiveEstimate<OwnerPayrollEstimate>({
       initialData: initialEstimate,
       month,
@@ -36,11 +36,30 @@ export function OwnerLiveEstimateOverview({
   const estimate = data ?? initialEstimate;
 
   if (!estimate) {
+    if (!hasAttemptedFetch || isLoading) {
+      return (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div className="h-28 animate-pulse rounded-lg border border-border-subtle bg-surface-base p-4" key={i} />
+          ))}
+        </div>
+      );
+    }
+
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
-          <div className="h-28 animate-pulse rounded-lg border border-border-subtle bg-surface-base p-4" key={i} />
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface-base p-4 sm:p-5 shadow-sm">
+        <div>
+          <p className="text-body font-semibold text-text-strong">Chưa tải được tổng quan lương tạm tính</p>
+          <p className="mt-1 text-secondary text-text-muted">Không thể kết nối dữ liệu ước tính quỹ lương. Vui lòng thử lại.</p>
+        </div>
+        <button
+          className="inline-flex items-center gap-2 rounded-md border border-border-subtle bg-surface-base px-3 py-1.5 text-secondary font-medium text-text-default hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          onClick={() => void refetch()}
+          type="button"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Thử lại
+        </button>
       </div>
     );
   }

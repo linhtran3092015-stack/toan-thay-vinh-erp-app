@@ -2,6 +2,13 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.2.1] - 2026-09-19
+
+### Fixed
+- **Khôi phục hiển thị Lương tạm tính trên môi trường Production**: Đẩy migration `20260918160000_payroll_live_estimate_engine.sql` lên cơ sở dữ liệu Supabase production (`ptkbpkdosjrfpfkpmlwn`), cung cấp đầy đủ các hàm RPC `get_my_payroll_estimate` và `get_owner_payroll_estimate`.
+- **Cơ chế tải dữ liệu phía client**: Thêm lệnh kích hoạt tải dữ liệu ngay khi component mount trong hook `usePayrollLiveEstimate`, ngăn chặn tình trạng kẹt skeleton vô hạn.
+- **Trạng thái dự phòng và nút thử lại**: Bổ sung trạng thái fallback hiển thị thông báo thân thiện và nút "Thử lại" trên cả thẻ nhân sự (`StaffLiveEstimateCard`) và dashboard chủ trung tâm (`OwnerLiveEstimateOverview`) khi có sự cố kết nối hoặc dữ liệu chưa sẵn sàng.
+
 ## [0.6.2.0] - 2026-09-18
 
 ### Added
