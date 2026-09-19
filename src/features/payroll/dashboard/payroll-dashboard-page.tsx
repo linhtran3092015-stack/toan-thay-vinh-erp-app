@@ -17,9 +17,24 @@ import { PayrollPositionSummaryTable } from "@/features/payroll/dashboard/compon
 import { formatCompactVnd, formatDashboardMonth, formatPercent, formatSignedPercent, formatVnd } from "@/features/payroll/dashboard/format";
 import type { PayrollDashboardData, PayrollDashboardEmployee } from "@/features/payroll/dashboard/read-models";
 
-export function OwnerPayrollDashboardPage({ dashboard }: { dashboard: PayrollDashboardData }) {
+import type { OwnerPayrollEstimate } from "@/features/payroll/estimate/types";
+import { OwnerLiveEstimateOverview } from "@/features/payroll/estimate/components/owner-live-estimate-overview";
+
+interface OwnerPayrollDashboardPageProps {
+  dashboard: PayrollDashboardData;
+  initialOwnerEstimate?: OwnerPayrollEstimate | null;
+}
+
+export function OwnerPayrollDashboardPage({
+  dashboard,
+  initialOwnerEstimate,
+}: OwnerPayrollDashboardPageProps) {
   const { summary } = dashboard;
-  const isEmpty = summary.employeeCount === 0;
+  const isApproved = dashboard.periodStatus === "approved";
+  const hasEstimateData =
+    Boolean(initialOwnerEstimate?.summary?.staffCount) ||
+    Boolean(initialOwnerEstimate?.statements?.length);
+  const isEmpty = summary.employeeCount === 0 && !hasEstimateData;
 
   return (
     <div className="grid min-w-0 gap-5">
@@ -30,10 +45,17 @@ export function OwnerPayrollDashboardPage({ dashboard }: { dashboard: PayrollDas
             {dashboard.periodStatus ? <PeriodStatusBadge status={dashboard.periodStatus} /> : null}
           </div>
           <h1 className="mt-1 text-page-title font-bold text-text-strong">Tổng quan quỹ lương</h1>
-          <p className="mt-1 max-w-2xl text-secondary text-text-muted">Chi phí thực trả sau khấu trừ, lấy từ phiên tính lương hiện hành của từng kỳ.</p>
+          <p className="mt-1 max-w-2xl text-secondary text-text-muted">Chi phí thực trả sau khấu trừ, đối chiếu thực thu và cập nhật theo phát sinh thực tế.</p>
         </div>
         <PayrollDashboardFilters dashboard={dashboard} />
       </header>
+
+      {/* Khối Lương tạm tính phát sinh & đối chiếu thực thu */}
+      <OwnerLiveEstimateOverview
+        initialEstimate={initialOwnerEstimate}
+        month={dashboard.filters.selectedMonth}
+        positionCode={dashboard.filters.selectedPositionCode}
+      />
 
       {isEmpty ? (
         <section className="rounded-lg border border-border-subtle bg-surface-base px-5 py-12 text-center">
@@ -42,9 +64,14 @@ export function OwnerPayrollDashboardPage({ dashboard }: { dashboard: PayrollDas
           <p className="mx-auto mt-2 max-w-lg text-secondary text-text-muted">Bộ lọc vẫn được giữ nguyên. Bạn có thể chọn kỳ khác hoặc mở bảng lương để kiểm tra dữ liệu nguồn.</p>
           <Link className="mt-5 inline-flex min-h-11 items-center justify-center rounded-md bg-action-primary px-4 text-control font-semibold text-text-on-primary hover:bg-action-primary-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href="/payroll">Xem bảng lương</Link>
         </section>
-      ) : (
+      ) : summary.employeeCount > 0 ? (
         <>
-          <PayrollKpiGrid dashboard={dashboard} />
+          <div className="mt-2 border-t border-border-subtle pt-6">
+            <h2 className="mb-4 text-section-title font-bold text-text-strong">
+              {isApproved ? "Thống kê phiên lương đã duyệt" : "Phân tích phiên tính lương nháp"}
+            </h2>
+            <PayrollKpiGrid dashboard={dashboard} />
+          </div>
 
           {dashboard.insights.length > 0 ? <PayrollInsights insights={dashboard.insights} /> : null}
 
@@ -66,7 +93,7 @@ export function OwnerPayrollDashboardPage({ dashboard }: { dashboard: PayrollDas
 
           <PayrollPositionSummaryTable items={dashboard.byPosition} />
         </>
-      )}
+      ) : null}
     </div>
   );
 }

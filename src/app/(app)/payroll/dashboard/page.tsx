@@ -3,6 +3,7 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { getOwnerPayrollDashboardResult } from "@/features/payroll/dashboard/data";
 import { OwnerPayrollDashboardPage } from "@/features/payroll/dashboard/payroll-dashboard-page";
 import { parsePayrollDashboardMonth, parsePayrollDashboardPosition } from "@/features/payroll/dashboard/url-state";
+import { getOwnerPayrollEstimateResult } from "@/features/payroll/estimate/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 interface OwnerPayrollDashboardRouteProps {
@@ -21,10 +22,20 @@ export default async function OwnerPayrollDashboardRoute({ searchParams }: Owner
   const params = await searchParams;
   const selectedMonth = parsePayrollDashboardMonth(params.month);
   const positionCode = parsePayrollDashboardPosition(params.position);
-  const dashboardResult = await getOwnerPayrollDashboardResult({ positionCode, selectedMonth });
+
+  const [dashboardResult, estimateResult] = await Promise.all([
+    getOwnerPayrollDashboardResult({ positionCode, selectedMonth }),
+    getOwnerPayrollEstimateResult({ month: selectedMonth, positionCode }),
+  ]);
+
   if (!dashboardResult.ok) {
     return <ErrorState description="Không thể tải dữ liệu lương. Vui lòng thử lại." title="Không tải được Dashboard lương" />;
   }
 
-  return <OwnerPayrollDashboardPage dashboard={dashboardResult.data} />;
+  return (
+    <OwnerPayrollDashboardPage
+      dashboard={dashboardResult.data}
+      initialOwnerEstimate={estimateResult.ok ? estimateResult.data : null}
+    />
+  );
 }
