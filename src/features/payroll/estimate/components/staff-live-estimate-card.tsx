@@ -24,7 +24,7 @@ export function StaffLiveEstimateCard({
   initialEstimate,
   month,
 }: StaffLiveEstimateCardProps) {
-  const { connectionState, data, isLoading, lastRefreshedAt, refetch } =
+  const { connectionState, data, hasAttemptedFetch, isLoading, lastRefreshedAt, refetch } =
     usePayrollLiveEstimate<StaffPayrollEstimate>({
       initialData: initialEstimate,
       month,
@@ -36,13 +36,38 @@ export function StaffLiveEstimateCard({
   const estimate = data ?? initialEstimate;
 
   if (!estimate) {
+    if (!hasAttemptedFetch || isLoading) {
+      return (
+        <section aria-labelledby="live-estimate-heading" className="rounded-lg border border-border-subtle bg-surface-base p-5">
+          <div className="flex items-center justify-between">
+            <div className="h-6 w-40 animate-pulse rounded bg-surface-raised" />
+            <div className="h-6 w-24 animate-pulse rounded bg-surface-raised" />
+          </div>
+          <div className="mt-4 h-10 w-48 animate-pulse rounded bg-surface-raised" />
+        </section>
+      );
+    }
+
     return (
-      <section aria-labelledby="live-estimate-heading" className="rounded-lg border border-border-subtle bg-surface-base p-5">
-        <div className="flex items-center justify-between">
-          <div className="h-6 w-40 animate-pulse rounded bg-surface-raised" />
-          <div className="h-6 w-24 animate-pulse rounded bg-surface-raised" />
+      <section aria-labelledby="live-estimate-heading" className="rounded-lg border border-border-subtle bg-surface-base p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-section-title font-bold text-text-strong" id="live-estimate-heading">
+              {formatMonth(month)}
+            </h2>
+            <p className="mt-1 text-secondary text-text-muted">
+              Chưa tải được dữ liệu lương tạm tính cho kỳ này.
+            </p>
+          </div>
+          <button
+            className="inline-flex items-center gap-2 rounded-md border border-border-subtle bg-surface-base px-3 py-1.5 text-secondary font-medium text-text-default hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            onClick={() => void refetch()}
+            type="button"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Thử lại
+          </button>
         </div>
-        <div className="mt-4 h-10 w-48 animate-pulse rounded bg-surface-raised" />
       </section>
     );
   }

@@ -25,7 +25,8 @@ export function usePayrollLiveEstimate<
   scope,
 }: UsePayrollLiveEstimateOptions<T>) {
   const [data, setData] = useState<T | null>(initialData);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(() => !initialData);
+  const [hasAttemptedFetch, setHasAttemptedFetch] = useState<boolean>(false);
   const [connectionState, setConnectionState] = useState<PayrollConnectionState>("connected");
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(() => new Date());
 
@@ -56,6 +57,7 @@ export function usePayrollLiveEstimate<
       setConnectionState("stale");
     } finally {
       setIsLoading(false);
+      setHasAttemptedFetch(true);
     }
   };
 
@@ -93,6 +95,7 @@ export function usePayrollLiveEstimate<
       } finally {
         isFetching = false;
         setIsLoading(false);
+        setHasAttemptedFetch(true);
       }
     };
 
@@ -135,6 +138,9 @@ export function usePayrollLiveEstimate<
       // Supabase env not available (e.g. testing / offline)
     }
 
+    // Always fetch fresh estimate on mount / parameter change
+    void runFetch();
+
     const pollInterval: NodeJS.Timeout = setInterval(() => {
       if (document.visibilityState === "visible") {
         void runFetch();
@@ -174,6 +180,7 @@ export function usePayrollLiveEstimate<
   return {
     connectionState,
     data,
+    hasAttemptedFetch,
     isLoading,
     lastRefreshedAt,
     refetch,
