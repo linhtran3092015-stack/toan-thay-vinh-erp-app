@@ -4,11 +4,64 @@ import { revalidatePath } from "next/cache";
 
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { z } from "zod";
 
 export type TuitionActionResult = { message: string; status: "error" | "success" };
 
 function failure(message: string): TuitionActionResult {
   return { message, status: "error" };
+}
+
+const periodRatesSchema = z.object({
+  periodId: z.string().uuid(), studentIds: z.array(z.string().uuid()).min(1).max(500),
+  unitPriceVnd: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), reason: z.string().trim().min(3).max(1000),
+});
+
+export async function setTuitionPeriodRatesAction(input: z.input<typeof periodRatesSchema>): Promise<TuitionActionResult> {
+  const permissions = await getDatabasePermissions();
+  if (!permissions.ok || !permissions.permissions.includes("students.manage_tuition_rates") || !permissions.permissions.includes("tuition_periods.view")) return failure("Không có quyền bổ sung đơn giá học phí.");
+  const parsed = periodRatesSchema.safeParse(input);
+  if (!parsed.success) return failure("Chọn từ 1 đến 500 học viên, nhập đơn giá nguyên dương và căn cứ áp dụng ít nhất 3 ký tự.");
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("set_tuition_period_student_rates", {
+    p_period_id: parsed.data.periodId, p_student_ids: parsed.data.studentIds,
+    p_unit_price_vnd: parsed.data.unitPriceVnd, p_reason: parsed.data.reason,
+  });
+  if (error) return failure(error.message.includes("TUITION_RATE_SELECTION_STALE")
+    ? "Dữ liệu đã thay đổi hoặc học viên đã có đơn giá. Vui lòng tải lại và chọn các học viên còn thiếu giá."
+    : "Không thể lưu đơn giá. Kỳ phải còn nháp và tất cả học viên được chọn phải còn thiếu giá. Không có đơn giá nào được lưu một phần.");
+  revalidatePath("/finance/tuition-periods", "layout");
+  revalidatePath("/students/[studentId]", "page");
+  return { status: "success", message: `Đã bổ sung đơn giá cho ${new Set(parsed.data.studentIds).size} học viên. Kiểm tra lại kỳ thu trước khi khóa và tạo yêu cầu thanh toán.` };
+}
+
+const periodSourcesSchema = z.object({
+  periodId: z.string().uuid(),
+  leadSourceId: z.string().uuid(),
+  reason: z.string().trim().min(3).max(1000),
+  studentIds: z.array(z.string().uuid()).min(1).max(500),
+});
+
+export async function setTuitionPeriodSourcesAction(input: z.input<typeof periodSourcesSchema>): Promise<TuitionActionResult> {
+  const permissions = await getDatabasePermissions();
+  if (!permissions.ok || !permissions.permissions.includes("students.correct_acquisition_source") || !permissions.permissions.includes("tuition_periods.view")) {
+    return failure("Không có quyền hiệu chỉnh nguồn học viên.");
+  }
+  const parsed = periodSourcesSchema.safeParse(input);
+  if (!parsed.success) return failure("Chọn từ 1 đến 500 học viên, chọn nguồn hợp lệ và lý do ít nhất 3 ký tự.");
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("set_tuition_period_student_sources", {
+    p_period_id: parsed.data.periodId,
+    p_lead_source_id: parsed.data.leadSourceId,
+    p_reason: parsed.data.reason,
+    p_student_ids: parsed.data.studentIds,
+  });
+  if (error) return failure(error.message.includes("TUITION_SOURCE_SELECTION_STALE")
+    ? "Thông tin nguồn đã thay đổi. Tải lại và chọn học viên còn thiếu nguồn."
+    : "Không thể lưu nguồn. Kỳ phải còn nháp, nguồn phải đang hoạt động và học viên phải còn thiếu nguồn. Không có dòng nào được lưu một phần.");
+  revalidatePath("/finance/tuition-periods", "layout");
+  revalidatePath("/students/[studentId]", "page");
+  return { status: "success", message: `Đã cập nhật nguồn tuyển sinh cho ${new Set(parsed.data.studentIds).size} học viên.` };
 }
 
 export async function createTuitionPeriodAction(input: {
@@ -45,11 +98,13 @@ export async function lockTuitionPeriodAction(periodId: string): Promise<Tuition
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("lock_tuition_collection_period", { p_period_id: periodId });
   if (error) {
+    if (error.message.includes("TUITION_PERIOD_EMPTY")) return failure("Chưa có buổi học đủ điều kiện trong kỳ. Kiểm tra lịch học và ghi danh trước khi khóa.");
     return failure(error.message.includes("TUITION_PERIOD_BLOCKERS")
-      ? "Preview còn dữ liệu chặn khóa. Hãy hoàn thiện đơn giá hoặc nguồn học viên."
+      ? "Cần bổ sung đơn giá, nguồn hoặc phụ huynh chính. Mở chi tiết kỳ thu để xem từng học viên."
       : "Không thể khóa kỳ thu. Không có dữ liệu nào được khóa một phần.");
   }
   revalidatePath("/finance/tuition-periods");
+  revalidatePath(`/finance/tuition-periods/${periodId}`);
   revalidatePath("/finance/payment-requests");
   return { message: "Đã khóa kỳ thu và tạo yêu cầu tái phí hợp lệ.", status: "success" };
 }

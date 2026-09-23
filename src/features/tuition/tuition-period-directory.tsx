@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { createTuitionPeriodAction, lockTuitionPeriodAction } from "@/features/tuition/actions";
 import Link from "next/link";
 import type { TuitionPeriodListItem, TuitionPreviewRow, TuitionSystemBlocker } from "@/features/tuition/data";
+import { summarizeTuitionPreview } from "@/features/tuition/readiness";
 
 interface TuitionPeriodDirectoryProps {
   canLock: boolean;
@@ -43,12 +44,25 @@ export function TuitionPeriodDirectory({ canLock, canManage, periods, previewByP
         const preview = previewByPeriod[period.id] ?? [];
         const blockers = preview.filter((row) => row.blockerCode);
         const systemBlockers = systemBlockersByPeriod[period.id] ?? [];
-        const hasBlockers = blockers.length > 0 || systemBlockers.length > 0;
+        const students = summarizeTuitionPreview(preview);
+        const missingRates = students.filter(student => student.issues.includes("MISSING_EFFECTIVE_TUITION_RATE")).length;
+        const missingSources = students.filter(student => student.issues.includes("MISSING_ACQUISITION_SOURCE")).length;
+        const hasBlockers = students.some(student => student.issues.length > 0) || systemBlockers.length > 0 || preview.length === 0;
         const total = preview.reduce((sum, row) => sum + (row.unitPriceVnd ?? 0), 0);
         return <article className="rounded-lg border border-border-subtle bg-surface-base p-4" key={period.id}>
           <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold text-text-strong"><Link href={`/finance/tuition-periods/${period.id}`}>{period.name}</Link></h2><p className="mt-1 text-secondary text-text-muted">{period.startsOn} → {period.endsOn}{period.dueOn ? ` · Hạn: ${period.dueOn}` : ""}</p></div><span className="rounded-full border border-border-subtle px-2 py-1 text-caption font-semibold text-text-default">{period.status === "locked" ? "Đã khóa" : "Nháp"}</span></div>
-          <dl className="mt-4 grid gap-2 text-secondary text-text-muted sm:grid-cols-3"><div><dt>Buổi chargeable</dt><dd className="mt-1 font-semibold text-text-strong">{preview.length}</dd></div><div><dt>Dòng bị chặn</dt><dd className="mt-1 font-semibold text-text-strong">{blockers.length + systemBlockers.length}</dd></div><div><dt>Tổng đơn giá preview</dt><dd className="mt-1 font-semibold text-text-strong">{formatVnd(total)}</dd></div></dl>
-          {period.status === "draft" ? <div className="mt-4 flex flex-wrap items-center gap-3">{hasBlockers ? <div className="grid gap-1 text-secondary text-danger"><p>Cần xử lý blocker trước khi khóa.</p>{systemBlockers.map((blocker) => <p key={blocker.code}>{blocker.message}</p>)}</div> : <p className="text-secondary text-text-muted">Preview hợp lệ; lock sẽ tạo snapshot, yêu cầu RENEWAL và QR cho các khoản phải thu.</p>}{canLock ? <button className="inline-flex h-10 items-center rounded-md border border-border-strong px-3 font-semibold text-text-strong disabled:opacity-50" disabled={isPending || hasBlockers} onClick={() => lock(period.id)} type="button">Khóa kỳ thu</button> : null}</div> : <p className="mt-4 text-secondary text-text-muted">Snapshot đã bất biến. Chỉ điều chỉnh/phát hành lại mới tạo QR và yêu cầu thanh toán mới.</p>}
+          {period.status === "draft" ? <>
+            <dl className="mt-4 grid gap-2 text-secondary text-text-muted sm:grid-cols-3"><div><dt>Học viên · Lượt học dự kiến</dt><dd className="mt-1 font-semibold text-text-strong">{students.length} học viên · {preview.length} lượt</dd></div><div><dt>Lượt học cần bổ sung dữ liệu</dt><dd className="mt-1 font-semibold text-text-strong">{blockers.length}</dd></div><div><dt>Giá trị lịch học trước bù trừ</dt><dd className="mt-1 font-semibold text-text-strong">{systemBlockers.some(b => b.code === "PREVIEW_UNAVAILABLE") || missingRates > 0 ? "Chưa đủ dữ liệu để tính" : formatVnd(total)}</dd></div></dl>
+            <p className="mt-3 text-secondary text-text-muted">Yêu cầu thanh toán chỉ được tạo sau khi khóa kỳ thành công; tạo bản nháp chưa phát sinh khoản phải thu.</p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">{hasBlockers ? <div className="grid gap-1 text-secondary text-danger">
+              {missingRates > 0 ? <p>{missingRates} học viên thiếu đơn giá. Cần nhập mức phí có hiệu lực từ ngày học tương ứng.</p> : null}
+              {missingSources > 0 ? <p>{missingSources} học viên chưa có nguồn.</p> : null}
+              {students.some(student => student.issues.includes("MISSING_PRIMARY_GUARDIAN")) ? <p>Có học viên chưa có phụ huynh chính. Bổ sung phụ huynh để tạo nội dung chuyển khoản.</p> : null}
+              {preview.length === 0 && systemBlockers.length === 0 ? <p>Chưa có buổi học đủ điều kiện. Kiểm tra lịch học và thời gian ghi danh trong kỳ.</p> : null}
+              {systemBlockers.map((blocker) => <p key={blocker.code}>{blocker.message}</p>)}
+              <Link className="font-semibold underline" href={`/finance/tuition-periods/${period.id}`}>Xem học viên cần bổ sung</Link>
+            </div> : <p className="text-secondary text-text-muted">Dữ liệu đã sẵn sàng để tính bù trừ và tạo phiếu cho từng học viên.</p>}{canLock ? <button className="inline-flex min-h-11 items-center rounded-md border border-border-strong px-3 font-semibold text-text-strong disabled:opacity-50" disabled={isPending || hasBlockers} onClick={() => lock(period.id)} type="button">Khóa kỳ và tạo yêu cầu thanh toán</button> : null}</div>
+          </> : <div className="mt-4 flex flex-wrap gap-4 text-secondary"><Link className="font-semibold text-action-link underline" href={`/finance/tuition-periods/${period.id}`}>Xem phiếu học phí</Link><Link className="font-semibold text-action-link underline" href="/finance/payment-requests">Xem yêu cầu thanh toán</Link></div>}
         </article>;
       })}
       {periods.length === 0 ? <p className="rounded-lg border border-border-subtle bg-surface-base p-5 text-secondary text-text-muted">Chưa có kỳ thu học phí.</p> : null}

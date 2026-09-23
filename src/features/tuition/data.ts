@@ -23,7 +23,7 @@ export interface TuitionPreviewRow {
 }
 
 export interface TuitionSystemBlocker {
-  code: "MISSING_RECEIPT_TEMPLATE" | "MISSING_RENEWAL_RECEIVING_ACCOUNT" | "AMBIGUOUS_RENEWAL_RECEIVING_ACCOUNT";
+  code: "MISSING_RECEIPT_TEMPLATE" | "MISSING_RENEWAL_RECEIVING_ACCOUNT" | "AMBIGUOUS_RENEWAL_RECEIVING_ACCOUNT" | "PREVIEW_UNAVAILABLE";
   message: string;
 }
 
@@ -62,11 +62,19 @@ export async function getTuitionPeriodPreview(
   periodId: string,
 ): Promise<TuitionPreviewRow[]> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("preview_tuition_collection_period", {
-    p_period_id: periodId,
-  });
-  if (error) return [];
-  return ((data ?? []) as TuitionPreviewDbRow[]).map((row) => ({
+  // A period can contain thousands of student/session rows. PostgREST caps
+  // each response; stable paging is required even when every row is blocked.
+  const rows: TuitionPreviewDbRow[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.rpc("preview_tuition_collection_period", {
+      p_period_id: periodId,
+    }).order("student_id").order("class_session_id").range(offset, offset + pageSize - 1);
+    if (error || !data) throw new Error("TUITION_PREVIEW_UNAVAILABLE");
+    rows.push(...data as TuitionPreviewDbRow[]);
+    if (data.length < pageSize) break;
+  }
+  return rows.map((row) => ({
     openingBalanceSessions: Number(row.opening_balance_sessions ?? 0),
     acquisitionSourceId: row.acquisition_source_id ?? null,
     blockerCode: row.blocker_code ?? null,
@@ -78,6 +86,66 @@ export async function getTuitionPeriodPreview(
     studentId: row.student_id,
     unitPriceVnd: Number(row.unit_price_vnd ?? 0) || null,
   }));
+}
+
+/** Never turn a failed preview into an apparently ready, zero-student period. */
+export async function getTuitionPeriodReadiness(period: TuitionPeriodListItem) {
+  const [preview, blockers] = await Promise.allSettled([
+    getTuitionPeriodPreview(period.id),
+    getTuitionPeriodSystemBlockers(period),
+  ]);
+  const systemBlockers: TuitionSystemBlocker[] = blockers.status === "fulfilled" ? blockers.value : [];
+  if (preview.status === "rejected" || blockers.status === "rejected") {
+    systemBlockers.push({ code: "PREVIEW_UNAVAILABLE", message: "Không tải được đầy đủ dữ liệu kỳ thu. Vui lòng tải lại trước khi khóa kỳ." });
+  }
+  return { rows: preview.status === "fulfilled" ? preview.value : [], systemBlockers };
+}
+
+export interface TuitionStudentDetail {
+  id: string;
+  fullName: string;
+  publicCode: string;
+}
+
+export interface TuitionLeadSourceItem {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export async function getTuitionLeadSources(): Promise<TuitionLeadSourceItem[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("crm_lead_sources")
+    .select("id, code, name")
+    .eq("is_active", true)
+    .order("name");
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function getTuitionStudentDetails(studentIds: string[]): Promise<Record<string, TuitionStudentDetail>> {
+  const supabase = await createSupabaseServerClient();
+  const details: Record<string, TuitionStudentDetail> = {};
+  const uniqueIds = [...new Set(studentIds)];
+  for (let offset = 0; offset < uniqueIds.length; offset += 200) {
+    const { data, error } = await supabase.from("students").select("id, full_name, public_code")
+      .in("id", uniqueIds.slice(offset, offset + 200));
+    if (error) continue;
+    for (const student of data ?? []) {
+      details[student.id] = { id: student.id, fullName: student.full_name, publicCode: student.public_code };
+    }
+  }
+  return details;
+}
+
+export async function getTuitionStudentLabels(studentIds: string[]): Promise<Record<string, string>> {
+  const details = await getTuitionStudentDetails(studentIds);
+  const labels: Record<string, string> = {};
+  for (const [id, info] of Object.entries(details)) {
+    labels[id] = `${info.fullName} (${info.publicCode})`;
+  }
+  return labels;
 }
 
 /** System blockers have no individual student row, but must be visible before lock. */
