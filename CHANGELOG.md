@@ -2,6 +2,15 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.3.0] - 2026-09-23
+
+### Fixed
+- Kỳ thu hiển thị đầy đủ học viên và buổi học vượt giới hạn 1.000 dòng; phân biệt thiếu dữ liệu với tổng học phí bằng 0.
+- Xem từng học viên thiếu giá, nguồn hoặc phụ huynh chính; bổ sung đơn giá và nguồn theo nhóm trong kỳ nháp, lưu nguyên khối và giữ lịch sử.
+- Xuất danh sách cần bổ sung ra Excel với đơn giá và nguồn chưa xác nhận để trống.
+- Nội dung chuyển khoản mới gồm họ tên, năm sinh, số điện thoại phụ huynh và mã phiếu; bảo toàn QR cũ, chặn khớp mơ hồ và mã đã trả chuyển sang phiếu mới.
+- Khóa kỳ rỗng bị chặn; giao diện giải thích thời điểm tạo yêu cầu thanh toán hàng loạt.
+
 ## [0.6.2.1] - 2026-09-19
 
 ### Fixed
