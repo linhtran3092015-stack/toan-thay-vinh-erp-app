@@ -13,7 +13,7 @@ export function PayslipDocument({ data }: { data: PayslipDocumentData }) {
   return (
     <article
       aria-label={`Phiếu lương ${data.employee.displayName} - ${data.period.periodMonthFormatted}`}
-      className="relative mx-auto my-6 max-w-[210mm] overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-md transition-shadow hover:shadow-lg print:my-0 print:max-w-none print:rounded-none print:border-none print:p-0 print:shadow-none sm:p-8"
+      className="relative mx-auto my-6 max-w-[210mm] overflow-hidden rounded-2xl border border-border-subtle bg-surface-base p-6 shadow-sm print:my-0 print:max-w-none print:rounded-none print:border-none print:p-0 print:shadow-none sm:p-8"
     >
       {/* Draft Watermark */}
       {isDraft ? (
@@ -21,7 +21,7 @@ export function PayslipDocument({ data }: { data: PayslipDocumentData }) {
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden select-none"
         >
-          <span className="rotate-[-30deg] text-6xl font-black tracking-widest text-slate-900/[0.05] uppercase sm:text-8xl">
+          <span className="rotate-[-30deg] text-6xl font-black tracking-widest text-text-strong/[0.05] uppercase sm:text-8xl">
             BẢN NHÁP
           </span>
         </div>
@@ -45,7 +45,7 @@ export function PayslipDocument({ data }: { data: PayslipDocumentData }) {
         />
 
         {/* Extra Breakdowns (Only rendered if present) */}
-        <PayslipBreakdowns breakdowns={data.breakdowns} />
+        <details className="rounded-xl border border-border-subtle p-4 print:hidden"><summary className="cursor-pointer font-semibold text-action-primary">Xem căn cứ tính công, chấm bài & hoa hồng</summary><div className="mt-4"><PayslipBreakdowns breakdowns={data.breakdowns} /></div></details>
 
         {/* Highlight Equation Formula Bar */}
         <PayslipSummaryFormula totals={data.totals} />

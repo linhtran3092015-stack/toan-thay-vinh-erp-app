@@ -19,6 +19,7 @@ import type { PayrollDashboardData, PayrollDashboardEmployee } from "@/features/
 
 import type { OwnerPayrollEstimate } from "@/features/payroll/estimate/types";
 import { OwnerLiveEstimateOverview } from "@/features/payroll/estimate/components/owner-live-estimate-overview";
+import { getCurrentPayrollMonth } from "@/features/payroll/dashboard/url-state";
 
 interface OwnerPayrollDashboardPageProps {
   dashboard: PayrollDashboardData;
@@ -100,15 +101,21 @@ export function OwnerPayrollDashboardPage({
 
 function PayrollDashboardFilters({ dashboard }: { dashboard: PayrollDashboardData }) {
   const currentMonth = dashboard.filters.selectedMonth.slice(0, 7);
+  const ongoingMonth = getCurrentPayrollMonth().slice(0, 7);
   const monthOptions = new Map(dashboard.filters.availableMonths.map((period) => [period.month.slice(0, 7), period.month]));
   monthOptions.set(currentMonth, dashboard.filters.selectedMonth);
+  monthOptions.set(ongoingMonth, `${ongoingMonth}-01`);
+
   return (
     <form className="grid gap-3 rounded-lg border border-border-subtle bg-surface-base p-3 sm:grid-cols-[minmax(170px,1fr)_minmax(190px,1fr)_auto]" method="get">
       <label className="grid gap-1 text-label font-medium text-text-muted">
         Tháng
         <select className="h-10 rounded-md border border-border-subtle bg-field-bg px-3 text-control text-text-strong focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" defaultValue={currentMonth} name="month">
           {[...monthOptions.keys()].sort((left, right) => right.localeCompare(left)).map((month) => (
-            <option key={month} value={month}>{formatDashboardMonth(`${month}-01`)}</option>
+            <option key={month} value={month}>
+              {formatDashboardMonth(`${month}-01`)}
+              {month === ongoingMonth ? " (Hiện tại)" : ""}
+            </option>
           ))}
         </select>
       </label>

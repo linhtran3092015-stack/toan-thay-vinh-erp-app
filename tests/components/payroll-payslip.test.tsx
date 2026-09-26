@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { PayslipDocument } from "@/features/payroll/payslip/components/payslip-document";
@@ -151,6 +151,18 @@ afterEach(() => {
 });
 
 describe("Payslip UI Presentation & Document Structure", () => {
+  it("groups repeated source rows and preserves the section subtotal", () => {
+    const data = makeDocumentData();
+    const source = data.earnings[0];
+    render(<PayslipDocument data={{ ...data, earnings: [
+      { ...source, id: "day-one", amountVnd: 100000, amountFormatted: "100.000 VND" },
+      { ...source, id: "day-two", amountVnd: 200000, amountFormatted: "200.000 VND" },
+    ] }} />);
+    const group = screen.getByRole("region", { name: "Lương theo công" });
+    expect(within(group).getAllByText("Lương công offline")).toHaveLength(1);
+    expect(within(group).getAllByText("300.000 VND")).toHaveLength(2);
+    expect(within(group).queryByText("100.000 VND")).not.toBeInTheDocument();
+  });
   it("TEST 1 & 12: renders complete payslip document with correct Vietnamese typography and brand hierarchy", () => {
     const data = makeDocumentData();
     render(<PayslipDocument data={data} />);
@@ -179,7 +191,7 @@ describe("Payslip UI Presentation & Document Structure", () => {
     // Income Overview Card
     expect(screen.getByText("Tổng thu nhập")).toBeInTheDocument();
     expect(screen.getAllByText("11.826.000 VND").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Tổng khấu trừ")).toBeInTheDocument();
+    expect(screen.getByText("Tổng bù trừ & khấu trừ")).toBeInTheDocument();
     expect(screen.getAllByText(/2\.350\.000 VND/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("9.476.000 VND").length).toBeGreaterThanOrEqual(1);
     expect(
@@ -187,12 +199,12 @@ describe("Payslip UI Presentation & Document Structure", () => {
     ).toBeInTheDocument();
 
     // Line tables
-    expect(screen.getByText("I. THU NHẬP")).toBeInTheDocument();
-    expect(screen.getByText("II. TẠM ỨNG & KHẤU TRỪ")).toBeInTheDocument();
-    expect(screen.getByText("1. Lương công offline")).toBeInTheDocument();
-    expect(screen.getByText("2. Thưởng chấm bài")).toBeInTheDocument();
-    expect(screen.getByText("3. Thưởng doanh thu")).toBeInTheDocument();
-    expect(screen.getByText("1. Khấu trừ tạm ứng")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Thu nhập" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bù trừ & khấu trừ" })).toBeInTheDocument();
+    expect(screen.getAllByText("Lương công offline")[0]).toBeInTheDocument();
+    expect(screen.getByText("Thưởng chấm bài")).toBeInTheDocument();
+    expect(screen.getByText("Thưởng doanh thu")).toBeInTheDocument();
+    expect(screen.getByText("Khấu trừ tạm ứng")).toBeInTheDocument();
 
     // Breakdowns
     expect(screen.getByText("CHI TIẾT CÔNG & GIỜ LÀM")).toBeInTheDocument();

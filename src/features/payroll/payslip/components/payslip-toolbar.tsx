@@ -38,7 +38,7 @@ export function PayslipToolbar({
         </Button>
 
         <a
-          className="inline-flex items-center gap-1.5 rounded-md bg-blue-900 px-3 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-800 active:bg-blue-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          className="inline-flex items-center gap-1.5 rounded-md bg-action-primary px-3 py-2 text-xs font-semibold text-white shadow-xs hover:bg-action-primary-hover active:bg-interactive-pressed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           download
           href={pdfDownloadUrl}
         >

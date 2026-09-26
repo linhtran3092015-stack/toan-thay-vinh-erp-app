@@ -1,3 +1,5 @@
+import { attendanceLineTypes, groupPayrollLines } from "@/features/payroll/payroll-line-groups";
+import { formatCurrency } from "@/features/payroll/payroll-presentation";
 import type { PayslipDocumentData } from "@/features/payroll/payslip/types";
 
 /**
@@ -24,7 +26,8 @@ function toAsciiReadable(text: string): string {
  */
 export function generatePayslipPdf(data: PayslipDocumentData): Uint8Array {
   // Content stream lines
-  const textLines: string[] = [];
+  const pages: string[][] = [[]];
+  let textLines = pages[0];
 
   const addHeader = (
     title: string,
@@ -105,90 +108,63 @@ export function generatePayslipPdf(data: PayslipDocumentData): Uint8Array {
   addLine(50, currentY, 545, currentY);
   currentY -= 20;
 
-  // Section I: Earnings
-  addHeader("I. THU NHAP", 50, currentY, 11, true);
-  currentY -= 16;
-  addText("Khoan muc", 50, currentY, 9, true);
-  addText("So tien", 450, currentY, 9, true);
-  currentY -= 10;
-  addLine(50, currentY, 545, currentY);
-  currentY -= 14;
-
-  for (const item of data.earnings) {
-    addText(item.label, 50, currentY, 9, false);
-    addText(item.amountFormatted, 450, currentY, 9, false);
-    currentY -= 14;
-    if (currentY < 120) break;
-  }
-
-  addLine(50, currentY, 545, currentY);
-  currentY -= 14;
-  addText("TONG CONG THU NHAP:", 50, currentY, 9, true);
-  addText(data.totals.grossFormatted, 450, currentY, 9, true);
-
-  currentY -= 20;
-
-  // Section II: Deductions
-  if (data.deductions.length > 0 && currentY > 120) {
-    addHeader("II. TAM UNG & KHAU TRU", 50, currentY, 11, true);
-    currentY -= 16;
-    addText("Khoan muc", 50, currentY, 9, true);
-    addText("So tien", 450, currentY, 9, true);
-    currentY -= 10;
-    addLine(50, currentY, 545, currentY);
-    currentY -= 14;
-
-    for (const item of data.deductions) {
-      addText(item.label, 50, currentY, 9, false);
-      addText(item.amountFormatted, 450, currentY, 9, false);
-      currentY -= 14;
-      if (currentY < 120) break;
+  const ensureSpace = (height = 20) => {
+    if (currentY - height < 100) {
+      textLines = [];
+      pages.push(textLines);
+      currentY = 800;
+      addHeader(`PHIEU LUONG - ${data.employee.displayName} (tiep)`, 50, currentY, 12);
+      currentY -= 28;
     }
-
-    addLine(50, currentY, 545, currentY);
-    currentY -= 14;
-    addText("TONG CONG KHAU TRU:", 50, currentY, 9, true);
-    addText(data.totals.totalDeductionsFormatted, 450, currentY, 9, true);
+  };
+  const renderSection = (title: string, lines: typeof data.earnings) => {
+    if (!lines.length) return;
+    ensureSpace(45);
+    addHeader(title, 50, currentY, 10);
+    addText(formatCurrency(lines.reduce((sum, line) => sum + line.amountVnd, 0)), 435, currentY, 9, true);
     currentY -= 20;
-  }
-
-  // Summary formula
-  if (currentY > 100) {
-    addLine(50, currentY, 545, currentY);
-    currentY -= 16;
-    addText(
-      `CONG THUC: Gross (${data.totals.grossFormatted}) - Khau tru (${data.totals.totalDeductionsFormatted}) = Thuc nhan (${data.totals.netFormatted})`,
-      50,
-      currentY,
-      9,
-      true
-    );
-    currentY -= 25;
-  }
+    for (const group of groupPayrollLines(lines)) {
+      ensureSpace();
+      addText(group.lines[0].label, 60, currentY, 9);
+      addText(formatCurrency(group.amountVnd), 435, currentY, 9);
+      currentY -= 18;
+    }
+    currentY -= 10;
+  };
+  renderSection("LUONG THEO CONG", data.earnings.filter(line => attendanceLineTypes.has(line.lineType)));
+  renderSection("CHAM BAI", data.earnings.filter(line => line.lineType === "grading_bonus"));
+  renderSection("THUONG & PHU CAP", data.earnings.filter(line => !attendanceLineTypes.has(line.lineType) && line.lineType !== "grading_bonus"));
+  ensureSpace(30);
+  addText("TONG THU NHAP", 50, currentY, 10, true);
+  addText(data.totals.grossFormatted, 435, currentY, 10, true);
+  currentY -= 28;
+  renderSection("BU TRU & KHAU TRU", data.deductions);
+  ensureSpace(60);
+  addText("TONG BU TRU & KHAU TRU", 50, currentY, 10, true);
+  addText(data.totals.totalDeductionsFormatted, 435, currentY, 10, true);
+  currentY -= 25;
+  addText("THUC NHAN", 50, currentY, 12, true);
+  addText(data.totals.netFormatted, 435, currentY, 11, true);
 
   // Notes and Signature
   addText("Ghi chu: Phieu luong duoc lap tu dong tu he thong ERP Toan Thay Vinh.", 50, 75, 8, false);
   addText(`Nguoi nhan luong: ${data.employee.displayName}`, 350, 75, 9, true);
   addText("TRUNG TAM TOAN THAY VINH - ERP OPERATIONAL SYSTEM", 50, 45, 8, false);
 
-  const streamContent = textLines.join("\n");
-  const streamLength = Buffer.byteLength(streamContent, "utf8");
-
-  // PDF Objects
+  // Every page owns a content stream; no source rows or totals are silently dropped.
   const objects: string[] = [
-    // 1: Catalog
     `<< /Type /Catalog /Pages 2 0 R >>`,
-    // 2: Pages
-    `<< /Type /Pages /Kids [3 0 R] /Count 1 >>`,
-    // 3: Page
-    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>`,
-    // 4: Font 1 (Helvetica)
+    `<< /Type /Pages /Kids [${pages.map((_, index) => `${5 + index * 2} 0 R`).join(" ")}] /Count ${pages.length} >>`,
     `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>`,
-    // 5: Font 2 (Helvetica-Bold)
     `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>`,
-    // 6: Content stream
-    `<< /Length ${streamLength} >>\nstream\n${streamContent}\nendstream`,
   ];
+  pages.forEach((page, index) => {
+    const contentId = 6 + index * 2;
+    page.push(`BT /F1 8 Tf 500 45 Td (${index + 1}/${pages.length}) Tj ET`);
+    const content = page.join("\n");
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`);
+    objects.push(`<< /Length ${Buffer.byteLength(content, "utf8")} >>\nstream\n${content}\nendstream`);
+  });
 
   // Build PDF Binary
   let pdfString = `%PDF-1.4\n`;

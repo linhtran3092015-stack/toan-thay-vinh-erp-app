@@ -18,25 +18,25 @@ export function PayslipBreakdowns({
     <div className="grid gap-4 md:grid-cols-2">
       {/* Work Hours Breakdown */}
       {hasWorkHours ? (
-        <div className="rounded-xl border border-blue-100 bg-white p-3.5 shadow-xs">
-          <div className="flex items-center gap-1.5 border-b border-slate-100 pb-2 text-xs font-bold text-blue-900">
-            <Clock aria-hidden="true" className="h-4 w-4 text-blue-700" />
+        <div className="rounded-xl border border-border-subtle bg-surface-base p-3.5 shadow-xs">
+          <div className="flex items-center gap-1.5 border-b border-border-subtle pb-2 text-xs font-bold text-action-primary">
+            <Clock aria-hidden="true" className="h-4 w-4 text-action-primary" />
             <span>CHI TIẾT CÔNG & GIỜ LÀM</span>
           </div>
           <ul className="mt-2.5 space-y-2 text-xs">
             {breakdowns.workHours.map((wh) => (
               <li
-                className="flex items-center justify-between rounded-lg bg-slate-50 p-2 text-slate-700"
+                className="flex items-center justify-between rounded-lg bg-surface-raised p-2 text-text-default"
                 key={wh.modeLabel}
               >
                 <div>
-                  <p className="font-semibold text-slate-900">{wh.modeLabel}</p>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="font-semibold text-text-strong">{wh.modeLabel}</p>
+                  <p className="text-[11px] text-text-muted">
                     {wh.workHoursFormatted} × {wh.dailyRateFormatted}
                     {wh.factorText ? ` (${wh.factorText})` : ""}
                   </p>
                 </div>
-                <span className="font-bold text-slate-900 tabular-nums">
+                <span className="font-bold text-text-strong tabular-nums">
                   {wh.subtotalFormatted}
                 </span>
               </li>
@@ -47,25 +47,25 @@ export function PayslipBreakdowns({
 
       {/* Grading Breakdown */}
       {hasGrading && breakdowns.grading ? (
-        <div className="rounded-xl border border-blue-100 bg-white p-3.5 shadow-xs">
-          <div className="flex items-center gap-1.5 border-b border-slate-100 pb-2 text-xs font-bold text-blue-900">
-            <Award aria-hidden="true" className="h-4 w-4 text-blue-700" />
+        <div className="rounded-xl border border-border-subtle bg-surface-base p-3.5 shadow-xs">
+          <div className="flex items-center gap-1.5 border-b border-border-subtle pb-2 text-xs font-bold text-action-primary">
+            <Award aria-hidden="true" className="h-4 w-4 text-action-primary" />
             <span>CHI TIẾT CHẤM BÀI</span>
           </div>
-          <div className="mt-2.5 rounded-lg bg-slate-50 p-2.5 text-xs">
+          <div className="mt-2.5 rounded-lg bg-surface-raised p-2.5 text-xs">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-900">
+              <span className="font-semibold text-text-strong">
                 {new Intl.NumberFormat("vi-VN").format(breakdowns.grading.creditsCount)} phiếu chấm
               </span>
-              <span className="font-bold text-slate-900 tabular-nums">
+              <span className="font-bold text-text-strong tabular-nums">
                 {breakdowns.grading.subtotalFormatted}
               </span>
             </div>
-            <p className="mt-1 text-[11px] text-slate-500">
+            <p className="mt-1 text-[11px] text-text-muted">
               Công thức: {breakdowns.grading.explanation}
             </p>
             {breakdowns.grading.poolAmountFormatted ? (
-              <p className="mt-0.5 text-[11px] text-slate-500">
+              <p className="mt-0.5 text-[11px] text-text-muted">
                 Quỹ chấm bài tháng: {breakdowns.grading.poolAmountFormatted}
               </p>
             ) : null}
@@ -75,15 +75,15 @@ export function PayslipBreakdowns({
 
       {/* Commission Breakdown */}
       {hasCommissions ? (
-        <div className="rounded-xl border border-blue-100 bg-white p-3.5 shadow-xs md:col-span-2">
-          <div className="flex items-center gap-1.5 border-b border-slate-100 pb-2 text-xs font-bold text-blue-900">
-            <TrendingUp aria-hidden="true" className="h-4 w-4 text-blue-700" />
+        <div className="rounded-xl border border-border-subtle bg-surface-base p-3.5 shadow-xs md:col-span-2">
+          <div className="flex items-center gap-1.5 border-b border-border-subtle pb-2 text-xs font-bold text-action-primary">
+            <TrendingUp aria-hidden="true" className="h-4 w-4 text-action-primary" />
             <span>CHI TIẾT THƯỞNG DOANH THU & HOA HỒNG</span>
           </div>
           <div className="mt-2.5 overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-slate-200 text-slate-500">
+                <tr className="border-b border-border-subtle text-text-muted">
                   <th className="pb-1.5 text-left font-semibold">Khối / Hạng mục</th>
                   <th className="pb-1.5 text-right font-semibold">Doanh thu căn cứ</th>
                   <th className="pb-1.5 text-right font-semibold">Tỷ lệ</th>
@@ -93,16 +93,16 @@ export function PayslipBreakdowns({
               <tbody className="divide-y divide-slate-100">
                 {breakdowns.commissions.map((c, idx) => (
                   <tr key={`${c.gradeLabel}-${idx}`}>
-                    <td className="py-2 text-slate-800 font-medium">
+                    <td className="py-2 text-text-strong font-medium">
                       {c.gradeLabel ?? "Doanh thu ghi nhận"}
                     </td>
-                    <td className="py-2 text-right text-slate-700 tabular-nums">
+                    <td className="py-2 text-right text-text-default tabular-nums">
                       {c.basisRevenueFormatted}
                     </td>
-                    <td className="py-2 text-right text-slate-700 tabular-nums">
+                    <td className="py-2 text-right text-text-default tabular-nums">
                       {c.ratePercentage}
                     </td>
-                    <td className="py-2 text-right font-bold text-slate-900 tabular-nums">
+                    <td className="py-2 text-right font-bold text-text-strong tabular-nums">
                       {c.subtotalFormatted}
                     </td>
                   </tr>

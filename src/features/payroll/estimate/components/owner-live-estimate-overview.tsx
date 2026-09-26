@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { usePayrollLiveEstimate } from "@/features/payroll/estimate/use-payroll-live-estimate";
 import type { OwnerPayrollEstimate } from "@/features/payroll/estimate/types";
 import { formatCompactVnd, formatDashboardMonth, formatVnd } from "@/features/payroll/dashboard/format";
+import { getCurrentPayrollMonth } from "@/features/payroll/dashboard/url-state";
 import { formatDateTime } from "@/features/payroll/payroll-presentation";
 
 interface OwnerLiveEstimateOverviewProps {
@@ -110,6 +111,21 @@ export function OwnerLiveEstimateOverview({
           </button>
         </div>
       </div>
+
+      {/* Notice when viewing past month with 0 live estimate */}
+      {month.slice(0, 7) !== getCurrentPayrollMonth().slice(0, 7) && summary.payableVnd === 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface-base p-4 text-secondary text-text-default shadow-sm">
+          <p>
+            Bạn đang xem <strong>{formatDashboardMonth(month)}</strong> (kỳ chưa có dữ liệu chấm công thời gian thực).
+          </p>
+          <a
+            className="inline-flex items-center font-semibold text-action-link hover:underline"
+            href={`/payroll/dashboard?month=${getCurrentPayrollMonth().slice(0, 7)}`}
+          >
+            Chuyển sang {formatDashboardMonth(getCurrentPayrollMonth())} (Tháng hiện tại) →
+          </a>
+        </div>
+      ) : null}
 
       {/* 4 Main KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -243,6 +259,68 @@ export function OwnerLiveEstimateOverview({
           <p className="mt-3 text-caption text-text-muted">
             *Tỷ lệ trên phục vụ đối chiếu lương phải trả với thực thu; không biểu thị lợi nhuận hoặc số dư tiền mặt. Khi lọc theo một vị trí, mẫu số vẫn là thực thu toàn trung tâm.
           </p>
+        </section>
+      ) : null}
+
+      {/* Breakdown by Staff Table */}
+      {estimate.statements.length > 0 && estimate.statements.some((s) => s.payableVnd > 0 || s.workedMinutes > 0) ? (
+        <section aria-labelledby="live-by-staff-heading" className="rounded-lg border border-border-subtle bg-surface-base p-4 sm:p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-section-title font-semibold text-text-strong" id="live-by-staff-heading">
+              Chi tiết nhân sự tạm tính ({formatDashboardMonth(month)})
+            </h3>
+            <span className="text-caption text-text-muted">
+              {estimate.statements.filter((s) => s.payableVnd > 0 || s.workedMinutes > 0).length} nhân sự phát sinh
+            </span>
+          </div>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-secondary">
+              <thead>
+                <tr className="border-b border-border-subtle text-caption font-semibold text-text-muted">
+                  <th className="pb-2">Nhân sự</th>
+                  <th className="pb-2">Vị trí</th>
+                  <th className="pb-2 text-right">Giờ làm</th>
+                  <th className="pb-2 text-right">Thu nhập</th>
+                  <th className="pb-2 text-right">Khấu trừ</th>
+                  <th className="pb-2 text-right">Lương tạm tính</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-subtle">
+                {estimate.statements
+                  .filter((s) => s.payableVnd > 0 || s.workedMinutes > 0)
+                  .sort((a, b) => b.payableVnd - a.payableVnd)
+                  .map((row) => (
+                    <tr key={row.staffId}>
+                      <td className="py-2.5 font-medium text-text-strong">
+                        <a className="hover:text-action-link hover:underline" href={`/staff/${row.staffId}`}>
+                          {row.staffDisplayName}
+                        </a>
+                        {row.staffEmployeeCode ? (
+                          <span className="ml-1.5 font-mono text-caption text-text-muted">
+                            ({row.staffEmployeeCode})
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-2.5 text-text-muted">
+                        {positionNames[row.positionCode ?? "__unassigned__"] ?? row.positionCode}
+                      </td>
+                      <td className="py-2.5 text-right tabular-nums text-text-default">
+                        {row.workHours}h {row.workedMinutes % 60}p
+                      </td>
+                      <td className="py-2.5 text-right tabular-nums text-text-default">
+                        {formatVnd(row.totalEarningsVnd)}
+                      </td>
+                      <td className="py-2.5 text-right tabular-nums text-warning-text">
+                        {row.totalDeductionsVnd > 0 ? `−${formatVnd(row.totalDeductionsVnd)}` : "0 ₫"}
+                      </td>
+                      <td className="py-2.5 text-right font-semibold tabular-nums text-action-link">
+                        {formatVnd(row.payableVnd)}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       ) : null}
     </div>

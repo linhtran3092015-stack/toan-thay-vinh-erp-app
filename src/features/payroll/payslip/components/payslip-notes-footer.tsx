@@ -25,9 +25,9 @@ export function PayslipNotesFooter({
       {/* Notes & Signature */}
       <div className="grid gap-6 sm:grid-cols-2">
         {/* Notes Left */}
-        <div className="space-y-2 text-xs text-slate-600">
-          <p className="font-bold text-slate-800 uppercase">Ghi Chú</p>
-          <ul className="list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-slate-500">
+        <div className="space-y-2 text-xs text-text-default">
+          <p className="font-bold text-text-strong uppercase">Ghi Chú</p>
+          <ul className="list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-text-muted">
             <li>
               Phiếu lương này được lập tự động từ hệ thống ERP Trung tâm Toán Thầy Vinh.
             </li>
@@ -41,24 +41,24 @@ export function PayslipNotesFooter({
 
         {/* Signature Right */}
         <div className="flex flex-col items-center justify-between text-center sm:items-end sm:text-right">
-          <p className="text-xs italic text-slate-500">
+          <p className="text-xs italic text-text-muted">
             {formatSignatureDate(period.payDate)}
           </p>
-          <div className="mt-2 text-xs text-slate-700">
-            <p className="font-bold text-slate-800">Người nhận lương</p>
-            <p className="text-[11px] italic text-slate-400">
+          <div className="mt-2 text-xs text-text-default">
+            <p className="font-bold text-text-strong">Người nhận lương</p>
+            <p className="text-[11px] italic text-text-muted">
               (Ký, ghi rõ họ tên)
             </p>
           </div>
-          <div className="mt-12 text-sm font-bold text-blue-950">
+          <div className="mt-12 text-sm font-bold text-text-strong">
             {employee.displayName}
           </div>
         </div>
       </div>
 
       {/* Brand Footer */}
-      <div className="border-t border-slate-200 pt-3 text-center text-[11px] text-slate-400">
-        <p className="font-semibold text-slate-600">
+      <div className="border-t border-border-subtle pt-3 text-center text-[11px] text-text-muted">
+        <p className="font-semibold text-text-default">
           TRUNG TÂM TOÁN THẦY VINH · ERP VẬN HÀNH
         </p>
       </div>
