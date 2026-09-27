@@ -62,3 +62,5 @@ Khi có đơn giá thật: nhập hoặc chuẩn bị bảng theo mã học viê
 - Rà soát độc lập phát hiện tên ngắn nằm trong tên dài có thể khớp sai; đã giới hạn nhánh không mã vào đúng toàn bộ thông tin, hoặc tiền tố cố định HOC PHI, và thêm regression.
 - 127 file / 644 test ứng dụng đạt; build và lint đạt. SQL integration đạt và được chạy lại sau chỉnh điều kiện khớp tên.
 - Snapshot định nghĩa hàm trước triển khai được lưu ngoài repository để phục vụ khôi phục; không chứa dữ liệu học sinh.
+
+Bản này chỉ xuất Excel để chuẩn bị dữ liệu; chưa có tính năng nhập file XLSX trên production. Có thể nhập đơn giá/nguồn theo nhóm trực tiếp ở chi tiết kỳ nháp. Các script import chưa được rà soát không nằm trong bản phát hành.

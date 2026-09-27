@@ -246,3 +246,6 @@ Các test DB/luồng người dùng cần bổ sung trong giai đoạn triển k
 - Sổ cái buổi tổng và `remaining_sessions` của lô không phải hai nguồn số dư đã được đồng bộ. Chưa dùng lô làm căn cứ hoàn tiền nếu chưa bổ sung tiêu thụ/đảo lô.
 
 **Trạng thái gstack: DONE_WITH_CONCERNS.** Đã hoàn tất rà soát mã nguồn và đề xuất phù hợp nghiệp vụ được xác nhận. Còn cần xác minh deployment/DB thật, kiểm thử SQL và các quyết định chính sách về quy đổi buổi khác giá, quyền học khi trả thiếu, chi phí vận hành trước khi triển khai.
+
+
+Tiến độ triển khai sau rà soát: [Bản sửa chuẩn bị kỳ thu](finance-tuition-readiness-implementation-2026-09-23.md).
