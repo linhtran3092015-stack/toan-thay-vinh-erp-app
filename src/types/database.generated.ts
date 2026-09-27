@@ -7537,6 +7537,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_tuition_period_student_rates: {
+        Args: { p_period_id: string; p_student_ids: string[]; p_unit_price_vnd: number; p_reason: string }
+        Returns: Json
+      }
+      set_tuition_period_student_sources: {
+        Args: { p_period_id: string; p_student_ids: string[]; p_lead_source_id: string; p_reason: string }
+        Returns: Json
+      }
       create_student_with_primary_guardian: {
         Args: {
           p_birth_year: number

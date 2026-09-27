@@ -25,5 +25,7 @@ jobs:
       - run: npm test
       - name: Payroll projection regression (isolated PostgreSQL)
         run: node scripts/test-payroll-projection-db.mjs
+      - name: Tuition readiness regression (isolated PostgreSQL)
+        run: node scripts/test-tuition-readiness-db.mjs
       - run: npm run build
       - run: npm run test:db:fresh
