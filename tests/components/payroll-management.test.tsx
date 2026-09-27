@@ -114,8 +114,8 @@ describe("Payroll 1 presentation", () => {
     expect(screen.getAllByText("18 giờ")).not.toHaveLength(0);
     expect(screen.queryByRole("button", { name: /gửi đối soát|duyệt/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("button", { name: "Xem chi tiết" })[0]);
-    expect(screen.getByRole("dialog", { name: /Phiếu lương/ })).toHaveTextContent("Gross");
-    expect(screen.getByRole("dialog", { name: /Phiếu lương/ })).toHaveTextContent("Gross − Khấu trừ = Thực nhận");
+    expect(screen.getByRole("dialog", { name: /Phiếu lương/ })).toHaveTextContent("Tổng thu nhập");
+    expect(screen.getByRole("dialog", { name: /Phiếu lương/ })).toHaveTextContent("Tổng thu nhập − Bù trừ & khấu trừ = Thực nhận");
     expect(screen.getByRole("dialog", { name: /Phiếu lương/ })).toHaveTextContent("Công & giờ làm");
     expect(screen.getByRole("dialog", { name: /Phiếu lương/ })).toHaveTextContent("Chấm bài");
     expect(screen.getAllByText("Lương theo giờ")).not.toHaveLength(0);

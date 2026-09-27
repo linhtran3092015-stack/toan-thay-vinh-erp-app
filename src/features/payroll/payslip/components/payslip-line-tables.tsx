@@ -1,141 +1,46 @@
-import type {
-  PayslipLineItem,
-  PayslipTotals,
-} from "@/features/payroll/payslip/types";
-import { MinusCircle, PlusCircle } from "lucide-react";
+import { attendanceLineTypes, groupPayrollLines } from "@/features/payroll/payroll-line-groups";
+import { formatCurrency } from "@/features/payroll/payroll-presentation";
+import type { PayslipLineItem, PayslipTotals } from "@/features/payroll/payslip/types";
 
-export function PayslipLineTables({
-  deductions,
-  earnings,
-  totals,
-}: {
-  deductions: readonly PayslipLineItem[];
-  earnings: readonly PayslipLineItem[];
-  totals: PayslipTotals;
-}) {
-  return (
-    <div className="grid gap-5 md:grid-cols-2">
-      {/* Section I: Thu nhập */}
-      <section className="flex flex-col justify-between overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-xs">
-        <div>
-          {/* Header */}
-          <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50/70 px-4 py-2.5 text-xs font-bold text-emerald-900 uppercase">
-            <PlusCircle aria-hidden="true" className="h-4 w-4 text-emerald-700" />
-            <span>I. THU NHẬP</span>
-          </div>
-
-          {/* Table */}
-          <div className="p-3">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-500">
-                  <th className="pb-2 text-left font-semibold">Khoản mục</th>
-                  <th className="pb-2 text-right font-semibold">Số tiền</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {earnings.length === 0 ? (
-                  <tr>
-                    <td
-                      className="py-3 text-center text-slate-400 italic"
-                      colSpan={2}
-                    >
-                      Không có khoản thu nhập nào ghi nhận trong kỳ.
-                    </td>
-                  </tr>
-                ) : (
-                  earnings.map((item, index) => (
-                    <tr key={item.id}>
-                      <td className="py-2 pr-2 text-slate-800">
-                        <span className="font-medium">
-                          {index + 1}. {item.label}
-                        </span>
-                        {item.note ? (
-                          <p className="text-[11px] text-slate-500">
-                            {item.note}
-                          </p>
-                        ) : null}
-                      </td>
-                      <td className="py-2 pl-2 text-right font-semibold text-slate-900 tabular-nums">
-                        {item.amountFormatted}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Subtotal */}
-        <div className="flex items-center justify-between border-t border-emerald-200 bg-emerald-50/50 px-4 py-2.5 text-xs font-bold text-emerald-950">
-          <span>TỔNG CỘNG THU NHẬP</span>
-          <span className="tabular-nums text-emerald-800">
-            {totals.grossFormatted}
-          </span>
-        </div>
-      </section>
-
-      {/* Section II: Khấu trừ */}
-      <section className="flex flex-col justify-between overflow-hidden rounded-xl border border-rose-200 bg-white shadow-xs">
-        <div>
-          {/* Header */}
-          <div className="flex items-center gap-2 border-b border-rose-100 bg-rose-50/70 px-4 py-2.5 text-xs font-bold text-rose-900 uppercase">
-            <MinusCircle aria-hidden="true" className="h-4 w-4 text-rose-700" />
-            <span>II. TẠM ỨNG & KHẤU TRỪ</span>
-          </div>
-
-          {/* Table */}
-          <div className="p-3">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-500">
-                  <th className="pb-2 text-left font-semibold">Khoản mục</th>
-                  <th className="pb-2 text-right font-semibold">Số tiền</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {deductions.length === 0 ? (
-                  <tr>
-                    <td
-                      className="py-3 text-center text-slate-400 italic"
-                      colSpan={2}
-                    >
-                      Không phát sinh khoản tạm ứng hoặc khấu trừ trong kỳ.
-                    </td>
-                  </tr>
-                ) : (
-                  deductions.map((item, index) => (
-                    <tr key={item.id}>
-                      <td className="py-2 pr-2 text-slate-800">
-                        <span className="font-medium">
-                          {index + 1}. {item.label}
-                        </span>
-                        {item.note ? (
-                          <p className="text-[11px] text-slate-500">
-                            {item.note}
-                          </p>
-                        ) : null}
-                      </td>
-                      <td className="py-2 pl-2 text-right font-semibold text-rose-700 tabular-nums">
-                        {item.amountFormatted}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Subtotal */}
-        <div className="flex items-center justify-between border-t border-rose-200 bg-rose-50/50 px-4 py-2.5 text-xs font-bold text-rose-950">
-          <span>TỔNG CỘNG KHẤU TRỪ</span>
-          <span className="tabular-nums text-rose-800">
-            {totals.totalDeductionsFormatted}
-          </span>
-        </div>
-      </section>
+function SummarySection({ title, lines }: { title: string; lines: readonly PayslipLineItem[] }) {
+  if (!lines.length) return null;
+  return <section aria-label={title} className="break-inside-avoid">
+    <div className="flex items-baseline justify-between gap-3 border-b border-border-subtle py-3 font-semibold text-text-strong">
+      <h4>{title}</h4><span className="shrink-0 tabular-nums">{formatCurrency(lines.reduce((sum, line) => sum + line.amountVnd, 0))}</span>
     </div>
-  );
+    <dl className="divide-y divide-border-subtle">
+      {groupPayrollLines(lines).map((group) => <div key={group.key} className="flex items-start justify-between gap-4 py-3">
+        <dt className="min-w-0 text-text-default">{group.lines[0].label}</dt>
+        <dd className="shrink-0 font-medium tabular-nums text-text-strong">{formatCurrency(group.amountVnd)}</dd>
+      </div>)}
+    </dl>
+  </section>;
+}
+
+export function PayslipLineTables({ deductions, earnings, totals }: {
+  deductions: readonly PayslipLineItem[]; earnings: readonly PayslipLineItem[]; totals: PayslipTotals;
+}) {
+  return <div className="grid items-start gap-5 md:grid-cols-[1.25fr_1fr] print:grid-cols-[1.25fr_1fr]">
+    <section aria-label="Thu nhập" className="overflow-hidden rounded-2xl border border-border-subtle bg-surface-base text-sm print:text-xs">
+      <h3 className="border-b border-border-subtle bg-surface-raised px-4 py-3 font-bold text-action-primary">Thu nhập</h3>
+      <div className="px-4">
+        <SummarySection title="Lương theo công" lines={earnings.filter(line => attendanceLineTypes.has(line.lineType))} />
+        <SummarySection title="Chấm bài" lines={earnings.filter(line => line.lineType === "grading_bonus")} />
+        <SummarySection title="Thưởng & phụ cấp" lines={earnings.filter(line => !attendanceLineTypes.has(line.lineType) && line.lineType !== "grading_bonus")} />
+        {!earnings.length ? <p className="py-4 text-text-muted">Không có khoản thu nhập nào ghi nhận trong kỳ.</p> : null}
+      </div>
+      <div className="flex justify-between gap-3 border-t border-border-subtle bg-surface-raised px-4 py-3 font-bold text-text-strong"><span>Tổng cộng thu nhập</span><span className="tabular-nums">{totals.grossFormatted}</span></div>
+    </section>
+    <section aria-label="Bù trừ & khấu trừ" className="overflow-hidden rounded-2xl border border-border-subtle bg-surface-base text-sm print:text-xs">
+      <h3 className="border-b border-border-subtle bg-surface-raised px-4 py-3 font-bold text-danger">Bù trừ & khấu trừ</h3>
+      <dl className="divide-y divide-border-subtle px-4">
+        {groupPayrollLines(deductions).map(group => <div key={group.key} className="flex items-start justify-between gap-4 py-3">
+          <dt className="text-text-default">{group.lines[0].label}</dt><dd className="shrink-0 font-medium tabular-nums text-danger">{formatCurrency(group.amountVnd)}</dd>
+        </div>)}
+      </dl>
+      {!deductions.length ? <p className="px-4 py-4 text-text-muted">Không phát sinh khoản tạm ứng hoặc khấu trừ trong kỳ.</p> : null}
+      {deductions.some(line => line.lineType === "piecework_offset") ? <p className="px-4 pb-4 text-xs leading-relaxed text-text-muted">Bù trừ theo chính sách lương khoán của kỳ. Thưởng chỉ làm tăng thực nhận khi vượt ngưỡng bù trừ.</p> : null}
+      <div className="flex justify-between gap-3 border-t border-border-subtle bg-surface-raised px-4 py-3 font-bold"><span className="text-text-strong">Tổng cộng khấu trừ</span><span className="tabular-nums text-danger">{totals.totalDeductionsFormatted}</span></div>
+    </section>
+  </div>;
 }

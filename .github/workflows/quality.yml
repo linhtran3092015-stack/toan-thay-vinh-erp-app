@@ -23,5 +23,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - name: Payroll projection regression (isolated PostgreSQL)
+        run: node scripts/test-payroll-projection-db.mjs
       - run: npm run build
       - run: npm run test:db:fresh

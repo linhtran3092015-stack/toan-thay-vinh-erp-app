@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { ExternalLink, FileText, X } from "lucide-react";
+import { ChevronRight, ExternalLink, FileText, X } from "lucide-react";
 import { useId, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,8 @@ import {
   getSourceKindLabel,
 } from "@/features/payroll/payroll-presentation";
 import type { PayrollLineRead, PayrollStatementRead } from "@/features/payroll/read-models";
+
+import { attendanceLineTypes, groupPayrollLines } from "@/features/payroll/payroll-line-groups";
 
 type BadgeTone = "info" | "neutral" | "success" | "warning";
 type LineGroupKey = "attendance" | "grading" | "earnings" | "deductions";
@@ -57,7 +59,6 @@ const groupMetadata: readonly {
   },
 ];
 
-const attendanceLineTypes = new Set(["base_offline", "base_online", "hourly_wage"]);
 
 function getLineGroup(line: PayrollLineRead): LineGroupKey {
   if (line.direction === "deduction") return "deductions";
@@ -138,8 +139,8 @@ export function PayrollPayslipDialog({
           </section>
 
           <section aria-label="Tóm tắt thu nhập" className="grid overflow-hidden rounded-lg border border-border-subtle bg-surface-base sm:grid-cols-3">
-            <SummaryAmount label="Gross" value={statement.totalEarningsVnd} />
-            <SummaryAmount deduction label="Khấu trừ" value={statement.totalDeductionsVnd} />
+            <SummaryAmount label="Tổng thu nhập" value={statement.totalEarningsVnd} />
+            <SummaryAmount deduction label="Bù trừ & khấu trừ" value={statement.totalDeductionsVnd} />
             <SummaryAmount emphasized label="Thực nhận" value={statement.payableAmountVnd} />
           </section>
 
@@ -149,7 +150,7 @@ export function PayrollPayslipDialog({
               return (
                 <PayslipGroup
                   canRequestCorrection={canRequestCorrection}
-                  description={group.description}
+                  description={group.key === "attendance" ? `${formatWorkMinutes(statement.workMinutes)} trong kỳ · Mở từng khoản để xem công theo ngày.` : group.description}
                   key={group.key}
                   lines={lines}
                   payrollStatementId={statement.id}
@@ -166,7 +167,7 @@ export function PayrollPayslipDialog({
             <div className="grid gap-4 p-4 lg:grid-cols-[1fr_auto] lg:items-center">
               <div>
                 <p className="text-label font-semibold text-text-default">Cách tính tổng thực nhận</p>
-                <p className="mt-1 text-secondary text-text-muted">Gross − Khấu trừ = Thực nhận</p>
+                <p className="mt-1 text-secondary text-text-muted">Tổng thu nhập − Bù trừ & khấu trừ = Thực nhận</p>
                 <p className="mt-2 tabular-nums text-body font-semibold text-text-strong">
                   {formatCurrency(statement.totalEarningsVnd)} − {formatCurrency(statement.totalDeductionsVnd)} = {formatCurrency(statement.payableAmountVnd)}
                 </p>
@@ -180,6 +181,8 @@ export function PayrollPayslipDialog({
               </div>
             </div>
           </section>
+
+          <div className="flex justify-end"><a className="inline-flex items-center gap-2 rounded-lg bg-action-primary px-4 py-2 text-sm font-semibold text-white hover:bg-action-primary-hover" href={`/payroll/${statement.payrollPeriodId}/statements/${statement.id}/payslip`}><ExternalLink size={16} aria-hidden="true" />Mở phiếu lương</a></div>
 
           {canAddManualLine || canRequestCorrection ? (
             <div className="flex flex-col gap-2 border-t border-border-subtle pt-4 sm:flex-row sm:justify-end">
@@ -215,42 +218,32 @@ function PayslipGroup({
   payrollStatementId: string;
   title: string;
 }) {
+  const groups = groupPayrollLines(lines);
+  const total = lines.reduce((sum, line) => sum + line.amountVnd, 0);
   return (
-    <section className="overflow-hidden rounded-lg border border-border-subtle bg-surface-base">
-      <div className="border-b border-border-subtle bg-surface-sunken px-4 py-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <h3 className="font-semibold text-text-strong">{title}</h3>
-            <p className="mt-0.5 text-caption text-text-muted">{description}</p>
-          </div>
-          <span className="text-caption font-medium text-text-muted">{lines.length} hạng mục</span>
-        </div>
+    <section aria-label={title} className="overflow-hidden rounded-2xl border border-border-subtle bg-surface-base">
+      <div className="flex items-start justify-between gap-4 border-b border-border-subtle bg-surface-raised px-4 py-4">
+        <div><h3 className="font-semibold text-text-strong">{title}</h3><p className="mt-1 text-caption text-text-muted">{description}</p></div>
+        <span aria-label={`Tổng ${title}`} className="shrink-0 text-base font-bold tabular-nums text-text-strong sm:text-lg">{formatCurrency(total)}</span>
       </div>
-
-      {lines.length === 0 ? (
-        <p className="px-4 py-4 text-secondary text-text-muted">Không phát sinh hạng mục trong nhóm này.</p>
-      ) : (
-        <div>
-          <div aria-hidden="true" className="hidden grid-cols-[minmax(160px,1.1fr)_minmax(150px,1fr)_minmax(240px,1.7fr)_minmax(120px,.8fr)_minmax(128px,.8fr)_minmax(170px,1fr)] gap-3 border-b border-border-subtle px-4 py-2 text-table-header font-semibold text-text-muted lg:grid">
-            <span>Hạng mục</span>
-            <span>Dữ liệu đầu vào</span>
-            <span>Công thức tính</span>
-            <span>Đơn giá / tỷ lệ</span>
-            <span className="text-right">Thành tiền</span>
-            <span>Nguồn & trạng thái</span>
-          </div>
-          <ul aria-label={`Chi tiết ${title}`}>
-            {lines.map((line) => (
-              <PayslipLine
-                canRequestCorrection={canRequestCorrection}
-                key={line.id}
-                line={line}
-                payrollStatementId={payrollStatementId}
-              />
-            ))}
+      {groups.length === 0 ? <p className="px-4 py-4 text-secondary text-text-muted">Không phát sinh hạng mục trong nhóm này.</p> : groups.map((group) => (
+        <details key={group.key} className="group/line border-b border-border-subtle last:border-b-0">
+          <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring [&::-webkit-details-marker]:hidden">
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-text-strong">{getLineTypeLabel(group.lineType)}</p>
+              <p className="mt-1 text-caption text-text-muted">{attendanceLineTypes.has(group.lineType)
+                ? `${formatWorkMinutes(group.lines.reduce((sum, line) => sum + (line.workMinutes ?? 0), 0))} trong kỳ · ${group.lines.length} phát sinh`
+                : `${group.lines.length} phát sinh · Xem căn cứ tính`}</p>
+            </div>
+            <span className={`shrink-0 font-semibold tabular-nums ${group.direction === "deduction" ? "text-danger" : "text-text-strong"}`}>{group.direction === "deduction" ? "−" : ""}{formatCurrency(group.amountVnd)}</span>
+            <ChevronRight aria-hidden="true" className="shrink-0 text-text-muted transition-transform group-open/line:rotate-90" size={18} />
+          </summary>
+          <ul aria-label={`Chi tiết ${getLineTypeLabel(group.lineType)}`} className="border-t border-border-subtle bg-surface-raised">
+            {group.lines.map((line) => <PayslipLine key={line.id} line={line} canRequestCorrection={canRequestCorrection} payrollStatementId={payrollStatementId} />)}
           </ul>
-        </div>
-      )}
+        </details>
+      ))}
+      {lines.some((line) => line.lineType === "piecework_offset") ? <p className="border-t border-border-subtle px-4 py-3 text-caption text-text-muted">Bù trừ lương khoán theo chính sách của kỳ. Khoản thưởng chỉ làm tăng thực nhận khi vượt ngưỡng bù trừ.</p> : null}
     </section>
   );
 }
@@ -273,7 +266,7 @@ function PayslipLine({
       <LineCell label="Hạng mục">
         <p className="font-semibold text-text-strong">{label}</p>
         {line.note ? <p className="mt-1 text-caption text-text-muted">{line.note}</p> : null}
-        {line.policyCode ? <p className="mt-1 break-all text-caption text-text-subtle">Chính sách: {line.policyCode}</p> : null}
+        
       </LineCell>
       <LineCell label="Dữ liệu đầu vào">
         <p className="tabular-nums text-text-default">{getLineInputSummary(line)}</p>
