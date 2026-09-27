@@ -68,6 +68,11 @@ select process_sepay_webhook_transaction(102,'VCB','2026-09-23 12:00+07','123456
 select test_assert((select count(*)=1 from finance_cashflow_records),'webhook retry creates no duplicate receipt');
 select test_assert((select sum(delta_sessions)=2 from student_session_ledger_entries),'webhook retry creates no duplicate sessions');
 select test_assert((select count(*)=0 from find_sepay_payment_candidates((select transfer_code from student_payment_requests where expected_amount_vnd=300000),'')),'paid reference does not fall through to another pending term');
+-- Preserve matching for pre-existing transfer codes distinct from public_code.
+update student_payment_requests set transfer_code='LEGACY-TUITION-223' where student_id='22222222-2222-4222-8222-222222222223';
+select test_assert((select count(*)=1 from find_sepay_payment_candidates('HOC PHI LEGACY-TUITION-223','')),'legacy transfer reference in bank content still matches');
+update student_payment_requests set status='cancelled' where student_id='22222222-2222-4222-8222-222222222223';
+select test_assert((select count(*)=0 from find_sepay_payment_candidates('HOC PHI LEGACY-TUITION-223','')),'cancelled legacy transfer reference never matches a pending request');
 -- Permission enforcement is in the DB, not just the UI.
 set test.permissions='tuition_periods.view';
 set role authenticated;

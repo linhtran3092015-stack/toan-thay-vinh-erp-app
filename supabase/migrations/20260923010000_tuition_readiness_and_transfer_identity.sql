@@ -47,6 +47,7 @@ declare content_key text:=public.normalize_payment_reference(coalesce(p_content,
 begin
   select exists(select 1 from public.student_payment_requests request
     where position(public.normalize_payment_reference(request.public_code) in content_key)>0
+       or position(nullif(public.normalize_payment_reference(request.transfer_code),'') in content_key)>0
        or public.normalize_payment_reference(request.public_code)=code_key
        or public.normalize_payment_reference(request.transfer_code)=code_key)
   into explicit_reference;
@@ -54,6 +55,7 @@ begin
     return query select request.id from public.student_payment_requests request
       where request.status='pending' and (
         position(public.normalize_payment_reference(request.public_code) in content_key)>0
+        or position(nullif(public.normalize_payment_reference(request.transfer_code),'') in content_key)>0
         or public.normalize_payment_reference(request.public_code)=code_key
         or public.normalize_payment_reference(request.transfer_code)=code_key);
   else
@@ -348,12 +350,12 @@ begin
   select * into v_period from public.tuition_collection_periods where id=p_period_id for update;
   if not found then raise exception 'TUITION_PERIOD_NOT_FOUND'; end if;
   if v_period.status='locked' then return jsonb_build_object('period_id',v_period.id,'status','locked','idempotent',true); end if;
-  if not exists(select 1 from public.preview_tuition_collection_period(p_period_id)) then raise exception 'TUITION_PERIOD_EMPTY'; end if;
   if exists(select 1 from public.preview_tuition_collection_period(p_period_id) where blocker_code is not null) then raise exception 'TUITION_PERIOD_BLOCKERS'; end if;
   select * into v_account from public.sepay_receiving_account_versions
   where purpose='renewal' and status='active' and effective_from <= v_period.ends_on and coalesce(effective_to,v_period.ends_on) >= v_period.ends_on
   order by effective_from desc limit 1;
   if v_account.id is null or exists(select 1 from public.sepay_receiving_account_versions where purpose='renewal' and status='active' and effective_from <= v_period.ends_on and coalesce(effective_to,v_period.ends_on) >= v_period.ends_on and id<>v_account.id) then raise exception 'RENEWAL_RECEIVING_ACCOUNT_BLOCKER'; end if;
+  if not exists(select 1 from public.preview_tuition_collection_period(p_period_id)) then raise exception 'TUITION_PERIOD_EMPTY'; end if;
   select tv.id,tv.content into v_template_id,v_template from public.tuition_receipt_template_versions tv where tv.id=coalesce(v_period.receipt_template_version_id,(select id from public.tuition_receipt_template_versions order by published_at desc limit 1));
   if v_template_id is null then raise exception 'RECEIPT_TEMPLATE_REQUIRED'; end if;
   for v_student in select student_id,(array_agg(enrollment_id order by session_date))[1] enrollment_id,(array_agg(class_id order by session_date))[1] class_id,(array_agg(acquisition_source_id order by session_date))[1] source_id,min(opening_balance_sessions) balance from public.preview_tuition_collection_period(p_period_id) group by student_id loop
