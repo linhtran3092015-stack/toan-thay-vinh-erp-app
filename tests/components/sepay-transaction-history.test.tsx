@@ -58,7 +58,7 @@ describe("SePay transaction history presentation", () => {
     expect(getSepayMatchPresentation("unmatched")).toEqual({ label: "Chưa khớp", tone: "neutral" });
     expect(getSepayMatchPresentation("auto_matched")).toEqual({ label: "Khớp tự động", tone: "success" });
     expect(getSepayMatchPresentation("manual_matched")).toEqual({ label: "Khớp thủ công", tone: "success" });
-    expect(getSepayMatchPresentation("split_allocated")).toEqual({ label: "Đã phân bổ nhiều học viên", tone: "info" });
+    expect(getSepayMatchPresentation("split_allocated")).toEqual({ label: "Đã phân bổ học phí", tone: "info" });
     expect(getSepayMatchPresentation("amount_mismatch")).toEqual({ label: "Sai số tiền – cần đối soát", tone: "warning" });
     expect(getSepayMatchPresentation("account_purpose_mismatch")).toEqual({ label: "Sai tài khoản nhận – cần đối soát", tone: "warning" });
     expect(getSepayMatchPresentation("identity_conflict")).toEqual({ label: "Trùng nhận diện – cần đối soát", tone: "warning" });
