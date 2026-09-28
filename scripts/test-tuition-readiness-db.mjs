@@ -1,9 +1,10 @@
 // Run real finance/tuition migration routines in an isolated local PostgreSQL.
 // Auth and academic/CRM tables are fixtures; no remote database or TCP listener.
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 const bin=[process.env.PG_BINDIR,'/opt/homebrew/opt/postgresql@14/bin','/usr/lib/postgresql/16/bin'].filter(Boolean).find(p=>existsSync(join(p,'initdb')));
 if(!bin) throw new Error('Set PG_BINDIR to a PostgreSQL installation.');
 const dir=mkdtempSync(join(tmpdir(),'tuition-readiness-'));
@@ -40,6 +41,16 @@ try {
  sql(migration('20260905010000_sepay_api_v2_record_only_ingestion.sql'));
  sql(migration('20260923010000_tuition_readiness_and_transfer_identity.sql'));
  sql(readFileSync(new URL('../tests/database/tuition-readiness.sql',import.meta.url),'utf8'));
+ sql(migration('20260928010000_sepay_manual_tuition_allocation.sql'));
+ sql(readFileSync(new URL('../tests/database/sepay-manual-allocation.sql',import.meta.url),'utf8'));
+ const concurrentSql = `set request.jwt.claim.sub='11111111-1111-4111-8111-111111111111'; set test.permissions='sepay.allocate';
+ select public.allocate_sepay_tuition_manually('77777777-7777-4777-8777-000000000010',
+ '[{"student_id":"22222222-2222-4222-8222-222222222224","allocated_amount_vnd":1000000,"allocated_sessions":10}]','Concurrent allocation test');`;
+ const attempts = await Promise.allSettled([1,2].map(()=>promisify(execFile)(join(bin,'psql'),['-h',dir,'-p','55443','-d','postgres','-v','ON_ERROR_STOP=1','-At','-c',concurrentSql])));
+ if(attempts.filter(r=>r.status==='fulfilled').length!==1 || !attempts.some(r=>r.status==='rejected' && r.reason.stderr.includes('TRANSACTION_ALREADY_RECONCILED'))) throw new Error('Concurrent allocation must have one winner and one already-reconciled rejection');
+ sql(`select test_assert((select count(*)=1 and sum(amount_vnd)=1000000 from finance_cashflow_records where sepay_transaction_id='77777777-7777-4777-8777-000000000010'),'concurrent submits record exactly one receipt');`);
+ console.log('PASS: concurrent manual allocation records exactly one receipt');
+ console.log('PASS: manual SePay allocation, request settlement, permissions, rollback and duplicate prevention');
  console.log('PASS: tuition readiness, atomic rate preparation, locked request creation, transfer identity, ambiguity and webhook idempotency (isolated PostgreSQL)');
 } catch(error) {if(error.stderr)process.stderr.write(error.stderr);throw error;}
 finally {if(running)execFileSync(join(bin,'pg_ctl'),['-D',join(dir,'data'),'stop','-m','fast'],{stdio:'pipe'});rmSync(dir,{recursive:true,force:true});}

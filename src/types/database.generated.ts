@@ -6319,6 +6319,18 @@ export type Database = {
           id: string
         }[]
       }
+      allocate_sepay_tuition_manually: {
+        Args: { p_sepay_transaction_id: string; p_allocations: Json; p_reason: string }
+        Returns: Json
+      }
+      search_sepay_allocation_students: {
+        Args: { p_search: string }
+        Returns: { student_id: string; student_name: string; student_code: string; birth_year: number; guardian_id: string; guardian_name: string; guardian_phone: string; pending_requests: Json }[]
+      }
+      get_sepay_allocation_details: {
+        Args: { p_sepay_transaction_id: string }
+        Returns: { student_name: string; student_code: string; allocated_amount_vnd: number; allocated_sessions: number; bonus_sessions: number; unit_price_vnd: number; notes: string | null; allocated_at: string; allocated_by_name: string | null; payment_request_code: string | null }[]
+      }
       allocate_payment_to_students: {
         Args: {
           p_allocations: Json
