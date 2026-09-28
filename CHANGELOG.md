@@ -2,6 +2,16 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.4.0] - 2026-09-28
+
+### Added
+- Phân bổ thủ công giao dịch SePay cho một hoặc nhiều học sinh, nhập tiền, buổi mua và buổi tặng; xem lại tổng phân bổ trước khi xác nhận.
+- Chọn yêu cầu thanh toán đã có để hoàn tất công nợ hoặc thu trực tiếp khi học sinh chưa có yêu cầu mở.
+- Xem chi tiết phân bổ, người thực hiện, thời điểm và lý do; ghi nhận khoản thu, đơn hàng và số buổi cùng một lần, chặn phân bổ trùng khi thao tác đồng thời.
+
+### Fixed
+- Cho phép đối soát giao dịch nhận trực tiếp qua webhook và giao dịch sai số tiền/loại yêu cầu; không còn giới hạn ở lịch sử SePay API.
+
 ## [0.6.3.0] - 2026-09-23
 
 ### Fixed
