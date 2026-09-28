@@ -2,12 +2,12 @@
 
 ## Luồng sử dụng
 
-Tại **Tài chính → Giao dịch SePay**, người có quyền `sepay.allocate` hoặc `payments.manage` chọn **Phân bổ học phí** ở giao dịch tiền vào chưa khớp, sai số tiền hoặc sai loại yêu cầu.
+Tại **Tài chính → Giao dịch SePay**, người có quyền xem `sepay.view` và quyền `sepay.allocate` hoặc `payments.manage` chọn **Phân bổ học phí** ở giao dịch tiền vào chưa khớp, sai số tiền hoặc sai loại yêu cầu. Áp dụng cho cả giao dịch nhận qua webhook và giao dịch nhập lịch sử.
 
 1. Đọc ngân hàng, số tiền, ngày và nội dung chuyển khoản.
 2. Tìm học sinh bằng tên (có hoặc không dấu), mã học sinh hoặc số điện thoại phụ huynh. Kiểm tra năm sinh và phụ huynh trước khi chọn.
-3. Có thể chọn nhiều học sinh, kể cả khác phụ huynh; mỗi học sinh xuất hiện một lần. Phụ huynh chính của từng học sinh được xác định lại ở thời điểm ghi nhận.
-4. Nếu học sinh chưa có yêu cầu chưa hoàn tất, nhập số tiền, số buổi mua và số buổi tặng đã thống nhất với phụ huynh. Nếu đã có yêu cầu, chọn yêu cầu tương ứng; số tiền và số buổi lấy từ yêu cầu đó.
+3. Có thể chọn tối đa 50 học sinh, kể cả khác phụ huynh; mỗi học sinh xuất hiện một lần. Phụ huynh chính của từng học sinh được xác định lại ở thời điểm ghi nhận.
+4. Nếu học sinh chưa có yêu cầu chưa hoàn tất, nhập số tiền, số buổi mua và số buổi tặng đã thống nhất với phụ huynh. Nếu đã có yêu cầu, chọn yêu cầu đang chờ thanh toán và chưa nhận tiền; số tiền và số buổi lấy từ yêu cầu đó. Yêu cầu đã thanh toán một phần hoặc khác loại tài khoản nhận không chọn được.
 5. Nhập lý do, phân bổ đủ toàn bộ tiền giao dịch, chọn **Kiểm tra phân bổ** rồi **Xác nhận phân bổ**.
 6. Giao dịch chuyển sang **Đã phân bổ học phí**. **Xem phân bổ** hiển thị từng học sinh, tiền, số buổi, yêu cầu liên quan, người ghi nhận, thời điểm và lý do. Người chỉ có `sepay.view` cũng xem được thông tin này.
 
