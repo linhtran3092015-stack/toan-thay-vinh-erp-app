@@ -138,6 +138,7 @@ export default async function SepayTransactionsPage({ searchParams }: SepayTrans
     <SepayTransactionHistory
       accountPurposeFilter={accountPurposeFilter}
       candidates={candidatesResult.ok ? candidatesResult.data : []}
+      canAllocate={permissionResult.permissions.includes("sepay.allocate") || permissionResult.permissions.includes("payments.manage")}
       canReconcile={canReconcile && candidatesResult.ok}
       managementPanel={syncPanel}
       page={transactionsResult.data.page}

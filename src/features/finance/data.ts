@@ -365,9 +365,8 @@ export async function getSepayReconciliationCandidatesResult(
 > {
   try {
     const relevantTransactions = transactions.filter((transaction) => (
-      transaction.sepayV2Id
-      && transaction.transferType === "in"
-      && transaction.matchStatus === "unmatched"
+      transaction.transferType === "in"
+      && ["unmatched", "amount_mismatch", "account_purpose_mismatch"].includes(transaction.matchStatus)
       && transaction.accountPurpose !== "unknown"
     ));
     if (relevantTransactions.length === 0) return { data: [], ok: true };

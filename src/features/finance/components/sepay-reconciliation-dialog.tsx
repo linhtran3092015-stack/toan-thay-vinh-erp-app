@@ -37,9 +37,8 @@ export function isSepayTransactionReconcilable(
   transaction: Pick<SepayTransactionReadModel, "matchStatus" | "sepayV2Id" | "transferType">,
 ): boolean {
   return Boolean(
-    transaction.sepayV2Id &&
     transaction.transferType === "in" &&
-    (transaction.matchStatus === "unmatched" || transaction.matchStatus === "identity_conflict"),
+    (["unmatched", "amount_mismatch", "account_purpose_mismatch"].includes(transaction.matchStatus) || (Boolean(transaction.sepayV2Id) && transaction.matchStatus === "identity_conflict")),
   );
 }
 
@@ -150,6 +149,8 @@ function SepayReconciliationDialogContent({
   const reasonInputRef = useRef<HTMLTextAreaElement>(null);
 
   const hasIdentityConflict = transaction.matchStatus === "identity_conflict";
+  const canResolveHistory = Boolean(transaction.sepayV2Id)
+    && ["unmatched", "identity_conflict"].includes(transaction.matchStatus);
   const expectedTopupType = transaction.accountPurpose === "renewal" ? "renewal" : "new";
 
   const matchingCandidates = useMemo(() => {
@@ -496,7 +497,7 @@ function SepayReconciliationDialogContent({
             </Button>
           ) : null}
 
-          <Button
+          {canResolveHistory ? <Button
             disabled={reason.trim().length < 3 || isPending}
             isLoading={isPending && activeAction === "already_accounted"}
             onClick={() => {
@@ -511,9 +512,9 @@ function SepayReconciliationDialogContent({
             variant="secondary"
           >
             Đã hạch toán trước đây
-          </Button>
+          </Button> : null}
 
-          <Button
+          {canResolveHistory ? <Button
             disabled={reason.trim().length < 3 || isPending}
             isLoading={isPending && activeAction === "ignored"}
             onClick={() => {
@@ -528,7 +529,7 @@ function SepayReconciliationDialogContent({
             variant="danger"
           >
             Bỏ qua
-          </Button>
+          </Button> : null}
         </div>
       </div>
     </div>

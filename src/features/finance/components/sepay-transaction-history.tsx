@@ -11,10 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { getSepayAccountPurposeQuery, type SepayAccountPurposeFilter } from "@/features/finance/sepay-transaction-url-state";
 import type { SepayTransactionReadModel } from "@/features/finance/read-models";
 import { SepayReconciliationActions, type SepayReconciliationCandidateView } from "@/features/finance/components/sepay-reconciliation-actions";
+import { SepayManualAllocation } from "@/features/finance/components/sepay-manual-allocation";
 import { SepayReconciliationDialog } from "@/features/finance/components/sepay-reconciliation-dialog";
 
 interface SepayTransactionHistoryProps {
   accountPurposeFilter?: SepayAccountPurposeFilter;
+  canAllocate?: boolean;
   canReconcile?: boolean;
   candidates?: SepayReconciliationCandidateView[];
   managementPanel?: ReactNode;
@@ -55,7 +57,7 @@ export function getSepayMatchPresentation(
     case "manual_matched":
       return { label: "Khớp thủ công", tone: "success" };
     case "split_allocated":
-      return { label: "Đã phân bổ nhiều học viên", tone: "info" };
+      return { label: "Đã phân bổ học phí", tone: "info" };
     case "amount_mismatch":
       return { label: "Sai số tiền – cần đối soát", tone: "warning" };
     case "account_purpose_mismatch":
@@ -74,6 +76,7 @@ export function getSepayMatchPresentation(
 /** Paginated SePay transaction history with permission-gated reconciliation. */
 export function SepayTransactionHistory({
   accountPurposeFilter = "",
+  canAllocate = false,
   canReconcile = false,
   candidates = [],
   managementPanel,
@@ -110,7 +113,7 @@ export function SepayTransactionHistory({
 
       {reconciliationError ? (
         <p className="rounded-md border border-danger-border bg-danger-bg px-4 py-3 text-secondary text-danger" role="alert">
-          Không tải được danh sách yêu cầu thanh toán để đối soát. Các thao tác đối soát đang tạm khóa; vui lòng tải lại trang.
+          Không tải được danh sách yêu cầu thanh toán để đối soát. Thao tác khớp theo danh sách này đang tạm khóa; vui lòng tải lại trang.
         </p>
       ) : null}
 
@@ -139,6 +142,7 @@ export function SepayTransactionHistory({
           />
         ) : (
           <SepayTransactionTable
+            canAllocate={canAllocate}
             canReconcile={canReconcile}
             candidates={candidates}
             onOpenReconciliation={handleOpenReconciliation}
@@ -162,11 +166,12 @@ export function SepayTransactionHistory({
 }
 
 function SepayTransactionTable({
+  canAllocate,
   canReconcile,
   candidates,
   onOpenReconciliation,
   transactions,
-}: Pick<SepayTransactionHistoryProps, "canReconcile" | "candidates" | "transactions"> & {
+}: Pick<SepayTransactionHistoryProps, "canAllocate" | "canReconcile" | "candidates" | "transactions"> & {
   onOpenReconciliation: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
 }) {
   return (
@@ -174,6 +179,7 @@ function SepayTransactionTable({
       <DataTableFrame
         body={transactions.map((transaction) => (
           <SepayTransactionTableRow
+            canAllocate={canAllocate}
             canReconcile={canReconcile}
             candidates={candidates}
             key={transaction.id}
@@ -193,7 +199,7 @@ function SepayTransactionTable({
             <TableHeader className="text-right">Số tiền</TableHeader>
             <TableHeader>Trạng thái khớp</TableHeader>
             <TableHeader>Tham chiếu hiện có</TableHeader>
-            {canReconcile ? <TableHeader>Thao tác</TableHeader> : null}
+            <TableHeader>Thao tác</TableHeader>
           </tr>
         }
         tableClassName="min-w-[1340px] table-fixed text-table-body text-text-default"
@@ -205,6 +211,7 @@ function SepayTransactionTable({
       >
         {transactions.map((transaction) => (
           <SepayTransactionRecord
+            canAllocate={canAllocate}
             canReconcile={canReconcile}
             candidates={candidates}
             key={transaction.id}
@@ -218,11 +225,13 @@ function SepayTransactionTable({
 }
 
 function SepayTransactionTableRow({
+  canAllocate,
   canReconcile,
   candidates,
   onOpenReconciliation,
   transaction,
 }: {
+  canAllocate?: boolean;
   canReconcile?: boolean;
   candidates?: SepayReconciliationCandidateView[];
   onOpenReconciliation: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
@@ -257,25 +266,30 @@ function SepayTransactionTableRow({
       <TableCell className="w-[170px] text-secondary text-text-muted">
         <SepayReference transaction={transaction} />
       </TableCell>
-      {canReconcile ? (
-        <TableCell className="w-[130px]">
-          <SepayReconciliationActions
-            candidates={candidates ?? []}
-            onOpenDialog={onOpenReconciliation}
-            transaction={transaction}
-          />
-        </TableCell>
-      ) : null}
+      <TableCell className="w-[160px]">
+        <div className="flex flex-col items-start gap-2">
+          <SepayManualAllocation canAllocate={canAllocate} transaction={transaction} />
+          {canReconcile ? (
+            <SepayReconciliationActions
+              candidates={candidates ?? []}
+              onOpenDialog={onOpenReconciliation}
+              transaction={transaction}
+            />
+          ) : null}
+        </div>
+      </TableCell>
     </tr>
   );
 }
 
 function SepayTransactionRecord({
+  canAllocate,
   canReconcile,
   candidates,
   onOpenReconciliation,
   transaction,
 }: {
+  canAllocate?: boolean;
   canReconcile?: boolean;
   candidates?: SepayReconciliationCandidateView[];
   onOpenReconciliation: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
@@ -312,16 +326,16 @@ function SepayTransactionRecord({
           <span className="font-medium text-text-default">Tham chiếu:</span>{" "}
           <SepayReference transaction={transaction} />
         </p>
-        {canReconcile ? (
-          <div className="mt-2 flex items-center justify-between border-t border-border-subtle pt-2">
-            <span className="text-caption text-text-muted">Thao tác:</span>
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-2">
+          <SepayManualAllocation canAllocate={canAllocate} transaction={transaction} />
+          {canReconcile ? (
             <SepayReconciliationActions
               candidates={candidates ?? []}
               onOpenDialog={onOpenReconciliation}
               transaction={transaction}
             />
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </article>
   );

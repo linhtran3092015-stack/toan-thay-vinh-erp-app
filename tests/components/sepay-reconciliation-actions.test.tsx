@@ -51,7 +51,8 @@ afterEach(() => {
 describe("SePay reconciliation UI and dialog interactions", () => {
   it("determines reconcilable eligibility correctly", () => {
     expect(isSepayTransactionReconcilable(transaction)).toBe(true);
-    expect(isSepayTransactionReconcilable({ ...transaction, sepayV2Id: null })).toBe(false);
+    expect(isSepayTransactionReconcilable({ ...transaction, sepayV2Id: null })).toBe(true);
+    expect(isSepayTransactionReconcilable({ ...transaction, matchStatus: "amount_mismatch" })).toBe(true);
     expect(isSepayTransactionReconcilable({ ...transaction, transferType: "out" })).toBe(false);
     expect(isSepayTransactionReconcilable({ ...transaction, matchStatus: "auto_matched" })).toBe(false);
     expect(isSepayTransactionReconcilable({ ...transaction, matchStatus: "identity_conflict" })).toBe(true);
@@ -228,6 +229,13 @@ describe("SePay reconciliation UI and dialog interactions", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Lỗi kết nối CSDL, vui lòng thử lại.");
     expect(reasonInput).toHaveValue("Đã đối chiếu sổ phụ chi tiết");
+  });
+
+  it.each(["amount_mismatch", "account_purpose_mismatch"] as const)("does not offer history resolution for %s", (matchStatus) => {
+    render(<SepayReconciliationActions candidates={[]} defaultOpen transaction={{ ...transaction, matchStatus }} />);
+    expect(screen.getByRole("button", { name: "Khớp và ghi nhận học phí" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Đã hạch toán trước đây" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Bỏ qua" })).not.toBeInTheDocument();
   });
 
   it("resets state when switching to a different transaction", () => {
