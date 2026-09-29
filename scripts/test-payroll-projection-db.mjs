@@ -14,12 +14,17 @@ try {
   running = true;
   sql(readFileSync(new URL('../tests/database/payroll-projection-fixture.sql', import.meta.url), 'utf8'));
   const migrationsDir = new URL('../supabase/migrations/', import.meta.url);
-  const names = process.env.PAYROLL_MIGRATION ? [process.env.PAYROLL_MIGRATION]
-    : readdirSync(migrationsDir).filter(name => name.endsWith('.sql')).sort();
+  const allNames = readdirSync(migrationsDir).filter(name => name.endsWith('.sql')).sort();
+  const names = process.env.PAYROLL_MIGRATION ? [process.env.PAYROLL_MIGRATION] : allNames;
+  // Apply the actual migration too, so its trigger and privilege statements are checked.
+  if (!process.env.PAYROLL_MIGRATION) {
+    sql('create role anon; create role authenticated;');
+    sql(readFileSync(new URL('../supabase/migrations/20260929090000_payroll_estimate_manual_adjustments.sql', import.meta.url), 'utf8'));
+  }
   // Test the latest definitions, so later migrations cannot silently remove bonuses again.
-  for (const routine of ['compute_payroll_projection', 'generate_payroll_calculation_run']) {
+  for (const routine of ['compute_payroll_projection', 'generate_payroll_calculation_run', 'get_owner_payroll_estimate', 'get_my_payroll_estimate']) {
     let definition;
-    for (const name of names) {
+    for (const name of (routine.startsWith('get_') ? allNames : names)) {
       const migration = readFileSync(new URL(name, migrationsDir), 'utf8');
       const start = migration.lastIndexOf('create or replace function public.' + routine + '(');
       if (start >= 0) definition = migration.slice(start, migration.indexOf('$$;', start) + 3);
@@ -27,7 +32,10 @@ try {
     if (!definition) throw new Error('Missing payroll routine: ' + routine);
     sql(definition);
   }
-  execFileSync(join(bin, 'psql'), ['-h', dir, '-p', '55444', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-q', '-f', new URL('../tests/database/payroll-optional-bonuses.sql', import.meta.url).pathname], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+  for (const test of ['payroll-optional-bonuses.sql', 'payroll-estimate-manual-lines.sql']) {
+    sql('begin;\n' + readFileSync(new URL('../tests/database/' + test, import.meta.url), 'utf8') + '\nrollback;');
+    console.log('PASS: ' + test);
+  }
   console.log('PASS: projection regression checks and persisted draft run checks');
 } catch (error) { if (error.stderr) process.stderr.write(error.stderr); process.exitCode = 1; }
 finally {

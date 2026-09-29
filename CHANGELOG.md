@@ -2,6 +2,12 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.4.1] - 2026-09-29
+
+### Fixed
+- Đồng bộ tổng quan lương tạm tính với Bảng lương bằng cách tính cả thưởng và khấu trừ thủ công của kỳ hiện tại.
+- Không cộng trùng điều chỉnh thủ công khi tính lại lương; tự làm mới tổng quan khi khoản điều chỉnh được thêm, sửa hoặc xóa.
+
 ## [0.6.4.0] - 2026-09-28
 
 ### Added
