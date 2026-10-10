@@ -563,14 +563,12 @@ async function loadRevenueComposition(
 
     if (error) return errorSection();
 
+    // Must match finance_cashflow_records.category CHECK constraint.
     const categoryLabels: Record<string, string> = {
-      exam_fee: "Lệ phí thi",
-      materials: "Tài liệu & Học cụ",
+      bonus_grant: "Buổi tặng",
       other: "Khác",
-      registration: "Phí đăng ký",
-      service: "Phí dịch vụ",
-      tuition: "Học phí",
-      workshop: "Chuyên đề / Sự kiện",
+      refund: "Hoàn tiền",
+      tuition_fee: "Học phí",
     };
 
     const categoryTotals = new Map<string, number>();
@@ -646,15 +644,16 @@ async function loadTopGradesAndClasses(
       );
     }
 
+    // Revenue per class is not tracked yet (session charges carry no unit
+    // price), so the ranking is by active enrollment only.
     const classItems: TopGradeOrClassItem[] = (classesRes.data ?? []).map((c) => {
       const studentCount = studentCountByClass.get(c.id) ?? 0;
-      const revenueVnd = studentCount * 1_800_000;
       return {
         code: c.code,
         id: c.id,
         name: c.name,
         rank: 0,
-        revenueVnd,
+        revenueVnd: null,
         studentCount,
       };
     });
@@ -691,31 +690,23 @@ async function loadAdmissionsFunnel(
     const cases = casesRes.data ?? [];
     const totalLeads = cases.length;
 
-    const contactedCount = cases.filter(
-      (c) => c.status !== "lead" && c.status !== "new",
+    // crm_cases.status: interested → trial_booked → trial_completed →
+    // pending_enrollment_confirmation → converted, or dropped.
+    const contactedCount = cases.filter((c) =>
+      [
+        "trial_booked",
+        "trial_completed",
+        "pending_enrollment_confirmation",
+        "converted",
+      ].includes(c.status),
     ).length;
     const consultedCount = cases.filter((c) =>
-      [
-        "consulting",
-        "trial_scheduled",
-        "trial_completed",
-        "registered",
-        "enrolled",
-        "official",
-      ].includes(c.status),
+      ["trial_completed", "pending_enrollment_confirmation", "converted"].includes(c.status),
     ).length;
     const registeredCount = cases.filter((c) =>
-      [
-        "trial_scheduled",
-        "trial_completed",
-        "registered",
-        "enrolled",
-        "official",
-      ].includes(c.status),
+      ["pending_enrollment_confirmation", "converted"].includes(c.status),
     ).length;
-    const enrolledCount = cases.filter((c) =>
-      ["enrolled", "official"].includes(c.status),
-    ).length;
+    const enrolledCount = cases.filter((c) => c.status === "converted").length;
 
     const baseCount = Math.max(1, totalLeads);
 
@@ -729,19 +720,19 @@ async function loadAdmissionsFunnel(
       {
         count: contactedCount,
         key: "contacted",
-        label: "Đã liên hệ",
+        label: "Đã đặt lịch học thử",
         percentage: Number(((contactedCount / baseCount) * 100).toFixed(1)),
       },
       {
         count: consultedCount,
         key: "consulted",
-        label: "Đã tư vấn",
+        label: "Đã học thử",
         percentage: Number(((consultedCount / baseCount) * 100).toFixed(1)),
       },
       {
         count: registeredCount,
         key: "registered",
-        label: "Đã đăng ký / Học thử",
+        label: "Chờ xác nhận nhập học",
         percentage: Number(((registeredCount / baseCount) * 100).toFixed(1)),
       },
       {

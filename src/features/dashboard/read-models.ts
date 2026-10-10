@@ -94,7 +94,8 @@ export interface TopGradeOrClassItem {
   id: string;
   name: string;
   rank: number;
-  revenueVnd: number;
+  /** Null until per-class revenue is tracked; never estimated. */
+  revenueVnd: number | null;
   studentCount: number;
 }
 

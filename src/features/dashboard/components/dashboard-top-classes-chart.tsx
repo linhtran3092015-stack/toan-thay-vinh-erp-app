@@ -38,7 +38,7 @@ export function DashboardTopClassesChart({
             Top 5 Lớp & Khối học tiêu biểu
           </h2>
           <p className="text-xs text-ink-muted">
-            Xếp hạng theo quy mô học sinh và doanh thu ước tính
+            Xếp hạng theo số học viên đang học
           </p>
         </div>
 
@@ -63,7 +63,11 @@ export function DashboardTopClassesChart({
               <div
                 className="group grid gap-1.5 rounded-xl p-2 transition hover:bg-surface-2"
                 key={item.id}
-                title={`${item.name}: ${item.studentCount} học sinh · ${formatVnd(item.revenueVnd)}`}
+                title={
+                  item.revenueVnd === null
+                    ? `${item.name}: ${item.studentCount} học viên`
+                    : `${item.name}: ${item.studentCount} học viên · ${formatVnd(item.revenueVnd)}`
+                }
               >
                 <div className="flex items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-2 min-w-0">
@@ -83,9 +87,11 @@ export function DashboardTopClassesChart({
                       <GraduationCap className="h-3.5 w-3.5 text-ink-subtle" />
                       {formatNumber(item.studentCount)} HS
                     </span>
-                    <span className="font-bold text-ink sm:text-sm">
-                      {formatCompactVnd(item.revenueVnd)}
-                    </span>
+                    {item.revenueVnd === null ? null : (
+                      <span className="font-bold text-ink sm:text-sm">
+                        {formatCompactVnd(item.revenueVnd)}
+                      </span>
+                    )}
                   </div>
                 </div>
 
