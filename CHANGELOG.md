@@ -2,6 +2,31 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.6.0] - 2026-10-11
+
+Đợt vá khẩn sau rà soát toàn hệ thống (xem `docs/review-toan-he-thong-2026-10-10.md`).
+
+### Security
+- Dữ liệu nguồn lương (`payroll_source_facts`, `payroll_calculation_runs`) chỉ còn đọc được bởi chính nhân sự đó hoặc người có quyền quản lý lương; trước đây mọi vai trò có `payroll.view` đều đọc được của nhau.
+- Nhận lời mời tài khoản yêu cầu email trong phiên đăng nhập đã được xác minh (`email_verified`), chặn việc đăng ký trùng địa chỉ để chiếm vai trò.
+- Bỏ đường dự phòng dùng service-role khi tạo buổi học hàng loạt; RPC từ chối thì báo lỗi rõ ràng thay vì chèn thẳng vào bảng, bỏ qua kiểm tra của DB. Thêm luật ESLint cấm import service-role ngoài webhook SePay và đồng bộ lịch sử SePay.
+- Webhook SePay không còn ghi nguyên nội dung giao dịch (tên người chuyển, số tài khoản) vào log; PDF phiếu lương trả `Cache-Control: no-store`.
+
+### Fixed
+- Dashboard: bỏ "doanh thu ước tính" theo lớp (số giả định `học sinh × 1.800.000`), phễu tuyển sinh dùng đúng trạng thái CRM thật nên tỷ lệ chuyển đổi không còn luôn 0%, nhãn danh mục thu khớp với dữ liệu.
+- Chăm sóc học viên: leo thang công việc Coaching tháng quá hạn nay chạy được (trước là mã chết).
+- Xuất báo cáo buổi học lọc theo ngày ngay trong truy vấn, không còn cắt 300 buổi mới nhất rồi mới lọc.
+- Ước tính lương hiện "Dữ liệu tính lúc" theo giờ server thay vì giờ máy người xem; mã vị trí hiện tên tiếng Việt.
+- Hộp thoại "thay đổi chưa lưu" bỏ chữ "mock"; thêm trang lỗi trong khung ứng dụng (giữ sidebar) và trang 404 tiếng Việt; không hiện thông điệp lỗi thô.
+
+### Changed
+- Design token: `text-secondary` trở lại đúng vai trò cỡ chữ 13px (trước bị `--color-secondary` ghi đè thành màu); định nghĩa thêm `bg-field-bg`, `bg-surface-canvas`, `border-neutral-border`; thay toàn bộ class không tồn tại (`text-section`, `text-kpi`, `text-warning-text`, `text-text-primary`...) bằng token đúng. Thêm test chặn dùng lại.
+- Nút nguy hiểm chuyển sang kiểu viền (không còn trùng màu đỏ với nút chính); chữ trên nút chính ở dark mode đổi sang trắng để đạt tương phản.
+- Sinh lại `database.generated.ts` từ schema thật; CI kiểm tra types không lệch migration, chạy thêm bộ test DB chăm sóc học viên, lịch tuần và lương theo ngày.
+
+### Database
+- `20261011090000_restrict_payroll_source_facts_rls.sql`, `20261011090300_fix_student_care_monthly_escalation.sql`, `20261011090400_invitation_requires_verified_email.sql`.
+
 ## [0.6.5.0] - 2026-10-10
 
 ### Added
