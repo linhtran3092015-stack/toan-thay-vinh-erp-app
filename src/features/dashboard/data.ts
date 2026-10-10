@@ -51,6 +51,11 @@ function hasPermission(
   return permissions.includes(permission);
 }
 
+/** `YYYY-MM-DDT…` → `YYYY-MM-DD` for comparing against date-typed columns. */
+function toDateOnly(isoTimestamp: string): string {
+  return isoTimestamp.slice(0, 10);
+}
+
 function getPreviousMonth(monthStr: string): string {
   const match = /^(\d{4})-(\d{2})$/.exec(monthStr);
   if (!match) return monthStr;
@@ -232,19 +237,21 @@ async function loadExecutiveKpis(
             .from("students")
             .select("id, lifecycle_status, created_at")
         : Promise.resolve({ data: null, error: null }),
+      // Revenue is attributed to the bank/business date (effective_on), not
+      // to when the accountant allocated the transfer.
       canViewFinance
         ? supabase
             .from("finance_cashflow_records")
-            .select("record_type, amount_vnd, created_at")
-            .gte("created_at", monthStart)
-            .lt("created_at", monthEnd)
+            .select("record_type, amount_vnd, effective_on")
+            .gte("effective_on", toDateOnly(monthStart))
+            .lt("effective_on", toDateOnly(monthEnd))
         : Promise.resolve({ data: null, error: null }),
       canViewFinance
         ? supabase
             .from("finance_cashflow_records")
-            .select("record_type, amount_vnd, created_at")
-            .gte("created_at", prevMonthStart)
-            .lt("created_at", prevMonthEnd)
+            .select("record_type, amount_vnd, effective_on")
+            .gte("effective_on", toDateOnly(prevMonthStart))
+            .lt("effective_on", toDateOnly(prevMonthEnd))
         : Promise.resolve({ data: null, error: null }),
       canViewFinance
         ? supabase
@@ -488,9 +495,9 @@ async function loadRevenueMonthlyTrend(
 
     const { data, error } = await supabase
       .from("finance_cashflow_records")
-      .select("record_type, amount_vnd, created_at")
-      .gte("created_at", yearStart)
-      .lt("created_at", yearEnd);
+      .select("record_type, amount_vnd, effective_on")
+      .gte("effective_on", toDateOnly(yearStart))
+      .lt("effective_on", toDateOnly(yearEnd));
 
     if (error) return errorSection();
 
@@ -500,8 +507,8 @@ async function loadRevenueMonthlyTrend(
     }
 
     for (const record of data ?? []) {
-      const date = new Date(record.created_at);
-      const month = date.getUTCMonth() + 1;
+      // effective_on is a plain YYYY-MM-DD business date; no timezone shift.
+      const month = Number(record.effective_on.slice(5, 7));
       const current = monthlyMap.get(month);
       if (current) {
         const amount = Number(record.amount_vnd);
@@ -558,8 +565,8 @@ async function loadRevenueComposition(
       .from("finance_cashflow_records")
       .select("category, amount_vnd, record_type")
       .eq("record_type", "receipt")
-      .gte("created_at", monthStart)
-      .lt("created_at", monthEnd);
+      .gte("effective_on", toDateOnly(monthStart))
+      .lt("effective_on", toDateOnly(monthEnd));
 
     if (error) return errorSection();
 

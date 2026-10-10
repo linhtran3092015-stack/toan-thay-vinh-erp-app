@@ -1780,6 +1780,7 @@ export type Database = {
           category: string
           created_at: string
           created_by: string | null
+          effective_on: string
           id: string
           note: string
           record_type: string
@@ -1792,6 +1793,7 @@ export type Database = {
           category: string
           created_at?: string
           created_by?: string | null
+          effective_on: string
           id?: string
           note: string
           record_type: string
@@ -1804,6 +1806,7 @@ export type Database = {
           category?: string
           created_at?: string
           created_by?: string | null
+          effective_on?: string
           id?: string
           note?: string
           record_type?: string

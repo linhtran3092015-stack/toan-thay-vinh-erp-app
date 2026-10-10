@@ -2,6 +2,15 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.8.0] - 2026-10-11
+
+### Fixed
+- Doanh thu và thưởng theo doanh thu (ngưỡng tuyển sinh, gia hạn coaching, kỷ lục gia hạn) tính theo **ngày tiền về ngân hàng** thay vì ngày kế toán phân bổ. Giao dịch chuyển tháng 9 nhưng phân bổ đầu tháng 10 trước đây bị tính vào tháng 10, làm doanh thu tháng 9 hiển thị 10 triệu thay vì 62 triệu đã phân bổ (quyết định chủ trung tâm 11/10/2026).
+- Phiếu thu có thêm `effective_on` (ngày nghiệp vụ, múi giờ VN; tự điền từ giao dịch SePay); dashboard doanh thu theo tháng/năm và cơ cấu doanh thu dùng cột này. Các fact lương đã ghi theo ngày phân bổ được sửa lại một lần trong migration.
+
+### Database
+- `20261012090000_cashflow_effective_on_bank_date.sql`. Kỳ lương tháng 9 (đang nháp) cần bấm "Tính lại" để cập nhật.
+
 ## [0.6.7.0] - 2026-10-11
 
 ### Added
