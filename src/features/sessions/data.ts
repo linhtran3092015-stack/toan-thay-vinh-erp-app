@@ -42,6 +42,11 @@ interface CountQueryRow {
 interface GetSessionDirectoryOptions {
   includeAttendanceCounts?: boolean;
   includeResultCounts?: boolean;
+  /** Inclusive YYYY-MM-DD bounds applied in the query, before the row limit. */
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  /** Row cap; defaults to the directory limit. Exports pass a higher cap. */
+  limit?: number;
 }
 
 const SESSION_DIRECTORY_LIMIT = 300;
@@ -109,7 +114,7 @@ export async function getSessionDirectory(
     const supabase =
       await createSupabaseServerClient();
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("class_sessions")
       .select(`
         id,
@@ -136,8 +141,19 @@ export async function getSessionDirectory(
       })
       .order("start_time", {
         ascending: true,
-      })
-      .limit(SESSION_DIRECTORY_LIMIT);
+      });
+
+    if (options.dateFrom) {
+      query = query.gte("session_date", options.dateFrom);
+    }
+
+    if (options.dateTo) {
+      query = query.lte("session_date", options.dateTo);
+    }
+
+    const { data, error } = await query.limit(
+      options.limit ?? SESSION_DIRECTORY_LIMIT,
+    );
 
     if (error) {
       return {
