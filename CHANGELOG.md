@@ -13,6 +13,8 @@ All notable changes to Toan Thay Vinh ERP will be documented in this file.
 - Webhook SePay không còn ghi nguyên nội dung giao dịch (tên người chuyển, số tài khoản) vào log; PDF phiếu lương trả `Cache-Control: no-store`.
 
 ### Fixed
+- Khóa buổi học không còn bắt buộc có điểm kiểm tra cho mọi học sinh có mặt (đúng hợp đồng nghiệp vụ); điểm danh đầy đủ vẫn là điều kiện khóa.
+- Chia lead CRM tự động: role `consultant` không tồn tại được đổi thành `admissions_specialist`; cấp quyền CRM cho chuyên viên và quản lý tuyển sinh. Trước đây mọi lead tự động dồn về trưởng nhóm.
 - Dashboard: bỏ "doanh thu ước tính" theo lớp (số giả định `học sinh × 1.800.000`), phễu tuyển sinh dùng đúng trạng thái CRM thật nên tỷ lệ chuyển đổi không còn luôn 0%, nhãn danh mục thu khớp với dữ liệu.
 - Chăm sóc học viên: leo thang công việc Coaching tháng quá hạn nay chạy được (trước là mã chết).
 - Xuất báo cáo buổi học lọc theo ngày ngay trong truy vấn, không còn cắt 300 buổi mới nhất rồi mới lọc.
@@ -25,7 +27,7 @@ All notable changes to Toan Thay Vinh ERP will be documented in this file.
 - Sinh lại `database.generated.ts` từ schema thật; CI kiểm tra types không lệch migration, chạy thêm bộ test DB chăm sóc học viên, lịch tuần và lương theo ngày.
 
 ### Database
-- `20261011090000_restrict_payroll_source_facts_rls.sql`, `20261011090300_fix_student_care_monthly_escalation.sql`, `20261011090400_invitation_requires_verified_email.sql`.
+- `20261011090000_restrict_payroll_source_facts_rls.sql`, `20261011090100_lock_session_without_test_score.sql`, `20261011090200_fix_crm_round_robin_role.sql`, `20261011090300_fix_student_care_monthly_escalation.sql`, `20261011090400_invitation_requires_verified_email.sql`.
 
 ## [0.6.5.0] - 2026-10-10
 
