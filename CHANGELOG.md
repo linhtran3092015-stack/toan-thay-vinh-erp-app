@@ -2,6 +2,14 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.9.0] - 2026-10-11
+
+### Added
+- Gợi ý khớp giao dịch SePay chưa phân bổ (Tài chính → Giao dịch SePay, người có quyền phân bổ): hệ thống đọc nội dung chuyển khoản, đối chiếu tên học sinh, năm sinh, mã học sinh và số điện thoại phụ huynh chính, gắn mức tin cậy (cao / cần kiểm tra), gợi ý số buổi từ đơn giá hiện hành. Kế toán sửa số buổi nếu cần và xác nhận từng dòng hoặc xác nhận hàng loạt các dòng tin cậy cao; mỗi xác nhận đi qua `allocate_sepay_tuition_manually` như phân bổ thủ công. RPC `suggest_sepay_allocation_matches` chỉ đọc.
+
+### Database
+- `20261012100000_sepay_allocation_suggestions.sql`.
+
 ## [0.6.8.0] - 2026-10-11
 
 ### Fixed

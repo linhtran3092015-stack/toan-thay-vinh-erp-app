@@ -1,5 +1,7 @@
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
+import { getSepayAllocationSuggestionsResult } from "@/features/finance/allocation-suggestions-data";
+import { SepayAllocationSuggestions } from "@/features/finance/components/sepay-allocation-suggestions";
 import { SepayTransactionHistory } from "@/features/finance/components/sepay-transaction-history";
 import { SepayHistorySyncPanel, type SepaySyncAccountView, type SepaySyncRunView } from "@/features/finance/components/sepay-history-sync-panel";
 import { getSepayReconciliationCandidatesResult, getSepayTransactionsResult } from "@/features/finance/data";
@@ -62,9 +64,26 @@ export default async function SepayTransactionsPage({ searchParams }: SepayTrans
       />
     );
   }
-  const candidatesResult = canReconcile
-    ? await getSepayReconciliationCandidatesResult(transactionsResult.data.transactions)
-    : { data: [] as SepayReconciliationCandidateReadModel[], ok: true as const };
+  const canAllocate = permissionResult.permissions.includes("sepay.allocate")
+    || permissionResult.permissions.includes("payments.manage");
+  const [candidatesResult, suggestionsResult] = await Promise.all([
+    canReconcile
+      ? getSepayReconciliationCandidatesResult(transactionsResult.data.transactions)
+      : Promise.resolve({ data: [] as SepayReconciliationCandidateReadModel[], ok: true as const }),
+    canAllocate
+      ? getSepayAllocationSuggestionsResult()
+      : Promise.resolve({ data: [], ok: true as const }),
+  ]);
+  const suggestionsPanel = canAllocate ? (
+    suggestionsResult.ok ? (
+      <SepayAllocationSuggestions suggestions={suggestionsResult.data} />
+    ) : (
+      <ErrorState
+        description={suggestionsResult.error}
+        title="Không tải được gợi ý khớp giao dịch"
+      />
+    )
+  ) : null;
 
   let syncPanel = null;
   if (canSyncHistory) {
@@ -138,9 +157,16 @@ export default async function SepayTransactionsPage({ searchParams }: SepayTrans
     <SepayTransactionHistory
       accountPurposeFilter={accountPurposeFilter}
       candidates={candidatesResult.ok ? candidatesResult.data : []}
-      canAllocate={permissionResult.permissions.includes("sepay.allocate") || permissionResult.permissions.includes("payments.manage")}
+      canAllocate={canAllocate}
       canReconcile={canReconcile && candidatesResult.ok}
-      managementPanel={syncPanel}
+      managementPanel={
+        suggestionsPanel || syncPanel ? (
+          <div className="grid gap-4">
+            {suggestionsPanel}
+            {syncPanel}
+          </div>
+        ) : null
+      }
       page={transactionsResult.data.page}
       pageSize={transactionsResult.data.pageSize}
       reconciliationError={canReconcile && !candidatesResult.ok}

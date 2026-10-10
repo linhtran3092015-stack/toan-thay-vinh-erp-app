@@ -10365,6 +10365,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      suggest_sepay_allocation_matches: {
+        Args: { p_limit?: number }
+        Returns: {
+          account_purpose: string
+          amount_vnd: number
+          birth_year: number
+          candidate_count: number
+          candidate_rank: number
+          confidence: string
+          current_grade: number
+          guardian_name: string
+          guardian_phone: string
+          match_reasons: string[]
+          match_status: string
+          pending_request_id: string
+          student_code: string
+          student_id: string
+          student_name: string
+          suggested_sessions: number
+          transaction_at: string
+          transaction_id: string
+          transfer_content: string
+          unit_price_vnd: number
+        }[]
+      }
       sync_payroll_order_facts: {
         Args: { p_period_month: string }
         Returns: number
