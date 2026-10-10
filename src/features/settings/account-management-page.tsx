@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
+import { DeleteAccountDialog } from "@/features/settings/components/delete-account-dialog";
 import { InviteAccountDialog } from "@/features/settings/components/invite-account-dialog";
 import { ManageAccountRolesDialog } from "@/features/settings/components/manage-account-roles-dialog";
 import { PendingInvitationCard } from "@/features/settings/components/pending-invitation-card";
@@ -191,8 +192,13 @@ function AccountDesktopTable({
               <td className="px-4 py-4"><AccountStatusBadge status={member.employmentStatus} /></td>
               <td className="px-4 py-4"><RoleBadges member={member} /></td>
               <td className="px-4 py-4 text-right">
-                {canManage && member.employmentStatus === "active" ? (
-                  <ManageAccountRolesDialog member={member} roles={roleOptions} />
+                {canManage ? (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {member.employmentStatus === "active" ? (
+                      <ManageAccountRolesDialog member={member} roles={roleOptions} />
+                    ) : null}
+                    {canDeleteMember(member) ? <DeleteAccountDialog member={member} /> : null}
+                  </div>
                 ) : (
                   <span className="text-xs text-ink-subtle">Chỉ đọc</span>
                 )}
@@ -226,9 +232,12 @@ function AccountMobileList({
             <AccountStatusBadge status={member.employmentStatus} />
           </div>
           <div className="mt-3"><RoleBadges member={member} /></div>
-          {canManage && member.employmentStatus === "active" ? (
-            <div className="mt-4 border-t border-hairline pt-3 [&>button]:min-h-11 [&>button]:w-full">
-              <ManageAccountRolesDialog member={member} roles={roleOptions} />
+          {canManage && (member.employmentStatus === "active" || canDeleteMember(member)) ? (
+            <div className="mt-4 grid gap-2 border-t border-hairline pt-3 [&_button]:min-h-11 [&_button]:w-full">
+              {member.employmentStatus === "active" ? (
+                <ManageAccountRolesDialog member={member} roles={roleOptions} />
+              ) : null}
+              {canDeleteMember(member) ? <DeleteAccountDialog member={member} /> : null}
             </div>
           ) : null}
         </article>
@@ -280,6 +289,12 @@ function SummaryItem({ attention = false, label, value }: { attention?: boolean;
       <p className={cn("mt-1 text-xl font-bold", attention ? "text-warning" : "text-ink")}>{value}</p>
     </div>
   );
+}
+
+// Owner accounts are protected server-side too; hiding the control avoids a
+// dead-end dialog. The database also refuses self-deletion.
+function canDeleteMember(member: StaffDirectoryMember): boolean {
+  return !(member.roles ?? []).some((role) => role.code === "owner");
 }
 
 function normalizeSearch(value: string): string {

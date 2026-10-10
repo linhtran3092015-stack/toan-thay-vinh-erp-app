@@ -41,6 +41,11 @@ const revokeInvitationSchema = z.object({
   reason: reasonSchema,
 });
 
+const deleteAccountSchema = z.object({
+  reason: reasonSchema,
+  userId: z.string().uuid("Tài khoản không hợp lệ."),
+});
+
 const updateSystemSettingsSchema = z.object({
   address: z.string().trim().max(500, "Địa chỉ không được vượt quá 500 ký tự."),
   contactEmail: z.string().trim().max(160).refine((value) => !value || z.string().email().safeParse(value).success, "Email liên hệ không hợp lệ."),
@@ -63,6 +68,7 @@ const setRolePermissionsSchema = z.object({
 type InviteAccountInput = z.input<typeof inviteAccountSchema>;
 type SetAccountRolesInput = z.input<typeof setAccountRolesSchema>;
 type RevokeInvitationInput = z.input<typeof revokeInvitationSchema>;
+type DeleteAccountInput = z.input<typeof deleteAccountSchema>;
 type UpdateSystemSettingsInput = z.input<typeof updateSystemSettingsSchema>;
 type SetRolePermissionsInput = z.input<typeof setRolePermissionsSchema>;
 
@@ -93,8 +99,14 @@ function getRpcErrorMessage(message: string): string {
   const knownMessages: Record<string, string> = {
     ACCOUNT_PROFILE_ALREADY_EXISTS:
       "Email này đã có tài khoản. Hãy cập nhật vai trò trong danh sách người dùng.",
+    ACCOUNT_ALREADY_DELETED: "Tài khoản này đã được xóa trước đó.",
     ACTIVE_OWNER_REQUIRED: "Chỉ Owner đang hoạt động được thực hiện thao tác này.",
     AT_LEAST_ONE_ROLE_REQUIRED: "Bắt buộc chọn ít nhất một vai trò.",
+    CANNOT_DELETE_OWN_ACCOUNT: "Không thể tự xóa tài khoản đang đăng nhập.",
+    CANNOT_DELETE_OWNER_ACCOUNT:
+      "Không thể xóa tài khoản đang giữ vai trò Owner. Hãy bỏ vai trò Owner trước.",
+    DELETION_REASON_REQUIRED: "Bắt buộc nhập lý do xóa tài khoản.",
+    TARGET_PROFILE_NOT_FOUND: "Không tìm thấy tài khoản cần xóa.",
     CHANGE_REASON_REQUIRED: "Bắt buộc nhập lý do thay đổi.",
     INVITATION_NOT_FOUND: "Không tìm thấy lời mời cần cập nhật.",
     INVITATION_REASON_REQUIRED: "Bắt buộc nhập lý do thêm tài khoản.",
@@ -208,6 +220,51 @@ export async function setAccountRolesAction(
     revalidatePath("/settings/users");
     revalidatePath("/staff");
     return { message: "Đã cập nhật vai trò tài khoản.", status: "success" };
+  } catch {
+    return createErrorState("Không thể kết nối hệ thống phân quyền.");
+  }
+}
+
+export async function deleteAccountAction(
+  input: DeleteAccountInput,
+): Promise<SettingsActionState> {
+  const parsed = deleteAccountSchema.safeParse(input);
+
+  if (!parsed.success) {
+    const errors = parsed.error.flatten().fieldErrors;
+    return createErrorState("Vui lòng kiểm tra lý do xóa tài khoản.", {
+      reason: errors.reason,
+      userId: errors.userId,
+    });
+  }
+
+  const ownerError = await verifyOwner();
+  if (ownerError) return ownerError;
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.rpc("delete_staff_account", {
+      deletion_reason: parsed.data.reason,
+      target_user_id: parsed.data.userId,
+    });
+
+    if (error) return createErrorState(getRpcErrorMessage(error.message));
+
+    const result = data as { hardDeleted?: boolean } | null;
+    if (!result || typeof result.hardDeleted !== "boolean") {
+      return createErrorState("Database không xác nhận được việc xóa tài khoản.");
+    }
+
+    revalidatePath("/settings");
+    revalidatePath("/settings/users");
+    revalidatePath("/staff");
+    revalidatePath("/timekeeping");
+    return {
+      message: result.hardDeleted
+        ? "Đã xóa hẳn tài khoản (chưa phát sinh dữ liệu)."
+        : "Đã vô hiệu hóa và ẩn tài khoản; lịch sử chấm công, lương được giữ lại.",
+      status: "success",
+    };
   } catch {
     return createErrorState("Không thể kết nối hệ thống phân quyền.");
   }

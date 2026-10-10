@@ -2,6 +2,17 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.7.0] - 2026-10-11
+
+### Added
+- Xóa tài khoản nhân sự tại Cài đặt → Người dùng (chỉ Owner đang hoạt động, bắt buộc nhập lý do): thu hồi toàn bộ vai trò và lời mời đang chờ, chuyển trạng thái "Đã nghỉ", ẩn khỏi danh sách nhân sự/phân ca/bảng lương, chặn đăng nhập. Lịch sử chấm công, lương, điểm danh được giữ nguyên để đối soát; tài khoản chưa phát sinh dữ liệu nào thì xóa hẳn cả đăng nhập. Không xóa được chính mình hay tài khoản đang giữ vai trò Owner. RPC `delete_staff_account`, có audit.
+
+### Changed
+- CI sinh types từ CLI local cùng phiên bản với kho mã; `database.generated.ts` được sinh lại theo cách đó để bước kiểm tra lệch types không báo sai vì khác generator.
+
+### Database
+- `20261011120000_delete_staff_account.sql` (thêm `profiles.account_deleted_at/_by/_reason`, RPC `delete_staff_account`).
+
 ## [0.6.6.0] - 2026-10-11
 
 Đợt vá khẩn sau rà soát toàn hệ thống (xem `docs/review-toan-he-thong-2026-10-10.md`).

@@ -82,6 +82,9 @@ export async function getStaffDirectory(options: {
     .select(
       "id, email, display_name, avatar_url, phone, employee_code, employment_status, joined_at, left_at, last_login_at",
     )
+    // Deleted accounts stay in the database for payroll/attendance history
+    // but never appear in directories.
+    .is("account_deleted_at", null)
     .order("display_name", { ascending: true })
     .order("email", { ascending: true });
 
