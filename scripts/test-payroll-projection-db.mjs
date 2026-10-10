@@ -22,9 +22,9 @@ try {
     sql(readFileSync(new URL('../supabase/migrations/20260929090000_payroll_estimate_manual_adjustments.sql', import.meta.url), 'utf8'));
   }
   // Test the latest definitions, so later migrations cannot silently remove bonuses again.
-  for (const routine of ['compute_payroll_projection', 'generate_payroll_calculation_run', 'get_owner_payroll_estimate', 'get_my_payroll_estimate']) {
+  for (const routine of ['compute_payroll_projection', 'generate_payroll_calculation_run', 'build_staff_payroll_estimate', 'get_owner_payroll_estimate', 'get_my_payroll_estimate', 'get_staff_payroll_estimate']) {
     let definition;
-    for (const name of (routine.startsWith('get_') ? allNames : names)) {
+    for (const name of (routine.startsWith('get_') || routine.startsWith('build_') ? allNames : names)) {
       const migration = readFileSync(new URL(name, migrationsDir), 'utf8');
       const start = migration.lastIndexOf('create or replace function public.' + routine + '(');
       if (start >= 0) definition = migration.slice(start, migration.indexOf('$$;', start) + 3);
@@ -32,7 +32,7 @@ try {
     if (!definition) throw new Error('Missing payroll routine: ' + routine);
     sql(definition);
   }
-  for (const test of ['payroll-optional-bonuses.sql', 'payroll-estimate-manual-lines.sql', 'payroll-owner-zero-minutes.sql']) {
+  for (const test of ['payroll-optional-bonuses.sql', 'payroll-estimate-manual-lines.sql', 'payroll-owner-zero-minutes.sql', 'payroll-daily-estimate-breakdown.sql']) {
     sql('begin;\n' + readFileSync(new URL('../tests/database/' + test, import.meta.url), 'utf8') + '\nrollback;');
     console.log('PASS: ' + test);
   }

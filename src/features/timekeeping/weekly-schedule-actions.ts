@@ -6,6 +6,10 @@ import type { TimekeepingManagementActionState } from "@/features/timekeeping/ti
 import { weeklyAssignmentSchema, type WeeklyAssignmentInput } from "@/features/timekeeping/weekly-schedule";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database.generated";
+
+type SaveWeeklyAssignmentArgs =
+  Database["public"]["Functions"]["save_weekly_shift_assignment"]["Args"];
 
 const messages: Record<string, string> = {
   WEEKLY_SCHEDULE_CONFLICT: "Lịch đã được người khác cập nhật. Hãy tải lại trang rồi thử lại.",
@@ -28,7 +32,9 @@ export async function saveWeeklyAssignmentAction(input: WeeklyAssignmentInput): 
       return { status: "error", message: "Vui lòng kiểm tra thông tin phân công.", fieldErrors: parsed.error.flatten().fieldErrors };
     }
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase.rpc("save_weekly_shift_assignment", {
+    // The SQL function accepts null for shift/expected-* (clear shift, first
+    // assignment); generated RPC types cannot express nullable args.
+    const args = {
       p_week_start: parsed.data.weekStart,
       p_weekday: parsed.data.weekday,
       p_staff_id: parsed.data.staffId,
@@ -36,7 +42,11 @@ export async function saveWeeklyAssignmentAction(input: WeeklyAssignmentInput): 
       p_expected_assignment_id: parsed.data.expectedAssignmentId,
       p_expected_updated_at: parsed.data.expectedUpdatedAt,
       p_reason: parsed.data.reason,
-    });
+    } satisfies Record<keyof SaveWeeklyAssignmentArgs, string | number | null>;
+    const { data, error } = await supabase.rpc(
+      "save_weekly_shift_assignment",
+      args as SaveWeeklyAssignmentArgs,
+    );
     if (error) {
       return { status: "error", message: Object.entries(messages).find(([code]) => error.message.includes(code))?.[1] ?? "Không thể lưu lịch. Vui lòng thử lại." };
     }

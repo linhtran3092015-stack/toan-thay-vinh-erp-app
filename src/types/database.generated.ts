@@ -174,6 +174,96 @@ export type Database = {
           },
         ]
       }
+      attendance_exception_reviews: {
+        Row: {
+          check_in_reason: string | null
+          check_out_reason: string | null
+          decision_reason: string | null
+          requested_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          time_entry_id: string
+        }
+        Insert: {
+          check_in_reason?: string | null
+          check_out_reason?: string | null
+          decision_reason?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          time_entry_id: string
+        }
+        Update: {
+          check_in_reason?: string | null
+          check_out_reason?: string | null
+          decision_reason?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          time_entry_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_exception_reviews_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_exception_reviews_time_entry_id_fkey"
+            columns: ["time_entry_id"]
+            isOneToOne: true
+            referencedRelation: "time_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_exception_submissions: {
+        Row: {
+          created_at: string
+          operation: string
+          reason: string
+          request_id: string
+          staff_id: string
+          time_entry_id: string
+        }
+        Insert: {
+          created_at?: string
+          operation: string
+          reason: string
+          request_id: string
+          staff_id: string
+          time_entry_id: string
+        }
+        Update: {
+          created_at?: string
+          operation?: string
+          reason?: string
+          request_id?: string
+          staff_id?: string
+          time_entry_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_exception_submissions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_exception_submissions_time_entry_id_fkey"
+            columns: ["time_entry_id"]
+            isOneToOne: false
+            referencedRelation: "time_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -2599,6 +2689,41 @@ export type Database = {
           },
         ]
       }
+      payroll_live_revisions: {
+        Row: {
+          changed_at: string
+          id: string
+          month: string
+          revision: number
+          scope: string
+          staff_id: string | null
+        }
+        Insert: {
+          changed_at?: string
+          id?: string
+          month: string
+          revision?: number
+          scope: string
+          staff_id?: string | null
+        }
+        Update: {
+          changed_at?: string
+          id?: string
+          month?: string
+          revision?: number
+          scope?: string
+          staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_live_revisions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll_periods: {
         Row: {
           approved_at: string | null
@@ -2819,6 +2944,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payroll_source_revisions: {
+        Row: {
+          input_fingerprint: string | null
+          month: string
+          revision: number
+          updated_at: string
+        }
+        Insert: {
+          input_fingerprint?: string | null
+          month: string
+          revision?: number
+          updated_at?: string
+        }
+        Update: {
+          input_fingerprint?: string | null
+          month?: string
+          revision?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       payroll_statements: {
         Row: {
@@ -4410,6 +4556,366 @@ export type Database = {
             columns: ["supersedes_id"]
             isOneToOne: false
             referencedRelation: "student_acquisition_source_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_care_assignments: {
+        Row: {
+          owner_id: string
+          student_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          owner_id: string
+          student_id: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          owner_id?: string
+          student_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_care_assignments_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_care_assignments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_care_assignments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_care_coaching_links: {
+        Row: {
+          coaching_id: string
+          created_at: string
+          created_by: string
+          task_id: string
+        }
+        Insert: {
+          coaching_id: string
+          created_at?: string
+          created_by: string
+          task_id: string
+        }
+        Update: {
+          coaching_id?: string
+          created_at?: string
+          created_by?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_care_coaching_links_coaching_id_fkey"
+            columns: ["coaching_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_care_coaching_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_care_coaching_links_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "student_care_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_care_evaluation_queue: {
+        Row: {
+          attempts: number
+          generation: number
+          last_error: string | null
+          queued_at: string
+          retry_at: string
+          student_id: string
+        }
+        Insert: {
+          attempts?: number
+          generation?: number
+          last_error?: string | null
+          queued_at?: string
+          retry_at?: string
+          student_id: string
+        }
+        Update: {
+          attempts?: number
+          generation?: number
+          last_error?: string | null
+          queued_at?: string
+          retry_at?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_care_evaluation_queue_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_care_events: {
+        Row: {
+          actor_id: string | null
+          event_type: string
+          id: string
+          occurred_at: string
+          payload: Json
+          request_id: string | null
+          student_id: string
+          task_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          event_type: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          request_id?: string | null
+          student_id: string
+          task_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          request_id?: string | null
+          student_id?: string
+          task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_care_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_care_events_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_care_events_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "student_care_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_care_monthly_contacts: {
+        Row: {
+          contact_event_id: string
+          task_id: string
+        }
+        Insert: {
+          contact_event_id: string
+          task_id: string
+        }
+        Update: {
+          contact_event_id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_care_monthly_contacts_contact_event_id_fkey"
+            columns: ["contact_event_id"]
+            isOneToOne: true
+            referencedRelation: "student_care_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_care_monthly_contacts_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: true
+            referencedRelation: "student_care_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_care_settings: {
+        Row: {
+          enabled: boolean
+          id: boolean
+          initialized_at: string | null
+          last_error: string | null
+          last_reconcile_at: string | null
+          last_success_at: string | null
+          policy_version: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          enabled?: boolean
+          id?: boolean
+          initialized_at?: string | null
+          last_error?: string | null
+          last_reconcile_at?: string | null
+          last_success_at?: string | null
+          policy_version?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          enabled?: boolean
+          id?: boolean
+          initialized_at?: string | null
+          last_error?: string | null
+          last_reconcile_at?: string | null
+          last_success_at?: string | null
+          policy_version?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_care_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_care_signal_state: {
+        Row: {
+          evaluated_at: string
+          evidence: Json
+          student_id: string
+        }
+        Insert: {
+          evaluated_at?: string
+          evidence?: Json
+          student_id: string
+        }
+        Update: {
+          evaluated_at?: string
+          evidence?: Json
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_care_signal_state_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_care_tasks: {
+        Row: {
+          claim_due_at: string | null
+          claimed_at: string | null
+          completed_at: string | null
+          contact_due_at: string | null
+          detected_at: string
+          due_at: string | null
+          evidence: Json
+          evidence_current: boolean
+          first_contact_at: string | null
+          id: string
+          kind: string
+          next_followup_at: string | null
+          outcome: string | null
+          owner_id: string | null
+          period_month: string | null
+          policy_version: number
+          status: string
+          student_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          claim_due_at?: string | null
+          claimed_at?: string | null
+          completed_at?: string | null
+          contact_due_at?: string | null
+          detected_at?: string
+          due_at?: string | null
+          evidence?: Json
+          evidence_current?: boolean
+          first_contact_at?: string | null
+          id?: string
+          kind: string
+          next_followup_at?: string | null
+          outcome?: string | null
+          owner_id?: string | null
+          period_month?: string | null
+          policy_version?: number
+          status?: string
+          student_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          claim_due_at?: string | null
+          claimed_at?: string | null
+          completed_at?: string | null
+          contact_due_at?: string | null
+          detected_at?: string
+          due_at?: string | null
+          evidence?: Json
+          evidence_current?: boolean
+          first_contact_at?: string | null
+          id?: string
+          kind?: string
+          next_followup_at?: string | null
+          outcome?: string | null
+          owner_id?: string | null
+          period_month?: string | null
+          policy_version?: number
+          status?: string
+          student_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_care_tasks_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_care_tasks_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -6158,22 +6664,6 @@ export type Database = {
       }
     }
     Functions: {
-      get_student_care_dashboard: {
-        Args: { p_filter?: Json }
-        Returns: Json
-      }
-      get_student_care_detail: {
-        Args: { p_task_id: string }
-        Returns: Json
-      }
-      get_student_care_students: {
-        Args: { p_search?: string; p_page?: number; p_inactive?: boolean }
-        Returns: Json
-      }
-      mutate_student_care: {
-        Args: { p_command: Json }
-        Returns: Json
-      }
       accept_my_account_invitation: { Args: never; Returns: boolean }
       activate_academic_year: {
         Args: { p_academic_year_id: string; p_reason: string }
@@ -6319,22 +6809,18 @@ export type Database = {
           id: string
         }[]
       }
-      allocate_sepay_tuition_manually: {
-        Args: { p_sepay_transaction_id: string; p_allocations: Json; p_reason: string }
-        Returns: Json
-      }
-      search_sepay_allocation_students: {
-        Args: { p_search: string }
-        Returns: { student_id: string; student_name: string; student_code: string; birth_year: number; guardian_id: string; guardian_name: string; guardian_phone: string; pending_requests: Json }[]
-      }
-      get_sepay_allocation_details: {
-        Args: { p_sepay_transaction_id: string }
-        Returns: { student_name: string; student_code: string; allocated_amount_vnd: number; allocated_sessions: number; bonus_sessions: number; unit_price_vnd: number; notes: string | null; allocated_at: string; allocated_by_name: string | null; payment_request_code: string | null }[]
-      }
       allocate_payment_to_students: {
         Args: {
           p_allocations: Json
           p_guardian_id: string
+          p_sepay_transaction_id: string
+        }
+        Returns: Json
+      }
+      allocate_sepay_tuition_manually: {
+        Args: {
+          p_allocations: Json
+          p_reason: string
           p_sepay_transaction_id: string
         }
         Returns: Json
@@ -6490,6 +6976,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      build_staff_payroll_estimate: {
+        Args: { p_month: string; p_staff_id: string }
+        Returns: Json
+      }
       bulk_transition_student_lifecycle_status: {
         Args: {
           p_expected_count: number
@@ -6499,6 +6989,10 @@ export type Database = {
           p_target_status: string
         }
         Returns: Json
+      }
+      bump_payroll_live_revision: {
+        Args: { p_month: string; p_scope: string; p_staff_id?: string }
+        Returns: undefined
       }
       calculate_haversine_distance_m: {
         Args: { lat1: number; lat2: number; lon1: number; lon2: number }
@@ -6775,6 +7269,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      compute_payroll_projection: {
+        Args: {
+          p_as_of?: string
+          p_mode?: string
+          p_month: string
+          p_target_staff_id?: string
+        }
+        Returns: Json
+      }
       configure_staff_payroll_compensation: {
         Args: {
           p_effective_from: string
@@ -6880,6 +7383,10 @@ export type Database = {
           invitation_id: string
           invited_at: string
         }[]
+      }
+      create_batch_class_sessions: {
+        Args: { p_class_id: string; p_reason?: string; p_sessions: Json }
+        Returns: Json
       }
       create_class: {
         Args: {
@@ -7494,6 +8001,7 @@ export type Database = {
           staff_id: string
           supersedes_staff_shift_assignment_id: string | null
           updated_at: string
+          week_start: string | null
           weekday: number
           work_shift_id: string
         }
@@ -7548,14 +8056,6 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
-      }
-      set_tuition_period_student_rates: {
-        Args: { p_period_id: string; p_student_ids: string[]; p_unit_price_vnd: number; p_reason: string }
-        Returns: Json
-      }
-      set_tuition_period_student_sources: {
-        Args: { p_period_id: string; p_student_ids: string[]; p_lead_source_id: string; p_reason: string }
-        Returns: Json
       }
       create_student_with_primary_guardian: {
         Args: {
@@ -7643,6 +8143,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      decide_attendance_exception: {
+        Args: { p_decision: string; p_entry_id: string; p_reason: string }
+        Returns: string
       }
       decide_payroll_import_batch: {
         Args: { p_batch_id: string; p_decision: string; p_review_note: string }
@@ -7825,6 +8329,7 @@ export type Database = {
           staff_id: string
           supersedes_staff_shift_assignment_id: string | null
           updated_at: string
+          week_start: string | null
           weekday: number
           work_shift_id: string
         }
@@ -7895,6 +8400,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      find_sepay_payment_candidates: {
+        Args: { p_code: string; p_content: string }
+        Returns: string[]
+      }
       find_student_form_duplicates: {
         Args: {
           p_birth_year: number
@@ -7914,6 +8423,14 @@ export type Database = {
           linked_student_public_code: string
         }[]
       }
+      format_student_payment_transfer_code: {
+        Args: {
+          p_guardian_id: string
+          p_public_code: string
+          p_student_id: string
+        }
+        Returns: string
+      }
       generate_payroll_calculation_run: {
         Args: { p_payroll_period_id: string; p_reason: string }
         Returns: {
@@ -7932,8 +8449,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_attendance_exception_reviews: { Args: never; Returns: Json }
       get_attendance_verification_config: { Args: never; Returns: Json }
       get_attendance_verification_policy: { Args: never; Returns: Json }
+      get_attendance_verification_policy_before_endpoint: {
+        Args: never
+        Returns: Json
+      }
       get_center_display_name: { Args: never; Returns: string }
       get_center_monthly_timekeeping_overview: {
         Args: { p_month: number; p_year: number }
@@ -8226,6 +8748,7 @@ export type Database = {
           work_shift_name: string
         }[]
       }
+      get_my_payroll_estimate: { Args: { p_month: string }; Returns: Json }
       get_my_permissions: {
         Args: never
         Returns: {
@@ -8296,6 +8819,10 @@ export type Database = {
       get_my_timekeeping_status: { Args: never; Returns: Json }
       get_owner_payroll_dashboard: {
         Args: { p_position_code?: string; p_selected_month: string }
+        Returns: Json
+      }
+      get_owner_payroll_estimate: {
+        Args: { p_month: string; p_position_code?: string }
         Returns: Json
       }
       get_payroll_dashboard: {
@@ -8390,6 +8917,21 @@ export type Database = {
           student_public_code: string
         }[]
       }
+      get_sepay_allocation_details: {
+        Args: { p_sepay_transaction_id: string }
+        Returns: {
+          allocated_amount_vnd: number
+          allocated_at: string
+          allocated_by_name: string
+          allocated_sessions: number
+          bonus_sessions: number
+          notes: string
+          payment_request_code: string
+          student_code: string
+          student_name: string
+          unit_price_vnd: number
+        }[]
+      }
       get_staff_monthly_timekeeping_entries: {
         Args: { p_month: number; p_staff_id: string; p_year: number }
         Returns: {
@@ -8415,7 +8957,17 @@ export type Database = {
           work_shift_name: string
         }[]
       }
+      get_staff_payroll_estimate: {
+        Args: { p_month: string; p_staff_id: string }
+        Returns: Json
+      }
       get_staff_payroll_profile: { Args: { p_staff_id: string }; Returns: Json }
+      get_student_care_dashboard: { Args: { p_filter?: Json }; Returns: Json }
+      get_student_care_detail: { Args: { p_task_id: string }; Returns: Json }
+      get_student_care_students: {
+        Args: { p_inactive?: boolean; p_page?: number; p_search?: string }
+        Returns: Json
+      }
       get_time_entry_adjustment_approval_queue: {
         Args: never
         Returns: {
@@ -8461,22 +9013,6 @@ export type Database = {
           work_shift_name: string
         }[]
       }
-      get_weekly_shift_schedule: {
-        Args: { p_week_start: string }
-        Returns: Json
-      }
-      save_weekly_shift_assignment: {
-        Args: {
-          p_week_start: string
-          p_weekday: number
-          p_staff_id: string
-          p_work_shift_id: string | null
-          p_expected_assignment_id: string | null
-          p_expected_updated_at: string | null
-          p_reason: string
-        }
-        Returns: string
-      }
       get_timekeeping_schedule: {
         Args: never
         Returns: {
@@ -8504,6 +9040,10 @@ export type Database = {
           staff_employee_code: string
           staff_id: string
         }[]
+      }
+      get_weekly_shift_schedule: {
+        Args: { p_week_start: string }
+        Returns: Json
       }
       has_permission: {
         Args: { required_permission: string }
@@ -8693,7 +9233,12 @@ export type Database = {
         }
         Returns: Json
       }
+      mutate_student_care: { Args: { p_command: Json }; Returns: Json }
       next_student_public_code: { Args: never; Returns: string }
+      normalize_payment_reference: {
+        Args: { p_value: string }
+        Returns: string
+      }
       normalize_sepay_receiving_account_number: {
         Args: { p_account_number: string }
         Returns: string
@@ -9019,6 +9564,7 @@ export type Database = {
           staff_id: string
           supersedes_staff_shift_assignment_id: string | null
           updated_at: string
+          week_start: string | null
           weekday: number
           work_shift_id: string
         }
@@ -9028,6 +9574,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      request_attendance_exception: {
+        Args: {
+          p_operation: string
+          p_reason: string
+          p_request_id: string
+          p_time_entry_id?: string
+        }
+        Returns: string
       }
       request_salary_advance: {
         Args: {
@@ -9291,6 +9846,35 @@ export type Database = {
           signed_account_number: string
         }[]
       }
+      resolve_staff_shift_for_checkin: {
+        Args: { p_date: string; p_staff_id: string; p_time: string }
+        Returns: string
+      }
+      resolve_staff_shift_on_date: {
+        Args: { p_staff_id: string; p_work_date: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          end_reason: string | null
+          ended_by: string | null
+          id: string
+          is_active: boolean
+          staff_id: string
+          supersedes_staff_shift_assignment_id: string | null
+          updated_at: string
+          week_start: string | null
+          weekday: number
+          work_shift_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "staff_shift_assignments"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       resume_student_enrollment: {
         Args: {
           p_effective_from: string
@@ -9456,6 +10040,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      run_student_care_worker: { Args: never; Returns: Json }
       run_teaching_assistant_timekeeping_watchdog: {
         Args: never
         Returns: number
@@ -9472,6 +10057,31 @@ export type Database = {
           form_id: string
           form_version_id: string
           version_number: number
+        }[]
+      }
+      save_weekly_shift_assignment: {
+        Args: {
+          p_expected_assignment_id: string
+          p_expected_updated_at: string
+          p_reason: string
+          p_staff_id: string
+          p_week_start: string
+          p_weekday: number
+          p_work_shift_id: string
+        }
+        Returns: string
+      }
+      search_sepay_allocation_students: {
+        Args: { p_search: string }
+        Returns: {
+          birth_year: number
+          guardian_id: string
+          guardian_name: string
+          guardian_phone: string
+          pending_requests: Json
+          student_code: string
+          student_id: string
+          student_name: string
         }[]
       }
       search_sepay_reconciliation_candidates: {
@@ -9542,6 +10152,24 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_tuition_period_student_rates: {
+        Args: {
+          p_period_id: string
+          p_reason: string
+          p_student_ids: string[]
+          p_unit_price_vnd: number
+        }
+        Returns: Json
+      }
+      set_tuition_period_student_sources: {
+        Args: {
+          p_lead_source_id: string
+          p_period_id: string
+          p_reason: string
+          p_student_ids: string[]
+        }
+        Returns: Json
+      }
       set_user_roles: {
         Args: {
           change_reason: string
@@ -9587,6 +10215,43 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      student_care_authorize: {
+        Args: { p_permission: string }
+        Returns: undefined
+      }
+      student_care_calculate: { Args: { p_student: string }; Returns: Json }
+      student_care_eligible_user: {
+        Args: { p_role?: string; p_user: string }
+        Returns: boolean
+      }
+      student_care_enqueue: { Args: { p_student: string }; Returns: undefined }
+      student_care_evaluate: { Args: { p_student: string }; Returns: undefined }
+      student_care_notify: {
+        Args: {
+          p_audience?: string
+          p_event: string
+          p_key: string
+          p_task: string
+        }
+        Returns: undefined
+      }
+      student_care_observations: {
+        Args: { p_student: string }
+        Returns: {
+          attendance_status: string
+          class_name: string
+          session_date: string
+          session_id: string
+          start_time: string
+          test_score: number
+        }[]
+      }
+      student_care_reconcile: { Args: never; Returns: undefined }
+      student_care_remind: { Args: never; Returns: undefined }
+      student_payment_transfer_identity: {
+        Args: { p_guardian_id: string; p_student_id: string }
+        Returns: string
       }
       submit_attendance_heartbeat: {
         Args: {
@@ -9685,6 +10350,7 @@ export type Database = {
         Args: { p_period_month: string }
         Returns: number
       }
+      time_entry_is_verified: { Args: { p_entry_id: string }; Returns: boolean }
       transfer_crm_case_lead: {
         Args: {
           p_crm_case_id: string

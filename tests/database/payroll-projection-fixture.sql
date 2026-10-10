@@ -29,7 +29,7 @@ create table payroll_periods(id uuid primary key default gen_random_uuid(),perio
 create table payroll_calculation_runs(id uuid primary key default gen_random_uuid(),payroll_period_id uuid,revision integer,status text,reason text,generated_by uuid);
 create table payroll_correction_requests(payroll_period_id uuid,status text);
 create table payroll_statements(id uuid primary key default gen_random_uuid(),payroll_period_id uuid,calculation_run_id uuid,staff_id uuid,staff_display_name_snapshot text,staff_employee_code_snapshot text,work_units integer,work_hours integer,work_minutes integer);
-create table payroll_line_items(id uuid primary key default gen_random_uuid(),payroll_statement_id uuid,line_type text,direction text,amount_vnd bigint,work_minutes integer,quantity numeric,unit_count integer,unit_rate_vnd bigint,unit_label text,policy_code text,source_kind text,source_id text,formula_snapshot jsonb,evidence_snapshot jsonb,note text,created_by uuid,salary_advance_id uuid);
+create table payroll_line_items(id uuid primary key default gen_random_uuid(),payroll_statement_id uuid,line_type text,direction text,amount_vnd bigint,work_minutes integer,quantity numeric,unit_count integer,unit_rate_vnd bigint,unit_label text,policy_code text,source_kind text,source_id text,formula_snapshot jsonb,evidence_snapshot jsonb,note text,created_by uuid,salary_advance_id uuid,source_time_entry_id uuid);
 create table payroll_calculation_issues(calculation_run_id uuid,issue_code text,source_fact_id uuid,staff_id uuid,details jsonb);
 create table payroll_source_revisions(month date primary key,revision integer,input_fingerprint text,updated_at timestamptz);
 alter table salary_advances add deducted_at timestamptz,add deduction_payroll_period_id uuid;

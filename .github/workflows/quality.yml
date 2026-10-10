@@ -27,5 +27,13 @@ jobs:
         run: node scripts/test-payroll-projection-db.mjs
       - name: Tuition readiness regression (isolated PostgreSQL)
         run: node scripts/test-tuition-readiness-db.mjs
+      - name: Student care regression (isolated PostgreSQL)
+        run: node scripts/test-student-care-db.mjs
+      - name: Weekly schedule regression (isolated PostgreSQL)
+        run: node scripts/test-weekly-schedule-db.mjs
       - run: npm run build
       - run: npm run test:db:fresh
+      - name: Generated database types match migrations
+        run: |
+          npx supabase gen types --local --lang typescript --schema public > src/types/database.generated.ts
+          git diff --exit-code -- src/types/database.generated.ts
