@@ -21,7 +21,7 @@ import {
 import type { TimekeepingMonthlyEntry } from "@/features/timekeeping/types";
 
 const formInputClassName =
-  "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-slate-100";
+  "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring/20 disabled:cursor-not-allowed disabled:bg-slate-100";
 
 interface AdminAdjustTimeEntryDialogProps {
   entry: TimekeepingMonthlyEntry | null;
@@ -203,7 +203,7 @@ function AdminAdjustTimeEntryForm({
         <label className="grid gap-1.5 text-xs font-semibold text-ink">
           Lý do điều chỉnh (bắt buộc)
           <textarea
-            className="min-h-20 w-full rounded-md border border-hairline bg-white p-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:bg-slate-100"
+            className="min-h-20 w-full rounded-md border border-hairline bg-white p-3 text-sm font-normal text-ink outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring/20 disabled:bg-slate-100"
             disabled={isPending}
             maxLength={500}
             onChange={(e) => setReason(e.target.value)}

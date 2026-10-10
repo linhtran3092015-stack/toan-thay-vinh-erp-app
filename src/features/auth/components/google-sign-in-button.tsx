@@ -54,7 +54,7 @@ export function GoogleSignInButton({
       <button
         className={cn(
           "flex h-12 w-full items-center justify-center gap-3 rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink shadow-sm transition-colors",
-          "hover:border-secondary hover:bg-canvas focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-secondary/25",
+          "hover:border-border-focus hover:bg-canvas focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring/25",
           "disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-subtle",
         )}
         disabled={!configured || isLoading}

@@ -16,11 +16,11 @@ export function UnsavedChangesDialog({
       role="dialog"
     >
       <div className="w-full rounded-t-lg border border-hairline bg-surface-1 p-5 shadow-modal md:mx-auto md:max-w-md md:rounded-lg">
-        <h2 className="text-section font-semibold text-ink">
+        <h2 className="text-section-title font-semibold text-ink">
           Có thay đổi chưa lưu
         </h2>
         <p className="mt-2 text-sm leading-6 text-ink-muted">
-          Nếu rời khỏi form, các thay đổi mock trong màn hình này sẽ bị bỏ.
+          Nếu rời khỏi biểu mẫu, các thay đổi chưa lưu sẽ bị bỏ.
         </p>
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button className="min-h-11" onClick={onStay} variant="outline">

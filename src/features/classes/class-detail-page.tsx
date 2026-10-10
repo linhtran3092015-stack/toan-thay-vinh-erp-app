@@ -309,7 +309,7 @@ export function ClassDetailPage({
               {detail.classinUrl ? (
                 <a
                   aria-label="Mở lớp trên ClassIn, mở trong thẻ mới"
-                  className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-primary transition hover:border-secondary hover:bg-canvas"
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-primary transition hover:border-border-focus hover:bg-canvas"
                   href={detail.classinUrl}
                   rel="noopener noreferrer"
                   target="_blank"
@@ -436,7 +436,7 @@ function ScheduleCard({
 
       {schedule.meetingUrl ? (
         <a
-          className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-md border border-hairline bg-white px-3 text-sm font-semibold text-primary hover:border-secondary hover:bg-surface-1"
+          className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-md border border-hairline bg-white px-3 text-sm font-semibold text-primary hover:border-border-focus hover:bg-surface-1"
           href={schedule.meetingUrl}
           rel="noopener noreferrer"
           target="_blank"

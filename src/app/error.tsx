@@ -12,7 +12,11 @@ export default function Error({
   return (
     <ErrorState
       actionLabel="Thử lại"
-      description={error.message || "Vui lòng thử lại sau ít phút."}
+      description={
+        error.digest
+          ? `Vui lòng thử lại sau ít phút. Mã sự cố: ${error.digest}`
+          : "Vui lòng thử lại sau ít phút."
+      }
       onReset={reset}
       title="Không thể tải dữ liệu"
     />

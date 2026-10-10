@@ -50,7 +50,7 @@ export function SettingsOverviewPage({
 
       <section className="overflow-hidden rounded-lg border border-hairline bg-surface-1 shadow-card">
         <div className="border-b border-hairline px-5 py-4">
-          <h2 className="text-section font-semibold text-ink">
+          <h2 className="text-section-title font-semibold text-ink">
             Quản trị truy cập
           </h2>
           <p className="mt-1 text-sm text-ink-muted">
@@ -96,7 +96,7 @@ export function SettingsOverviewPage({
 
       <section className="overflow-hidden rounded-lg border border-hairline bg-surface-1 shadow-card">
         <div className="border-b border-hairline px-5 py-4">
-          <h2 className="text-section font-semibold text-ink">
+          <h2 className="text-section-title font-semibold text-ink">
             Cấu hình nền tảng
           </h2>
         </div>

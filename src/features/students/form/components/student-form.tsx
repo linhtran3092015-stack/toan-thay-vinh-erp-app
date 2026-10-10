@@ -279,7 +279,7 @@ export function StudentForm({
                         ? "border-primary bg-primary text-white"
                         : isDone
                           ? "border-success-border bg-success-bg text-success"
-                          : "border-hairline bg-surface-1 text-ink-muted hover:border-secondary hover:text-ink",
+                          : "border-hairline bg-surface-1 text-ink-muted hover:border-border-focus hover:text-ink",
                     )}
                     onClick={() => handleStepClick(step.id)}
                     type="button"

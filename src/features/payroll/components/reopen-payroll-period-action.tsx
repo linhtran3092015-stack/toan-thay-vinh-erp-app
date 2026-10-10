@@ -99,7 +99,7 @@ export function ReopenPayrollPeriodAction({
           </div>
 
           <label className="grid gap-1.5 text-label">
-            <span>Lý do mở lại <span className="text-danger-text">*</span></span>
+            <span>Lý do mở lại <span className="text-danger">*</span></span>
             <textarea
               className="min-h-24 rounded-md border border-border-subtle bg-surface-base px-3 py-3 text-control outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
               disabled={isInteractionLocked}

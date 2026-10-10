@@ -83,7 +83,7 @@ export function StudentProfileHeader({
               return (
                 <Link
                   className={cn(
-                    "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink transition hover:border-secondary hover:bg-canvas focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-secondary/25",
+                    "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-ink transition hover:border-border-focus hover:bg-canvas focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring/25",
                   )}
                   href={`/students/${student.id}/edit`}
                   key={action.label}

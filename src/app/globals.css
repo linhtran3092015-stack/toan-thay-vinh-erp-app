@@ -917,9 +917,8 @@
   --color-primary: var(--color-primary);
   --color-primary-strong: var(--color-primary-strong);
   --color-primary-soft: var(--color-primary-soft);
-  --color-secondary: var(--color-secondary);
-  --color-secondary-strong: var(--color-secondary-strong);
-  --color-secondary-soft: var(--color-secondary-soft);
+  /* No `--color-secondary` here on purpose: it would shadow the 13px type
+     token `--text-secondary`, so `text-secondary` must stay a size utility. */
   --color-success: var(--color-success);
   --color-success-bg: var(--color-success-bg);
   --color-success-border: var(--color-success-border);
@@ -938,6 +937,9 @@
   --color-neutral-bg: var(--color-neutral-bg);
 
   --color-surface-base: var(--surface-base);
+  --color-surface-canvas: var(--surface-canvas);
+  --color-field-bg: var(--field-bg);
+  --color-neutral-border: var(--status-neutral-border);
   --color-surface-raised: var(--surface-raised);
   --color-surface-sunken: var(--surface-sunken);
   /* Compatibility for existing skeletons that use the subtle surface token. */
@@ -1094,6 +1096,8 @@ a {
 }
 :root.dark, :root[data-theme="dark"] {
   --action-primary: var(--erp-accent);
+  /* The accent is a saturated mid-tone in dark mode too, so keep light text on it. */
+  --text-on-primary: #FFFFFF;
   --action-primary-hover: color-mix(in srgb, var(--erp-accent) 85%, black);
   --action-link: color-mix(in srgb, var(--erp-accent) 35%, white);
   --action-primary-soft: color-mix(in srgb, var(--erp-accent) 25%, #1E2430);

@@ -20,7 +20,7 @@ export function SystemSettingsForm({ initialValues }: { initialValues: SystemSet
     setMessage(result.message);
   })}>
     <section className="rounded-lg border border-hairline bg-surface-1 p-5 shadow-card">
-      <h2 className="text-section font-semibold text-ink">Thông tin trung tâm</h2>
+      <h2 className="text-section-title font-semibold text-ink">Thông tin trung tâm</h2>
       <p className="mt-1 text-sm text-ink-muted">Thông tin hiển thị an toàn. Phiếu học phí đã khóa vẫn dùng mẫu phiên bản đã snapshot.</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <Field defaultValue={initialValues["center.display_name"]} label="Tên hiển thị trung tâm" name="displayName" required />
@@ -31,7 +31,7 @@ export function SystemSettingsForm({ initialValues }: { initialValues: SystemSet
       </div>
     </section>
     <section className="rounded-lg border border-hairline bg-surface-1 p-5 shadow-card">
-      <h2 className="text-section font-semibold text-ink">Coaching</h2>
+      <h2 className="text-section-title font-semibold text-ink">Coaching</h2>
       <p className="mt-1 text-sm text-ink-muted">Chỉ là giá trị gợi ý khi phát hành liên kết mới; không thay đổi liên kết đã phát hành.</p>
       <label className="mt-4 grid max-w-sm gap-1 text-sm"><span className="font-medium">Thời hạn liên kết mặc định (ngày)</span><input className="rounded-md border border-hairline bg-surface-base p-2" defaultValue={initialValues["coaching.default_public_link_expiry_days"]} min={1} max={90} name="defaultPublicLinkExpiryDays" required type="number" /></label>
     </section>

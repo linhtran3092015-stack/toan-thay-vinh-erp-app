@@ -15,7 +15,7 @@ export function StudentCoachingTab({ records }: StudentCoachingTabProps) {
     return (
       <Card>
         <CardContent className="py-10 text-center">
-          <h2 className="text-section font-semibold text-ink">
+          <h2 className="text-section-title font-semibold text-ink">
             Chưa có phiếu coaching
           </h2>
           <p className="mt-2 text-sm text-ink-muted">
@@ -43,7 +43,7 @@ export function StudentCoachingTab({ records }: StudentCoachingTabProps) {
             >
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <h2 className="text-card-title font-semibold text-ink">
+                  <h2 className="text-section-title font-semibold text-ink">
                     {record.campaignName}
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-ink-muted">

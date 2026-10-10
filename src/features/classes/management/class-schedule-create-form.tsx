@@ -57,7 +57,7 @@ const WEEKDAY_OPTIONS = [
 ] as const;
 
 const inputClassName =
-  "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-slate-100";
+  "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring/20 disabled:cursor-not-allowed disabled:bg-slate-100";
 
 function createInitialValues(
   defaultLearningMode:

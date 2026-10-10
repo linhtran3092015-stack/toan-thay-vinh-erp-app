@@ -156,7 +156,7 @@ function StaffDailyEstimateDialogBody({
         {!data && hasAttemptedFetch && !isLoading ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface-base p-4">
             <div className="flex items-start gap-3">
-              <AlertCircle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-warning-text" />
+              <AlertCircle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
               <div>
                 <p className="text-body font-semibold text-text-strong">Chưa tải được lương theo ngày của nhân sự</p>
                 <p className="mt-1 text-secondary text-text-muted">
@@ -195,7 +195,7 @@ function StaffDailyEstimateDialogBody({
             </section>
 
             {(statement?.pendingVerificationCount ?? 0) > 0 ? (
-              <p className="rounded-lg border border-warning-border bg-warning-bg px-3.5 py-2.5 text-secondary text-warning-text">
+              <p className="rounded-lg border border-warning-border bg-warning-bg px-3.5 py-2.5 text-secondary text-warning">
                 Có {statement?.pendingVerificationCount} ca chờ xác minh công đã được tính tạm vào số liệu.
               </p>
             ) : null}

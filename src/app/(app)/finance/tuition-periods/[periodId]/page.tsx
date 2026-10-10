@@ -33,7 +33,7 @@ export default async function TuitionPeriodDetailPage({ params }: { params: Prom
   if (!period) {
     return (
       <div className="grid gap-4 py-8 text-center">
-        <h1 className="text-xl font-bold text-text-primary">Không tìm thấy kỳ thu học phí</h1>
+        <h1 className="text-xl font-bold text-text-strong">Không tìm thấy kỳ thu học phí</h1>
         <p className="text-sm text-text-muted">Kỳ thu này không tồn tại hoặc bạn không có quyền xem.</p>
         <div>
           <Link
@@ -93,7 +93,7 @@ export default async function TuitionPeriodDetailPage({ params }: { params: Prom
         </p>
       </PageHeader>
       <section className="rounded-lg border border-border-subtle bg-surface-raised p-4">
-        <h2 className="text-base font-semibold text-text-primary">Trạng thái: Đã khóa kỳ thu</h2>
+        <h2 className="text-base font-semibold text-text-strong">Trạng thái: Đã khóa kỳ thu</h2>
         <p className="mt-1 text-sm text-text-muted">
           {items.length} phiếu · {items.filter(item => item.amountVnd === 0).length} không cần thu ·{" "}
           {items.filter(item => item.amountVnd > 0).length} yêu cầu thanh toán
@@ -116,7 +116,7 @@ export default async function TuitionPeriodDetailPage({ params }: { params: Prom
         }))}
       />
       <section className="grid gap-3">
-        <h3 className="font-semibold text-sm text-text-secondary">Danh sách phiếu học phí ({items.length})</h3>
+        <h3 className="font-semibold text-sm text-text-muted">Danh sách phiếu học phí ({items.length})</h3>
         <div className="grid gap-2">
           {items.map(item => (
             <article
@@ -124,7 +124,7 @@ export default async function TuitionPeriodDetailPage({ params }: { params: Prom
               key={item.id}
             >
               <div>
-                <strong className="text-text-primary">{item.studentName}</strong>
+                <strong className="text-text-strong">{item.studentName}</strong>
                 <p className="text-xs text-text-muted">
                   {item.payableSessions} buổi · {item.amountVnd.toLocaleString("vi-VN")}đ · Trạng thái: {item.status}
                 </p>

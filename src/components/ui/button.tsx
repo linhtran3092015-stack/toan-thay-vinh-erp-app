@@ -20,8 +20,9 @@ const variantClasses: Record<ButtonVariant, string> = {
     "border-border-subtle bg-surface-base text-text-strong hover:border-border-strong hover:bg-interactive-hover disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
   ghost:
     "border-transparent bg-transparent text-text-muted hover:bg-interactive-hover hover:text-text-strong disabled:text-text-disabled",
+  // Outlined so it never reads as the (also red) primary accent; fills on hover.
   danger:
-    "border-danger bg-danger text-text-on-danger hover:bg-danger/90 disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
+    "border-danger bg-danger-bg text-danger hover:bg-danger hover:text-text-on-danger disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

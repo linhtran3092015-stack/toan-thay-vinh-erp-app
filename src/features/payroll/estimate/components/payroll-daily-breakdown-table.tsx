@@ -128,7 +128,7 @@ export function PayrollDailyBreakdownTable({
                     {line.note ? <p className="text-caption text-text-muted">{line.note}</p> : null}
                   </div>
                   <span
-                    className={`shrink-0 font-medium tabular-nums ${signedAmount < 0 ? "text-warning-text" : "text-text-strong"}`}
+                    className={`shrink-0 font-medium tabular-nums ${signedAmount < 0 ? "text-warning" : "text-text-strong"}`}
                   >
                     {formatSignedAmount(signedAmount)}
                   </span>
@@ -168,7 +168,7 @@ function DailyRow({ day }: { day: DailyPayrollDay }) {
     >
       <td className="whitespace-nowrap px-3 py-2 align-top">
         <div className="flex items-center gap-2">
-          <span className={`font-semibold tabular-nums ${isWeekend ? "text-warning-text" : "text-text-strong"}`}>
+          <span className={`font-semibold tabular-nums ${isWeekend ? "text-warning" : "text-text-strong"}`}>
             {String(day.dayOfMonth).padStart(2, "0")}
           </span>
           <span className="text-caption text-text-muted">{getWeekdayLabel(day.weekday)}</span>
@@ -237,7 +237,7 @@ function DailyRow({ day }: { day: DailyPayrollDay }) {
       <td className={`whitespace-nowrap px-3 py-2 text-right align-top font-semibold tabular-nums ${isIdle ? "text-text-subtle" : "text-text-strong"}`}>
         {isIdle ? (day.isFuture ? "—" : "0 VND") : formatSignedAmount(day.totalVnd)}
         {day.deductionVnd > 0 ? (
-          <p className="text-caption font-normal text-warning-text">đã trừ {formatCurrency(day.deductionVnd)}</p>
+          <p className="text-caption font-normal text-warning">đã trừ {formatCurrency(day.deductionVnd)}</p>
         ) : null}
       </td>
     </tr>

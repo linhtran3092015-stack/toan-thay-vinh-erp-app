@@ -30,7 +30,7 @@ export function StudentAlertPanel({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={meta.tone}>Mức độ: {meta.label}</Badge>
-                  <h2 className="text-card-title font-semibold text-ink">
+                  <h2 className="text-section-title font-semibold text-ink">
                     {alert.title}
                   </h2>
                 </div>

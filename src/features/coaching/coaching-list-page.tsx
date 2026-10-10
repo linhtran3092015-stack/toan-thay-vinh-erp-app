@@ -98,7 +98,7 @@ export function CoachingListPage({
 
       {entries.length === 0 ? (
         <section className="rounded-lg border border-dashed border-hairline-strong bg-surface-1 px-6 py-12 text-center shadow-xs">
-          <h2 className="text-section font-semibold text-ink">Chưa có phiếu coaching</h2>
+          <h2 className="text-section-title font-semibold text-ink">Chưa có phiếu coaching</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-ink-muted">
             {canManage
               ? "Tạo phiếu đầu tiên để bắt đầu theo dõi một đợt Coaching của học viên."
@@ -108,7 +108,7 @@ export function CoachingListPage({
       ) : (
         <section className="overflow-hidden rounded-lg border border-hairline bg-surface-1 shadow-card">
           <div className="border-b border-hairline px-5 py-4">
-            <h2 className="text-section font-semibold text-ink">Danh sách phiếu</h2>
+            <h2 className="text-section-title font-semibold text-ink">Danh sách phiếu</h2>
             <p className="mt-1 text-sm text-ink-muted">
               Hiển thị tối đa 200 phiếu mới nhất.
             </p>
@@ -196,7 +196,7 @@ function CoachingTableRow({ entry }: { entry: CoachingRecordDashboardEntry }) {
 function CoachingMobileCard({ entry }: { entry: CoachingRecordDashboardEntry }) {
   return (
     <Link
-      className="rounded-lg border border-hairline bg-white p-4 transition hover:border-secondary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-secondary/25"
+      className="rounded-lg border border-hairline bg-white p-4 transition hover:border-border-focus focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring/25"
       href={`/coaching/${entry.id}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">

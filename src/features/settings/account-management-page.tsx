@@ -82,7 +82,7 @@ export function AccountManagementPage({
       {canManage && pendingInvitations.length > 0 ? (
         <section className="grid gap-3" aria-labelledby="pending-invitations-heading">
           <div>
-            <h3 className="text-section font-semibold text-ink" id="pending-invitations-heading">
+            <h3 className="text-section-title font-semibold text-ink" id="pending-invitations-heading">
               Tài khoản chờ đăng nhập
             </h3>
             <p className="mt-1 text-sm text-ink-muted">
@@ -114,7 +114,7 @@ export function AccountManagementPage({
       <section aria-labelledby="accounts-heading" className="grid gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h3 className="text-section font-semibold text-ink" id="accounts-heading">
+            <h3 className="text-section-title font-semibold text-ink" id="accounts-heading">
               Tài khoản đã đăng nhập
             </h3>
             <p className="mt-1 text-sm text-ink-muted">
@@ -124,7 +124,7 @@ export function AccountManagementPage({
           <label className="grid w-full gap-1.5 text-xs font-semibold text-ink-muted sm:max-w-sm">
             <span>Tìm tài khoản</span>
             <input
-              className="min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm text-ink outline-none focus:border-secondary focus:ring-[3px] focus:ring-secondary/20"
+              className="min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm text-ink outline-none focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring/20"
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Tên, email, mã nhân sự hoặc vai trò..."
               type="search"

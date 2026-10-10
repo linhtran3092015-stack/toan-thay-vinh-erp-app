@@ -43,7 +43,7 @@ export function FieldShell({
 
 export function fieldControlClass(error?: string, className?: string) {
   return cn(
-    "min-h-11 w-full min-w-0 rounded-md border bg-white px-3 text-sm text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:bg-neutral-bg disabled:text-ink-muted",
+    "min-h-11 w-full min-w-0 rounded-md border bg-white px-3 text-sm text-ink outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring/20 disabled:bg-neutral-bg disabled:text-ink-muted",
     error ? "border-danger" : "border-hairline",
     className,
   );

@@ -64,7 +64,7 @@ export function GradingCreditListPage({
 
       {entries.length === 0 ? (
         <section className="rounded-lg border border-dashed border-hairline-strong bg-surface-1 px-6 py-12 text-center shadow-xs">
-          <h2 className="text-section font-semibold text-ink">
+          <h2 className="text-section-title font-semibold text-ink">
             Chưa có tín chỉ chấm bài
           </h2>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-ink-muted">
@@ -74,7 +74,7 @@ export function GradingCreditListPage({
       ) : (
         <section className="overflow-hidden rounded-lg border border-hairline bg-surface-1 shadow-card">
           <div className="border-b border-hairline px-5 py-4">
-            <h2 className="text-section font-semibold text-ink">
+            <h2 className="text-section-title font-semibold text-ink">
               Lịch sử ghi nhận
             </h2>
             <p className="mt-1 text-sm text-ink-muted">

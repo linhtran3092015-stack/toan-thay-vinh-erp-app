@@ -139,7 +139,7 @@ export function TuitionReadinessTable({
       {/* Action header with Excel download tools */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface-raised p-4">
         <div>
-          <h2 className="text-base font-semibold text-text-primary">Công cụ File mẫu &amp; Dữ liệu ban đầu</h2>
+          <h2 className="text-base font-semibold text-text-strong">Công cụ File mẫu &amp; Dữ liệu ban đầu</h2>
           <p className="text-xs text-text-muted">
             Tải file mẫu Excel chuẩn để nhập hàng loạt hoặc xuất danh sách học viên đang thiếu dữ liệu.
           </p>
@@ -183,7 +183,7 @@ export function TuitionReadinessTable({
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
               filterMode === "missing_rate"
                 ? "bg-primary text-text-on-primary font-semibold"
-                : "bg-surface-raised text-text-secondary hover:bg-surface-base border border-border-subtle"
+                : "bg-surface-raised text-text-muted hover:bg-surface-base border border-border-subtle"
             }`}
             onClick={() => setFilterMode("missing_rate")}
             type="button"
@@ -194,7 +194,7 @@ export function TuitionReadinessTable({
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
               filterMode === "missing_source"
                 ? "bg-primary text-text-on-primary font-semibold"
-                : "bg-surface-raised text-text-secondary hover:bg-surface-base border border-border-subtle"
+                : "bg-surface-raised text-text-muted hover:bg-surface-base border border-border-subtle"
             }`}
             onClick={() => setFilterMode("missing_source")}
             type="button"
@@ -205,7 +205,7 @@ export function TuitionReadinessTable({
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
               filterMode === "all"
                 ? "bg-primary text-text-on-primary font-semibold"
-                : "bg-surface-raised text-text-secondary hover:bg-surface-base border border-border-subtle"
+                : "bg-surface-raised text-text-muted hover:bg-surface-base border border-border-subtle"
             }`}
             onClick={() => setFilterMode("all")}
             type="button"
@@ -216,7 +216,7 @@ export function TuitionReadinessTable({
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
               filterMode === "ready"
                 ? "bg-primary text-text-on-primary font-semibold"
-                : "bg-surface-raised text-text-secondary hover:bg-surface-base border border-border-subtle"
+                : "bg-surface-raised text-text-muted hover:bg-surface-base border border-border-subtle"
             }`}
             onClick={() => setFilterMode("ready")}
             type="button"
@@ -272,7 +272,7 @@ export function TuitionReadinessTable({
           ref={rateFormRef}
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-semibold text-text-primary">
+            <h3 className="font-semibold text-text-strong">
               Bổ sung đơn giá ({selectedRateIds.length} học viên đang chọn)
             </h3>
             <div className="flex items-center gap-2">
@@ -306,7 +306,7 @@ export function TuitionReadinessTable({
             </p>
           ) : null}
           <div className="grid gap-3 md:grid-cols-3">
-            <label className="grid gap-1 text-xs font-medium text-text-secondary">
+            <label className="grid gap-1 text-xs font-medium text-text-muted">
               Học phí mỗi buổi (VND) *
               <input
                 className="min-h-10 rounded border border-border-subtle bg-surface-raised px-3 text-sm"
@@ -318,7 +318,7 @@ export function TuitionReadinessTable({
                 type="number"
               />
             </label>
-            <label className="grid gap-1 text-xs font-medium text-text-secondary">
+            <label className="grid gap-1 text-xs font-medium text-text-muted">
               Căn cứ áp dụng *
               <input
                 className="min-h-10 rounded border border-border-subtle bg-surface-raised px-3 text-sm"
@@ -374,7 +374,7 @@ export function TuitionReadinessTable({
           ref={sourceFormRef}
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-semibold text-text-primary">
+            <h3 className="font-semibold text-text-strong">
               Gán nguồn tuyển sinh ({selectedSourceIds.length} học viên đang chọn)
             </h3>
             <div className="flex items-center gap-2">
@@ -400,7 +400,7 @@ export function TuitionReadinessTable({
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
-            <label className="grid gap-1 text-xs font-medium text-text-secondary">
+            <label className="grid gap-1 text-xs font-medium text-text-muted">
               Nguồn tuyển sinh *
               <select
                 className="min-h-10 rounded border border-border-subtle bg-surface-raised px-3 text-sm"
@@ -417,7 +417,7 @@ export function TuitionReadinessTable({
                 ))}
               </select>
             </label>
-            <label className="grid gap-1 text-xs font-medium text-text-secondary">
+            <label className="grid gap-1 text-xs font-medium text-text-muted">
               Lý do gán *
               <input
                 className="min-h-10 rounded border border-border-subtle bg-surface-raised px-3 text-sm"
@@ -455,7 +455,7 @@ export function TuitionReadinessTable({
 
       {/* Students Table */}
       <div className="overflow-x-auto rounded-lg border border-border-subtle bg-surface-base">
-        <table className="w-full text-left text-sm text-text-secondary">
+        <table className="w-full text-left text-sm text-text-muted">
           <thead>
             <tr className="border-b border-border-subtle bg-surface-raised text-xs font-semibold uppercase text-text-muted">
               <th className="p-3">
@@ -522,7 +522,7 @@ export function TuitionReadinessTable({
                       ) : (
                         <span className="w-4 inline-block" />
                       )}
-                      <span className="font-medium text-text-primary">
+                      <span className="font-medium text-text-strong">
                         {labels[student.studentId] ?? `Học viên ${student.studentId}`}
                       </span>
                     </label>

@@ -190,7 +190,7 @@ export function PayrollPage({
                   </div>
                   {issue.staffId ? (
                     <Link
-                      className="inline-flex shrink-0 items-center justify-center rounded-md border border-border-default bg-surface-base px-2.5 py-1 text-caption font-semibold text-text-strong hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+                      className="inline-flex shrink-0 items-center justify-center rounded-md border border-border-subtle bg-surface-base px-2.5 py-1 text-caption font-semibold text-text-strong hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
                       href={`/staff/${issue.staffId}`}
                     >
                       Mở hồ sơ nhân sự
@@ -223,7 +223,7 @@ export function PayrollPage({
 
         {periods.length === 0 ? (
           <section className="rounded-lg border border-dashed border-border-strong bg-surface-base px-6 py-10 text-center">
-            <h3 className="text-subtitle font-semibold text-text-strong">Chưa có bảng lương lịch sử</h3>
+            <h3 className="text-secondary font-semibold text-text-strong">Chưa có bảng lương lịch sử</h3>
             <p className="mx-auto mt-2 max-w-lg text-secondary leading-6 text-text-muted">
               Chưa có kỳ lương chính thức nào được chốt trong phạm vi dữ liệu của tài khoản hiện tại.
             </p>

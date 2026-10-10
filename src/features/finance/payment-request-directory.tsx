@@ -174,7 +174,7 @@ function summarizePaymentRequests(items: PaymentRequestReadModel[]) {
 }
 
 function SummaryItem({ description, label, value }: { description?: string; label: string; value: string }) {
-  return <div className="bg-surface-base px-4 py-3"><p className="text-label text-text-muted">{label}</p><p className="mt-1 tabular-nums text-kpi text-text-strong">{value}</p>{description ? <p className="mt-1 text-caption text-text-muted">{description}</p> : null}</div>;
+  return <div className="bg-surface-base px-4 py-3"><p className="text-label text-text-muted">{label}</p><p className="mt-1 tabular-nums text-numeric text-text-strong">{value}</p>{description ? <p className="mt-1 text-caption text-text-muted">{description}</p> : null}</div>;
 }
 
 function normalizeSearch(value: string): string {

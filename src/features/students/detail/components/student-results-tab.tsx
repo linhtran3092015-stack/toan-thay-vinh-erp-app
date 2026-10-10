@@ -39,7 +39,7 @@ export function StudentResultsTab({
       </div>
 
       <section className="grid gap-3">
-        <h2 className="text-section font-semibold text-ink">
+        <h2 className="text-section-title font-semibold text-ink">
           Danh sách từng buổi
         </h2>
 
@@ -130,7 +130,7 @@ function ScoreChart({
               <div className="flex flex-1 flex-col items-center gap-2" key={index}>
                 <div className="flex h-36 w-full items-end rounded-md bg-canvas px-2">
                   <div
-                    className="w-full rounded-t-md bg-secondary"
+                    className="w-full rounded-t-md bg-action-primary"
                     style={{ height: `${Math.max(value * 10, 6)}%` }}
                   />
                 </div>

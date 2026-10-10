@@ -97,7 +97,7 @@ export function CoachingDetailPage({
       </section>
 
       <section className="rounded-lg border border-hairline bg-surface-1 p-5 shadow-card">
-        <h2 className="text-section font-semibold text-ink">Lý do theo dõi</h2>
+        <h2 className="text-section-title font-semibold text-ink">Lý do theo dõi</h2>
         <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink-muted">
           {record.reason}
         </p>
@@ -105,7 +105,7 @@ export function CoachingDetailPage({
 
       <section className="rounded-lg border border-hairline bg-surface-1 shadow-card">
         <div className="border-b border-hairline px-5 py-4">
-          <h2 className="text-section font-semibold text-ink">Lịch sử phiếu</h2>
+          <h2 className="text-section-title font-semibold text-ink">Lịch sử phiếu</h2>
           <p className="mt-1 text-sm text-ink-muted">
             Mọi thay đổi được ghi thành sự kiện mới; lịch sử cũ không bị ghi đè.
           </p>
@@ -145,7 +145,7 @@ export function CoachingDetailPage({
       </section>
 
       <section className="rounded-lg border border-hairline bg-surface-1 p-5 shadow-card">
-        <h2 className="text-section font-semibold text-ink">Phản hồi Phiếu Coaching</h2>
+        <h2 className="text-section-title font-semibold text-ink">Phản hồi Phiếu Coaching</h2>
         <p className="mt-1 text-sm text-ink-muted">{responses.length ? `${responses.length} phản hồi đã gắn với lịch sử phiếu này.` : "Chưa có phản hồi công khai nào."}</p>
         {responses.length ? <ul className="mt-3 divide-y divide-hairline rounded-md border border-hairline">{responses.map((response) => <li className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm" key={response.id}><span>{response.formName} · v{response.versionNumber} · {formatDateTime(response.submittedAt)}</span><Link className="font-semibold text-primary hover:underline" href={`/coaching/responses/${response.id}`}>Xem phản hồi</Link></li>)}</ul> : null}
         <Link className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline" href="/coaching/responses">Xem tất cả phản hồi</Link>
@@ -154,7 +154,7 @@ export function CoachingDetailPage({
 
       <div className="flex justify-end">
         <Link
-          className="inline-flex min-h-11 items-center justify-center rounded-md border border-hairline bg-surface-1 px-4 text-sm font-semibold text-ink transition hover:border-hairline-strong hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-secondary/25"
+          className="inline-flex min-h-11 items-center justify-center rounded-md border border-hairline bg-surface-1 px-4 text-sm font-semibold text-ink transition hover:border-hairline-strong hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring/25"
           href="/coaching"
         >
           Quay lại danh sách

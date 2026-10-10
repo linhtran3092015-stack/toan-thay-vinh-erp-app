@@ -18,7 +18,7 @@ import { getVietnamBusinessDate } from "@/features/timekeeping/timekeeping-clien
 import type { TimekeepingStaffOption } from "@/features/timekeeping/types";
 
 const formInputClassName =
-  "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-slate-100";
+  "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring/20 disabled:cursor-not-allowed disabled:bg-slate-100";
 
 interface AdminCreateTimeEntryDialogProps {
   isOpen: boolean;
@@ -263,7 +263,7 @@ function AdminCreateTimeEntryForm({
         <label className="grid gap-1.5 text-xs font-semibold text-ink">
           Ghi chú / Lý do bổ sung
           <textarea
-            className="min-h-18 w-full rounded-md border border-hairline bg-white p-3 text-sm font-normal text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:bg-slate-100"
+            className="min-h-18 w-full rounded-md border border-hairline bg-white p-3 text-sm font-normal text-ink outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring/20 disabled:bg-slate-100"
             disabled={isPending}
             maxLength={500}
             onChange={(e) => setNotes(e.target.value)}

@@ -31,7 +31,7 @@ interface CoachingEventActionsProps {
 type DialogMode = "close" | "note" | "start";
 
 const textAreaClassName =
-  "min-h-28 w-full resize-y rounded-md border border-hairline bg-white px-3 py-3 text-sm text-ink outline-none transition focus:border-secondary focus:ring-[3px] focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-canvas";
+  "min-h-28 w-full resize-y rounded-md border border-hairline bg-white px-3 py-3 text-sm text-ink outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring/20 disabled:cursor-not-allowed disabled:bg-canvas";
 
 export function CoachingEventActions({
   coachingRecordId,

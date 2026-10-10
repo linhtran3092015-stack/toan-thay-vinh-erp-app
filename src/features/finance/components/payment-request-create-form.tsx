@@ -114,7 +114,7 @@ function PaymentRequestSuccess({ directoryHref, onCreateAnother, paymentRequest,
       <div className="grid gap-5 lg:grid-cols-[minmax(320px,520px)_minmax(0,1fr)]">
         <section className="rounded-lg border border-border-subtle bg-surface-base p-4"><Image alt={`Mã VietQR cho yêu cầu ${paymentRequest.publicCode}`} className="mx-auto h-auto w-full max-w-[480px]" height={520} priority src={paymentRequest.qrImageUrl} unoptimized width={520} /></section>
         <section className="rounded-lg border border-border-subtle bg-surface-base p-4 md:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-4"><div><p className="text-label text-text-muted">Mã yêu cầu</p><p className="mt-1 font-mono text-body font-bold text-action-link">{paymentRequest.publicCode}</p></div><p className="tabular-nums text-kpi text-text-strong">{formatCurrency(paymentRequest.expectedAmountVnd)}</p></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-4"><div><p className="text-label text-text-muted">Mã yêu cầu</p><p className="mt-1 font-mono text-body font-bold text-action-link">{paymentRequest.publicCode}</p></div><p className="tabular-nums text-numeric text-text-strong">{formatCurrency(paymentRequest.expectedAmountVnd)}</p></div>
           <dl className="mt-4 grid gap-4 text-secondary">
             <TransferDetail label="Học viên" value={student?.name ?? "Học viên"} />
             <TransferDetail label="Ngân hàng" value={paymentRequest.bankCode} />

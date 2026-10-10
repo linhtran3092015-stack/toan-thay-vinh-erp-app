@@ -63,7 +63,7 @@ function RecentPaymentRequests({ items }: { items: PaymentRequestReadModel[] }) 
   </>;
 }
 
-function OverviewMetric({ label, value }: { label: string; value: string }) { return <div className="bg-surface-base px-4 py-3"><p className="text-label text-text-muted">{label}</p><p className="mt-1 tabular-nums text-kpi text-text-strong">{value}</p></div>; }
+function OverviewMetric({ label, value }: { label: string; value: string }) { return <div className="bg-surface-base px-4 py-3"><p className="text-label text-text-muted">{label}</p><p className="mt-1 tabular-nums text-numeric text-text-strong">{value}</p></div>; }
 function Header({ children, className = "" }: { children: ReactNode; className?: string }) { return <th className={`h-10 border-b border-border-subtle px-3 text-left font-semibold ${className}`} scope="col">{children}</th>; }
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { currency: "VND", maximumFractionDigits: 0, style: "currency" });
 function formatCurrency(value: number) { return currencyFormatter.format(value); }

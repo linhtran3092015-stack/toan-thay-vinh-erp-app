@@ -20,7 +20,7 @@ export function StudentAuditTab({ records }: StudentAuditTabProps) {
             >
               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <h2 className="text-card-title font-semibold text-ink">
+                  <h2 className="text-section-title font-semibold text-ink">
                     {record.action}
                   </h2>
                   <p className="mt-1 text-sm text-ink-muted">
