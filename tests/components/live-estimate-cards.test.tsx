@@ -79,7 +79,9 @@ describe("StaffLiveEstimateCard Component", () => {
     expect(screen.getByText("tháng 9 năm 2026")).toBeInTheDocument();
     expect(screen.getAllByText("Lương tạm tính").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("500.000 VND").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("teaching_assistant")).toBeInTheDocument();
+    // Position codes are shown as Vietnamese labels, never raw codes.
+    expect(screen.getByText("Trợ giảng")).toBeInTheDocument();
+    expect(screen.queryByText("teaching_assistant")).not.toBeInTheDocument();
   });
 
   it("renders retry button when fetch fails and estimate is null", async () => {

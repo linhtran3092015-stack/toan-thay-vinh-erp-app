@@ -14,6 +14,12 @@ export const payrollPositionLabels: Record<PayrollPositionCode, string> = {
   teaching_assistant: "Trợ giảng",
 };
 
+/** Vietnamese label for a payroll position code; falls back to the raw code. */
+export function getPayrollPositionLabel(code: string | null | undefined): string {
+  if (!code) return "Chưa phân vị trí";
+  return (payrollPositionLabels as Record<string, string>)[code] ?? code;
+}
+
 export const payrollTaskCodes = [
   "center_renewal_duty",
   "record_excess",

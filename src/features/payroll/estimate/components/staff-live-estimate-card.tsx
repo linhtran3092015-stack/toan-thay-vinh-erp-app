@@ -15,6 +15,7 @@ import {
   formatWorkMinutes,
   getLineTypeLabel,
 } from "@/features/payroll/payroll-presentation";
+import { getPayrollPositionLabel } from "@/features/staff/payroll-profile-types";
 
 interface StaffLiveEstimateCardProps {
   initialEstimate?: StaffPayrollEstimate | null;
@@ -28,7 +29,7 @@ export function StaffLiveEstimateCard({
   month,
   today,
 }: StaffLiveEstimateCardProps) {
-  const { connectionState, data, hasAttemptedFetch, isLoading, lastRefreshedAt, refetch } =
+  const { connectionState, data, hasAttemptedFetch, isLoading, refetch } =
     usePayrollLiveEstimate<StaffPayrollEstimate>({
       initialData: initialEstimate,
       month,
@@ -128,7 +129,7 @@ export function StaffLiveEstimateCard({
             <span>
               {isApproved
                 ? `Chốt kỳ lúc: ${estimate.approvedAt ? formatDateTime(estimate.approvedAt) : "Đã duyệt"}`
-                : `Cập nhật: ${formatDateTime(lastRefreshedAt.toISOString())}`}
+                : `Dữ liệu tính lúc: ${formatDateTime(estimate.calculatedAt)}`}
             </span>
             <button
               aria-label="Làm mới lương tạm tính"
@@ -160,14 +161,14 @@ export function StaffLiveEstimateCard({
               <span>Chưa phát sinh công hoàn tất trong tháng</span>
             )}
             {statement?.positionCode ? (
-              <span>Vị trí: <strong className="font-semibold text-text-default">{statement.positionCode}</strong></span>
+              <span>Vị trí: <strong className="font-semibold text-text-default">{getPayrollPositionLabel(statement.positionCode)}</strong></span>
             ) : null}
           </div>
         </div>
 
         {/* Pending Verification Notice */}
         {pendingCount > 0 ? (
-          <div className="mt-4 flex items-start gap-3 rounded-lg border border-warning-border bg-warning-bg p-3.5 text-secondary text-warning-text">
+          <div className="mt-4 flex items-start gap-3 rounded-lg border border-warning-border bg-warning-bg p-3.5 text-secondary text-warning">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
               <p className="font-semibold">
@@ -254,9 +255,9 @@ export function StaffLiveEstimateCard({
               {/* Khấu trừ tạm ứng */}
               {statement?.advanceDeductionsVnd && statement.advanceDeductionsVnd > 0 ? (
                 <tr>
-                  <td className="py-2.5 font-medium text-warning-text">Khấu trừ tạm ứng</td>
+                  <td className="py-2.5 font-medium text-warning">Khấu trừ tạm ứng</td>
                   <td className="py-2.5 text-text-muted">Khoản tạm ứng thuộc kỳ {formatMonth(month).toLowerCase()}</td>
-                  <td className="py-2.5 text-right font-medium text-warning-text tabular-nums">
+                  <td className="py-2.5 text-right font-medium text-warning tabular-nums">
                     −{formatCurrency(statement.advanceDeductionsVnd)}
                   </td>
                 </tr>
@@ -265,9 +266,9 @@ export function StaffLiveEstimateCard({
               {/* Khấu trừ khác nếu có */}
               {deductionTotal > (statement?.advanceDeductionsVnd ?? 0) ? (
                 <tr>
-                  <td className="py-2.5 font-medium text-warning-text">Khấu trừ khác</td>
+                  <td className="py-2.5 font-medium text-warning">Khấu trừ khác</td>
                   <td className="py-2.5 text-text-muted">Bù trừ lương khoán / giảm trừ</td>
-                  <td className="py-2.5 text-right font-medium text-warning-text tabular-nums">
+                  <td className="py-2.5 text-right font-medium text-warning tabular-nums">
                     −{formatCurrency(deductionTotal - (statement?.advanceDeductionsVnd ?? 0))}
                   </td>
                 </tr>
@@ -337,7 +338,7 @@ export function StaffLiveEstimateCard({
                           {shift.isPendingVerification ? (
                             <Badge tone="warning">Chờ xác minh · đã tính tạm</Badge>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-success-text">
+                            <span className="inline-flex items-center gap-1 text-success">
                               <CheckCircle2 className="h-3.5 w-3.5" /> Đã xác minh
                             </span>
                           )}

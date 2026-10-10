@@ -13,6 +13,7 @@ import type { OwnerPayrollEstimate } from "@/features/payroll/estimate/types";
 import { formatCompactVnd, formatDashboardMonth, formatVnd } from "@/features/payroll/dashboard/format";
 import { getCurrentPayrollMonth } from "@/features/payroll/dashboard/url-state";
 import { formatDateTime } from "@/features/payroll/payroll-presentation";
+import { payrollPositionLabels } from "@/features/staff/payroll-profile-types";
 
 interface OwnerLiveEstimateOverviewProps {
   initialEstimate?: OwnerPayrollEstimate | null;
@@ -23,9 +24,7 @@ interface OwnerLiveEstimateOverviewProps {
 }
 
 const positionNames: Record<string, string> = {
-  admissions_manager: "Quản lý tuyển sinh",
-  operations_assistant: "Trợ lý vận hành",
-  teaching_assistant: "Trợ giảng",
+  ...payrollPositionLabels,
   __unassigned__: "Chưa phân vị trí",
 };
 
@@ -35,7 +34,7 @@ export function OwnerLiveEstimateOverview({
   positionCode,
   today,
 }: OwnerLiveEstimateOverviewProps) {
-  const { connectionState, data, hasAttemptedFetch, isLoading, lastRefreshedAt, refetch } =
+  const { connectionState, data, hasAttemptedFetch, isLoading, refetch } =
     usePayrollLiveEstimate<OwnerPayrollEstimate>({
       initialData: initialEstimate,
       month,
@@ -109,9 +108,14 @@ export function OwnerLiveEstimateOverview({
           <span>
             {isApproved
               ? `Chốt: ${estimate.approvedAt ? formatDateTime(estimate.approvedAt) : "Đã duyệt"}`
+              : `Dữ liệu tính lúc: ${formatDateTime(estimate.calculatedAt)}`}
+          </span>
+          <span>
+            {isApproved
+              ? null
               : latestCompletedWorkAt
                 ? `Ca gần nhất: ${formatDateTime(latestCompletedWorkAt)}`
-                : `Dữ liệu: ${formatDateTime(lastRefreshedAt.toISOString())}`}
+                : "Chưa có ca hoàn tất"}
           </span>
           <button
             aria-label="Làm mới tổng quan lương tạm tính"
@@ -207,7 +211,7 @@ export function OwnerLiveEstimateOverview({
 
       {/* Pending verification notice */}
       {pendingCount > 0 ? (
-        <div className="flex items-start gap-3 rounded-lg border border-warning-border bg-warning-bg p-3.5 text-secondary text-warning-text">
+        <div className="flex items-start gap-3 rounded-lg border border-warning-border bg-warning-bg p-3.5 text-secondary text-warning">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
             <p className="font-semibold">
@@ -249,7 +253,7 @@ export function OwnerLiveEstimateOverview({
                     <td className="py-2.5 text-right tabular-nums text-text-default">
                       {formatVnd(row.totalEarningsVnd)}
                     </td>
-                    <td className="py-2.5 text-right tabular-nums text-warning-text">
+                    <td className="py-2.5 text-right tabular-nums text-warning">
                       {row.totalDeductionsVnd > 0 ? `−${formatVnd(row.totalDeductionsVnd)}` : "0 ₫"}
                     </td>
                     <td className="py-2.5 text-right font-semibold tabular-nums text-action-link">
@@ -261,7 +265,7 @@ export function OwnerLiveEstimateOverview({
                   <td className="py-3">Tổng cộng</td>
                   <td className="py-3 text-center tabular-nums">{summary.staffCount}</td>
                   <td className="py-3 text-right tabular-nums">{formatVnd(summary.totalEarningsVnd)}</td>
-                  <td className="py-3 text-right tabular-nums text-warning-text">
+                  <td className="py-3 text-right tabular-nums text-warning">
                     {summary.totalDeductionsVnd > 0 ? `−${formatVnd(summary.totalDeductionsVnd)}` : "0 ₫"}
                   </td>
                   <td className="py-3 text-right tabular-nums text-action-link">{formatVnd(summary.payableVnd)}</td>
@@ -340,7 +344,7 @@ export function OwnerLiveEstimateOverview({
                       <td className="py-2.5 text-right tabular-nums text-text-default">
                         {formatVnd(row.totalEarningsVnd)}
                       </td>
-                      <td className="py-2.5 text-right tabular-nums text-warning-text">
+                      <td className="py-2.5 text-right tabular-nums text-warning">
                         {row.totalDeductionsVnd > 0 ? `−${formatVnd(row.totalDeductionsVnd)}` : "0 ₫"}
                       </td>
                       <td className="py-2.5 text-right font-semibold tabular-nums text-action-link">
