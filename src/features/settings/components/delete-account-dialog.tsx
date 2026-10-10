@@ -128,7 +128,7 @@ export function DeleteAccountDialog({ member }: { member: StaffDirectoryMember }
 
           {actionState.status === "error" ? (
             <div className="mt-4">
-              <ResultBanner message={actionState.message} status="error" />
+              <ResultBanner title={actionState.message} tone="error" />
             </div>
           ) : null}
 
