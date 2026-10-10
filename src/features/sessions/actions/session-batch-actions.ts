@@ -9,6 +9,32 @@ import {
 } from "../forms/session-batch-schema";
 import type { ExistingSessionSnapshot } from "../batch-data";
 
+const batchRpcErrorMessages: Record<string, string> = {
+  AUTHENTICATION_REQUIRED: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+  SESSIONS_MANAGE_PERMISSION_DENIED: "Tài khoản hiện tại không có quyền tạo buổi học.",
+  CLASS_NOT_FOUND: "Không tìm thấy lớp học.",
+  CLASS_NOT_ACTIVE: "Lớp học chưa ở trạng thái đang hoạt động nên không thể tạo buổi.",
+  CLASS_SESSION_REQUIRES_ACTIVE_CLASS: "Lớp học chưa ở trạng thái đang hoạt động nên không thể tạo buổi.",
+  CLASS_SESSION_REQUIRES_ACTIVE_ACADEMIC_YEAR: "Năm học của lớp chưa kích hoạt nên không thể tạo buổi.",
+  SCHEDULE_TEMPLATE_CLASS_MISMATCH: "Khung lịch không thuộc lớp này.",
+  CLASS_SESSION_SCHEDULE_CLASS_MISMATCH: "Khung lịch không thuộc lớp này.",
+  CLASS_SESSION_SCHEDULE_NOT_EFFECTIVE: "Có buổi nằm ngoài thời gian hiệu lực của khung lịch.",
+  CLASS_SESSION_WEEKDAY_MISMATCH: "Có buổi không đúng thứ trong tuần của khung lịch.",
+  COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION: "Lớp ghép không tạo buổi trực tiếp; hãy tạo ở lớp thành phần.",
+  INVALID_SESSION_TIME: "Giờ bắt đầu phải trước giờ kết thúc.",
+  INVALID_COMPONENT_CODE: "Mã thành phần không hợp lệ.",
+};
+
+function getBatchRpcErrorMessage(rawMessage: string | null): string {
+  if (!rawMessage) return "Không thể lưu buổi học vào cơ sở dữ liệu.";
+  const code = Object.keys(batchRpcErrorMessages).find((key) => rawMessage.includes(key));
+  if (code) return batchRpcErrorMessages[code];
+  if (rawMessage.includes("duplicate key")) {
+    return "Có buổi học trùng với buổi đã tồn tại. Vui lòng kiểm tra lại danh sách.";
+  }
+  return "Không thể lưu buổi học vào cơ sở dữ liệu. Vui lòng thử lại hoặc liên hệ quản trị viên.";
+}
+
 export interface BatchSessionActionResult {
   status: "success" | "error";
   message: string;
@@ -206,73 +232,12 @@ export async function createBatchSessionsAction(
       createdCount = (rpcData as { created_count?: number })?.created_count ?? 0;
       createdSessionIds = (rpcData as { session_ids?: string[] })?.session_ids ?? [];
     } else {
-      // Fallback to service role client (bypasses direct table write restrictions)
-      try {
-        const { createSupabaseServiceRoleClient } = await import(
-          "@/lib/supabase/service-role"
-        );
-        const serviceClient = createSupabaseServiceRoleClient();
-
-        const serviceRecords = nonDuplicateSessions.map((s) => ({
-          class_id: classId,
-          session_date: s.sessionDate,
-          start_time: s.startTime.length === 5 ? `${s.startTime}:00` : s.startTime,
-          end_time: s.endTime.length === 5 ? `${s.endTime}:00` : s.endTime,
-          learning_mode: s.learningMode,
-          session_kind: s.scheduleTemplateId ? "regular" : "additional",
-          schedule_template_id: s.scheduleTemplateId ?? null,
-          component_code: s.componentCode ?? null,
-          room_name: s.roomName ?? null,
-          meeting_url: s.meetingUrl ?? null,
-          notes: s.notes ?? null,
-          status: "scheduled",
-          created_by: userRes.user.id,
-        }));
-
-        const { data: serviceSessions, error: serviceErr } = await serviceClient
-          .from("class_sessions")
-          .insert(serviceRecords)
-          .select("id, session_date, start_time");
-
-        if (serviceErr) {
-          return {
-            status: "error",
-            message: `Lỗi khi lưu buổi học vào cơ sở dữ liệu: ${serviceErr.message}`,
-          };
-        }
-
-        const createdList = serviceSessions ?? [];
-        createdCount = createdList.length;
-        createdSessionIds = createdList.map((r) => r.id);
-
-        await serviceClient.from("audit_logs").insert({
-          actor_user_id: userRes.user.id,
-          module: "sessions",
-          action: "batch_sessions_created",
-          entity_type: "class",
-          entity_id: classId,
-          new_data: {
-            class_id: classId,
-            class_code: classRow.code,
-            created_count: createdCount,
-            session_ids: createdSessionIds,
-          },
-          reason: reason || "Tạo buổi học hàng loạt",
-          metadata: {
-            source: "batch_session_creation",
-            total_requested: sessions.length,
-            total_created: createdCount,
-            skipped_duplicates: sessions.length - createdCount,
-          },
-        });
-      } catch {
-        return {
-          status: "error",
-          message: rpcErr
-            ? `Lỗi khi lưu buổi học: ${rpcErr.message}`
-            : "Không thể lưu buổi học vào cơ sở dữ liệu.",
-        };
-      }
+      // The RPC is the only write path: its permission, class-status and
+      // template checks must not be bypassed when it rejects the batch.
+      return {
+        status: "error",
+        message: getBatchRpcErrorMessage(rpcErr?.message ?? null),
+      };
     }
 
     if (createdCount === 0 && nonDuplicateSessions.length > 0) {

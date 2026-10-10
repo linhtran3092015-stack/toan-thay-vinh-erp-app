@@ -148,40 +148,38 @@ describe("createBatchSessionsAction", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/sessions");
   });
 
-  it("falls back to service role client if RPC encounters an error", async () => {
+  it("surfaces an RPC rejection as an error and never falls back to the service role", async () => {
     const mockClient = createMockServerClient({
       rpcResult: {
         data: null,
-        error: { message: "function create_batch_class_sessions does not exist" },
+        error: { message: "P0001: CLASS_NOT_ACTIVE" },
       },
     });
     mocks.server.mockResolvedValue(mockClient);
 
-    const mockServiceClient = {
-      from: vi.fn().mockImplementation((table: string) => {
-        if (table === "class_sessions") {
-          return {
-            insert: vi.fn().mockReturnValue({
-              select: vi.fn().mockResolvedValue({
-                data: [
-                  { id: "fallback-1", session_date: "2026-09-20", start_time: "18:00:00" },
-                  { id: "fallback-2", session_date: "2026-09-27", start_time: "18:00:00" },
-                ],
-                error: null,
-              }),
-            }),
-          };
-        }
-        return {
-          insert: vi.fn().mockResolvedValue({ data: [], error: null }),
-        };
-      }),
-    };
-    mocks.service.mockReturnValue(mockServiceClient);
+    const res = await createBatchSessionsAction(samplePayload);
+    expect(res.status).toBe("error");
+    expect(res.message).toBe(
+      "Lớp học chưa ở trạng thái đang hoạt động nên không thể tạo buổi.",
+    );
+    expect(res.createdCount).toBeUndefined();
+    // The RPC's permission and validation checks are the only write path.
+    expect(mocks.service).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("maps unknown RPC failures to a generic message without leaking raw SQL text", async () => {
+    const mockClient = createMockServerClient({
+      rpcResult: {
+        data: null,
+        error: { message: 'relation "class_sessions" violates constraint xyz' },
+      },
+    });
+    mocks.server.mockResolvedValue(mockClient);
 
     const res = await createBatchSessionsAction(samplePayload);
-    expect(res.status).toBe("success");
-    expect(res.createdCount).toBe(2);
-    expect(res.sessionIds).toEqual(["fallback-1", "fallback-2"]);
+    expect(res.status).toBe("error");
+    expect(res.message).not.toContain("relation");
+    expect(mocks.service).not.toHaveBeenCalled();
   });
 });
