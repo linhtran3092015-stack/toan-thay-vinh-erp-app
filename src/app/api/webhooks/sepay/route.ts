@@ -62,7 +62,8 @@ export async function POST(request: Request) {
 
   const detailedResult = parseSepayWebhookPayloadDetailed(rawBody);
   if (!detailedResult.ok) {
-    console.error("SEPAY_WEBHOOK_VALIDATION_FAILED:", detailedResult.error, "rawBody:", rawBody);
+    // Never log the body: it carries payer names, account numbers and transfer content.
+    console.error("SEPAY_WEBHOOK_VALIDATION_FAILED:", detailedResult.error, "bodyLength:", rawBody.length);
     return NextResponse.json(
       { error: detailedResult.error, success: false },
       { headers: { "Cache-Control": "no-store" }, status: 400 },
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
 
   // Handle SePay test webhook ping (mock payload with id: 0)
   if (payload.id === 0) {
-    console.log("SEPAY_TEST_WEBHOOK_PING_VERIFIED:", payload);
+    console.log("SEPAY_TEST_WEBHOOK_PING_VERIFIED:", { id: payload.id, transactionDate: payload.transactionDate });
     return webhookResponse(true, 200);
   }
 

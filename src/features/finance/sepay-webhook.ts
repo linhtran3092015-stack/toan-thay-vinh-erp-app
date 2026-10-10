@@ -108,7 +108,7 @@ export function parseSepayWebhookPayload(
 ): SepayWebhookPayload | null {
   const result = parseSepayWebhookPayloadDetailed(rawBody);
   if (!result.ok) {
-    console.error("SEPAY_WEBHOOK_PAYLOAD_PARSE_FAILED:", result.error, "body:", rawBody);
+    console.error("SEPAY_WEBHOOK_PAYLOAD_PARSE_FAILED:", result.error, "bodyLength:", rawBody.length);
     return null;
   }
   return result.data;
