@@ -111,6 +111,9 @@ export interface PayrollCalculationIssueRead {
   severity: "blocking" | "warning";
   sourceFactId: string | null;
   staffId: string | null;
+  staffDisplayName?: string | null;
+  staffEmployeeCode?: string | null;
+  staffEmail?: string | null;
 }
 
 export interface PayrollManagementOverviewRead {

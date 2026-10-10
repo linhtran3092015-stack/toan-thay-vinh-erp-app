@@ -52,6 +52,9 @@ const payrollManagementOverviewSchema = z.object({
     revision: z.number().int().positive(),
     severity: z.enum(["blocking", "warning"]),
     sourceFactId: z.string().uuid().nullable(),
+    staffDisplayName: z.string().nullable().optional(),
+    staffEmail: z.string().nullable().optional(),
+    staffEmployeeCode: z.string().nullable().optional(),
     staffId: z.string().uuid().nullable(),
   })),
 });

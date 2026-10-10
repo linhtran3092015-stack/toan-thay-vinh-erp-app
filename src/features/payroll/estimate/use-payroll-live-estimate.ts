@@ -14,6 +14,30 @@ interface UsePayrollLiveEstimateOptions<T> {
   month: string;
   positionCode?: string | null;
   scope: "owner" | "staff";
+  /**
+   * Nhân sự cần xem (chỉ với scope "staff"). Bỏ trống = người đang đăng nhập;
+   * có giá trị = chủ trung tâm xem lương theo ngày của nhân sự đó.
+   */
+  staffId?: string | null;
+}
+
+export function buildEstimateEndpoint({
+  month,
+  positionCode,
+  scope,
+  staffId,
+}: Pick<UsePayrollLiveEstimateOptions<unknown>, "month" | "positionCode" | "scope" | "staffId">): string {
+  const monthParam = `month=${encodeURIComponent(month)}`;
+
+  if (scope === "owner") {
+    return `/api/payroll/owner-estimate?${monthParam}${positionCode ? `&position=${encodeURIComponent(positionCode)}` : ""}`;
+  }
+
+  if (staffId) {
+    return `/api/payroll/staff-estimate?${monthParam}&staffId=${encodeURIComponent(staffId)}`;
+  }
+
+  return `/api/payroll/estimate?${monthParam}`;
 }
 
 export function usePayrollLiveEstimate<
@@ -23,6 +47,7 @@ export function usePayrollLiveEstimate<
   month,
   positionCode,
   scope,
+  staffId = null,
 }: UsePayrollLiveEstimateOptions<T>) {
   const [data, setData] = useState<T | null>(initialData);
   const [isLoading, setIsLoading] = useState<boolean>(() => !initialData);
@@ -34,10 +59,7 @@ export function usePayrollLiveEstimate<
     setIsLoading(true);
 
     try {
-      const endpoint =
-        scope === "owner"
-          ? `/api/payroll/owner-estimate?month=${encodeURIComponent(month)}${positionCode ? `&position=${encodeURIComponent(positionCode)}` : ""}`
-          : `/api/payroll/estimate?month=${encodeURIComponent(month)}`;
+      const endpoint = buildEstimateEndpoint({ month, positionCode, scope, staffId });
 
       const res = await fetch(endpoint, {
         cache: "no-store",
@@ -71,10 +93,7 @@ export function usePayrollLiveEstimate<
       setIsLoading(true);
 
       try {
-        const endpoint =
-          scope === "owner"
-            ? `/api/payroll/owner-estimate?month=${encodeURIComponent(month)}${positionCode ? `&position=${encodeURIComponent(positionCode)}` : ""}`
-            : `/api/payroll/estimate?month=${encodeURIComponent(month)}`;
+        const endpoint = buildEstimateEndpoint({ month, positionCode, scope, staffId });
 
         const res = await fetch(endpoint, {
           cache: "no-store",
@@ -111,7 +130,7 @@ export function usePayrollLiveEstimate<
 
     try {
       supabase = getSupabaseBrowserClient();
-      const channelName = `payroll_live_${scope}_${month}_${positionCode ?? "all"}`;
+      const channelName = `payroll_live_${scope}_${month}_${positionCode ?? "all"}_${staffId ?? "me"}`;
 
       channel = supabase
         .channel(channelName)
@@ -175,7 +194,7 @@ export function usePayrollLiveEstimate<
         void supabase.removeChannel(channel);
       }
     };
-  }, [month, positionCode, scope]);
+  }, [month, positionCode, scope, staffId]);
 
   return {
     connectionState,

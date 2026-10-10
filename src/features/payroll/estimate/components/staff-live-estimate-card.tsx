@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle2, Clock, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { PayrollDailyBreakdownTable } from "@/features/payroll/estimate/components/payroll-daily-breakdown-table";
 import { usePayrollLiveEstimate } from "@/features/payroll/estimate/use-payroll-live-estimate";
 import type { StaffPayrollEstimate } from "@/features/payroll/estimate/types";
 import {
@@ -18,11 +19,14 @@ import {
 interface StaffLiveEstimateCardProps {
   initialEstimate?: StaffPayrollEstimate | null;
   month: string;
+  /** Ghi đè "hôm nay" (YYYY-MM-DD) cho bảng theo ngày; dùng trong kiểm thử. */
+  today?: string;
 }
 
 export function StaffLiveEstimateCard({
   initialEstimate,
   month,
+  today,
 }: StaffLiveEstimateCardProps) {
   const { connectionState, data, hasAttemptedFetch, isLoading, lastRefreshedAt, refetch } =
     usePayrollLiveEstimate<StaffPayrollEstimate>({
@@ -279,6 +283,15 @@ export function StaffLiveEstimateCard({
               </tr>
             </tbody>
           </table>
+        </div>
+
+        {/* Bảng lương theo ngày */}
+        <div className="mt-6 border-t border-border-subtle pt-5">
+          <PayrollDailyBreakdownTable
+            estimate={estimate}
+            headingId="live-estimate-daily-heading"
+            today={today}
+          />
         </div>
 
         {/* Collapsible Recent Shifts */}

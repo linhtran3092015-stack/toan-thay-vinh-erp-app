@@ -1,7 +1,13 @@
 "use client";
 
-import { AlertTriangle, DollarSign, Percent, RefreshCw, TrendingUp, Users } from "lucide-react";
+import { AlertTriangle, CalendarDays, DollarSign, Percent, RefreshCw, TrendingUp, Users } from "lucide-react";
+import { useState } from "react";
+
 import { Badge } from "@/components/ui/badge";
+import {
+  StaffDailyEstimateDialog,
+  type StaffDailyEstimateTarget,
+} from "@/features/payroll/estimate/components/staff-daily-estimate-dialog";
 import { usePayrollLiveEstimate } from "@/features/payroll/estimate/use-payroll-live-estimate";
 import type { OwnerPayrollEstimate } from "@/features/payroll/estimate/types";
 import { formatCompactVnd, formatDashboardMonth, formatVnd } from "@/features/payroll/dashboard/format";
@@ -12,6 +18,8 @@ interface OwnerLiveEstimateOverviewProps {
   initialEstimate?: OwnerPayrollEstimate | null;
   month: string;
   positionCode?: string | null;
+  /** Ghi đè "hôm nay" (YYYY-MM-DD) cho bảng lương theo ngày; dùng trong kiểm thử. */
+  today?: string;
 }
 
 const positionNames: Record<string, string> = {
@@ -25,6 +33,7 @@ export function OwnerLiveEstimateOverview({
   initialEstimate,
   month,
   positionCode,
+  today,
 }: OwnerLiveEstimateOverviewProps) {
   const { connectionState, data, hasAttemptedFetch, isLoading, lastRefreshedAt, refetch } =
     usePayrollLiveEstimate<OwnerPayrollEstimate>({
@@ -33,6 +42,10 @@ export function OwnerLiveEstimateOverview({
       positionCode,
       scope: "owner",
     });
+
+  // Nhân sự đang được mở bảng lương theo ngày (hộp thoại realtime)
+  const [dailyTarget, setDailyTarget] = useState<StaffDailyEstimateTarget | null>(null);
+  const [isDailyOpen, setIsDailyOpen] = useState(false);
 
   const estimate = data ?? initialEstimate;
 
@@ -265,10 +278,13 @@ export function OwnerLiveEstimateOverview({
       {/* Breakdown by Staff Table */}
       {estimate.statements.length > 0 && estimate.statements.some((s) => s.payableVnd > 0 || s.workedMinutes > 0) ? (
         <section aria-labelledby="live-by-staff-heading" className="rounded-lg border border-border-subtle bg-surface-base p-4 sm:p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="text-section-title font-semibold text-text-strong" id="live-by-staff-heading">
-              Chi tiết nhân sự tạm tính ({formatDashboardMonth(month)})
-            </h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-section-title font-semibold text-text-strong" id="live-by-staff-heading">
+                Chi tiết nhân sự tạm tính ({formatDashboardMonth(month)})
+              </h3>
+              <p className="mt-0.5 text-caption text-text-muted">Ấn vào tên nhân sự để xem lương theo từng ngày (cập nhật thời gian thực).</p>
+            </div>
             <span className="text-caption text-text-muted">
               {estimate.statements.filter((s) => s.payableVnd > 0 || s.workedMinutes > 0).length} nhân sự phát sinh
             </span>
@@ -292,9 +308,23 @@ export function OwnerLiveEstimateOverview({
                   .map((row) => (
                     <tr key={row.staffId}>
                       <td className="py-2.5 font-medium text-text-strong">
-                        <a className="hover:text-action-link hover:underline" href={`/staff/${row.staffId}`}>
-                          {row.staffDisplayName}
-                        </a>
+                        <button
+                          aria-label={`Xem lương theo ngày của ${row.staffDisplayName}`}
+                          className="inline-flex items-center gap-1.5 rounded-sm text-left hover:text-action-link hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+                          onClick={() => {
+                            setDailyTarget({
+                              positionLabel: positionNames[row.positionCode ?? "__unassigned__"] ?? row.positionCode,
+                              staffDisplayName: row.staffDisplayName,
+                              staffEmployeeCode: row.staffEmployeeCode,
+                              staffId: row.staffId,
+                            });
+                            setIsDailyOpen(true);
+                          }}
+                          type="button"
+                        >
+                          <span>{row.staffDisplayName}</span>
+                          <CalendarDays aria-hidden="true" className="h-3.5 w-3.5 text-text-muted" />
+                        </button>
                         {row.staffEmployeeCode ? (
                           <span className="ml-1.5 font-mono text-caption text-text-muted">
                             ({row.staffEmployeeCode})
@@ -323,6 +353,14 @@ export function OwnerLiveEstimateOverview({
           </div>
         </section>
       ) : null}
+
+      <StaffDailyEstimateDialog
+        isOpen={isDailyOpen}
+        month={month}
+        onClose={() => setIsDailyOpen(false)}
+        target={dailyTarget}
+        today={today}
+      />
     </div>
   );
 }

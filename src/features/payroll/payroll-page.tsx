@@ -153,15 +153,49 @@ export function PayrollPage({
 
       {(canManage || canReconcile || canApprove || canResolveFeedback || canImport) && issues.length > 0 ? (
         <section className="rounded-lg border border-warning-border bg-warning-bg p-4" aria-labelledby="payroll-data-issues">
-          <h2 className="text-section-title text-text-strong" id="payroll-data-issues">Dữ liệu cần xử lý trước khi đối soát</h2>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-section-title text-text-strong" id="payroll-data-issues">Dữ liệu cần xử lý trước khi đối soát</h2>
+            <p className="text-caption text-text-muted">
+              Sau khi cập nhật cấu hình hoặc xử lý dữ liệu, bấm <strong>Tính lại</strong> tại kỳ lương để làm mới danh sách lỗi.
+            </p>
+          </div>
           <ul className="mt-3 grid gap-2">
             {issues.map((issue) => {
               const contextStr = formatIssueContext(issue.details as Record<string, unknown> | undefined);
+              const staffLabel = issue.staffDisplayName || (issue.staffEmployeeCode ? `Mã NV: ${issue.staffEmployeeCode}` : (issue.staffId ? `Nhân sự ${issue.staffId}` : null));
               return (
-                <li className="rounded-md border border-warning-border bg-surface-base px-3 py-2.5" key={issue.id}>
-                  <p className="font-semibold text-text-strong">{issueLabel(issue.issueCode)} · {formatMonth(issue.periodMonth)}</p>
-                  {contextStr ? <p className="mt-0.5 text-secondary text-text-default">{contextStr}</p> : null}
-                  <p className="mt-1 text-caption text-text-muted">Phiên bản {issue.revision}{issue.staffId ? ` · Nhân sự ${issue.staffId}` : ""}{issue.sourceFactId ? ` · Dữ liệu ${issue.sourceFactId}` : ""}</p>
+                <li className="flex flex-col gap-2 rounded-md border border-warning-border bg-surface-base px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between" key={issue.id}>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-text-strong">{issueLabel(issue.issueCode)} · {formatMonth(issue.periodMonth)}</p>
+                    {contextStr ? <p className="mt-0.5 text-secondary text-text-default">{contextStr}</p> : null}
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 text-caption text-text-muted">
+                      <span>Phiên bản {issue.revision}</span>
+                      {staffLabel ? (
+                        <>
+                          <span>·</span>
+                          {issue.staffId ? (
+                            <Link
+                              className="font-medium text-action-link hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-ring"
+                              href={`/staff/${issue.staffId}`}
+                            >
+                              {issue.staffDisplayName ? `${issue.staffDisplayName}${issue.staffEmployeeCode ? ` (${issue.staffEmployeeCode})` : ""}` : staffLabel}
+                            </Link>
+                          ) : (
+                            <span>{staffLabel}</span>
+                          )}
+                        </>
+                      ) : null}
+                      {issue.sourceFactId ? <span>· Dữ liệu {issue.sourceFactId}</span> : null}
+                    </div>
+                  </div>
+                  {issue.staffId ? (
+                    <Link
+                      className="inline-flex shrink-0 items-center justify-center rounded-md border border-border-default bg-surface-base px-2.5 py-1 text-caption font-semibold text-text-strong hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+                      href={`/staff/${issue.staffId}`}
+                    >
+                      Mở hồ sơ nhân sự
+                    </Link>
+                  ) : null}
                 </li>
               );
             })}

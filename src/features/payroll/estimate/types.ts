@@ -28,12 +28,35 @@ export const staffEstimateLineSchema = z.object({
   lineType: z.string(),
   note: z.string().nullable().default(null),
   policyCode: z.string().nullable().default(null),
+  /** Mã bản ghi nguồn (id chấm công, id dữ liệu nghiệp vụ...). */
+  sourceId: z.string().nullable().optional(),
+  /** Loại nguồn: time_entry, payroll_source_fact, grading_pool, salary_advance... */
+  sourceKind: z.string().nullable().optional(),
   unitLabel: z.string().nullable().default(null),
   unitRateVnd: z.number().int().nullable().default(null),
+  /**
+   * Ngày phát sinh (YYYY-MM-DD). Khoản tính theo tháng được gắn ngày đầu tháng
+   * và không có nguồn theo ngày (xem `isDatedSourceKind`).
+   */
+  workDate: z.string().nullable().optional(),
   workedMinutes: z.number().int().nullable().default(null),
 });
 
 export type StaffEstimateLine = z.infer<typeof staffEstimateLineSchema>;
+
+/** Một ca làm việc trong tháng (đã kết thúc hoặc đang mở) phục vụ bảng lương theo ngày. */
+export const staffMonthShiftSchema = z.object({
+  checkInAt: z.string().nullable().default(null),
+  checkOutAt: z.string().nullable().default(null),
+  id: z.string().uuid(),
+  isPendingVerification: z.boolean().default(false),
+  status: z.string().default("checked_out"),
+  workDate: z.string(),
+  workedMinutes: z.number().int().default(0),
+  workMode: z.string().default("offline"),
+});
+
+export type StaffMonthShift = z.infer<typeof staffMonthShiftSchema>;
 
 export const staffRecentShiftSchema = z.object({
   checkInAt: z.string().nullable().default(null),
@@ -73,6 +96,12 @@ export const staffPayrollEstimateSchema = z.object({
   payrollPeriodId: z.string().uuid().optional(),
   payrollStatementId: z.string().uuid().optional(),
   recentShifts: z.array(staffRecentShiftSchema).default([]),
+  /** Toàn bộ ca trong tháng; trống với payload cũ chưa nâng cấp RPC. */
+  shifts: z.array(staffMonthShiftSchema).default([]),
+  /** Chỉ có khi chủ trung tâm xem lương của một nhân sự khác. */
+  staffDisplayName: z.string().nullable().optional(),
+  staffEmployeeCode: z.string().nullable().optional(),
+  staffId: z.string().uuid().optional(),
   statement: staffEstimateStatementSchema.nullable().default(null),
   status: z.enum(["estimated", "approved"]).default("estimated"),
 });

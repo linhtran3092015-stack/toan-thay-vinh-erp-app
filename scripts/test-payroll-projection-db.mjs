@@ -32,7 +32,7 @@ try {
     if (!definition) throw new Error('Missing payroll routine: ' + routine);
     sql(definition);
   }
-  for (const test of ['payroll-optional-bonuses.sql', 'payroll-estimate-manual-lines.sql']) {
+  for (const test of ['payroll-optional-bonuses.sql', 'payroll-estimate-manual-lines.sql', 'payroll-owner-zero-minutes.sql']) {
     sql('begin;\n' + readFileSync(new URL('../tests/database/' + test, import.meta.url), 'utf8') + '\nrollback;');
     console.log('PASS: ' + test);
   }

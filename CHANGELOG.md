@@ -2,6 +2,16 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.5.0] - 2026-10-10
+
+### Added
+- Bảng lương theo ngày trong mục Bảng lương của nhân sự: liệt kê đủ các ngày trong tháng, mỗi ngày gồm ca làm việc (giờ vào/ra, online/offline, chờ xác minh), giờ công đã tính, lương công, phụ cấp/thưởng phát sinh đúng ngày và thành tiền; ca đang mở hiển thị "đang làm, chưa tính tiền".
+- Tách riêng mục "Khoản tính theo tháng" (thưởng quỹ chấm bài, thưởng ngưỡng doanh thu, bù trừ lương khoán, tạm ứng, điều chỉnh thủ công) để tổng theo ngày cộng khoản theo tháng luôn khớp lương tạm tính.
+- Chủ trung tâm ấn vào tên nhân sự trong Tổng quan quỹ lương để mở hộp thoại lương theo ngày của tháng đang xem, cập nhật thời gian thực; RPC `get_staff_payroll_estimate` (quyền `payroll.dashboard.view`) và API `/api/payroll/staff-estimate`.
+
+### Changed
+- `get_my_payroll_estimate` trả thêm toàn bộ ca trong tháng (`shifts`) và ngày phát sinh (`workDate`, `sourceKind`) cho từng dòng lương, kể cả với kỳ đã duyệt; công thức tính lương không thay đổi.
+
 ## [0.6.4.1] - 2026-09-29
 
 ### Fixed

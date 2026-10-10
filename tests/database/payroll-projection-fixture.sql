@@ -33,3 +33,5 @@ create table payroll_line_items(id uuid primary key default gen_random_uuid(),pa
 create table payroll_calculation_issues(calculation_run_id uuid,issue_code text,source_fact_id uuid,staff_id uuid,details jsonb);
 create table payroll_source_revisions(month date primary key,revision integer,input_fingerprint text,updated_at timestamptz);
 alter table salary_advances add deducted_at timestamptz,add deduction_payroll_period_id uuid;
+create table roles(id uuid primary key default gen_random_uuid(), code text);
+create table user_role_assignments(user_id uuid, role_id uuid, revoked_at timestamptz);
