@@ -8,6 +8,7 @@ import { StaffProfileEditDialog } from "@/features/staff/components/staff-profil
 import { StaffRateVersionDialog } from "@/features/staff/components/staff-rate-version-dialog";
 import { StaffBankAccountDialog } from "@/features/staff/components/staff-bank-account-dialog";
 import { StaffBankAccountDecisionDialog } from "@/features/staff/components/staff-bank-account-decision-dialog";
+import { StaffGradeAssignmentEndDialog } from "@/features/staff/components/staff-grade-assignment-end-dialog";
 import { StaffPayrollAssignmentDialog } from "@/features/staff/components/staff-payroll-assignment-dialog";
 import { StaffPayrollCompensationDialog } from "@/features/staff/components/staff-payroll-compensation-dialog";
 import {
@@ -205,7 +206,22 @@ function PayrollProfileSection({
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <div className="rounded-lg border border-border-subtle p-4">
             <h3 className="font-semibold text-text-strong">Khối đang/phải phụ trách</h3>
-            {profile.gradeAssignments.length ? <ul className="mt-3 flex flex-wrap gap-2">{profile.gradeAssignments.map((assignment) => <li className="rounded-full border border-border-subtle bg-surface-raised px-3 py-1.5 text-secondary font-medium" key={assignment.id}>Khối {assignment.grade} · từ {formatDate(assignment.effectiveFrom)}{assignment.effectiveTo ? ` đến ${formatDate(assignment.effectiveTo)}` : ""}</li>)}</ul> : <p className="mt-2 text-secondary text-text-muted">Chưa có phân công khối.</p>}
+            {profile.gradeAssignments.length ? (
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {profile.gradeAssignments.map((assignment) => (
+                  <li
+                    className="inline-flex items-center rounded-full border border-border-subtle bg-surface-raised px-3 py-1.5 text-secondary font-medium"
+                    key={assignment.id}
+                  >
+                    Khối {assignment.grade} · từ {formatDate(assignment.effectiveFrom)}
+                    {assignment.effectiveTo ? ` đến ${formatDate(assignment.effectiveTo)}` : ""}
+                    {canManage && !assignment.effectiveTo ? (
+                      <StaffGradeAssignmentEndDialog assignment={assignment} staffId={profile.staffId} />
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="mt-2 text-secondary text-text-muted">Chưa có phân công khối.</p>}
           </div>
           <div className="rounded-lg border border-border-subtle p-4">
             <h3 className="font-semibold text-text-strong">Nhiệm vụ được tính thưởng</h3>

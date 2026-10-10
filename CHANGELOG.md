@@ -2,6 +2,14 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.10.0] - 2026-10-11
+
+### Added
+- Thu hồi phân công khối phụ trách của trợ lý vận hành ngay trên hồ sơ nhân sự (nút "Thu hồi" cạnh khối đang mở): chọn ngày kết thúc và lý do; khối được giải phóng từ ngày kế tiếp để phân cho người khác, lịch sử giữ nguyên, có audit. Không cho chọn ngày trong tháng lương đã chốt, không tự thu hồi khối của chính mình. RPC `end_staff_grade_assignment`.
+
+### Database
+- `20261012110000_end_staff_grade_assignment.sql`.
+
 ## [0.6.9.0] - 2026-10-11
 
 ### Added

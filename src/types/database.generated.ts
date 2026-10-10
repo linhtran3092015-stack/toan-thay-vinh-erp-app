@@ -8330,6 +8330,29 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      end_staff_grade_assignment: {
+        Args: {
+          p_assignment_id: string
+          p_effective_to: string
+          p_reason: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          effective_from: string
+          effective_to: string | null
+          grade: number
+          id: string
+          reason: string
+          staff_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "staff_grade_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       end_staff_shift_assignment: {
         Args: {
           p_effective_to: string

@@ -111,6 +111,13 @@ export const createStaffGradeAssignmentSchema = z
     { message: "Ngày kết thúc không thể trước ngày bắt đầu.", path: ["effectiveTo"] },
   );
 
+export const endStaffGradeAssignmentSchema = z.object({
+  assignmentId: z.string().uuid("Phân công khối không hợp lệ."),
+  effectiveTo: dateStringSchema,
+  reason: z.string().trim().min(1, "Bắt buộc nhập lý do thu hồi.").max(2000),
+  staffId: z.string().uuid("Mã hồ sơ nhân sự không hợp lệ."),
+});
+
 export const createStaffPayrollTaskVersionSchema = z.object({
   effectiveFrom: dateStringSchema,
   isEnabled: z.boolean(),

@@ -8,6 +8,7 @@ import type {
   CreateStaffGradeAssignmentActionInput,
   CreateStaffPayrollTaskVersionActionInput,
   CreateStaffRateVersionActionInput,
+  EndStaffGradeAssignmentActionInput,
   StaffManagementActionState,
   SubmitStaffBankAccountChangeActionInput,
   UpdateStaffProfileActionInput,
@@ -18,6 +19,7 @@ import {
   createStaffGradeAssignmentSchema,
   createStaffPayrollTaskVersionSchema,
   createStaffRateVersionSchema,
+  endStaffGradeAssignmentSchema,
   submitStaffBankAccountChangeSchema,
   updateStaffProfileSchema,
 } from "@/features/staff/staff-management-schemas";
@@ -83,6 +85,13 @@ function getRpcErrorMessage(message: string): string {
       "Khối này đã được phân công cho một trợ lý trong khoảng thời gian đã chọn.",
     STAFF_GRADE_ASSIGNMENT_REQUIRES_OPERATIONS_POSITION:
       "Chỉ có thể phân khối cho nhân sự ở vị trí Trợ lý vận hành.",
+    STAFF_GRADE_ASSIGNMENT_NOT_FOUND: "Không tìm thấy phân công khối cần thu hồi.",
+    STAFF_GRADE_ASSIGNMENT_ALREADY_ENDED: "Phân công khối này đã kết thúc trước đó.",
+    STAFF_GRADE_ASSIGNMENT_DATES_INVALID:
+      "Ngày kết thúc không thể trước ngày bắt đầu phụ trách.",
+    STAFF_GRADE_ASSIGNMENT_REASON_REQUIRED: "Bắt buộc nhập lý do.",
+    STAFF_GRADE_ASSIGNMENT_SELF_CHANGE_FORBIDDEN:
+      "Không thể tự thay đổi phân công khối của chính mình.",
     PAYROLL_CONFIGURATION_BACKDATE_LOCKED:
       "Không thể áp dụng hồi tố vì đã có kỳ lương được đối soát hoặc phê duyệt.",
     STAFF_BANK_ACCOUNT_REQUEST_ALREADY_PENDING:
@@ -331,6 +340,32 @@ export async function createStaffGradeAssignmentAction(
   revalidateStaffRoutes(parsed.data.staffId);
   revalidatePath("/payroll");
   return { message: "Đã lưu phân công khối.", status: "success" };
+}
+
+export async function endStaffGradeAssignmentAction(
+  input: EndStaffGradeAssignmentActionInput,
+): Promise<StaffManagementActionState> {
+  const permissionError = await getPermissionError("staff.manage_payroll_profile");
+  if (permissionError) return createErrorState(permissionError);
+
+  const parsed = endStaffGradeAssignmentSchema.safeParse(input);
+  if (!parsed.success) {
+    return createErrorState(
+      "Vui lòng kiểm tra lại ngày kết thúc và lý do thu hồi.",
+      parsed.error.flatten().fieldErrors,
+    );
+  }
+
+  const error = await runStaffPayrollRpc("end_staff_grade_assignment", {
+    p_assignment_id: parsed.data.assignmentId,
+    p_effective_to: parsed.data.effectiveTo,
+    p_reason: parsed.data.reason,
+  });
+  if (error) return error;
+
+  revalidateStaffRoutes(parsed.data.staffId);
+  revalidatePath("/payroll");
+  return { message: "Đã thu hồi phân công khối.", status: "success" };
 }
 
 export async function createStaffPayrollTaskVersionAction(

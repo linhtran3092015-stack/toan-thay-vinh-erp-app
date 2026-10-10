@@ -5,6 +5,7 @@ import {
   createStaffPayrollTaskVersionSchema,
   createStaffRateVersionSchema,
   decideStaffBankAccountChangeSchema,
+  endStaffGradeAssignmentSchema,
   submitStaffBankAccountChangeSchema,
   updateStaffProfileSchema,
 } from "@/features/staff/staff-management-schemas";
@@ -167,6 +168,40 @@ describe("Staff Management Schemas", () => {
           staffId: validUuid,
         }).success,
       ).toBe(true);
+    });
+  });
+
+  describe("endStaffGradeAssignmentSchema", () => {
+    it("accepts a dated revocation with a reason", () => {
+      expect(
+        endStaffGradeAssignmentSchema.safeParse({
+          assignmentId: validUuid,
+          effectiveTo: "2026-10-31",
+          reason: "Chuyển khối sang trợ lý mới",
+          staffId: validUuid,
+        }).success,
+      ).toBe(true);
+    });
+
+    it("rejects a missing date or blank reason", () => {
+      const missingDate = endStaffGradeAssignmentSchema.safeParse({
+        assignmentId: validUuid,
+        effectiveTo: "",
+        reason: "x",
+        staffId: validUuid,
+      });
+      expect(missingDate.success).toBe(false);
+
+      const blankReason = endStaffGradeAssignmentSchema.safeParse({
+        assignmentId: validUuid,
+        effectiveTo: "2026-10-31",
+        reason: "   ",
+        staffId: validUuid,
+      });
+      expect(blankReason.success).toBe(false);
+      expect(blankReason.success ? null : blankReason.error.flatten().fieldErrors.reason?.[0]).toBe(
+        "Bắt buộc nhập lý do thu hồi.",
+      );
     });
   });
 });

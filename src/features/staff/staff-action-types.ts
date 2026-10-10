@@ -41,6 +41,13 @@ export interface CreateStaffGradeAssignmentActionInput {
   staffId: string;
 }
 
+export interface EndStaffGradeAssignmentActionInput {
+  assignmentId: string;
+  effectiveTo: string;
+  reason: string;
+  staffId: string;
+}
+
 export interface CreateStaffPayrollTaskVersionActionInput {
   effectiveFrom: string;
   isEnabled: boolean;
