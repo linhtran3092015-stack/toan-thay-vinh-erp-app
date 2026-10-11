@@ -52,6 +52,7 @@ const updateSystemSettingsSchema = z.object({
   contactPhone: z.string().trim().max(160, "Số điện thoại liên hệ quá dài."),
   defaultPublicLinkExpiryDays: z.number().int().min(1, "Thời hạn tối thiểu là 1 ngày.").max(90, "Thời hạn tối đa là 90 ngày."),
   displayName: z.string().trim().min(1, "Bắt buộc nhập tên trung tâm.").max(160),
+  sessionAutoLockAfterDays: z.number().int().min(0, "Số ngày tự khóa tối thiểu là 0 (tắt).").max(30, "Số ngày tự khóa tối đa là 30."),
   teacherDisplayName: z.string().trim().min(1, "Bắt buộc nhập tên giáo viên / thương hiệu.").max(160),
 });
 
@@ -358,12 +359,14 @@ export async function updateSystemSettingsAction(input: UpdateSystemSettingsInpu
       "center.contact_phone": parsed.data.contactPhone,
       "center.display_name": parsed.data.displayName,
       "coaching.default_public_link_expiry_days": parsed.data.defaultPublicLinkExpiryDays,
+      "sessions.auto_lock_after_days": parsed.data.sessionAutoLockAfterDays,
       "teacher.display_name": parsed.data.teacherDisplayName,
     } });
     if (error) return createErrorState(getRpcErrorMessage(error.message));
     revalidatePath("/settings");
     revalidatePath("/settings/general");
     revalidatePath("/coaching");
+    revalidatePath("/sessions");
     return { message: "Đã lưu cài đặt hệ thống.", status: "success" };
   } catch {
     return createErrorState("Không thể kết nối hệ thống cài đặt.");

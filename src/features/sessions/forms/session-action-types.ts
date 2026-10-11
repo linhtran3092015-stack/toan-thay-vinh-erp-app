@@ -27,6 +27,18 @@ export interface CancelSessionActionInput
   reason: string;
 }
 
+export interface RescheduleSessionActionInput
+  extends SessionIdActionInput {
+  endTime: string;
+  learningMode: SessionLearningMode;
+  meetingUrl?: string | null;
+  notes?: string | null;
+  reason: string;
+  roomName?: string | null;
+  sessionDate: string;
+  startTime: string;
+}
+
 export type SessionLifecycleFieldErrors =
   Record<string, string[] | undefined>;
 

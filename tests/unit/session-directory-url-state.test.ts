@@ -8,7 +8,7 @@ const session: SessionDirectoryItem = { attendanceCount: 1, classCode: "7A", cla
 
 describe("Sessions directory URL view state", () => {
   it("parses valid values and uses existing defaults for invalid values", () => {
-    expect(parseSessionDirectoryViewState(new URLSearchParams("search=Toán&class=class-1&status=scheduled&kind=regular&from=2026-08-01&to=2026-08-31&page=3"), ["class-1"])).toEqual({ filters: { search: "Toán", classId: "class-1", status: "scheduled", kind: "regular", dateFrom: "2026-08-01", dateTo: "2026-08-31" }, page: 3 });
+    expect(parseSessionDirectoryViewState(new URLSearchParams("search=Toán&class=class-1&status=scheduled&kind=regular&lock=unlocked&from=2026-08-01&to=2026-08-31&page=3"), ["class-1"])).toEqual({ filters: { search: "Toán", classId: "class-1", status: "scheduled", kind: "regular", lock: "unlocked", dateFrom: "2026-08-01", dateTo: "2026-08-31" }, page: 3 });
     expect(parseSessionDirectoryViewState(new URLSearchParams("class=other&status=invalid&kind=invalid&from=bad&to=bad&page=0"), ["class-1"])).toEqual({ filters: defaultSessionFilters, page: 1 });
   });
 

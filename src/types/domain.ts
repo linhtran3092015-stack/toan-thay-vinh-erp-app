@@ -7,7 +7,8 @@ export type StudentLifecycleStatus =
   | "resumed"
   | "trial_booked"
   | "trial_completed"
-  | "waiting_class";
+  | "waiting_class"
+  | "withdrawn";
 
 export type UserRole =
   | "academic_admin"

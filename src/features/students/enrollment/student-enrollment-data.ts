@@ -83,6 +83,14 @@ export async function getStudentEnrollmentUiModel(
 
   return {
     actions: {
+      end: createPermissionAvailability({
+        hasPermission: permissions.includes(
+          "students.manage_status",
+        ),
+        permissionCode: "students.manage_status",
+        visible: activeEnrollment !== null,
+      }),
+
       enroll: createClassActionAvailability({
         canViewClasses,
         classOptions,
@@ -152,8 +160,11 @@ function isReadyToResume(
   const latestEnrollment =
     detail.enrollmentHistory[0];
 
+  // Reserved students resume; withdrawn students (enrollment "completed")
+  // come back through the same flow.
   return (
-    latestEnrollment?.status === "reserved" &&
+    (latestEnrollment?.status === "reserved" ||
+      latestEnrollment?.status === "completed") &&
     latestEnrollment.effectiveTo !== null
   );
 }

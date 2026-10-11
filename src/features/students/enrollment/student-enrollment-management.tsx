@@ -18,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  endStudentEnrollmentAction,
   enrollStudentInClassAction,
   reserveStudentEnrollmentAction,
   resumeStudentEnrollmentAction,
@@ -54,6 +55,7 @@ const operationOrder: StudentEnrollmentOperation[] = [
   "enroll",
   "transfer",
   "reserve",
+  "end",
   "resume",
 ];
 
@@ -61,6 +63,7 @@ const operationLabels: Record<
   StudentEnrollmentOperation,
   string
 > = {
+  end: "Kết thúc ghi danh",
   enroll: "Nhập lớp",
   reserve: "Bảo lưu",
   resume: "Quay lại học",
@@ -71,6 +74,8 @@ const operationDescriptions: Record<
   StudentEnrollmentOperation,
   string
 > = {
+  end:
+    "Học viên nghỉ hẳn: kết thúc lớp hiện tại vào ngày nghỉ và chuyển sang trạng thái Đã nghỉ. Quay lại học dùng nghiệp vụ Quay lại học.",
   enroll:
     "Xếp lớp lần đầu và chuyển trạng thái học viên sang Đang học.",
   reserve:
@@ -310,7 +315,7 @@ function EnrollmentOperationDialog({
     operation === "transfer";
 
   const usesRegisteredMode =
-    operation !== "reserve";
+    operation !== "reserve" && operation !== "end";
 
   const classOptions =
     operation === "transfer"
@@ -325,10 +330,14 @@ function EnrollmentOperationDialog({
   const dateFieldName =
     operation === "reserve"
       ? "reservedFrom"
-      : "effectiveFrom";
+      : operation === "end"
+        ? "effectiveTo"
+        : "effectiveFrom";
 
   const dateLabel =
-    operation === "reserve"
+    operation === "end"
+      ? "Ngày nghỉ (không được ở tương lai)"
+      : operation === "reserve"
       ? "Ngày bắt đầu bảo lưu"
       : operation === "transfer"
         ? "Ngày chuyển lớp"
@@ -557,6 +566,14 @@ function EnrollmentOperationDialog({
             />
           </FieldShell>
 
+          {operation === "end" ? (
+            <div className="rounded-lg border border-danger-border bg-danger-bg px-4 py-3 text-sm leading-6 text-danger">
+              Sau khi xác nhận, lớp hiện tại kết thúc từ ngày nghỉ và học viên
+              chuyển sang trạng thái Đã nghỉ. Số buổi còn lại được giữ nguyên
+              trên sổ buổi để đối chiếu hoàn phí nếu có.
+            </div>
+          ) : null}
+
           {operation === "reserve" ? (
             <div className="rounded-lg border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning">
               Sau khi xác nhận, lớp hiện tại sẽ kết
@@ -579,9 +596,11 @@ function EnrollmentOperationDialog({
               disabled={isPending}
               type="submit"
               variant={
-                operation === "reserve"
-                  ? "primary"
-                  : "secondary"
+                operation === "end"
+                  ? "danger"
+                  : operation === "reserve"
+                    ? "primary"
+                    : "secondary"
               }
             >
               {isPending
@@ -629,6 +648,14 @@ async function runOperation({
     return reserveStudentEnrollmentAction({
       reason: values.reason,
       reservedFrom: values.effectiveDate,
+      studentId,
+    });
+  }
+
+  if (operation === "end") {
+    return endStudentEnrollmentAction({
+      effectiveTo: values.effectiveDate,
+      reason: values.reason,
       studentId,
     });
   }
@@ -710,6 +737,8 @@ function getReasonPlaceholder(
     StudentEnrollmentOperation,
     string
   > = {
+    end:
+      "Ví dụ: Phụ huynh báo nghỉ hẳn từ tháng này vì chuyển trường.",
     enroll:
       "Ví dụ: Phụ huynh đã xác nhận nhập học và hoàn tất điều kiện xếp lớp.",
     reserve:

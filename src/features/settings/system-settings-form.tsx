@@ -15,6 +15,7 @@ export function SystemSettingsForm({ initialValues }: { initialValues: SystemSet
       contactPhone: String(formData.get("contactPhone") ?? ""),
       defaultPublicLinkExpiryDays: Number(formData.get("defaultPublicLinkExpiryDays")),
       displayName: String(formData.get("displayName") ?? ""),
+      sessionAutoLockAfterDays: Number(formData.get("sessionAutoLockAfterDays")),
       teacherDisplayName: String(formData.get("teacherDisplayName") ?? ""),
     });
     setMessage(result.message);
@@ -34,6 +35,11 @@ export function SystemSettingsForm({ initialValues }: { initialValues: SystemSet
       <h2 className="text-section-title font-semibold text-ink">Coaching</h2>
       <p className="mt-1 text-sm text-ink-muted">Chỉ là giá trị gợi ý khi phát hành liên kết mới; không thay đổi liên kết đã phát hành.</p>
       <label className="mt-4 grid max-w-sm gap-1 text-sm"><span className="font-medium">Thời hạn liên kết mặc định (ngày)</span><input className="rounded-md border border-hairline bg-surface-base p-2" defaultValue={initialValues["coaching.default_public_link_expiry_days"]} min={1} max={90} name="defaultPublicLinkExpiryDays" required type="number" /></label>
+    </section>
+    <section className="rounded-lg border border-hairline bg-surface-1 p-5 shadow-card">
+      <h2 className="text-section-title font-semibold text-ink">Buổi học</h2>
+      <p className="mt-1 text-sm text-ink-muted">Buổi đã hoàn thành và điểm danh đủ sẽ được hệ thống tự khóa sau số ngày này (khóa mới trừ buổi và tính thưởng chấm bài). Nhập 0 để tắt tự khóa.</p>
+      <label className="mt-4 grid max-w-sm gap-1 text-sm"><span className="font-medium">Tự khóa buổi học sau (ngày)</span><input className="rounded-md border border-hairline bg-surface-base p-2" defaultValue={initialValues["sessions.auto_lock_after_days"]} min={0} max={30} name="sessionAutoLockAfterDays" required type="number" /></label>
     </section>
     <div className="flex items-center gap-3"><button className="rounded-md bg-primary px-4 py-2 font-semibold text-white disabled:opacity-60" disabled={pending} type="submit">{pending ? "Đang lưu…" : "Lưu cài đặt"}</button>{message ? <p role="status" className="text-sm text-ink-muted">{message}</p> : null}</div>
   </form>;

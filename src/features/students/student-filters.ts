@@ -32,6 +32,7 @@ export const studentStatusOptions: Array<{
   { value: "resumed", label: "Quay lại học" },
   { value: "waiting_class", label: "Chờ chọn lớp" },
   { value: "completed", label: "Hoàn thành" },
+  { value: "withdrawn", label: "Đã nghỉ" },
 ];
 
 export const studentStatusMeta: Record<
@@ -53,6 +54,7 @@ export const studentStatusMeta: Record<
   },
   trial_completed: { label: "Đã học thử", tone: "info" },
   waiting_class: { label: "Chờ chọn lớp", tone: "info" },
+  withdrawn: { label: "Đã nghỉ", tone: "neutral" },
 };
 
 export function normalizeStudentSearch(value: string): string {

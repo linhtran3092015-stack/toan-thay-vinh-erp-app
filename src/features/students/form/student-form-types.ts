@@ -137,5 +137,6 @@ export const formLifecycleStatusOptions: Array<{
   { label: "Bảo lưu", value: "reserved" },
   { label: "Quay lại học", value: "resumed" },
   { label: "Chờ chọn lớp", value: "waiting_class" },
+  { label: "Đã nghỉ", value: "withdrawn" },
   { label: "Hoàn thành", value: "completed" },
 ];

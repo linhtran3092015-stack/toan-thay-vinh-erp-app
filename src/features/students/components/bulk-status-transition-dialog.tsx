@@ -9,6 +9,11 @@ import {
   previewBulkStudentStatusTransitionAction,
 } from "@/features/students/bulk-status-actions";
 import { studentStatusOptions } from "@/features/students/student-filters";
+import { bulkTransitionStatuses } from "@/features/students/bulk-status-types";
+
+const bulkStatusOptions = studentStatusOptions.filter((opt) =>
+  (bulkTransitionStatuses as readonly string[]).includes(opt.value),
+);
 import type { StudentLifecycleStatus } from "@/types/domain";
 
 interface BulkStatusTransitionDialogProps {
@@ -37,7 +42,7 @@ export function BulkStatusTransitionDialog({
   const [sourceStatus, setSourceStatus] =
     useState<StudentLifecycleStatus>(defaultSource);
   const [targetStatus, setTargetStatus] = useState<StudentLifecycleStatus>(
-    defaultSource === "interested" ? "active" : "interested",
+    defaultSource === "interested" ? "trial_booked" : "interested",
   );
   const [reason, setReason] = useState("");
   const [previewCount, setPreviewCount] = useState<number | null>(null);
@@ -50,7 +55,7 @@ export function BulkStatusTransitionDialog({
   const isSpecificSelection = selectedStudentIds.length > 0;
 
   const validTargetOptions = useMemo(
-    () => studentStatusOptions.filter((opt) => opt.value !== sourceStatus),
+    () => bulkStatusOptions.filter((opt) => opt.value !== sourceStatus),
     [sourceStatus],
   );
 
@@ -211,7 +216,7 @@ export function BulkStatusTransitionDialog({
                   }
                   value={sourceStatus}
                 >
-                  {studentStatusOptions.map((opt) => (
+                  {bulkStatusOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>

@@ -14,6 +14,7 @@ import { SessionAttendanceManagement } from "@/features/sessions/components/sess
 import { SessionResultManagement } from "@/features/sessions/components/session-result-management";
 import { SessionLockActions } from "@/features/sessions/components/session-lock-actions";
 import { SessionLifecycleActions } from "@/features/sessions/components/session-lifecycle-actions";
+import { SessionRescheduleDialog } from "@/features/sessions/components/session-reschedule-dialog";
 import type {
   SessionAttendanceStatus,
   SessionDetailReadModel,
@@ -95,6 +96,27 @@ export function SessionDetailPage({
           sessionId={detail.id}
           status={detail.status}
         />
+      ) : null}
+
+      {canManageSessions && detail.status === "scheduled" && !detail.lockedAt ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <SessionRescheduleDialog
+            classCode={detail.classCode}
+            endTime={detail.endTime}
+            learningMode={detail.learningMode}
+            meetingUrl={detail.meetingUrl}
+            notes={detail.notes}
+            roomName={detail.roomName}
+            sessionDate={detail.sessionDate}
+            sessionId={detail.id}
+            startTime={detail.startTime}
+          />
+          {detail.previousSessionDate ? (
+            <p className="text-caption text-text-muted">
+              Đã dời {detail.rescheduleCount} lần, lần gần nhất từ ngày {formatIsoDate(detail.previousSessionDate)}.
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <SessionWorkspace
@@ -656,4 +678,9 @@ function formatNotebookStatus(
   };
 
   return labels[value];
+}
+
+function formatIsoDate(value: string): string {
+  const [year, month, day] = value.split("-");
+  return `${day}/${month}/${year}`;
 }

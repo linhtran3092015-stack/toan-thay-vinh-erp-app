@@ -62,6 +62,8 @@ export interface SessionDetailReadModel {
   meetingUrl: string | null;
   notes: string | null;
   participants: SessionParticipantReadModel[];
+  previousSessionDate: string | null;
+  rescheduleCount: number;
   resultCount: number | null;
   roomName: string | null;
   rosterCount: number | null;

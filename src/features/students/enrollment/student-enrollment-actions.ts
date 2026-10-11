@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import type {
+  EndStudentInput,
   EnrollStudentInput,
   ReserveStudentInput,
   ResumeStudentInput,
@@ -63,6 +64,12 @@ const transferStudentSchema = z.object({
 const reserveStudentSchema = z.object({
   reason: reasonSchema,
   reservedFrom: isoDateSchema,
+  studentId: uuidSchema,
+});
+
+const endStudentSchema = z.object({
+  effectiveTo: isoDateSchema,
+  reason: reasonSchema,
   studentId: uuidSchema,
 });
 
@@ -151,8 +158,18 @@ function getRpcErrorMessage(
       "Bắt buộc nhập ngày bắt đầu học.",
     ENROLLMENT_REASON_REQUIRED:
       "Bắt buộc nhập lý do xếp lớp.",
+    ACTIVE_STUDENT_ENROLLMENT_REQUIRED_FOR_END:
+      "Học viên hiện không có lớp đang hoạt động để kết thúc.",
+    END_ENROLLMENT_DATE_BEFORE_START:
+      "Ngày nghỉ không được trước ngày bắt đầu lớp hiện tại.",
+    END_ENROLLMENT_DATE_CANNOT_BE_FUTURE:
+      "Ngày nghỉ không được ở tương lai. Đến ngày đó hãy ghi nhận.",
+    END_ENROLLMENT_EFFECTIVE_DATE_REQUIRED:
+      "Bắt buộc nhập ngày nghỉ.",
+    END_ENROLLMENT_REASON_REQUIRED:
+      "Bắt buộc nhập lý do nghỉ.",
     LATEST_STUDENT_ENROLLMENT_IS_NOT_RESERVED:
-      "Lịch sử gần nhất của học viên không ở trạng thái bảo lưu.",
+      "Lịch sử gần nhất của học viên không ở trạng thái bảo lưu hoặc đã nghỉ.",
     REGISTERED_MODE_INVALID:
       "Hình thức học phải là online hoặc offline.",
     RESERVED_ENROLLMENT_ALREADY_HAS_SUCCESSOR:
@@ -177,6 +194,8 @@ function getRpcErrorMessage(
       "Học viên đã có lịch sử xếp lớp. Không thể dùng nghiệp vụ nhập lớp lần đầu.",
     STUDENT_ENROLLMENT_HISTORY_NOT_FOUND:
       "Học viên chưa có lịch sử xếp lớp để quay lại học.",
+    STUDENT_END_ENROLLMENT_PERMISSION_DENIED:
+      "Tài khoản hiện tại không có quyền kết thúc ghi danh.",
     STUDENT_ENROLLMENT_PERMISSION_DENIED:
       "Tài khoản hiện tại không có quyền nhập học viên vào lớp.",
     STUDENT_NOT_FOUND:
@@ -534,6 +553,75 @@ export async function resumeStudentEnrollmentAction(
   } catch {
     return createErrorState(
       "Không thể kết nối tới hệ thống quay lại học. Vui lòng thử lại.",
+    );
+  }
+}
+
+export async function endStudentEnrollmentAction(
+  input: EndStudentInput,
+): Promise<StudentEnrollmentActionState> {
+  const parsed = endStudentSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return createErrorState(
+      "Vui lòng kiểm tra lại thông tin kết thúc ghi danh.",
+      parsed.error.flatten().fieldErrors,
+    );
+  }
+
+  const permissionError =
+    await getPermissionError(
+      "students.manage_status",
+    );
+
+  if (permissionError) {
+    return createErrorState(permissionError);
+  }
+
+  try {
+    const supabase =
+      await createSupabaseServerClient();
+
+    const { data, error } = await supabase.rpc(
+      "end_student_enrollment",
+      {
+        p_effective_to: parsed.data.effectiveTo,
+        p_reason: parsed.data.reason,
+        p_student_id: parsed.data.studentId,
+      },
+    );
+
+    if (error) {
+      return createErrorState(
+        getRpcErrorMessage(error.message),
+      );
+    }
+
+    const enrollment =
+      parseEnrollmentResult(data);
+
+    if (
+      !enrollment ||
+      enrollment.student_id !==
+        parsed.data.studentId
+    ) {
+      return createErrorState(
+        "Database không trả về kết quả kết thúc ghi danh hợp lệ.",
+      );
+    }
+
+    revalidateEnrollmentPaths(
+      enrollment.student_id,
+      enrollment.class_id,
+    );
+
+    return createSuccessState(
+      "Đã kết thúc ghi danh. Học viên chuyển sang trạng thái Đã nghỉ.",
+      enrollment,
+    );
+  } catch {
+    return createErrorState(
+      "Không thể kết nối tới hệ thống ghi danh. Vui lòng thử lại.",
     );
   }
 }

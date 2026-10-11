@@ -257,3 +257,33 @@ export const cancelSessionSchema =
         "Lý do hủy không được vượt quá 500 ký tự.",
       ),
   });
+
+const LEARNING_MODES = ["online", "offline", "hybrid"] as const;
+
+/** Reschedule or edit a session that is still "scheduled". */
+export const rescheduleSessionSchema = sessionIdSchema
+  .extend({
+    endTime: z.string().regex(TIME_PATTERN, "Giờ kết thúc phải có định dạng HH:mm."),
+    learningMode: z.enum(LEARNING_MODES, { message: "Hình thức học không hợp lệ." }),
+    meetingUrl: optionalUrlSchema,
+    notes: optionalLongTextSchema,
+    reason: z
+      .string()
+      .trim()
+      .min(3, "Lý do đổi lịch phải có ít nhất 3 ký tự.")
+      .max(1000, "Lý do đổi lịch không được vượt quá 1.000 ký tự."),
+    roomName: optionalShortTextSchema,
+    sessionDate: z
+      .string()
+      .refine(isValidDate, "Ngày học không hợp lệ."),
+    startTime: z.string().regex(TIME_PATTERN, "Giờ bắt đầu phải có định dạng HH:mm."),
+  })
+  .superRefine((value, context) => {
+    if (timeToSeconds(value.endTime) <= timeToSeconds(value.startTime)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Giờ kết thúc phải sau giờ bắt đầu.",
+        path: ["endTime"],
+      });
+    }
+  });

@@ -28,6 +28,12 @@ export interface ReserveStudentInput {
   studentId: string;
 }
 
+export interface EndStudentInput {
+  effectiveTo: string;
+  reason: string;
+  studentId: string;
+}
+
 export interface ResumeStudentInput {
   effectiveFrom: string;
   reason: string;

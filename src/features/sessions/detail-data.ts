@@ -38,6 +38,8 @@ interface SessionDetailQueryRow {
   learning_mode: string;
   locked_at: string | null;
   lock_reason: string | null;
+  previous_session_date: string | null;
+  reschedule_count: number;
   meeting_url: string | null;
   notes: string | null;
   room_name: string | null;
@@ -181,6 +183,8 @@ export async function getSessionDetail(
         cancellation_reason,
         locked_at,
         lock_reason,
+        previous_session_date,
+        reschedule_count,
         notes,
         class:classes!class_sessions_class_id_fkey (
           id,
@@ -530,6 +534,8 @@ export async function getSessionDetail(
       level: joinedClass.level,
       lockedAt: session.locked_at,
       lockReason: session.lock_reason,
+      previousSessionDate: session.previous_session_date,
+      rescheduleCount: session.reschedule_count,
       meetingUrl: session.meeting_url,
       notes: session.notes,
       participants,

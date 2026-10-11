@@ -7,6 +7,7 @@ export const SYSTEM_SETTING_DEFAULTS = {
   "center.contact_email": "",
   "center.address": "",
   "coaching.default_public_link_expiry_days": 7,
+  "sessions.auto_lock_after_days": 3,
 } as const;
 
 export type SystemSettingKey = keyof typeof SYSTEM_SETTING_DEFAULTS;

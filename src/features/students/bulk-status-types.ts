@@ -10,7 +10,21 @@ export const studentLifecycleStatusSchema = z.enum([
   "trial_booked",
   "trial_completed",
   "waiting_class",
+  "withdrawn",
 ]);
+
+/**
+ * Only pre-enrollment statuses can be changed in bulk; enrollment-bound
+ * statuses (active, resumed, reserved, withdrawn, completed) go through the
+ * enrollment workflow so class history stays in sync.
+ */
+export const bulkTransitionStatuses = [
+  "interested",
+  "trial_booked",
+  "trial_completed",
+  "pending_enrollment_confirmation",
+  "waiting_class",
+] as const;
 
 export const previewBulkStudentStatusInputSchema = z.object({
   sourceStatus: studentLifecycleStatusSchema,

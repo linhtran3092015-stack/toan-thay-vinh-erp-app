@@ -8,6 +8,7 @@ import type {
 } from "@/features/students/read-models";
 
 export type StudentEnrollmentOperation =
+  | "end"
   | "enroll"
   | "reserve"
   | "resume"
@@ -30,6 +31,7 @@ export interface StudentEnrollmentActionAvailability {
 }
 
 export interface StudentEnrollmentActionMap {
+  end: StudentEnrollmentActionAvailability;
   enroll: StudentEnrollmentActionAvailability;
   reserve: StudentEnrollmentActionAvailability;
   resume: StudentEnrollmentActionAvailability;

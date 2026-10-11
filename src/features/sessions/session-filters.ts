@@ -5,12 +5,14 @@ export interface SessionDirectoryFiltersState {
   dateFrom: string;
   dateTo: string;
   kind: string;
+  /** all | unlocked | locked */
+  lock: string;
   search: string;
   status: string;
 }
 
 export const defaultSessionFilters: SessionDirectoryFiltersState = {
-  classId: "all", dateFrom: "", dateTo: "", kind: "all", search: "", status: "all",
+  classId: "all", dateFrom: "", dateTo: "", kind: "all", lock: "all", search: "", status: "all",
 };
 
 export function filterSessions(sessions: SessionDirectoryItem[], filters: SessionDirectoryFiltersState) {
@@ -20,6 +22,7 @@ export function filterSessions(sessions: SessionDirectoryItem[], filters: Sessio
     (filters.classId === "all" || session.classId === filters.classId) &&
     (filters.status === "all" || session.status === filters.status) &&
     (filters.kind === "all" || session.sessionKind === filters.kind) &&
+    (filters.lock === "all" || (filters.lock === "unlocked" ? session.lockedAt === null : session.lockedAt !== null)) &&
     (filters.dateFrom.length === 0 || session.sessionDate >= filters.dateFrom) &&
     (filters.dateTo.length === 0 || session.sessionDate <= filters.dateTo),
   );

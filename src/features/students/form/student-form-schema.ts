@@ -15,6 +15,7 @@ const statusValues = [
   "reserved",
   "resumed",
   "waiting_class",
+  "withdrawn",
   "completed",
 ] as const;
 

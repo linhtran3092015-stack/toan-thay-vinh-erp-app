@@ -2,6 +2,21 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.16.0] - 2026-10-13
+
+Đợt 2 — nhóm 2a (học vụ khép kín).
+
+### Added
+- **Đổi lịch / sửa buổi học** còn ở trạng thái đã lên lịch (ngày, giờ, hình thức, phòng, link, ghi chú; bắt buộc lý do). Lịch cũ được lưu trên buổi và hiện "Đã dời … lần"; buổi chính được dời sang ngày khác thứ của lịch mẫu; chặn trùng ngày cùng lịch mẫu và chồng giờ cùng lớp. RPC `update_class_session`. Unique index (lịch mẫu, ngày) bỏ qua buổi đã hủy nên tạo lại được buổi cùng ngày sau khi hủy.
+- **Hàng đợi "buổi đã hoàn thành chưa khóa"** đầu trang Buổi học (số ngày chờ, thiếu bao nhiêu điểm danh, ngày tự khóa dự kiến) và bộ lọc "Khóa: chưa khóa / đã khóa". RPC `get_unlocked_completed_sessions`.
+- **Tự khóa buổi học** sau N ngày kể từ khi hoàn thành nếu đã điểm danh đủ (cài đặt `Tự khóa buổi học sau (ngày)` tại Cài đặt → Chung, mặc định 3, 0 = tắt). Worker pg_cron `class-session-auto-lock` mỗi giờ; khóa ghi tên người hoàn thành buổi và lý do "Tự động khóa". Nhắc người hoàn thành buổi sau 24 giờ chưa khóa và nhắc quản lý buổi học mỗi sáng khi còn tồn đọng (`class-session-lock-reminders`).
+- **Kết thúc ghi danh / học sinh nghỉ** (`end_student_enrollment`, quyền quản lý trạng thái học sinh): đóng lớp hiện tại vào ngày nghỉ (không được ở tương lai) kèm lý do, học sinh sang trạng thái mới **Đã nghỉ**; quay lại học dùng nghiệp vụ "Quay lại học" như sau bảo lưu.
+
+### Changed
+- Chuyển trạng thái hàng loạt chỉ cho phép giữa các trạng thái trước ghi danh (quan tâm, đặt lịch học thử, đã học thử, chờ xác nhận, chờ chọn lớp); trạng thái gắn với ghi danh phải đi qua nhập lớp / chuyển lớp / bảo lưu / kết thúc ghi danh. Audit ghi thêm một dòng cho từng học sinh.
+- Đóng hoặc lưu trữ lớp tự hủy các buổi còn "đã lên lịch" (lý do ghi rõ đóng lớp, có audit số buổi); còn buổi đang diễn ra thì không đóng được.
+- Khóa buổi tách lõi dùng chung `lock_class_session_internal` cho thao tác tay và worker.
+
 ## [0.6.15.0] - 2026-10-12
 
 Đợt 1 — ba việc còn lại (đảo phân bổ, KPI dashboard bằng SQL, hoa hồng theo ngày tiền về).

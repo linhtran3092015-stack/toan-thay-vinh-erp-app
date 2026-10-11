@@ -857,6 +857,13 @@ export type Database = {
           makeup_for_session_id: string | null
           meeting_url: string | null
           notes: string | null
+          previous_end_time: string | null
+          previous_session_date: string | null
+          previous_start_time: string | null
+          reschedule_count: number
+          reschedule_reason: string | null
+          rescheduled_at: string | null
+          rescheduled_by: string | null
           room_name: string | null
           schedule_template_id: string | null
           session_date: string
@@ -886,6 +893,13 @@ export type Database = {
           makeup_for_session_id?: string | null
           meeting_url?: string | null
           notes?: string | null
+          previous_end_time?: string | null
+          previous_session_date?: string | null
+          previous_start_time?: string | null
+          reschedule_count?: number
+          reschedule_reason?: string | null
+          rescheduled_at?: string | null
+          rescheduled_by?: string | null
           room_name?: string | null
           schedule_template_id?: string | null
           session_date: string
@@ -915,6 +929,13 @@ export type Database = {
           makeup_for_session_id?: string | null
           meeting_url?: string | null
           notes?: string | null
+          previous_end_time?: string | null
+          previous_session_date?: string | null
+          previous_start_time?: string | null
+          reschedule_count?: number
+          reschedule_reason?: string | null
+          rescheduled_at?: string | null
+          rescheduled_by?: string | null
           room_name?: string | null
           schedule_template_id?: string | null
           session_date?: string
@@ -966,6 +987,13 @@ export type Database = {
             columns: ["makeup_for_session_id"]
             isOneToOne: false
             referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_sessions_rescheduled_by_fkey"
+            columns: ["rescheduled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -7090,6 +7118,13 @@ export type Database = {
           makeup_for_session_id: string | null
           meeting_url: string | null
           notes: string | null
+          previous_end_time: string | null
+          previous_session_date: string | null
+          previous_start_time: string | null
+          reschedule_count: number
+          reschedule_reason: string | null
+          rescheduled_at: string | null
+          rescheduled_by: string | null
           room_name: string | null
           schedule_template_id: string | null
           session_date: string
@@ -7368,6 +7403,13 @@ export type Database = {
           makeup_for_session_id: string | null
           meeting_url: string | null
           notes: string | null
+          previous_end_time: string | null
+          previous_session_date: string | null
+          previous_start_time: string | null
+          reschedule_count: number
+          reschedule_reason: string | null
+          rescheduled_at: string | null
+          rescheduled_by: string | null
           room_name: string | null
           schedule_template_id: string | null
           session_date: string
@@ -7678,6 +7720,13 @@ export type Database = {
           makeup_for_session_id: string | null
           meeting_url: string | null
           notes: string | null
+          previous_end_time: string | null
+          previous_session_date: string | null
+          previous_start_time: string | null
+          reschedule_count: number
+          reschedule_reason: string | null
+          rescheduled_at: string | null
+          rescheduled_by: string | null
           room_name: string | null
           schedule_template_id: string | null
           session_date: string
@@ -8488,6 +8537,32 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      end_student_enrollment: {
+        Args: { p_effective_to: string; p_reason: string; p_student_id: string }
+        Returns: {
+          class_id: string
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          end_reason: string | null
+          ended_by: string | null
+          id: string
+          registered_mode: string
+          start_reason: string | null
+          started_by: string | null
+          status: string
+          student_id: string
+          supersedes_enrollment_id: string | null
+          transition_kind: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "student_enrollments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       enroll_student_in_class: {
         Args: {
           p_class_id: string
@@ -9194,6 +9269,27 @@ export type Database = {
           staff_id: string
         }[]
       }
+      get_unlocked_completed_sessions: {
+        Args: { p_limit?: number }
+        Returns: {
+          attendance_count: number
+          auto_lock_on: string
+          class_code: string
+          class_id: string
+          class_name: string
+          class_session_id: string
+          completed_at: string
+          completed_by: string
+          completed_by_name: string
+          days_since_completed: number
+          end_time: string
+          missing_attendance_count: number
+          roster_count: number
+          session_date: string
+          session_kind: string
+          start_time: string
+        }[]
+      }
       get_weekly_shift_schedule: {
         Args: { p_week_start: string }
         Returns: Json
@@ -9293,6 +9389,58 @@ export type Database = {
           makeup_for_session_id: string | null
           meeting_url: string | null
           notes: string | null
+          previous_end_time: string | null
+          previous_session_date: string | null
+          previous_start_time: string | null
+          reschedule_count: number
+          reschedule_reason: string | null
+          rescheduled_at: string | null
+          rescheduled_by: string | null
+          room_name: string | null
+          schedule_template_id: string | null
+          session_date: string
+          session_kind: string
+          start_time: string
+          started_at: string | null
+          started_by: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      lock_class_session_internal: {
+        Args: { p_actor: string; p_class_session_id: string; p_reason: string }
+        Returns: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          class_id: string
+          completed_at: string | null
+          completed_by: string | null
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          learning_mode: string
+          lock_reason: string | null
+          locked_at: string | null
+          locked_by: string | null
+          makeup_for_session_id: string | null
+          meeting_url: string | null
+          notes: string | null
+          previous_end_time: string | null
+          previous_session_date: string | null
+          previous_start_time: string | null
+          reschedule_count: number
+          reschedule_reason: string | null
+          rescheduled_at: string | null
+          rescheduled_by: string | null
           room_name: string | null
           schedule_template_id: string | null
           session_date: string
@@ -9930,6 +10078,13 @@ export type Database = {
           makeup_for_session_id: string | null
           meeting_url: string | null
           notes: string | null
+          previous_end_time: string | null
+          previous_session_date: string | null
+          previous_start_time: string | null
+          reschedule_count: number
+          reschedule_reason: string | null
+          rescheduled_at: string | null
+          rescheduled_by: string | null
           room_name: string | null
           schedule_template_id: string | null
           session_date: string
@@ -10246,6 +10401,8 @@ export type Database = {
           user_id: string
         }[]
       }
+      run_class_session_auto_lock_worker: { Args: never; Returns: number }
+      run_class_session_lock_reminders: { Args: never; Returns: number }
       run_student_care_worker: { Args: never; Returns: Json }
       run_teaching_assistant_timekeeping_watchdog: {
         Args: never
@@ -10304,6 +10461,7 @@ export type Database = {
           topup_type: string
         }[]
       }
+      session_auto_lock_after_days: { Args: never; Returns: number }
       set_attendance_verification_config: {
         Args: {
           p_attendance_radius_m: number
@@ -10405,6 +10563,13 @@ export type Database = {
           makeup_for_session_id: string | null
           meeting_url: string | null
           notes: string | null
+          previous_end_time: string | null
+          previous_session_date: string | null
+          previous_start_time: string | null
+          reschedule_count: number
+          reschedule_reason: string | null
+          rescheduled_at: string | null
+          rescheduled_by: string | null
           room_name: string | null
           schedule_template_id: string | null
           session_date: string
@@ -10699,6 +10864,61 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "classes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_class_session: {
+        Args: {
+          p_class_session_id: string
+          p_end_time: string
+          p_learning_mode: string
+          p_meeting_url: string
+          p_notes: string
+          p_reason: string
+          p_room_name: string
+          p_session_date: string
+          p_start_time: string
+        }
+        Returns: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          class_id: string
+          completed_at: string | null
+          completed_by: string | null
+          component_code: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          learning_mode: string
+          lock_reason: string | null
+          locked_at: string | null
+          locked_by: string | null
+          makeup_for_session_id: string | null
+          meeting_url: string | null
+          notes: string | null
+          previous_end_time: string | null
+          previous_session_date: string | null
+          previous_start_time: string | null
+          reschedule_count: number
+          reschedule_reason: string | null
+          rescheduled_at: string | null
+          rescheduled_by: string | null
+          room_name: string | null
+          schedule_template_id: string | null
+          session_date: string
+          session_kind: string
+          start_time: string
+          started_at: string | null
+          started_by: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_sessions"
           isOneToOne: true
           isSetofReturn: false
         }

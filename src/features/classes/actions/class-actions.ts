@@ -101,6 +101,9 @@ function getRpcErrorMessage(
     CLASS_HAS_ACTIVE_STUDENT_ENROLLMENTS:
       "Cần xử lý toàn bộ học viên đang học trước khi đóng hoặc lưu trữ lớp.",
 
+    CLASS_HAS_SESSION_IN_PROGRESS:
+      "Lớp còn buổi học đang diễn ra. Hoàn thành hoặc hủy buổi đó trước khi đóng lớp.",
+
     CLASS_ID_REQUIRED:
       "Thiếu mã lớp cần thao tác.",
 

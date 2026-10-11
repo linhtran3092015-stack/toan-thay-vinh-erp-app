@@ -115,6 +115,7 @@ export function getStudentLifecycleStatusLabel(
     trial_booked: "Đã đặt lịch học thử",
     trial_completed: "Đã học thử",
     waiting_class: "Chờ chọn lớp",
+    withdrawn: "Đã nghỉ",
   };
 
   return Object.hasOwn(labels, status)

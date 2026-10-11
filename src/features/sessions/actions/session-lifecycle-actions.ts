@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type {
   CancelSessionActionInput,
   CreateSessionActionInput,
+  RescheduleSessionActionInput,
   SessionIdActionInput,
   SessionLifecycleActionState,
   SessionLifecycleFieldErrors,
@@ -12,6 +13,7 @@ import type {
 import {
   cancelSessionSchema,
   createSessionSchema,
+  rescheduleSessionSchema,
   sessionIdSchema,
 } from "@/features/sessions/forms/session-lifecycle-form-schema";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
@@ -160,6 +162,22 @@ function getLifecycleRpcErrorMessage(
     SCHEDULE_TEMPLATE_NOT_FOUND:
       "Không tìm thấy lịch học cố định đã chọn.",
 
+    CLASS_SESSION_DATE_CONFLICT:
+      "Lịch mẫu của lớp đã có buổi học vào ngày này. Chọn ngày khác hoặc hủy buổi trùng trước.",
+    CLASS_SESSION_RESCHEDULE_REASON_REQUIRED:
+      "Bắt buộc nhập lý do đổi lịch (3–1000 ký tự).",
+    CLASS_SESSION_RESCHEDULE_STATUS_INVALID:
+      "Chỉ buổi học còn ở trạng thái đã lên lịch mới đổi lịch được. Buổi đã bắt đầu thì hủy rồi tạo buổi bù.",
+    CLASS_SESSION_SCHEDULE_NOT_EFFECTIVE:
+      "Ngày mới nằm ngoài khoảng hiệu lực của lịch mẫu.",
+    CLASS_SESSION_SCHEDULE_REQUIRED:
+      "Bắt buộc nhập ngày, giờ bắt đầu và giờ kết thúc.",
+    CLASS_SESSION_TIME_CONFLICT:
+      "Lớp đã có buổi học khác chồng giờ trong ngày này.",
+    CLASS_SESSION_TIME_RANGE_INVALID:
+      "Giờ kết thúc phải sau giờ bắt đầu.",
+    MAKEUP_SESSION_DATE_INVALID:
+      "Buổi bù phải diễn ra sau buổi gốc đã hủy.",
     SESSION_MANAGE_PERMISSION_DENIED:
       "Tài khoản hiện tại không có quyền quản lý buổi học.",
   };
@@ -432,6 +450,72 @@ export async function cancelSessionAction(
 
     return {
       message: "Đã hủy buổi học.",
+      sessionId: data.id,
+      status: "success",
+    };
+  } catch {
+    return createErrorState(
+      "Không thể kết nối tới hệ thống buổi học. Vui lòng thử lại.",
+    );
+  }
+}
+
+export async function rescheduleSessionAction(
+  input: RescheduleSessionActionInput,
+): Promise<SessionLifecycleActionState> {
+  const permissionError =
+    await getLifecyclePermissionError();
+
+  if (permissionError) {
+    return createErrorState(permissionError);
+  }
+
+  const parsed =
+    rescheduleSessionSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return createErrorState(
+      "Vui lòng kiểm tra lại lịch mới của buổi học.",
+      parsed.error.flatten().fieldErrors,
+    );
+  }
+
+  try {
+    const supabase =
+      await createSupabaseServerClient();
+
+    const { data, error } = await supabase.rpc(
+      "update_class_session",
+      {
+        p_class_session_id: parsed.data.sessionId,
+        p_end_time: parsed.data.endTime,
+        p_learning_mode: parsed.data.learningMode,
+        p_meeting_url: parsed.data.meetingUrl ?? "",
+        p_notes: parsed.data.notes ?? "",
+        p_reason: parsed.data.reason,
+        p_room_name: parsed.data.roomName ?? "",
+        p_session_date: parsed.data.sessionDate,
+        p_start_time: parsed.data.startTime,
+      },
+    );
+
+    if (error) {
+      return createErrorState(
+        getLifecycleRpcErrorMessage(error.message),
+      );
+    }
+
+    if (!data?.id) {
+      return createErrorState(
+        "Database không trả về kết quả đổi lịch buổi học.",
+      );
+    }
+
+    revalidateSessionRoutes(data.id);
+    revalidatePath(`/classes/${data.class_id}`);
+
+    return {
+      message: "Đã cập nhật lịch buổi học.",
       sessionId: data.id,
       status: "success",
     };

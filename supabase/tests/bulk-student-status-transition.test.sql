@@ -26,11 +26,11 @@ insert into public.students(id, public_code, full_name, birth_year, current_grad
   ('c2000000-0000-0000-0000-000000000013', 'TV-2030-20013', 'Bulk status untouched', 2020, 5, 'interested');
 
 select lives_ok(
-  $$select public.bulk_transition_student_lifecycle_status('interested', 'active', 2, array['c2000000-0000-0000-0000-000000000011'::uuid, 'c2000000-0000-0000-0000-000000000012'::uuid], 'Regression test')$$,
+  $$select public.bulk_transition_student_lifecycle_status('interested', 'trial_booked', 2, array['c2000000-0000-0000-0000-000000000011'::uuid, 'c2000000-0000-0000-0000-000000000012'::uuid], 'Regression test')$$,
   'selected rows can be locked, counted, and transitioned without an aggregate FOR UPDATE error'
 );
 select is(
-  (select count(*) from public.students where id in ('c2000000-0000-0000-0000-000000000011', 'c2000000-0000-0000-0000-000000000012') and lifecycle_status = 'active')::integer,
+  (select count(*) from public.students where id in ('c2000000-0000-0000-0000-000000000011', 'c2000000-0000-0000-0000-000000000012') and lifecycle_status = 'trial_booked')::integer,
   2,
   'both selected students are transitioned'
 );
@@ -45,7 +45,7 @@ select is(
   'the successful transition is audited with its affected count'
 );
 select throws_ok(
-  $$select public.bulk_transition_student_lifecycle_status('interested', 'active', 2, array['c2000000-0000-0000-0000-000000000013'::uuid], 'Stale preview')$$,
+  $$select public.bulk_transition_student_lifecycle_status('interested', 'trial_booked', 2, array['c2000000-0000-0000-0000-000000000013'::uuid], 'Stale preview')$$,
   '23514',
   'Dữ liệu đã thay đổi kể từ lúc preview. Vui lòng thực hiện preview lại.',
   'stale previews still abort atomically'
@@ -61,7 +61,7 @@ select is(
   'a failed transition does not create an audit record'
 );
 select is(
-  (select count(*) from public.students where lifecycle_status = 'active')::integer,
+  (select count(*) from public.students where id in ('c2000000-0000-0000-0000-000000000011', 'c2000000-0000-0000-0000-000000000012', 'c2000000-0000-0000-0000-000000000013') and lifecycle_status = 'trial_booked')::integer,
   2,
   'only the successfully transitioned students are active'
 );

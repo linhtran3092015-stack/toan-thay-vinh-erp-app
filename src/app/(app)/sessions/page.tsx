@@ -2,7 +2,9 @@ import { Suspense } from "react";
 
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
+import { UnlockedSessionQueue } from "@/features/sessions/components/unlocked-session-queue";
 import { getSessionDirectory } from "@/features/sessions/data";
+import { getUnlockedSessionQueueResult } from "@/features/sessions/unlocked-sessions-data";
 import { SessionListPage } from "@/features/sessions/session-list-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -42,12 +44,14 @@ export default async function SessionsRoute() {
       "results.view",
     );
 
-  const directoryResult =
-    await getSessionDirectory({
+  const [directoryResult, queueResult] = await Promise.all([
+    getSessionDirectory({
       includeAttendanceCounts:
         canViewAttendance,
       includeResultCounts: canViewResults,
-    });
+    }),
+    getUnlockedSessionQueueResult(),
+  ]);
 
   if (!directoryResult.ok) {
     return (
@@ -63,6 +67,14 @@ export default async function SessionsRoute() {
   return (
     <Suspense>
       <SessionListPage
+        queuePanel={
+          queueResult.ok ? (
+            <UnlockedSessionQueue
+              canLock={permissionResult.permissions.includes("sessions.lock")}
+              queue={queueResult.data}
+            />
+          ) : null
+        }
         canManageSessions={
           permissionResult.permissions.includes(
             "sessions.manage",
