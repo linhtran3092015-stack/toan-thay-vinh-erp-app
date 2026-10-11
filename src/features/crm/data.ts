@@ -147,6 +147,9 @@ export async function getCrmCaseDetail(
     .eq("crm_case_id", caseId)
     .order("created_at", { ascending: false });
 
+  // Working notes and follow-ups (RPC resolves author names).
+  const { data: noteRows } = await supabase.rpc("get_crm_case_notes", { p_crm_case_id: caseId });
+
   // Fetch checklist
   const { data: checklistRow } = await supabase
     .from("student_enrollment_checklists")
@@ -170,6 +173,16 @@ export async function getCrmCaseDetail(
       reason: h.reason,
     })),
     birthYear: caseRow.birth_year,
+    caseNotes: (noteRows ?? []).map((n) => ({
+      createdAt: n.created_at,
+      createdBy: n.created_by,
+      createdByName: n.created_by_name,
+      followUpAt: n.follow_up_at,
+      followUpDoneAt: n.follow_up_done_at,
+      followUpDoneByName: n.follow_up_done_by_name,
+      id: n.note_id,
+      note: n.note,
+    })),
     checklist: checklistRow
       ? {
           completedAt: checklistRow.completed_at,
@@ -190,6 +203,8 @@ export async function getCrmCaseDetail(
       : null,
     createdAt: caseRow.created_at,
     discountNotes: caseRow.discount_notes,
+    dropReason: caseRow.drop_reason,
+    droppedAt: caseRow.dropped_at,
     expectedGrade: caseRow.expected_grade,
     expectedLevel: caseRow.expected_level,
     expectedMode: caseRow.expected_mode,

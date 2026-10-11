@@ -31,7 +31,9 @@ export async function getPaymentRequestCreationOptions(): Promise<
         )
       `,
       )
-      .eq("lifecycle_status", "active")
+      // Provisional students from CRM (pending confirmation) may receive a
+      // new-enrollment request before conversion.
+      .in("lifecycle_status", ["active", "pending_enrollment_confirmation"])
       .eq("student_guardians.is_primary", true)
       .is("student_guardians.ended_at", null)
       .order("full_name")

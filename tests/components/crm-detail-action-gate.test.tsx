@@ -6,6 +6,7 @@ import CrmCaseDetailPage from "@/app/(app)/crm/[caseId]/page";
 const data = vi.hoisted(() => ({ getCrmCaseDetail: vi.fn(), getSaleOwners: vi.fn() }));
 const permissions = vi.hoisted(() => ({ getCachedDatabasePermissions: vi.fn() }));
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/features/crm/data", () => data);
 vi.mock("@/lib/permissions/database-permissions", () => permissions);
 vi.mock("@/lib/supabase/server", () => ({
@@ -29,6 +30,9 @@ describe("CRM detail converted-case action gate", () => {
     data.getSaleOwners.mockResolvedValue([]);
     data.getCrmCaseDetail.mockResolvedValue({
       assignmentHistory: [],
+      caseNotes: [],
+      dropReason: null,
+      droppedAt: null,
       birthYear: 2015,
       checklist: null,
       createdAt: "2026-08-10T00:00:00Z",

@@ -35,6 +35,17 @@ export interface CrmTrialBookingReadModel {
   trialDate: string;
 }
 
+export interface CrmCaseNoteReadModel {
+  createdAt: string;
+  createdBy: string;
+  createdByName: string | null;
+  followUpAt: string | null;
+  followUpDoneAt: string | null;
+  followUpDoneByName: string | null;
+  id: string;
+  note: string;
+}
+
 export interface CrmAssignmentHistoryReadModel {
   assignedByName: string | null;
   assignmentMethod: string;
@@ -68,6 +79,8 @@ export interface CrmCaseDetailReadModel {
   checklist: EnrollmentChecklistReadModel | null;
   createdAt: string;
   discountNotes: string | null;
+  dropReason: string | null;
+  droppedAt: string | null;
   expectedGrade: number;
   expectedLevel: string | null;
   expectedMode: string | null;
@@ -83,6 +96,8 @@ export interface CrmCaseDetailReadModel {
   leadSourceName: string;
   nickname: string | null;
   notes: string | null;
+  /** Working notes and follow-ups, newest first. */
+  caseNotes: CrmCaseNoteReadModel[];
   provinceCity: string | null;
   publicCode: string;
   saleOwnerId: string | null;

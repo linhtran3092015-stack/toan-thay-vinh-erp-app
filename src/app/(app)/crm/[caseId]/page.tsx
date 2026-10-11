@@ -8,10 +8,13 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CrmCaseNotesPanel } from "@/features/crm/components/crm-case-notes-panel";
+import { CrmCaseStatusDialog } from "@/features/crm/components/crm-case-status-dialog";
 import { CrmConversionChecklistDialog } from "@/features/crm/components/crm-conversion-checklist-dialog";
 import { CrmLeadTransferDialog } from "@/features/crm/components/crm-lead-transfer-dialog";
 import { CrmStatusBadge } from "@/features/crm/components/crm-status-badge";
 import { CrmTrialBookingDialog } from "@/features/crm/components/crm-trial-booking-dialog";
+import { CrmTrialResultDialog } from "@/features/crm/components/crm-trial-result-dialog";
 import { getCrmCaseDetail, getSaleOwners } from "@/features/crm/data";
 import { getCrmDirectoryHref } from "@/features/crm/crm-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
@@ -103,11 +106,23 @@ export default async function CrmCaseDetailPage({ params, searchParams }: CrmCas
               />
             ) : null}
 
-            {canUpdate && detail.status !== "converted" ? (
+            {canUpdate && detail.status !== "converted" && detail.status !== "dropped" ? (
               <CrmTrialBookingDialog crmCaseId={detail.id} />
             ) : null}
 
-            {canConfirmOfficial && detail.status !== "converted" ? (
+            {canUpdate && (detail.status === "interested" || detail.status === "trial_booked" || detail.status === "trial_completed") ? (
+              <CrmCaseStatusDialog crmCaseId={detail.id} targetStatus="pending_enrollment_confirmation" />
+            ) : null}
+
+            {canUpdate && detail.status === "dropped" ? (
+              <CrmCaseStatusDialog crmCaseId={detail.id} targetStatus="interested" />
+            ) : null}
+
+            {canUpdate && detail.status !== "converted" && detail.status !== "dropped" ? (
+              <CrmCaseStatusDialog crmCaseId={detail.id} targetStatus="dropped" />
+            ) : null}
+
+            {canConfirmOfficial && detail.status !== "converted" && detail.status !== "dropped" ? (
               <CrmConversionChecklistDialog
                 checklist={detail.checklist}
                 classes={activeClasses}
@@ -118,13 +133,19 @@ export default async function CrmCaseDetailPage({ params, searchParams }: CrmCas
 
             {detail.studentId ? (
               <Link href={`/students/${detail.studentId}`}>
-                <Button variant="outline">Xem hồ sơ học viên <ExternalLink aria-hidden="true" size={16} strokeWidth={1.8} /></Button>
+                <Button variant="outline">{detail.status === "converted" ? "Xem hồ sơ học viên" : "Hồ sơ tạm & phiếu thu"} <ExternalLink aria-hidden="true" size={16} strokeWidth={1.8} /></Button>
               </Link>
             ) : null}
           </div>}
           context={<CrmStatusBadge status={detail.status} />}
           title={detail.fullName}
         >
+          {detail.status === "dropped" && detail.dropReason ? (
+            <p className="mt-1 text-secondary text-danger">Đã dừng{detail.droppedAt ? ` ngày ${formatDate(detail.droppedAt)}` : ""}: {detail.dropReason}</p>
+          ) : null}
+          {detail.status === "pending_enrollment_confirmation" && detail.studentId ? (
+            <p className="mt-1 text-secondary text-text-muted">Hồ sơ học sinh tạm đã tạo: kế toán có thể lập phiếu thu tuyển mới từ trang Phiếu thu; tiền về sẽ tự khớp theo mã chuyển khoản.</p>
+          ) : null}
           <p className="mt-1 tabular-nums text-secondary text-text-muted">{detail.publicCode} · Khối {detail.expectedGrade}{detail.expectedLevel ? ` · Mức ${detail.expectedLevel}` : ""}{detail.expectedMode ? ` · ${formatMode(detail.expectedMode)}` : ""} · Sale: {detail.saleOwnerName ?? "Chưa phân công"}</p>
         </PageHeader>
       </div>
@@ -162,9 +183,15 @@ export default async function CrmCaseDetailPage({ params, searchParams }: CrmCas
                     <div className="rounded-md border border-border-subtle bg-surface-sunken p-3 text-body" key={t.id}>
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-text-strong">Ngày thử: {formatDate(t.trialDate)}</span>
-                        <Badge tone={t.status === "attended" ? "success" : "warning"}>{t.status}</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge tone={t.status === "attended" ? "success" : t.status === "scheduled" ? "info" : "neutral"}>{formatTrialStatus(t.status)}</Badge>
+                          {canUpdate && t.status === "scheduled" && detail.status !== "converted" && detail.status !== "dropped" ? (
+                            <CrmTrialResultDialog bookingId={t.id} crmCaseId={detail.id} trialDateLabel={formatDate(t.trialDate)} />
+                          ) : null}
+                        </div>
                       </div>
                       <p className="mt-1 text-caption text-text-muted">Hình thức: {t.learningMode}</p>
+                      {t.teacherFeedback ? <p className="mt-1 text-caption text-text-default">Nhận xét giáo viên: {t.teacherFeedback}</p> : null}
                       {t.saleNotes ? <p className="mt-1 text-caption text-text-default">Ghi chú sale: {t.saleNotes}</p> : null}
                     </div>
                   ))}
@@ -172,6 +199,8 @@ export default async function CrmCaseDetailPage({ params, searchParams }: CrmCas
               )}
             </CardContent>
           </Card>
+
+          <CrmCaseNotesPanel canUpdate={canUpdate && detail.status !== "converted"} crmCaseId={detail.id} notes={detail.caseNotes} todayIso={getVietnamToday()} />
         </div>
 
         <div className="grid content-start gap-4">
@@ -255,4 +284,20 @@ function formatDate(value: string | null): string {
   const parts = value.split("T")[0].split("-");
   if (parts.length !== 3) return value;
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+function formatTrialStatus(status: string): string {
+  switch (status) {
+    case "attended": return "Đã đến học thử";
+    case "no_show": return "Vắng";
+    case "cancelled": return "Đã hủy";
+    case "scheduled": return "Đã đặt lịch";
+    default: return status;
+  }
+}
+
+function getVietnamToday(): string {
+  const parts = new Intl.DateTimeFormat("en-US", { day: "2-digit", month: "2-digit", timeZone: "Asia/Ho_Chi_Minh", year: "numeric" }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
 }

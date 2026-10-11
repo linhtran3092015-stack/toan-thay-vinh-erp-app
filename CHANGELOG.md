@@ -2,6 +2,20 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.17.0] - 2026-10-13
+
+Đợt 2 — nhóm 2b (CRM khép kín).
+
+### Added
+- **Kết quả học thử** trên từng lịch thử (đã đến / vắng / hủy, nhận xét giáo viên, ghi chú sale). Đến học thử chuyển lead sang "Đã học thử"; vắng hoặc hủy mà không còn lịch thử nào khác trả lead về "Đang quan tâm". RPC `record_crm_trial_result`.
+- **Chuyển trạng thái lead có lý do**: "Chờ xác nhận nhập học", "Dừng lead" (lý do bắt buộc, hủy lịch thử đang chờ) và "Mở lại". RPC `advance_crm_case_status`; lý do dừng hiện trên trang lead.
+- **Ghi chú & hẹn theo dõi** trên lead (`crm_case_notes`): ghi chú có ngày hẹn, đánh dấu đã xử lý; worker pg_cron `crm-follow-up-reminders` nhắc sale phụ trách mỗi sáng khi hẹn đến hạn hoặc quá hạn.
+- Sale nhận **thông báo khi được giao lead** (tạo mới hoặc chuyển giao).
+- **Phiếu thu tuyển mới trước khi chuyển đổi**: chuyển lead sang "Chờ xác nhận nhập học" tạo hồ sơ học sinh tạm (gắn phụ huynh chính) nên kế toán lập phiếu thu ngay và tiền về tự khớp theo mã chuyển khoản; phiếu thu ghi `crm_case_id`. Danh sách chọn học sinh khi tạo phiếu thu gồm cả hồ sơ tạm.
+
+### Changed
+- Chuyển đổi học viên chính thức dùng lại hồ sơ tạm thay vì tạo hồ sơ mới; mục 1 checklist "Đã nhận học phí" được hệ thống xác nhận khi học sinh có phiếu thu ở trạng thái đã thu; lead đã dừng không chuyển đổi được.
+
 ## [0.6.16.0] - 2026-10-13
 
 Đợt 2 — nhóm 2a (học vụ khép kín).

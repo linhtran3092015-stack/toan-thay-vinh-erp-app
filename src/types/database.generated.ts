@@ -1532,12 +1532,70 @@ export type Database = {
           },
         ]
       }
+      crm_case_notes: {
+        Row: {
+          created_at: string
+          created_by: string
+          crm_case_id: string
+          follow_up_at: string | null
+          follow_up_done_at: string | null
+          follow_up_done_by: string | null
+          id: string
+          note: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          crm_case_id: string
+          follow_up_at?: string | null
+          follow_up_done_at?: string | null
+          follow_up_done_by?: string | null
+          id?: string
+          note: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          crm_case_id?: string
+          follow_up_at?: string | null
+          follow_up_done_at?: string | null
+          follow_up_done_by?: string | null
+          id?: string
+          note?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_case_notes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_case_notes_crm_case_id_fkey"
+            columns: ["crm_case_id"]
+            isOneToOne: false
+            referencedRelation: "crm_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_case_notes_follow_up_done_by_fkey"
+            columns: ["follow_up_done_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_cases: {
         Row: {
           birth_year: number
           created_at: string
           created_by: string | null
           discount_notes: string | null
+          drop_reason: string | null
+          dropped_at: string | null
+          dropped_by: string | null
           expected_grade: number
           expected_level: string | null
           expected_mode: string | null
@@ -1556,6 +1614,7 @@ export type Database = {
           public_code: string
           sale_owner_id: string | null
           status: string
+          status_changed_at: string
           student_id: string | null
           updated_at: string
         }
@@ -1564,6 +1623,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           discount_notes?: string | null
+          drop_reason?: string | null
+          dropped_at?: string | null
+          dropped_by?: string | null
           expected_grade: number
           expected_level?: string | null
           expected_mode?: string | null
@@ -1582,6 +1644,7 @@ export type Database = {
           public_code: string
           sale_owner_id?: string | null
           status?: string
+          status_changed_at?: string
           student_id?: string | null
           updated_at?: string
         }
@@ -1590,6 +1653,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           discount_notes?: string | null
+          drop_reason?: string | null
+          dropped_at?: string | null
+          dropped_by?: string | null
           expected_grade?: number
           expected_level?: string | null
           expected_mode?: string | null
@@ -1608,6 +1674,7 @@ export type Database = {
           public_code?: string
           sale_owner_id?: string | null
           status?: string
+          status_changed_at?: string
           student_id?: string | null
           updated_at?: string
         }
@@ -1615,6 +1682,13 @@ export type Database = {
           {
             foreignKeyName: "crm_cases_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_cases_dropped_by_fkey"
+            columns: ["dropped_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1746,6 +1820,8 @@ export type Database = {
           crm_case_id: string
           id: string
           learning_mode: string
+          result_recorded_at: string | null
+          result_recorded_by: string | null
           sale_notes: string | null
           status: string
           teacher_feedback: string | null
@@ -1759,6 +1835,8 @@ export type Database = {
           crm_case_id: string
           id?: string
           learning_mode: string
+          result_recorded_at?: string | null
+          result_recorded_by?: string | null
           sale_notes?: string | null
           status?: string
           teacher_feedback?: string | null
@@ -1772,6 +1850,8 @@ export type Database = {
           crm_case_id?: string
           id?: string
           learning_mode?: string
+          result_recorded_at?: string | null
+          result_recorded_by?: string | null
           sale_notes?: string | null
           status?: string
           teacher_feedback?: string | null
@@ -1798,6 +1878,13 @@ export type Database = {
             columns: ["crm_case_id"]
             isOneToOne: false
             referencedRelation: "crm_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_trial_bookings_result_recorded_by_fkey"
+            columns: ["result_recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -6786,6 +6873,25 @@ export type Database = {
           id: string
         }[]
       }
+      add_crm_case_note: {
+        Args: { p_crm_case_id: string; p_follow_up_at?: string; p_note: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          crm_case_id: string
+          follow_up_at: string | null
+          follow_up_done_at: string | null
+          follow_up_done_by: string | null
+          id: string
+          note: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "crm_case_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       add_payroll_manual_line: {
         Args: {
           p_amount_vnd: number
@@ -6902,6 +7008,49 @@ export type Database = {
         Returns: {
           id: string
         }[]
+      }
+      advance_crm_case_status: {
+        Args: {
+          p_crm_case_id: string
+          p_reason?: string
+          p_target_status: string
+        }
+        Returns: {
+          birth_year: number
+          created_at: string
+          created_by: string | null
+          discount_notes: string | null
+          drop_reason: string | null
+          dropped_at: string | null
+          dropped_by: string | null
+          expected_grade: number
+          expected_level: string | null
+          expected_mode: string | null
+          expected_official_start_date: string | null
+          expected_tuition_fee_vnd: number | null
+          full_name: string
+          guardian_full_name: string
+          guardian_id: string | null
+          guardian_phone: string
+          guardian_relationship: string
+          id: string
+          lead_source_id: string | null
+          nickname: string | null
+          notes: string | null
+          province_city: string | null
+          public_code: string
+          sale_owner_id: string | null
+          status: string
+          status_changed_at: string
+          student_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "crm_cases"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       allocate_payment_to_students: {
         Args: {
@@ -7062,6 +7211,8 @@ export type Database = {
           crm_case_id: string
           id: string
           learning_mode: string
+          result_recorded_at: string | null
+          result_recorded_by: string | null
           sale_notes: string | null
           status: string
           teacher_feedback: string | null
@@ -7427,6 +7578,25 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      complete_crm_follow_up: {
+        Args: { p_note_id: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          crm_case_id: string
+          follow_up_at: string | null
+          follow_up_done_at: string | null
+          follow_up_done_by: string | null
+          id: string
+          note: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "crm_case_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       compute_payroll_projection: {
         Args: {
           p_as_of?: string
@@ -7785,6 +7955,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           discount_notes: string | null
+          drop_reason: string | null
+          dropped_at: string | null
+          dropped_by: string | null
           expected_grade: number
           expected_level: string | null
           expected_mode: string | null
@@ -7803,6 +7976,7 @@ export type Database = {
           public_code: string
           sale_owner_id: string | null
           status: string
+          status_changed_at: string
           student_id: string | null
           updated_at: string
         }
@@ -8860,6 +9034,19 @@ export type Database = {
           student_public_code: string
         }[]
       }
+      get_crm_case_notes: {
+        Args: { p_crm_case_id: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          created_by_name: string
+          follow_up_at: string
+          follow_up_done_at: string
+          follow_up_done_by_name: string
+          note: string
+          note_id: string
+        }[]
+      }
       get_dashboard_executive_overview: {
         Args: { p_month?: string }
         Returns: Json
@@ -9729,6 +9916,35 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_crm_trial_result: {
+        Args: {
+          p_booking_id: string
+          p_result: string
+          p_sale_notes?: string
+          p_teacher_feedback?: string
+        }
+        Returns: {
+          class_session_id: string | null
+          created_at: string
+          created_by: string | null
+          crm_case_id: string
+          id: string
+          learning_mode: string
+          result_recorded_at: string | null
+          result_recorded_by: string | null
+          sale_notes: string | null
+          status: string
+          teacher_feedback: string | null
+          trial_date: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "crm_trial_bookings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       record_session_result: {
         Args: {
           p_class_session_id: string
@@ -10403,6 +10619,7 @@ export type Database = {
       }
       run_class_session_auto_lock_worker: { Args: never; Returns: number }
       run_class_session_lock_reminders: { Args: never; Returns: number }
+      run_crm_follow_up_reminders: { Args: never; Returns: number }
       run_student_care_worker: { Args: never; Returns: Json }
       run_teaching_assistant_timekeeping_watchdog: {
         Args: never
@@ -10767,6 +10984,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           discount_notes: string | null
+          drop_reason: string | null
+          dropped_at: string | null
+          dropped_by: string | null
           expected_grade: number
           expected_level: string | null
           expected_mode: string | null
@@ -10785,6 +11005,7 @@ export type Database = {
           public_code: string
           sale_owner_id: string | null
           status: string
+          status_changed_at: string
           student_id: string | null
           updated_at: string
         }
