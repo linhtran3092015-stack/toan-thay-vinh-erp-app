@@ -1,9 +1,10 @@
 import "server-only";
 
+import { z } from "zod";
+
 import { getSalaryAdvancesDashboardResult } from "@/features/advances/data";
 import { getCoachingRecordsDashboardResult } from "@/features/coaching/data";
 import type {
-  AdmissionsFunnelStep,
   AdmissionsFunnelSummary,
   AttentionItem,
   DashboardAdvanceSummary,
@@ -16,7 +17,6 @@ import type {
   MonthlyRevenueTrendItem,
   OperationalHighlightsSummary,
   PayrollExecutiveSummary,
-  PositionPayrollBreakdown,
   ReceivablesAgingDistribution,
   RevenueCompositionItem,
   RoleAwareDashboardReadModel,
@@ -51,28 +51,15 @@ function hasPermission(
   return permissions.includes(permission);
 }
 
-/** `YYYY-MM-DDT…` → `YYYY-MM-DD` for comparing against date-typed columns. */
-function toDateOnly(isoTimestamp: string): string {
-  return isoTimestamp.slice(0, 10);
-}
-
-function getPreviousMonth(monthStr: string): string {
-  const match = /^(\d{4})-(\d{2})$/.exec(monthStr);
-  if (!match) return monthStr;
-  let year = Number(match[1]);
-  let month = Number(match[2]) - 1;
-  if (month === 0) {
-    month = 12;
-    year -= 1;
-  }
-  return `${year}-${String(month).padStart(2, "0")}`;
-}
-
 function calculatePercentChange(current: number, previous: number): number | null {
   if (previous === 0) {
     return current > 0 ? 100 : null;
   }
   return Number((((current - previous) / previous) * 100).toFixed(1));
+}
+
+function percentOf(part: number, whole: number): number {
+  return Number(((part / Math.max(1, whole)) * 100).toFixed(1));
 }
 
 // Legacy loaders for test compatibility
@@ -199,939 +186,403 @@ async function loadCoachingSummary(
   });
 }
 
-// 1. Executive Top KPIs
-async function loadExecutiveKpis(
+// Executive sections: one SQL round trip (get_dashboard_executive_overview).
+// The database decides visibility per permission and returns null for a
+// section the caller may not see.
+const vnd = z.coerce.number();
+const count = z.coerce.number().int().nonnegative();
+
+const executiveOverviewSchema = z.object({
+  admissions_funnel: z.object({
+    converted: count,
+    pending_confirmation_or_later: count,
+    top_sources: z.array(z.object({ count, name: z.string() })),
+    total: count,
+    trial_booked_or_later: count,
+    trial_completed_or_later: count,
+  }).nullable(),
+  attention: z.object({
+    advances_pending: count.nullable(),
+    coaching_urgent: count.nullable(),
+    import_conflicted: count.nullable(),
+    payments_overdue: count.nullable(),
+    payroll_review: count.nullable(),
+    timekeeping_adjustments_pending: count.nullable(),
+  }),
+  kpis: z.object({
+    cashflow: z.object({
+      disbursement_vnd: vnd,
+      prev_disbursement_vnd: vnd,
+      prev_refund_vnd: vnd,
+      prev_revenue_vnd: vnd,
+      receivables_vnd: vnd,
+      refund_vnd: vnd,
+      revenue_vnd: vnd,
+    }).nullable(),
+    students: z.object({
+      active_count: count,
+      created_before_month_count: count,
+      total_count: count,
+    }).nullable(),
+  }).nullable(),
+  month: z.string(),
+  operational_highlights: z.object({
+    active_classes: count.nullable(),
+    active_staff: count.nullable(),
+    closed_coaching: count.nullable(),
+    completed_sessions: count.nullable(),
+    grading_credit_units: z.coerce.number().nonnegative().nullable(),
+  }),
+  payroll_summary: z.object({
+    approved_count: count,
+    by_position: z.array(z.object({
+      amount_vnd: vnd,
+      employee_count: count,
+      position_code: z.string(),
+    })),
+    draft_count: count,
+    latest_period_month: z.string().nullable(),
+    prev_total_payroll_vnd: vnd,
+    review_count: count,
+    statement_count: count,
+    total_payroll_vnd: vnd,
+  }).nullable(),
+  receivables_aging: z.object({
+    collected_vnd: vnd,
+    from_31_to_60_vnd: vnd,
+    over_60_vnd: vnd,
+    total_vnd: vnd,
+    under_30_vnd: vnd,
+  }).nullable(),
+  revenue_composition: z.array(z.object({ amount_vnd: vnd, category: z.string() })).nullable(),
+  revenue_trend: z.array(z.object({
+    cost_vnd: vnd,
+    month: z.string(),
+    refund_vnd: vnd,
+    revenue_vnd: vnd,
+  })).nullable(),
+  student_status: z.object({
+    active: count,
+    completed: count,
+    reserved: count,
+    total: count,
+    waiting: count,
+  }).nullable(),
+  top_classes: z.array(z.object({
+    code: z.string(),
+    id: z.string(),
+    name: z.string(),
+    student_count: count,
+  })).nullable(),
+});
+
+type ExecutiveOverview = z.infer<typeof executiveOverviewSchema>;
+
+type ExecutiveSections = Pick<
+  RoleAwareDashboardReadModel,
+  | "admissionsFunnel"
+  | "attention"
+  | "kpis"
+  | "operationalHighlights"
+  | "payrollSummary"
+  | "receivablesAging"
+  | "revenueComposition"
+  | "revenueTrend"
+  | "studentStatus"
+  | "topClasses"
+>;
+
+function executiveSectionsWithStatus(status: "error" | "hidden"): ExecutiveSections {
+  const section = status === "error" ? errorSection : hiddenSection;
+  return {
+    admissionsFunnel: section(),
+    attention: section(),
+    kpis: section(),
+    operationalHighlights: section(),
+    payrollSummary: section(),
+    receivablesAging: section(),
+    revenueComposition: section(),
+    revenueTrend: section(),
+    studentStatus: section(),
+    topClasses: section(),
+  };
+}
+
+function mapKpis(kpis: ExecutiveOverview["kpis"]): DashboardSectionState<ExecutiveKpisSummary> {
+  if (!kpis) return hiddenSection();
+  const cashflow = kpis.cashflow;
+  const students = kpis.students;
+  const net = cashflow ? cashflow.revenue_vnd - cashflow.disbursement_vnd - cashflow.refund_vnd : 0;
+  const prevNet = cashflow
+    ? cashflow.prev_revenue_vnd - cashflow.prev_disbursement_vnd - cashflow.prev_refund_vnd
+    : 0;
+  return readySection({
+    disbursementChangePercent: cashflow
+      ? calculatePercentChange(cashflow.disbursement_vnd, cashflow.prev_disbursement_vnd)
+      : null,
+    disbursementVnd: cashflow?.disbursement_vnd ?? 0,
+    netCashflowChangePercent: cashflow ? calculatePercentChange(net, prevNet) : null,
+    netCashflowVnd: net,
+    receivablesVnd: cashflow?.receivables_vnd ?? 0,
+    revenueChangePercent: cashflow
+      ? calculatePercentChange(cashflow.revenue_vnd, cashflow.prev_revenue_vnd)
+      : null,
+    revenueVnd: cashflow?.revenue_vnd ?? 0,
+    totalStudents: students
+      ? (students.active_count > 0 ? students.active_count : students.total_count)
+      : 0,
+    totalStudentsChangePercent: students && students.created_before_month_count > 0
+      ? calculatePercentChange(students.total_count, students.created_before_month_count)
+      : null,
+  });
+}
+
+function mapAttention(attention: ExecutiveOverview["attention"]): DashboardSectionState<AttentionItem[]> {
+  const items: AttentionItem[] = [];
+  const push = (count: number | null, item: Omit<AttentionItem, "count" | "title"> & { title: (n: number) => string }) => {
+    if (count === null || count <= 0) return;
+    items.push({ ...item, count, title: item.title(count) });
+  };
+
+  push(attention.payroll_review, {
+    description: "Bảng lương các kỳ đã hoàn thành tính toán, cần kiểm tra và phê duyệt.",
+    href: "/payroll",
+    id: "payroll-review",
+    module: "Bảng lương",
+    severity: "danger",
+    title: (n) => `${n} kỳ bảng lương đang chờ duyệt`,
+  });
+  push(attention.advances_pending, {
+    description: "Nhân viên gửi yêu cầu tạm ứng lương trong tháng, chờ xét duyệt.",
+    href: "/advances",
+    id: "advances-pending",
+    module: "Tạm ứng",
+    severity: "warning",
+    title: (n) => `${n} yêu cầu tạm ứng lương cần phê duyệt`,
+  });
+  push(attention.timekeeping_adjustments_pending, {
+    description: "Đơn xin giải trình hoặc điều chỉnh giờ vào/ra của nhân sự.",
+    href: "/payroll",
+    id: "timekeeping-adj",
+    module: "Chấm công",
+    severity: "warning",
+    title: (n) => `${n} yêu cầu điều chỉnh bảng công chờ duyệt`,
+  });
+  push(attention.payments_overdue, {
+    description: "Yêu cầu thanh toán đã tạo quá 14 ngày nhưng chưa thu được tiền.",
+    href: "/finance",
+    id: "payments-overdue",
+    module: "Tài chính",
+    severity: "danger",
+    title: (n) => `${n} khoản học phí quá hạn cần đôn đốc`,
+  });
+  push(attention.coaching_urgent, {
+    description: "Học sinh có vấn đề học tập hoặc chuyên cần mức độ cao cần theo sát.",
+    href: "/coaching",
+    id: "coaching-urgent",
+    module: "Coaching",
+    severity: "warning",
+    title: (n) => `${n} học sinh có phiếu Coaching ưu tiên cao`,
+  });
+  push(attention.import_conflicted, {
+    description: "Tệp tải lên dữ liệu đối soát bảng lương phát sinh xung đột.",
+    href: "/payroll",
+    id: "import-conflicted",
+    module: "Dữ liệu",
+    severity: "info",
+    title: (n) => `${n} đợt import bảng lương có xung đột cần giải quyết`,
+  });
+
+  return readySection(items);
+}
+
+function mapRevenueTrend(
+  trend: ExecutiveOverview["revenue_trend"],
+): DashboardSectionState<MonthlyRevenueTrendItem[]> {
+  if (!trend) return hiddenSection();
+  return readySection(trend.map((item) => ({
+    costVnd: item.cost_vnd,
+    month: item.month,
+    monthLabel: `T${Number(item.month.slice(5, 7))}`,
+    netVnd: item.revenue_vnd - item.cost_vnd - item.refund_vnd,
+    revenueVnd: item.revenue_vnd,
+  })));
+}
+
+// Must match finance_cashflow_records.category CHECK constraint.
+const revenueCategoryLabels: Record<string, string> = {
+  bonus_grant: "Buổi tặng",
+  other: "Khác",
+  refund: "Hoàn tiền",
+  tuition_fee: "Học phí",
+};
+
+function mapRevenueComposition(
+  composition: ExecutiveOverview["revenue_composition"],
+): DashboardSectionState<RevenueCompositionItem[]> {
+  if (!composition) return hiddenSection();
+  const total = composition.reduce((sum, item) => sum + item.amount_vnd, 0);
+  const items: RevenueCompositionItem[] = composition.map((item) => ({
+    amountVnd: item.amount_vnd,
+    category: item.category,
+    label: revenueCategoryLabels[item.category] ?? item.category,
+    sharePercent: total > 0 ? Number(((item.amount_vnd / total) * 100).toFixed(1)) : 0,
+  }));
+  if (items.length === 0) {
+    items.push({ amountVnd: 0, category: "tuition_fee", label: "Học phí", sharePercent: 100 });
+  }
+  return readySection(items);
+}
+
+function mapTopClasses(
+  classes: ExecutiveOverview["top_classes"],
+): DashboardSectionState<TopGradeOrClassItem[]> {
+  if (!classes) return hiddenSection();
+  // Revenue per class is not tracked yet (session charges carry no unit
+  // price), so the ranking is by active enrollment only.
+  return readySection(classes.map((item, index) => ({
+    code: item.code,
+    id: item.id,
+    name: item.name,
+    rank: index + 1,
+    revenueVnd: null,
+    studentCount: item.student_count,
+  })));
+}
+
+function mapAdmissionsFunnel(
+  funnel: ExecutiveOverview["admissions_funnel"],
+): DashboardSectionState<AdmissionsFunnelSummary> {
+  if (!funnel) return hiddenSection();
+  const base = funnel.total;
+  return readySection({
+    conversionRatePercent: percentOf(funnel.converted, base),
+    steps: [
+      { count: funnel.total, key: "leads", label: "Tổng tiềm năng", percentage: 100 },
+      { count: funnel.trial_booked_or_later, key: "contacted", label: "Đã đặt lịch học thử", percentage: percentOf(funnel.trial_booked_or_later, base) },
+      { count: funnel.trial_completed_or_later, key: "consulted", label: "Đã học thử", percentage: percentOf(funnel.trial_completed_or_later, base) },
+      { count: funnel.pending_confirmation_or_later, key: "registered", label: "Chờ xác nhận nhập học", percentage: percentOf(funnel.pending_confirmation_or_later, base) },
+      { count: funnel.converted, key: "enrolled", label: "Đã nhập học", percentage: percentOf(funnel.converted, base) },
+    ],
+    topSources: funnel.top_sources.map((source) => ({ count: source.count, name: source.name })),
+    totalLeads: funnel.total,
+  });
+}
+
+function mapStudentStatus(
+  status: ExecutiveOverview["student_status"],
+): DashboardSectionState<StudentStatusDistribution> {
+  if (!status) return hiddenSection();
+  const total = status.total;
+  return readySection({
+    activeCount: status.active,
+    completedCount: status.completed,
+    items: [
+      { color: "#16794C", count: status.active, key: "active", label: "Đang theo học", percentage: percentOf(status.active, total) },
+      { color: "#C06A1B", count: status.reserved, key: "reserved", label: "Bảo lưu / Tạm nghỉ", percentage: percentOf(status.reserved, total) },
+      { color: "#667085", count: status.completed, key: "completed", label: "Đã hoàn thành / Nghỉ", percentage: percentOf(status.completed, total) },
+      { color: "#315FCC", count: status.waiting, key: "waiting", label: "Chờ xếp lớp / Quan tâm", percentage: percentOf(status.waiting, total) },
+    ],
+    reservedCount: status.reserved,
+    totalCount: total,
+    waitingCount: status.waiting,
+  });
+}
+
+function mapReceivablesAging(
+  aging: ExecutiveOverview["receivables_aging"],
+): DashboardSectionState<ReceivablesAgingDistribution> {
+  if (!aging) return hiddenSection();
+  const total = aging.total_vnd;
+  return readySection({
+    collectedVnd: aging.collected_vnd,
+    from31To60DaysVnd: aging.from_31_to_60_vnd,
+    items: [
+      { amountVnd: aging.under_30_vnd, color: "#315FCC", key: "under_30", label: "Trong hạn / Dưới 30 ngày", percentage: percentOf(aging.under_30_vnd, total) },
+      { amountVnd: aging.from_31_to_60_vnd, color: "#C06A1B", key: "31_to_60", label: "Quá hạn 31–60 ngày", percentage: percentOf(aging.from_31_to_60_vnd, total) },
+      { amountVnd: aging.over_60_vnd, color: "#C33752", key: "over_60", label: "Quá hạn trên 60 ngày", percentage: percentOf(aging.over_60_vnd, total) },
+    ],
+    over60DaysVnd: aging.over_60_vnd,
+    totalReceivablesVnd: total,
+    under30DaysVnd: aging.under_30_vnd,
+  });
+}
+
+// Must match staff_payroll_position_versions.position_code CHECK constraint.
+const positionNames: Record<string, string> = {
+  admissions_manager: "Quản lý tuyển sinh",
+  operations_assistant: "Trợ lý vận hành",
+  other: "Chưa gán vị trí",
+  teaching_assistant: "Trợ giảng",
+};
+
+function mapPayrollSummary(
+  payroll: ExecutiveOverview["payroll_summary"],
+): DashboardSectionState<PayrollExecutiveSummary> {
+  if (!payroll) return hiddenSection();
+  return readySection({
+    approvedCount: payroll.approved_count,
+    draftCount: payroll.draft_count,
+    latestPeriodMonth: payroll.latest_period_month,
+    reviewCount: payroll.review_count,
+    staffByPosition: payroll.by_position.map((position) => ({
+      amountVnd: position.amount_vnd,
+      employeeCount: position.employee_count,
+      positionName: positionNames[position.position_code] ?? position.position_code,
+    })),
+    statementCount: payroll.statement_count,
+    totalPayrollVnd: payroll.total_payroll_vnd,
+    variancePercent: calculatePercentChange(payroll.total_payroll_vnd, payroll.prev_total_payroll_vnd),
+  });
+}
+
+function mapOperationalHighlights(
+  operations: ExecutiveOverview["operational_highlights"],
+): DashboardSectionState<OperationalHighlightsSummary> {
+  return readySection({
+    activeClassesCount: operations.active_classes ?? 0,
+    activeStaffCount: operations.active_staff ?? 0,
+    closedCoachingCount: operations.closed_coaching ?? 0,
+    completedSessionsCount: operations.completed_sessions ?? 0,
+    gradingCreditUnits: operations.grading_credit_units ?? 0,
+  });
+}
+
+async function loadExecutiveSections(
   permissions: readonly PermissionCode[],
   selectedMonth: string,
-): Promise<DashboardSectionState<ExecutiveKpisSummary>> {
-  const canViewFinance =
-    hasPermission(permissions, "finance.view") ||
-    hasPermission(permissions, "cashflow.view") ||
-    hasPermission(permissions, "payments.view");
-  const canViewStudents = hasPermission(permissions, "students.view");
-
-  if (!canViewFinance && !canViewStudents) {
-    return hiddenSection();
+): Promise<ExecutiveSections> {
+  if (!hasPermission(permissions, "dashboard.view")) {
+    return executiveSectionsWithStatus("hidden");
   }
 
   try {
     const supabase = await createSupabaseServerClient();
-    const prevMonth = getPreviousMonth(selectedMonth);
-
-    const monthStart = `${selectedMonth}-01T00:00:00.000Z`;
-    const nextMonthObj = new Date(`${selectedMonth}-01T00:00:00.000Z`);
-    nextMonthObj.setUTCMonth(nextMonthObj.getUTCMonth() + 1);
-    const monthEnd = nextMonthObj.toISOString();
-
-    const prevMonthStart = `${prevMonth}-01T00:00:00.000Z`;
-    const prevMonthEnd = monthStart;
-
-    const [
-      studentsRes,
-      cashflowCurrentRes,
-      cashflowPrevRes,
-      paymentRequestsRes,
-    ] = await Promise.all([
-      canViewStudents
-        ? supabase
-            .from("students")
-            .select("id, lifecycle_status, created_at")
-        : Promise.resolve({ data: null, error: null }),
-      // Revenue is attributed to the bank/business date (effective_on), not
-      // to when the accountant allocated the transfer.
-      canViewFinance
-        ? supabase
-            .from("finance_cashflow_records")
-            .select("record_type, amount_vnd, effective_on")
-            .gte("effective_on", toDateOnly(monthStart))
-            .lt("effective_on", toDateOnly(monthEnd))
-        : Promise.resolve({ data: null, error: null }),
-      canViewFinance
-        ? supabase
-            .from("finance_cashflow_records")
-            .select("record_type, amount_vnd, effective_on")
-            .gte("effective_on", toDateOnly(prevMonthStart))
-            .lt("effective_on", toDateOnly(prevMonthEnd))
-        : Promise.resolve({ data: null, error: null }),
-      canViewFinance
-        ? supabase
-            .from("student_payment_requests")
-            .select("expected_amount_vnd, paid_amount_vnd, status")
-            .in("status", ["pending", "partially_paid"])
-        : Promise.resolve({ data: null, error: null }),
-    ]);
-
-    if (
-      (canViewStudents && studentsRes.error) ||
-      (canViewFinance &&
-        (cashflowCurrentRes.error ||
-          cashflowPrevRes.error ||
-          paymentRequestsRes.error))
-    ) {
-      return errorSection();
-    }
-
-    // Students
-    const allStudents = studentsRes.data ?? [];
-    const activeStudents = allStudents.filter(
-      (s) => s.lifecycle_status === "active" || s.lifecycle_status === "resumed",
-    ).length;
-    const totalStudents = activeStudents > 0 ? activeStudents : allStudents.length;
-
-    // Previous students
-    const prevStudentsCount = allStudents.filter((s) => s.created_at < monthStart).length;
-    const totalStudentsChangePercent =
-      prevStudentsCount > 0
-        ? calculatePercentChange(allStudents.length, prevStudentsCount)
-        : null;
-
-    // Current Cashflow
-    const currentRecords = cashflowCurrentRes.data ?? [];
-    const currentReceipts = currentRecords
-      .filter((r) => r.record_type === "receipt")
-      .reduce((sum, r) => sum + Number(r.amount_vnd), 0);
-    const currentDisbursements = currentRecords
-      .filter((r) => r.record_type === "disbursement")
-      .reduce((sum, r) => sum + Number(r.amount_vnd), 0);
-    const currentRefunds = currentRecords
-      .filter((r) => r.record_type === "refund")
-      .reduce((sum, r) => sum + Number(r.amount_vnd), 0);
-    const currentNet = currentReceipts - currentDisbursements - currentRefunds;
-
-    // Previous Cashflow
-    const prevRecords = cashflowPrevRes.data ?? [];
-    const prevReceipts = prevRecords
-      .filter((r) => r.record_type === "receipt")
-      .reduce((sum, r) => sum + Number(r.amount_vnd), 0);
-    const prevDisbursements = prevRecords
-      .filter((r) => r.record_type === "disbursement")
-      .reduce((sum, r) => sum + Number(r.amount_vnd), 0);
-    const prevRefunds = prevRecords
-      .filter((r) => r.record_type === "refund")
-      .reduce((sum, r) => sum + Number(r.amount_vnd), 0);
-    const prevNet = prevReceipts - prevDisbursements - prevRefunds;
-
-    // Receivables
-    const pendingRequests = paymentRequestsRes.data ?? [];
-    const receivablesVnd = pendingRequests.reduce(
-      (sum, r) =>
-        sum + (Number(r.expected_amount_vnd) - Number(r.paid_amount_vnd || 0)),
-      0,
-    );
-
-    return readySection({
-      disbursementChangePercent: calculatePercentChange(
-        currentDisbursements,
-        prevDisbursements,
-      ),
-      disbursementVnd: currentDisbursements,
-      netCashflowChangePercent: calculatePercentChange(currentNet, prevNet),
-      netCashflowVnd: currentNet,
-      receivablesVnd,
-      revenueChangePercent: calculatePercentChange(currentReceipts, prevReceipts),
-      revenueVnd: currentReceipts,
-      totalStudents,
-      totalStudentsChangePercent,
+    const { data, error } = await supabase.rpc("get_dashboard_executive_overview", {
+      p_month: `${selectedMonth}-01`,
     });
-  } catch {
-    return errorSection();
-  }
-}
-
-// 2. Attention Panel
-async function loadAttentionItems(
-  permissions: readonly PermissionCode[],
-): Promise<DashboardSectionState<AttentionItem[]>> {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const items: AttentionItem[] = [];
-    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-
-    const [
-      payrollRes,
-      advancesRes,
-      timekeepingRes,
-      overduePaymentRes,
-      coachingRes,
-      importBatchRes,
-    ] = await Promise.all([
-      hasPermission(permissions, "payroll.view")
-        ? supabase
-            .from("payroll_periods")
-            .select("id, month, status")
-            .eq("status", "review")
-        : Promise.resolve({ data: null, error: null }),
-      hasPermission(permissions, "advances.view")
-        ? supabase
-            .from("salary_advances")
-            .select("id, status")
-            .in("status", ["requested", "review"])
-        : Promise.resolve({ data: null, error: null }),
-      hasPermission(permissions, "timekeeping.approve_adjustment") ||
-      hasPermission(permissions, "timekeeping.view")
-        ? supabase
-            .from("time_entry_adjustment_requests")
-            .select("id, status")
-            .eq("status", "pending")
-        : Promise.resolve({ data: null, error: null }),
-      hasPermission(permissions, "payments.view") ||
-      hasPermission(permissions, "finance.view")
-        ? supabase
-            .from("student_payment_requests")
-            .select("id, status, created_at")
-            .eq("status", "pending")
-            .lt("created_at", fourteenDaysAgo)
-        : Promise.resolve({ data: null, error: null }),
-      hasPermission(permissions, "coaching.view")
-        ? supabase
-            .from("coaching_records")
-            .select("id, priority, current_status")
-            .eq("priority", "high")
-            .in("current_status", ["open", "in_progress"])
-        : Promise.resolve({ data: null, error: null }),
-      hasPermission(permissions, "payroll.import") ||
-      hasPermission(permissions, "payroll.view")
-        ? supabase
-            .from("payroll_import_batches")
-            .select("id, status")
-            .eq("status", "conflicted")
-        : Promise.resolve({ data: null, error: null }),
-    ]);
-
-    if (payrollRes.data && payrollRes.data.length > 0) {
-      items.push({
-        count: payrollRes.data.length,
-        description: "Bảng lương các kỳ đã hoàn thành tính toán, cần kiểm tra và phê duyệt.",
-        href: "/payroll",
-        id: "payroll-review",
-        module: "Bảng lương",
-        severity: "danger",
-        title: `${payrollRes.data.length} kỳ bảng lương đang chờ duyệt`,
-      });
+    if (error) {
+      return executiveSectionsWithStatus("error");
     }
-
-    if (advancesRes.data && advancesRes.data.length > 0) {
-      items.push({
-        count: advancesRes.data.length,
-        description: "Nhân viên gửi yêu cầu tạm ứng lương trong tháng, chờ xét duyệt.",
-        href: "/advances",
-        id: "advances-pending",
-        module: "Tạm ứng",
-        severity: "warning",
-        title: `${advancesRes.data.length} yêu cầu tạm ứng lương cần phê duyệt`,
-      });
+    const parsed = executiveOverviewSchema.safeParse(data);
+    if (!parsed.success) {
+      return executiveSectionsWithStatus("error");
     }
-
-    if (timekeepingRes.data && timekeepingRes.data.length > 0) {
-      items.push({
-        count: timekeepingRes.data.length,
-        description: "Đơn xin giải trình hoặc điều chỉnh giờ vào/ra của nhân sự.",
-        href: "/payroll",
-        id: "timekeeping-adj",
-        module: "Chấm công",
-        severity: "warning",
-        title: `${timekeepingRes.data.length} yêu cầu điều chỉnh bảng công chờ duyệt`,
-      });
-    }
-
-    if (overduePaymentRes.data && overduePaymentRes.data.length > 0) {
-      items.push({
-        count: overduePaymentRes.data.length,
-        description: "Yêu cầu thanh toán đã tạo quá 14 ngày nhưng chưa thu được tiền.",
-        href: "/finance",
-        id: "payments-overdue",
-        module: "Tài chính",
-        severity: "danger",
-        title: `${overduePaymentRes.data.length} khoản học phí quá hạn cần đôn đốc`,
-      });
-    }
-
-    if (coachingRes.data && coachingRes.data.length > 0) {
-      items.push({
-        count: coachingRes.data.length,
-        description: "Học sinh có vấn đề học tập hoặc chuyên cần mức độ cao cần theo sát.",
-        href: "/coaching",
-        id: "coaching-urgent",
-        module: "Coaching",
-        severity: "warning",
-        title: `${coachingRes.data.length} học sinh có phiếu Coaching ưu tiên cao`,
-      });
-    }
-
-    if (importBatchRes.data && importBatchRes.data.length > 0) {
-      items.push({
-        count: importBatchRes.data.length,
-        description: "Tệp tải lên dữ liệu đối soát bảng lương phát sinh xung đột.",
-        href: "/payroll",
-        id: "import-conflicted",
-        module: "Dữ liệu",
-        severity: "info",
-        title: `${importBatchRes.data.length} đợt import bảng lương có xung đột cần giải quyết`,
-      });
-    }
-
-    return readySection(items);
-  } catch {
-    return errorSection();
-  }
-}
-
-// 3. Biểu đồ Doanh thu & Chi phí 12 tháng
-async function loadRevenueMonthlyTrend(
-  permissions: readonly PermissionCode[],
-  selectedYear: number,
-): Promise<DashboardSectionState<MonthlyRevenueTrendItem[]>> {
-  if (
-    !hasPermission(permissions, "finance.view") &&
-    !hasPermission(permissions, "cashflow.view")
-  ) {
-    return hiddenSection();
-  }
-
-  try {
-    const supabase = await createSupabaseServerClient();
-    const yearStart = `${selectedYear}-01-01T00:00:00.000Z`;
-    const yearEnd = `${selectedYear + 1}-01-01T00:00:00.000Z`;
-
-    const { data, error } = await supabase
-      .from("finance_cashflow_records")
-      .select("record_type, amount_vnd, effective_on")
-      .gte("effective_on", toDateOnly(yearStart))
-      .lt("effective_on", toDateOnly(yearEnd));
-
-    if (error) return errorSection();
-
-    const monthlyMap = new Map<number, { cost: number; net: number; revenue: number }>();
-    for (let month = 1; month <= 12; month += 1) {
-      monthlyMap.set(month, { cost: 0, net: 0, revenue: 0 });
-    }
-
-    for (const record of data ?? []) {
-      // effective_on is a plain YYYY-MM-DD business date; no timezone shift.
-      const month = Number(record.effective_on.slice(5, 7));
-      const current = monthlyMap.get(month);
-      if (current) {
-        const amount = Number(record.amount_vnd);
-        if (record.record_type === "receipt") {
-          current.revenue += amount;
-          current.net += amount;
-        } else if (record.record_type === "disbursement") {
-          current.cost += amount;
-          current.net -= amount;
-        } else if (record.record_type === "refund") {
-          current.net -= amount;
-        }
-      }
-    }
-
-    const items: MonthlyRevenueTrendItem[] = [];
-    for (let month = 1; month <= 12; month += 1) {
-      const val = monthlyMap.get(month)!;
-      items.push({
-        costVnd: val.cost,
-        month: `${selectedYear}-${String(month).padStart(2, "0")}`,
-        monthLabel: `T${month}`,
-        netVnd: val.net,
-        revenueVnd: val.revenue,
-      });
-    }
-
-    return readySection(items);
-  } catch {
-    return errorSection();
-  }
-}
-
-// 4. Cơ cấu Doanh thu
-async function loadRevenueComposition(
-  permissions: readonly PermissionCode[],
-  selectedMonth: string,
-): Promise<DashboardSectionState<RevenueCompositionItem[]>> {
-  if (
-    !hasPermission(permissions, "finance.view") &&
-    !hasPermission(permissions, "cashflow.view")
-  ) {
-    return hiddenSection();
-  }
-
-  try {
-    const supabase = await createSupabaseServerClient();
-    const monthStart = `${selectedMonth}-01T00:00:00.000Z`;
-    const nextMonthObj = new Date(`${selectedMonth}-01T00:00:00.000Z`);
-    nextMonthObj.setUTCMonth(nextMonthObj.getUTCMonth() + 1);
-    const monthEnd = nextMonthObj.toISOString();
-
-    const { data, error } = await supabase
-      .from("finance_cashflow_records")
-      .select("category, amount_vnd, record_type")
-      .eq("record_type", "receipt")
-      .gte("effective_on", toDateOnly(monthStart))
-      .lt("effective_on", toDateOnly(monthEnd));
-
-    if (error) return errorSection();
-
-    // Must match finance_cashflow_records.category CHECK constraint.
-    const categoryLabels: Record<string, string> = {
-      bonus_grant: "Buổi tặng",
-      other: "Khác",
-      refund: "Hoàn tiền",
-      tuition_fee: "Học phí",
+    const overview = parsed.data;
+    return {
+      admissionsFunnel: mapAdmissionsFunnel(overview.admissions_funnel),
+      attention: mapAttention(overview.attention),
+      kpis: mapKpis(overview.kpis),
+      operationalHighlights: mapOperationalHighlights(overview.operational_highlights),
+      payrollSummary: mapPayrollSummary(overview.payroll_summary),
+      receivablesAging: mapReceivablesAging(overview.receivables_aging),
+      revenueComposition: mapRevenueComposition(overview.revenue_composition),
+      revenueTrend: mapRevenueTrend(overview.revenue_trend),
+      studentStatus: mapStudentStatus(overview.student_status),
+      topClasses: mapTopClasses(overview.top_classes),
     };
-
-    const categoryTotals = new Map<string, number>();
-    let totalRevenue = 0;
-
-    for (const row of data ?? []) {
-      const cat = row.category || "tuition";
-      const amt = Number(row.amount_vnd);
-      categoryTotals.set(cat, (categoryTotals.get(cat) ?? 0) + amt);
-      totalRevenue += amt;
-    }
-
-    const items: RevenueCompositionItem[] = [];
-    for (const [category, amountVnd] of categoryTotals.entries()) {
-      const sharePercent =
-        totalRevenue > 0
-          ? Number(((amountVnd / totalRevenue) * 100).toFixed(1))
-          : 0;
-      items.push({
-        amountVnd,
-        category,
-        label: categoryLabels[category] ?? category,
-        sharePercent,
-      });
-    }
-
-    items.sort((a, b) => b.amountVnd - a.amountVnd);
-
-    if (items.length === 0) {
-      items.push({
-        amountVnd: 0,
-        category: "tuition",
-        label: "Học phí",
-        sharePercent: 100,
-      });
-    }
-
-    return readySection(items);
   } catch {
-    return errorSection();
-  }
-}
-
-// 5. Top Khối / Lớp
-async function loadTopGradesAndClasses(
-  permissions: readonly PermissionCode[],
-): Promise<DashboardSectionState<TopGradeOrClassItem[]>> {
-  if (
-    !hasPermission(permissions, "classes.view") &&
-    !hasPermission(permissions, "students.view")
-  ) {
-    return hiddenSection();
-  }
-
-  try {
-    const supabase = await createSupabaseServerClient();
-    const [classesRes, enrollmentsRes] = await Promise.all([
-      supabase.from("classes").select("id, name, code, grade, level, status"),
-      supabase
-        .from("student_enrollments")
-        .select("class_id, status")
-        .eq("status", "active")
-        .is("effective_to", null),
-    ]);
-
-    if (classesRes.error || enrollmentsRes.error) return errorSection();
-
-    const studentCountByClass = new Map<string, number>();
-    for (const enrollment of enrollmentsRes.data ?? []) {
-      studentCountByClass.set(
-        enrollment.class_id,
-        (studentCountByClass.get(enrollment.class_id) ?? 0) + 1,
-      );
-    }
-
-    // Revenue per class is not tracked yet (session charges carry no unit
-    // price), so the ranking is by active enrollment only.
-    const classItems: TopGradeOrClassItem[] = (classesRes.data ?? []).map((c) => {
-      const studentCount = studentCountByClass.get(c.id) ?? 0;
-      return {
-        code: c.code,
-        id: c.id,
-        name: c.name,
-        rank: 0,
-        revenueVnd: null,
-        studentCount,
-      };
-    });
-
-    classItems.sort((a, b) => b.studentCount - a.studentCount);
-    const top5 = classItems.slice(0, 5).map((item, index) => ({
-      ...item,
-      rank: index + 1,
-    }));
-
-    return readySection(top5);
-  } catch {
-    return errorSection();
-  }
-}
-
-// 6. Phễu tuyển sinh (Admissions CRM Funnel)
-async function loadAdmissionsFunnel(
-  permissions: readonly PermissionCode[],
-): Promise<DashboardSectionState<AdmissionsFunnelSummary>> {
-  if (!hasPermission(permissions, "crm.view")) {
-    return hiddenSection();
-  }
-
-  try {
-    const supabase = await createSupabaseServerClient();
-    const [casesRes, sourcesRes] = await Promise.all([
-      supabase.from("crm_cases").select("id, status, source_id:lead_source_id"),
-      supabase.from("crm_lead_sources").select("id, name"),
-    ]);
-
-    if (casesRes.error) return errorSection();
-
-    const cases = casesRes.data ?? [];
-    const totalLeads = cases.length;
-
-    // crm_cases.status: interested → trial_booked → trial_completed →
-    // pending_enrollment_confirmation → converted, or dropped.
-    const contactedCount = cases.filter((c) =>
-      [
-        "trial_booked",
-        "trial_completed",
-        "pending_enrollment_confirmation",
-        "converted",
-      ].includes(c.status),
-    ).length;
-    const consultedCount = cases.filter((c) =>
-      ["trial_completed", "pending_enrollment_confirmation", "converted"].includes(c.status),
-    ).length;
-    const registeredCount = cases.filter((c) =>
-      ["pending_enrollment_confirmation", "converted"].includes(c.status),
-    ).length;
-    const enrolledCount = cases.filter((c) => c.status === "converted").length;
-
-    const baseCount = Math.max(1, totalLeads);
-
-    const steps: AdmissionsFunnelStep[] = [
-      {
-        count: totalLeads,
-        key: "leads",
-        label: "Tổng tiềm năng",
-        percentage: 100,
-      },
-      {
-        count: contactedCount,
-        key: "contacted",
-        label: "Đã đặt lịch học thử",
-        percentage: Number(((contactedCount / baseCount) * 100).toFixed(1)),
-      },
-      {
-        count: consultedCount,
-        key: "consulted",
-        label: "Đã học thử",
-        percentage: Number(((consultedCount / baseCount) * 100).toFixed(1)),
-      },
-      {
-        count: registeredCount,
-        key: "registered",
-        label: "Chờ xác nhận nhập học",
-        percentage: Number(((registeredCount / baseCount) * 100).toFixed(1)),
-      },
-      {
-        count: enrolledCount,
-        key: "enrolled",
-        label: "Đã nhập học",
-        percentage: Number(((enrolledCount / baseCount) * 100).toFixed(1)),
-      },
-    ];
-
-    const sourceNameMap = new Map<string, string>(
-      (sourcesRes.data ?? []).map((s) => [s.id, s.name]),
-    );
-
-    const sourceCounts = new Map<string, number>();
-    for (const c of cases) {
-      const sourceName =
-        (c.source_id ? sourceNameMap.get(c.source_id) : null) ??
-        "Fanpage / Trực tiếp";
-      sourceCounts.set(sourceName, (sourceCounts.get(sourceName) ?? 0) + 1);
-    }
-
-    const topSources = Array.from(sourceCounts.entries())
-      .map(([name, count]) => ({ count, name }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 4);
-
-    const conversionRatePercent = Number(
-      ((enrolledCount / baseCount) * 100).toFixed(1),
-    );
-
-    return readySection({
-      conversionRatePercent,
-      steps,
-      topSources,
-      totalLeads,
-    });
-  } catch {
-    return errorSection();
-  }
-}
-
-// 7. Tình hình học sinh (Student Status Distribution)
-async function loadStudentStatusComposition(
-  permissions: readonly PermissionCode[],
-): Promise<DashboardSectionState<StudentStatusDistribution>> {
-  if (!hasPermission(permissions, "students.view")) {
-    return hiddenSection();
-  }
-
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("students")
-      .select("id, lifecycle_status");
-
-    if (error) return errorSection();
-
-    const students = data ?? [];
-    const totalCount = students.length;
-
-    let activeCount = 0;
-    let reservedCount = 0;
-    let completedCount = 0;
-    let waitingCount = 0;
-
-    for (const s of students) {
-      if (s.lifecycle_status === "active" || s.lifecycle_status === "resumed") {
-        activeCount += 1;
-      } else if (s.lifecycle_status === "reserved") {
-        reservedCount += 1;
-      } else if (s.lifecycle_status === "completed") {
-        completedCount += 1;
-      } else {
-        waitingCount += 1;
-      }
-    }
-
-    const base = Math.max(1, totalCount);
-
-    const items = [
-      {
-        color: "#16794C",
-        count: activeCount,
-        key: "active",
-        label: "Đang theo học",
-        percentage: Number(((activeCount / base) * 100).toFixed(1)),
-      },
-      {
-        color: "#C06A1B",
-        count: reservedCount,
-        key: "reserved",
-        label: "Bảo lưu / Tạm nghỉ",
-        percentage: Number(((reservedCount / base) * 100).toFixed(1)),
-      },
-      {
-        color: "#667085",
-        count: completedCount,
-        key: "completed",
-        label: "Đã hoàn thành / Nghỉ",
-        percentage: Number(((completedCount / base) * 100).toFixed(1)),
-      },
-      {
-        color: "#315FCC",
-        count: waitingCount,
-        key: "waiting",
-        label: "Chờ xếp lớp / Quan tâm",
-        percentage: Number(((waitingCount / base) * 100).toFixed(1)),
-      },
-    ];
-
-    return readySection({
-      activeCount,
-      completedCount,
-      items,
-      reservedCount,
-      totalCount,
-      waitingCount,
-    });
-  } catch {
-    return errorSection();
-  }
-}
-
-// 8. Công nợ phải thu & Tuổi nợ (Receivables Aging)
-async function loadReceivablesAging(
-  permissions: readonly PermissionCode[],
-  selectedMonth: string,
-): Promise<DashboardSectionState<ReceivablesAgingDistribution>> {
-  if (
-    !hasPermission(permissions, "finance.view") &&
-    !hasPermission(permissions, "payments.view")
-  ) {
-    return hiddenSection();
-  }
-
-  try {
-    const supabase = await createSupabaseServerClient();
-    const monthStart = `${selectedMonth}-01T00:00:00.000Z`;
-    const nextMonthObj = new Date(`${selectedMonth}-01T00:00:00.000Z`);
-    nextMonthObj.setUTCMonth(nextMonthObj.getUTCMonth() + 1);
-    const monthEnd = nextMonthObj.toISOString();
-
-    const [pendingRes, paidRes] = await Promise.all([
-      supabase
-        .from("student_payment_requests")
-        .select("expected_amount_vnd, paid_amount_vnd, created_at, status")
-        .in("status", ["pending", "partially_paid"]),
-      supabase
-        .from("student_payment_requests")
-        .select("paid_amount_vnd, paid_at")
-        .eq("status", "paid")
-        .gte("paid_at", monthStart)
-        .lt("paid_at", monthEnd),
-    ]);
-
-    if (pendingRes.error || paidRes.error) return errorSection();
-
-    const now = Date.now();
-    const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-    let under30DaysVnd = 0;
-    let from31To60DaysVnd = 0;
-    let over60DaysVnd = 0;
-    let totalReceivablesVnd = 0;
-
-    for (const req of pendingRes.data ?? []) {
-      const debt =
-        Number(req.expected_amount_vnd) - Number(req.paid_amount_vnd || 0);
-      if (debt <= 0) continue;
-      totalReceivablesVnd += debt;
-
-      const createdTime = new Date(req.created_at).getTime();
-      const ageDays = (now - createdTime) / MS_PER_DAY;
-
-      if (ageDays <= 30) {
-        under30DaysVnd += debt;
-      } else if (ageDays <= 60) {
-        from31To60DaysVnd += debt;
-      } else {
-        over60DaysVnd += debt;
-      }
-    }
-
-    const collectedVnd = (paidRes.data ?? []).reduce(
-      (sum, r) => sum + Number(r.paid_amount_vnd || 0),
-      0,
-    );
-
-    const base = Math.max(1, totalReceivablesVnd);
-
-    const items = [
-      {
-        amountVnd: under30DaysVnd,
-        color: "#315FCC",
-        key: "under_30",
-        label: "Trong hạn / Dưới 30 ngày",
-        percentage: Number(((under30DaysVnd / base) * 100).toFixed(1)),
-      },
-      {
-        amountVnd: from31To60DaysVnd,
-        color: "#C06A1B",
-        key: "31_to_60",
-        label: "Quá hạn 31–60 ngày",
-        percentage: Number(((from31To60DaysVnd / base) * 100).toFixed(1)),
-      },
-      {
-        amountVnd: over60DaysVnd,
-        color: "#C33752",
-        key: "over_60",
-        label: "Quá hạn trên 60 ngày",
-        percentage: Number(((over60DaysVnd / base) * 100).toFixed(1)),
-      },
-    ];
-
-    return readySection({
-      collectedVnd,
-      from31To60DaysVnd,
-      items,
-      over60DaysVnd,
-      totalReceivablesVnd,
-      under30DaysVnd,
-    });
-  } catch {
-    return errorSection();
-  }
-}
-
-// 9. Quỹ lương & Nhân sự (Payroll & HR Executive Summary)
-async function loadPayrollExecutiveSummary(
-  permissions: readonly PermissionCode[],
-  selectedMonth: string,
-): Promise<DashboardSectionState<PayrollExecutiveSummary>> {
-  if (
-    !hasPermission(permissions, "payroll.view") &&
-    !hasPermission(permissions, "payroll.dashboard.view")
-  ) {
-    return hiddenSection();
-  }
-
-  try {
-    const supabase = await createSupabaseServerClient();
-    const prevMonth = getPreviousMonth(selectedMonth);
-
-    const [payrollRes, statementsRes, prevStatementsRes, staffRes] =
-      await Promise.all([
-        getPayrollDashboardResult(),
-        supabase
-          .from("payroll_statements")
-          .select(
-            `
-          id,
-          period_id,
-          payroll_periods!inner(month, status),
-          staff_id
-        `,
-          )
-          .eq("payroll_periods.month", selectedMonth),
-        supabase
-          .from("payroll_statements")
-          .select(
-            `
-          payroll_periods!inner(month)
-        `,
-          )
-          .eq("payroll_periods.month", prevMonth),
-        supabase
-          .from("staff_payroll_position_versions")
-          .select("staff_id, position_code, effective_from")
-          .order("effective_from", { ascending: false }),
-      ]);
-
-    if (!payrollRes.ok || statementsRes.error || prevStatementsRes.error) {
-      return errorSection();
-    }
-
-    const periods = payrollRes.data;
-    const latestPeriodMonth = periods.reduce<string | null>(
-      (latest, p) =>
-        latest === null || p.periodMonth > latest ? p.periodMonth : latest,
-      null,
-    );
-
-    const currentStatements = statementsRes.data ?? [];
-    const prevStatements = prevStatementsRes.data ?? [];
-
-    const totalPayrollVnd = currentStatements.length * 5_500_000;
-    const prevTotalPayrollVnd = prevStatements.length * 5_500_000;
-
-    const variancePercent = calculatePercentChange(
-      totalPayrollVnd,
-      prevTotalPayrollVnd,
-    );
-
-    const positionNames: Record<string, string> = {
-      academic_director: "Giám đốc học vụ",
-      admin: "Quản trị viên",
-      center_manager: "Quản lý trung tâm",
-      consultant: "Tư vấn tuyển sinh",
-      operations: "Vận hành",
-      teacher: "Giáo viên",
-      teaching_assistant: "Trợ giảng",
-    };
-
-    const positionStaffCount = new Map<string, number>();
-    for (const v of staffRes.data ?? []) {
-      const code = v.position_code || "other";
-      positionStaffCount.set(code, (positionStaffCount.get(code) ?? 0) + 1);
-    }
-
-    const staffByPosition: PositionPayrollBreakdown[] = Array.from(
-      positionStaffCount.entries(),
-    ).map(([code, employeeCount]) => ({
-      amountVnd:
-        totalPayrollVnd > 0
-          ? Math.round(
-              (totalPayrollVnd * employeeCount) /
-                Math.max(1, staffRes.data?.length || 1),
-            )
-          : 0,
-      employeeCount,
-      positionName: positionNames[code] ?? code,
-    }));
-
-    return readySection({
-      approvedCount: periods.filter((p) => p.periodStatus === "approved").length,
-      draftCount: periods.filter((p) => p.periodStatus === "draft").length,
-      latestPeriodMonth,
-      reviewCount: periods.filter((p) => p.periodStatus === "review").length,
-      staffByPosition,
-      statementCount: currentStatements.length || periods.length,
-      totalPayrollVnd,
-      variancePercent,
-    });
-  } catch {
-    return errorSection();
-  }
-}
-
-// 10. Hoạt động nổi bật trong tháng (Operational Highlights)
-async function loadOperationalHighlights(
-  permissions: readonly PermissionCode[],
-  selectedMonth: string,
-): Promise<DashboardSectionState<OperationalHighlightsSummary>> {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const [classesRes, sessionsRes, gradingRes, coachingRes, staffRes] =
-      await Promise.all([
-        hasPermission(permissions, "classes.view")
-          ? supabase.from("classes").select("id, status").eq("status", "active")
-          : Promise.resolve({ data: null, error: null }),
-        hasPermission(permissions, "sessions.view")
-          ? supabase
-              .from("class_sessions")
-              .select("id, status, session_date")
-              .eq("status", "completed")
-              .gte("session_date", `${selectedMonth}-01`)
-              .lt("session_date", `${selectedMonth}-31`)
-          : Promise.resolve({ data: null, error: null }),
-        hasPermission(permissions, "grading_credits.view")
-          ? getGradingCreditsDashboardResult()
-          : Promise.resolve({ data: null, ok: false as const }),
-        hasPermission(permissions, "coaching.view")
-          ? getCoachingRecordsDashboardResult()
-          : Promise.resolve({ data: null, ok: false as const }),
-        hasPermission(permissions, "staff.view")
-          ? supabase
-              .from("profiles")
-              .select("id, employment_status")
-              .eq("employment_status", "active")
-          : Promise.resolve({ data: null, error: null }),
-      ]);
-
-    const activeClassesCount = classesRes.data?.length ?? 0;
-    const completedSessionsCount = sessionsRes.data?.length ?? 0;
-    const gradingCreditUnits = gradingRes.ok
-      ? gradingRes.data.reduce((sum, g) => sum + g.creditUnits, 0)
-      : 0;
-    const closedCoachingCount = coachingRes.ok
-      ? coachingRes.data.filter((c) => c.currentStatus === "closed").length
-      : 0;
-    const activeStaffCount = staffRes.data?.length ?? 0;
-
-    return readySection({
-      activeClassesCount,
-      activeStaffCount,
-      closedCoachingCount,
-      completedSessionsCount,
-      gradingCreditUnits,
-    });
-  } catch {
-    return errorSection();
+    return executiveSectionsWithStatus("error");
   }
 }
 
@@ -1168,54 +619,27 @@ export async function getRoleAwareDashboardReadModel(
     advances,
     gradingCredits,
     coaching,
-    kpis,
-    attention,
-    revenueTrend,
-    revenueComposition,
-    topClasses,
-    admissionsFunnel,
-    studentStatus,
-    receivablesAging,
-    payrollSummary,
-    operationalHighlights,
+    executive,
   ] = await Promise.all([
     loadFinanceSummary(permissions),
     loadPayrollSummary(permissions),
     loadAdvanceSummary(permissions),
     loadGradingCreditSummary(permissions),
     loadCoachingSummary(permissions),
-    loadExecutiveKpis(permissions, selectedMonth),
-    loadAttentionItems(permissions),
-    loadRevenueMonthlyTrend(permissions, selectedYear),
-    loadRevenueComposition(permissions, selectedMonth),
-    loadTopGradesAndClasses(permissions),
-    loadAdmissionsFunnel(permissions),
-    loadStudentStatusComposition(permissions),
-    loadReceivablesAging(permissions, selectedMonth),
-    loadPayrollExecutiveSummary(permissions, selectedMonth),
-    loadOperationalHighlights(permissions, selectedMonth),
+    loadExecutiveSections(permissions, selectedMonth),
   ]);
 
   return {
-    admissionsFunnel,
+    ...executive,
     advances,
-    attention,
     availableMonths,
     availableYears,
     coaching,
     finance,
     gradingCredits,
-    kpis,
     lastUpdatedAt: new Date().toISOString(),
-    operationalHighlights,
     payroll,
-    payrollSummary,
-    receivablesAging,
-    revenueComposition,
-    revenueTrend,
     selectedMonth,
     selectedYear,
-    studentStatus,
-    topClasses,
   };
 }

@@ -2,6 +2,20 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.15.0] - 2026-10-12
+
+Đợt 1 — ba việc còn lại (đảo phân bổ, KPI dashboard bằng SQL, hoa hồng theo ngày tiền về).
+
+### Added
+- **Đảo phân bổ giao dịch SePay** (nút "Đảo phân bổ" trên trang Giao dịch SePay, quyền `payments.manage`) cho giao dịch đã khớp tự động, khớp lịch sử hoặc phân bổ thủ công: trừ lại buổi bằng bút toán đối ứng trên sổ buổi (không xóa lịch sử), phiếu thu quay về trạng thái trước khi thu, gỡ lô buổi / dòng chia / dòng tiền / fact lương hệ thống / accrual hoa hồng, giao dịch trở về "Chưa khớp" để phân bổ lại. Từ chối khi tháng tiền về đã có kỳ lương duyệt; báo rõ kỳ lương nháp cần "Tính lại". Audit lưu toàn bộ snapshot. RPC `reverse_sepay_allocation`.
+- **RPC `get_dashboard_executive_overview`** tính toàn bộ KPI dashboard (doanh thu/chi phí theo ngày tiền về, công nợ và tuổi nợ, phễu CRM, tình hình học sinh, lớp đông nhất, quỹ lương, hoạt động trong tháng, việc cần chú ý) trong một lượt SQL; mục không có quyền trả `null` và được ẩn.
+- Sổ doanh thu hoa hồng có cột **Ngày tiền về** (`recognized_on`), sắp xếp theo ngày tiền về.
+
+### Changed
+- Doanh thu đủ điều kiện hoa hồng ghi nhận theo ngày tiền về ngân hàng (`recognized_at` = thời điểm ngân hàng ghi nhận, `recognized_on` = ngày nghiệp vụ VN) thay vì ngày kế toán phân bổ; accrual cũ được sửa lại một lần.
+- Dashboard không còn tải nguyên bảng học sinh, dòng tiền, phiếu thu, CRM, lớp, buổi học về máy chủ ứng dụng để đếm; sửa luôn các truy vấn sai tên cột khiến thẻ Quỹ lương lỗi, bỏ ước lượng quỹ lương 5.500.000 đ/người (dùng dòng lương thật của lần tính hiện hành, chia theo vị trí), bỏ lỗi thiếu ngày 31 khi đếm buổi học, và chỉ hiển thị quỹ lương cho người có quyền quản lý/đối soát/duyệt lương hoặc `payroll.dashboard.view`.
+- Phân bổ lại cùng giao dịch cho cùng học sinh sau khi đảo dùng khóa sự kiện sổ buổi có hậu tố (`:r1`, `:r2`…).
+
 ## [0.6.14.0] - 2026-10-12
 
 Đợt 1 — nhóm 1d (khóa lương sau khi trả).

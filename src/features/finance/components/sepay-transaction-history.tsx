@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { getSepayAccountPurposeQuery, type SepayAccountPurposeFilter } from "@/features/finance/sepay-transaction-url-state";
 import type { SepayTransactionReadModel } from "@/features/finance/read-models";
 import { SepayReconciliationActions, type SepayReconciliationCandidateView } from "@/features/finance/components/sepay-reconciliation-actions";
+import { SepayAllocationReversalDialog } from "@/features/finance/components/sepay-allocation-reversal-dialog";
 import { SepayManualAllocation } from "@/features/finance/components/sepay-manual-allocation";
 import { SepayReconciliationDialog } from "@/features/finance/components/sepay-reconciliation-dialog";
 
@@ -18,6 +19,8 @@ interface SepayTransactionHistoryProps {
   accountPurposeFilter?: SepayAccountPurposeFilter;
   canAllocate?: boolean;
   canReconcile?: boolean;
+  /** payments.manage: may undo a matched or allocated transaction. */
+  canReverse?: boolean;
   candidates?: SepayReconciliationCandidateView[];
   managementPanel?: ReactNode;
   page?: number;
@@ -78,6 +81,7 @@ export function SepayTransactionHistory({
   accountPurposeFilter = "",
   canAllocate = false,
   canReconcile = false,
+  canReverse = false,
   candidates = [],
   managementPanel,
   page = 1,
@@ -144,6 +148,7 @@ export function SepayTransactionHistory({
           <SepayTransactionTable
             canAllocate={canAllocate}
             canReconcile={canReconcile}
+            canReverse={canReverse}
             candidates={candidates}
             onOpenReconciliation={handleOpenReconciliation}
             transactions={transactions}
@@ -168,10 +173,11 @@ export function SepayTransactionHistory({
 function SepayTransactionTable({
   canAllocate,
   canReconcile,
+  canReverse,
   candidates,
   onOpenReconciliation,
   transactions,
-}: Pick<SepayTransactionHistoryProps, "canAllocate" | "canReconcile" | "candidates" | "transactions"> & {
+}: Pick<SepayTransactionHistoryProps, "canAllocate" | "canReconcile" | "canReverse" | "candidates" | "transactions"> & {
   onOpenReconciliation: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
 }) {
   return (
@@ -181,6 +187,7 @@ function SepayTransactionTable({
           <SepayTransactionTableRow
             canAllocate={canAllocate}
             canReconcile={canReconcile}
+            canReverse={canReverse}
             candidates={candidates}
             key={transaction.id}
             onOpenReconciliation={onOpenReconciliation}
@@ -213,6 +220,7 @@ function SepayTransactionTable({
           <SepayTransactionRecord
             canAllocate={canAllocate}
             canReconcile={canReconcile}
+            canReverse={canReverse}
             candidates={candidates}
             key={transaction.id}
             onOpenReconciliation={onOpenReconciliation}
@@ -227,12 +235,14 @@ function SepayTransactionTable({
 function SepayTransactionTableRow({
   canAllocate,
   canReconcile,
+  canReverse,
   candidates,
   onOpenReconciliation,
   transaction,
 }: {
   canAllocate?: boolean;
   canReconcile?: boolean;
+  canReverse?: boolean;
   candidates?: SepayReconciliationCandidateView[];
   onOpenReconciliation: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
   transaction: SepayTransactionReadModel;
@@ -269,6 +279,7 @@ function SepayTransactionTableRow({
       <TableCell className="w-[160px]">
         <div className="flex flex-col items-start gap-2">
           <SepayManualAllocation canAllocate={canAllocate} transaction={transaction} />
+          {canReverse ? <SepayAllocationReversalDialog transaction={transaction} /> : null}
           {canReconcile ? (
             <SepayReconciliationActions
               candidates={candidates ?? []}
@@ -285,12 +296,14 @@ function SepayTransactionTableRow({
 function SepayTransactionRecord({
   canAllocate,
   canReconcile,
+  canReverse,
   candidates,
   onOpenReconciliation,
   transaction,
 }: {
   canAllocate?: boolean;
   canReconcile?: boolean;
+  canReverse?: boolean;
   candidates?: SepayReconciliationCandidateView[];
   onOpenReconciliation: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
   transaction: SepayTransactionReadModel;
@@ -328,6 +341,7 @@ function SepayTransactionRecord({
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-2">
           <SepayManualAllocation canAllocate={canAllocate} transaction={transaction} />
+          {canReverse ? <SepayAllocationReversalDialog transaction={transaction} /> : null}
           {canReconcile ? (
             <SepayReconciliationActions
               candidates={candidates ?? []}

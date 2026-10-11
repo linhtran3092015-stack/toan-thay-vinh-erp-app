@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       academic_years: {
@@ -3337,6 +3362,7 @@ export type Database = {
           lead_source_name: string
           recognized_at: string
           recognized_by: string | null
+          recognized_on: string
           recognized_revenue_vnd: number
           sale_owner_id: string
           source_cashflow_record_id: string
@@ -3352,6 +3378,7 @@ export type Database = {
           lead_source_name: string
           recognized_at: string
           recognized_by?: string | null
+          recognized_on: string
           recognized_revenue_vnd: number
           sale_owner_id: string
           source_cashflow_record_id: string
@@ -3367,6 +3394,7 @@ export type Database = {
           lead_source_name?: string
           recognized_at?: string
           recognized_by?: string | null
+          recognized_on?: string
           recognized_revenue_vnd?: number
           sale_owner_id?: string
           source_cashflow_record_id?: string
@@ -7292,6 +7320,12 @@ export type Database = {
         Args: { p_configuration: Json; p_question_type: string }
         Returns: boolean
       }
+      commission_recognized_at_for_cashflow: {
+        Args: {
+          p_cashflow: Database["public"]["Tables"]["finance_cashflow_records"]["Row"]
+        }
+        Returns: string
+      }
       commit_class_schedule_import_batch: {
         Args: { p_batch_id: string; p_reason: string }
         Returns: {
@@ -8776,6 +8810,10 @@ export type Database = {
           student_public_code: string
         }[]
       }
+      get_dashboard_executive_overview: {
+        Args: { p_month?: string }
+        Returns: Json
+      }
       get_effective_sepay_receiving_account: {
         Args: { p_effective_on?: string; p_purpose: string }
         Returns: {
@@ -9045,6 +9083,7 @@ export type Database = {
           lead_source_group: string
           lead_source_name: string
           recognized_at: string
+          recognized_on: string
           recognized_revenue_vnd: number
           sale_owner_display_name: string
           sale_owner_employee_code: string
@@ -9408,6 +9447,10 @@ export type Database = {
         Returns: Json
       }
       mutate_student_care: { Args: { p_command: Json }; Returns: Json }
+      next_student_ledger_event_key: {
+        Args: { p_base: string }
+        Returns: string
+      }
       next_student_public_code: { Args: never; Returns: string }
       normalize_payment_reference: {
         Args: { p_value: string }
@@ -10143,6 +10186,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      reverse_sepay_allocation: {
+        Args: { p_reason: string; p_sepay_transaction_id: string }
+        Returns: Json
       }
       reverse_session_charge: {
         Args: { p_reason: string; p_session_attendance_id: string }
@@ -10987,6 +11034,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

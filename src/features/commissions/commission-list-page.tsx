@@ -87,7 +87,7 @@ export function CommissionListPage({
               Danh sách doanh thu đủ điều kiện
             </h2>
             <p className="mt-1 text-secondary text-text-muted">
-              Hiển thị tối đa 200 bản ghi mới nhất theo thứ tự hệ thống ghi nhận.
+              Hiển thị tối đa 200 bản ghi mới nhất theo ngày tiền về ngân hàng.
             </p>
           </div>
 
@@ -120,6 +120,7 @@ function CommissionDirectory({
             <TableHeader>Nguồn</TableHeader>
             <TableHeader className="text-right">Doanh thu đủ điều kiện</TableHeader>
             <TableHeader>Trạng thái</TableHeader>
+            <TableHeader>Ngày tiền về</TableHeader>
             <TableHeader>Ghi nhận lúc</TableHeader>
           </tr>
         }
@@ -157,6 +158,7 @@ function CommissionTableRow({
         {formatCurrency(entry.recognizedRevenueVnd)}
       </TableCell>
       <TableCell className="w-[160px]"><Badge tone={status.tone}>{status.label}</Badge></TableCell>
+      <TableCell className="w-[140px] tabular-nums font-medium text-text-strong">{formatDate(entry.recognizedOn)}</TableCell>
       <TableCell className="w-[180px] tabular-nums">{formatDateTime(entry.recognizedAt)}</TableCell>
     </tr>
   );
@@ -186,6 +188,7 @@ function CommissionRecord({
       <dl className="mt-4 grid gap-3 text-secondary text-text-default">
         <RecordField content={<SourceContext entry={entry} source={source} />} label="Nguồn" />
         {canManage ? <RecordField content={<SaleOwner entry={entry} />} label="Người phụ trách" /> : null}
+        <RecordField label="Ngày tiền về" value={formatDate(entry.recognizedOn)} />
         <RecordField label="Ghi nhận lúc" value={formatDateTime(entry.recognizedAt)} />
       </dl>
     </article>
@@ -261,4 +264,10 @@ function formatCurrency(value: number): string {
 
 function formatDateTime(value: string): string {
   return dateTimeFormatter.format(new Date(value));
+}
+
+/** `YYYY-MM-DD` business date; rendered without a timezone shift. */
+function formatDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
 }

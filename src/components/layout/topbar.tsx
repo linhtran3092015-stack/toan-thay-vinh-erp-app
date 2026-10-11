@@ -32,7 +32,7 @@ export function Topbar({
       : String(unreadNotificationCount);
 
   return (
-    <header className="sticky top-0 z-30 flex h-[var(--topbar-height)] items-center gap-3 border-b border-border-subtle bg-surface-base px-4 transition-colors duration-150 sm:px-5 lg:px-6">
+    <header className="sticky top-[var(--safe-area-top)] z-30 flex h-[var(--topbar-height)] items-center gap-3 border-b border-border-subtle bg-surface-base px-4 transition-colors duration-150 sm:px-5 lg:px-6">
       <button
         aria-label="Mở điều hướng chính"
         className="flex h-11 w-11 items-center justify-center rounded-md text-text-strong transition-colors hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring md:hidden"

@@ -16,6 +16,7 @@ import {
 const LOGIN_PATH = "/login";
 const PUBLIC_PATHS = new Set([
   "/auth/callback",
+  "/manifest.webmanifest",
   "/api/health/supabase",
   "/api/webhooks/sepay",
 ]);

@@ -15,6 +15,7 @@ const accrual = (
   leadSourceGroup: "mma",
   leadSourceName: "MMA Referral",
   recognizedAt: "2026-08-11T08:00:00.000Z",
+  recognizedOn: "2026-08-11",
   recognizedRevenueVnd: 150_000,
   saleOwnerDisplayName: "Nguyễn Minh An",
   saleOwnerEmployeeCode: "NS-001",

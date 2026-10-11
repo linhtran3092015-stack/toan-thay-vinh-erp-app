@@ -77,7 +77,7 @@ export function Sidebar({
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[72px] border-r border-[var(--nav-sidebar-border)] bg-[var(--nav-sidebar-bg)] text-[var(--nav-sidebar-fg)] md:block xl:w-[var(--sidebar-width)]">
+      <aside className="fixed inset-y-0 left-[var(--safe-area-left)] z-40 hidden w-[72px] pt-[var(--safe-area-top)] pb-[var(--safe-area-bottom)] border-r border-[var(--nav-sidebar-border)] bg-[var(--nav-sidebar-bg)] text-[var(--nav-sidebar-fg)] md:block xl:w-[var(--sidebar-width)]">
         <SidebarContents
           activeDomainKey={activeDomainKey}
           centerDisplayName={centerDisplayName}
@@ -101,7 +101,7 @@ export function Sidebar({
         <aside
           aria-label="Điều hướng chính"
           aria-modal="true"
-          className="fixed inset-y-0 left-0 z-50 w-[min(320px,calc(100vw-32px))] bg-[var(--nav-sidebar-bg)] text-[var(--nav-sidebar-fg)] shadow-[var(--elevation-2)] md:hidden"
+          className="fixed inset-y-0 left-0 z-50 w-[min(320px,calc(100vw-32px))] pt-[var(--safe-area-top)] pb-[var(--safe-area-bottom)] pl-[var(--safe-area-left)] bg-[var(--nav-sidebar-bg)] text-[var(--nav-sidebar-fg)] shadow-[var(--elevation-2)] md:hidden"
           ref={mobilePanelRef}
           role="dialog"
         >

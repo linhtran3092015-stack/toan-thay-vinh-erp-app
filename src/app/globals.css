@@ -1,5 +1,39 @@
 @import "tailwindcss";
 
+/* PWA / notched devices (viewport-fit=cover). The insets are 0 everywhere else. */
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+}
+
+body {
+  padding-top: var(--safe-area-top);
+  padding-right: var(--safe-area-right);
+  padding-bottom: var(--safe-area-bottom);
+  padding-left: var(--safe-area-left);
+}
+
+/* Paint the iOS status-bar strip in the brand colour (status bar text is white
+   under `black-translucent`), matching the Android theme-color status bar. */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--safe-area-top);
+  background: var(--erp-accent, #B83C30);
+  z-index: 100;
+  pointer-events: none;
+}
+
+@media print {
+  body { padding: 0; }
+  body::before { display: none; }
+}
+
 .navigation-pending {
   /* Avoid a flash for cached/fast navigations; keep the actual wait unbounded. */
   animation: navigation-pending-reveal 120ms step-end both;

@@ -11,6 +11,7 @@ import {
 import { ModuleNavigation } from "@/components/layout/module-navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { InstallAppPrompt } from "@/components/shared/install-app-prompt";
 import { StudentCareRefresh } from "@/features/student-care/refresh";
 import type { AuthUser } from "@/features/auth/types";
 import type { PermissionCode } from "@/lib/permissions/types";
@@ -80,6 +81,7 @@ export function AppShell({
           {children}
         </main>
       </div>
+      <InstallAppPrompt />
     </div>
   );
 }

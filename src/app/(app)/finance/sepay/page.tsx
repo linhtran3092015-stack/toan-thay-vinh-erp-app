@@ -159,6 +159,7 @@ export default async function SepayTransactionsPage({ searchParams }: SepayTrans
       candidates={candidatesResult.ok ? candidatesResult.data : []}
       canAllocate={canAllocate}
       canReconcile={canReconcile && candidatesResult.ok}
+      canReverse={permissionResult.permissions.includes("payments.manage")}
       managementPanel={
         suggestionsPanel || syncPanel ? (
           <div className="grid gap-4">

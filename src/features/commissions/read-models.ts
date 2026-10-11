@@ -7,7 +7,10 @@ export interface SalesCommissionAccrualDashboardEntry {
   /** Transports the server value exactly for safe unsupported-value presentation. */
   leadSourceGroup: string;
   leadSourceName: string;
+  /** Bank timestamp of the transfer (or receipt creation for cash). */
   recognizedAt: string;
+  /** Vietnam business date the money arrived; drives the commission month. */
+  recognizedOn: string;
   recognizedRevenueVnd: number;
   saleOwnerDisplayName: string;
   saleOwnerEmployeeCode: string | null;

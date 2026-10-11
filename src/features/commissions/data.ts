@@ -29,6 +29,7 @@ export async function getSalesCommissionAccrualsDashboardResult(): Promise<
         leadSourceGroup: entry.lead_source_group,
         leadSourceName: entry.lead_source_name,
         recognizedAt: entry.recognized_at,
+        recognizedOn: entry.recognized_on,
         recognizedRevenueVnd: entry.recognized_revenue_vnd,
         saleOwnerDisplayName: entry.sale_owner_display_name,
         saleOwnerEmployeeCode: entry.sale_owner_employee_code,
