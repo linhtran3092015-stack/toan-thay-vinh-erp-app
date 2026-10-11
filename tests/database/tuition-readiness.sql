@@ -84,3 +84,36 @@ do $$begin
 end;$$;
 reset role;
 select test_assert(not has_function_privilege('authenticated','public.student_payment_transfer_identity(uuid,uuid)','execute'),'identity helper is not a public data lookup');
+-- Phase 1b (20261012130000 / 20261012130100): cutoff balance, overlap guard, atomic reissue.
+begin;
+set test.permissions='tuition_periods.view,tuition_periods.lock,tuition_periods.adjust,tuition_periods.manage';
+-- Opening balance is taken at the period start: entries dated inside the period do not move it.
+insert into class_sessions(class_id,session_date,session_kind,status) values('55555555-5555-4555-8555-555555555555','2026-11-15','regular','scheduled'),('55555555-5555-4555-8555-555555555555','2026-11-22','regular','scheduled'),('55555555-5555-4555-8555-555555555555','2026-11-29','regular','scheduled');
+insert into tuition_collection_periods(id,name,starts_on,ends_on,created_by) values('66666666-6666-4666-8666-666666666668','Next','2026-11-07','2026-12-31',auth.uid());
+insert into student_session_ledger_entries(student_id,entry_type,delta_sessions,effective_on,event_key) values
+ ('22222222-2222-4222-8222-222222222223','payment_credit',2,'2026-11-01','cutoff-before'),
+ ('22222222-2222-4222-8222-222222222223','session_charge',-3,'2026-11-10','cutoff-after');
+select test_assert((select min(opening_balance_sessions)=2 from preview_tuition_collection_period('66666666-6666-4666-8666-666666666668') where student_id='22222222-2222-4222-8222-222222222223'),'opening balance ignores entries dated inside the period');
+-- A new period cannot overlap a locked one.
+do $$begin
+ begin perform create_tuition_collection_period('Overlap','2026-10-01','2026-11-30',null,null);raise exception 'should reject';
+ exception when others then if sqlerrm<>'TUITION_PERIOD_OVERLAPS' then raise;end if;end;
+end;$$;
+insert into tuition_collection_periods(id,name,starts_on,ends_on,created_by) values('66666666-6666-4666-8666-666666666669','Overlapping draft','2026-11-01','2026-11-30',auth.uid());
+do $$begin
+ begin perform lock_tuition_collection_period('66666666-6666-4666-8666-666666666669');raise exception 'should reject';
+ exception when others then if sqlerrm<>'TUITION_PERIOD_OVERLAPS' then raise;end if;end;
+end;$$;
+-- Reissue replaces the original request instead of leaving two pending ones.
+select lock_tuition_collection_period('66666666-6666-4666-8666-666666666668');
+select test_assert((select count(*)=1 from student_payment_requests r join tuition_collection_items i on i.payment_request_id=r.id where i.period_id='66666666-6666-4666-8666-666666666668' and i.student_id='22222222-2222-4222-8222-222222222222' and r.status='pending'),'next period bills the student once');
+select reissue_tuition_collection_item((select id from tuition_collection_items where period_id='66666666-6666-4666-8666-666666666668' and student_id='22222222-2222-4222-8222-222222222222'),100000,'Giảm học phí theo thỏa thuận');
+select test_assert((select count(*)=1 from student_payment_requests r join tuition_collection_items i on i.payment_request_id=r.id where i.period_id='66666666-6666-4666-8666-666666666668' and i.student_id='22222222-2222-4222-8222-222222222222' and r.status='pending'),'after reissue exactly one request stays pending');
+select test_assert((select r.status='cancelled' and r.superseded_by_request_id is not null and r.cancelled_at is not null from tuition_collection_items i join student_payment_requests r on r.id=i.payment_request_id where i.period_id='66666666-6666-4666-8666-666666666668' and i.student_id='22222222-2222-4222-8222-222222222222' and i.reissued_from_item_id is null),'original request is cancelled and points at its replacement');
+select test_assert((select count(*)=0 from find_sepay_payment_candidates((select r.transfer_code from tuition_collection_items i join student_payment_requests r on r.id=i.payment_request_id where i.period_id='66666666-6666-4666-8666-666666666668' and i.student_id='22222222-2222-4222-8222-222222222222' and i.reissued_from_item_id is null),'')),'the superseded transfer code no longer auto-matches');
+-- A paid item cannot be reissued.
+do $$begin
+ begin perform reissue_tuition_collection_item((select id from tuition_collection_items where period_id='66666666-6666-4666-8666-666666666666' and student_id='22222222-2222-4222-8222-222222222222'),0,'Thu thử');raise exception 'should reject';
+ exception when others then if sqlerrm<>'TUITION_ITEM_ALREADY_PAID' then raise;end if;end;
+end;$$;
+rollback;

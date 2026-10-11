@@ -2,6 +2,19 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.12.0] - 2026-10-12
+
+Đợt 1 — nhóm 1b (học phí đúng số).
+
+### Fixed
+- **Tái phát hành phiếu học phí thay thế phiếu gốc**: phiếu thu gốc đang chờ bị hủy và trỏ sang phiếu thay thế; QR cũ không hiện nữa, mã chuyển khoản cũ không khớp tự động; không tái phát hành phiếu đã thu tiền. Trước đây hai phiếu cùng chờ nên công nợ đếm đôi và phụ huynh có thể trả theo phiếu cũ.
+- **Số dư đầu kỳ không còn tính trùng buổi của chính kỳ đó**: các lần trừ buổi có ngày trong kỳ bị loại khỏi số dư đầu kỳ (tiền nạp trong kỳ vẫn tính), nên khóa kỳ sau khi kỳ đã bắt đầu không còn lập phiếu lại cho buổi đã trừ.
+- **Nợ cũ không lên hai phiếu**: phần nợ đầu kỳ đã nằm trên phiếu chờ thanh toán của kỳ trước (chưa bị thay thế) không bị tính lại ở kỳ sau.
+- **Kỳ thu không được chồng ngày với kỳ đã khóa** (kiểm tra khi tạo và khi khóa, mã lỗi `TUITION_PERIOD_OVERLAPS`).
+
+### Database
+- `20261012130000_tuition_reissue_supersedes_request.sql` (thêm `student_payment_requests.cancelled_at/_by/_reason`, `superseded_by_request_id`), `20261012130100_tuition_period_cutoff_balance_and_overlap.sql`.
+
 ## [0.6.11.0] - 2026-10-12
 
 Đợt 1 — nhóm 1a (chấm công & kiểm soát).

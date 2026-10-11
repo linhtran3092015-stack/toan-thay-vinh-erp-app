@@ -5483,6 +5483,9 @@ export type Database = {
         Row: {
           bonus_sessions: number
           calculated_unit_price_vnd: number
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           crm_case_id: string | null
@@ -5497,6 +5500,7 @@ export type Database = {
           qr_payload_url: string | null
           status: string
           student_id: string | null
+          superseded_by_request_id: string | null
           topup_type: string
           transfer_code: string
           updated_at: string
@@ -5504,6 +5508,9 @@ export type Database = {
         Insert: {
           bonus_sessions?: number
           calculated_unit_price_vnd: number
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           crm_case_id?: string | null
@@ -5518,6 +5525,7 @@ export type Database = {
           qr_payload_url?: string | null
           status?: string
           student_id?: string | null
+          superseded_by_request_id?: string | null
           topup_type?: string
           transfer_code: string
           updated_at?: string
@@ -5525,6 +5533,9 @@ export type Database = {
         Update: {
           bonus_sessions?: number
           calculated_unit_price_vnd?: number
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           crm_case_id?: string | null
@@ -5539,11 +5550,19 @@ export type Database = {
           qr_payload_url?: string | null
           status?: string
           student_id?: string | null
+          superseded_by_request_id?: string | null
           topup_type?: string
           transfer_code?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "student_payment_requests_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "student_payment_requests_created_by_fkey"
             columns: ["created_by"]
@@ -5570,6 +5589,13 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_payment_requests_superseded_by_request_id_fkey"
+            columns: ["superseded_by_request_id"]
+            isOneToOne: false
+            referencedRelation: "student_payment_requests"
             referencedColumns: ["id"]
           },
         ]
@@ -10492,6 +10518,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      tuition_period_overlaps_locked: {
+        Args: { p_ends_on: string; p_period_id: string; p_starts_on: string }
+        Returns: boolean
       }
       update_class: {
         Args: {

@@ -40,6 +40,9 @@ try {
  sql(`alter table public.sepay_transactions add account_purpose text not null default 'unknown';`);
  sql(migration('20260905010000_sepay_api_v2_record_only_ingestion.sql'));
  sql(migration('20260923010000_tuition_readiness_and_transfer_identity.sql'));
+ // Phase 1b redefinitions: atomic reissue, cutoff balance, overlap guard.
+ sql(migration('20261012130000_tuition_reissue_supersedes_request.sql'));
+ sql(migration('20261012130100_tuition_period_cutoff_balance_and_overlap.sql'));
  sql(readFileSync(new URL('../tests/database/tuition-readiness.sql',import.meta.url),'utf8'));
  sql(migration('20260928010000_sepay_manual_tuition_allocation.sql'));
  sql(readFileSync(new URL('../tests/database/sepay-manual-allocation.sql',import.meta.url),'utf8'));
