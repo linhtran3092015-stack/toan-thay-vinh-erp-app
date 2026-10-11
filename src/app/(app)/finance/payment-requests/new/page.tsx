@@ -5,6 +5,7 @@ import { getPaymentRequestCreationOptions } from "@/features/finance/payment-req
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function NewPaymentRequestPage() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -23,7 +24,7 @@ export default async function NewPaymentRequestPage() {
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền payments.create_request."
+        description={permissionDeniedDescription("payments.create_request")}
         title="Không có quyền tạo yêu cầu thanh toán"
       />
     );

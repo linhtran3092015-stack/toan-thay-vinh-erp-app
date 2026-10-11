@@ -11,6 +11,7 @@ import { getCoachingForms, getCoachingPublicLinks, getCoachingRecordResponses } 
 import { getSystemSettings } from "@/features/settings/system-settings-data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface CoachingDetailRouteProps {
   params: Promise<{ coachingId: string }>;
 }
@@ -33,7 +34,7 @@ export default async function CoachingDetailRoute({
   if (!permissionResult.permissions.includes("coaching.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền coaching.view."
+        description={permissionDeniedDescription("coaching.view")}
         title="Không có quyền xem Coaching"
       />
     );

@@ -1,6 +1,6 @@
 {
   "name": "toan-thay-vinh-erp-app",
-  "version": "0.6.17",
+  "version": "0.6.18",
   "private": true,
   "scripts": {
     "clean": "rm -rf .next",
@@ -21,7 +21,9 @@
     "supabase:db:pull": "supabase db pull --linked",
     "supabase:db:push": "supabase db push --linked",
     "supabase:migration:new": "supabase migration new",
-    "supabase:types": "supabase gen types --linked --lang typescript --schema public > src/types/database.generated.ts"
+    "supabase:types": "supabase gen types --linked --lang typescript --schema public > src/types/database.generated.ts",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\""
   },
   "engines": {
     "node": "24.x"
@@ -59,6 +61,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
     "jsdom": "^30.0.1",
+    "prettier": "^3.9.10",
     "supabase": "^2.109.1",
     "tailwindcss": "^4",
     "typescript": "^5",

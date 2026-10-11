@@ -6,12 +6,13 @@ import { SepayTransactionHistory } from "@/features/finance/components/sepay-tra
 import { SepayHistorySyncPanel, type SepaySyncAccountView, type SepaySyncRunView } from "@/features/finance/components/sepay-history-sync-panel";
 import { getSepayReconciliationCandidatesResult, getSepayTransactionsResult } from "@/features/finance/data";
 import type { SepayReconciliationCandidateReadModel } from "@/features/finance/read-models";
-import { parseSepayAccountPurposeFilter } from "@/features/finance/sepay-transaction-url-state";
+import { parseSepayAccountPurposeFilter, parseSepayQueueFilter } from "@/features/finance/sepay-transaction-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface SepayTransactionsPageProps {
-  searchParams: Promise<{ accountPurpose?: string | string[]; page?: string | string[] }>;
+  searchParams: Promise<{ accountPurpose?: string | string[]; page?: string | string[]; queue?: string | string[] }>;
 }
 
 function getVietnamDate(offsetDays = 0): string {
@@ -40,7 +41,7 @@ export default async function SepayTransactionsPage({ searchParams }: SepayTrans
   if (!permissionResult.permissions.includes("sepay.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền sepay.view."
+        description={permissionDeniedDescription("sepay.view")}
         title="Không có quyền xem Giao dịch SePay"
       />
     );
@@ -48,6 +49,7 @@ export default async function SepayTransactionsPage({ searchParams }: SepayTrans
 
   const params = await searchParams;
   const accountPurposeFilter = parseSepayAccountPurposeFilter(params.accountPurpose);
+  const queueFilter = parseSepayQueueFilter(params.queue);
   const requestedPage = typeof params.page === "string" ? Number(params.page) : 1;
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const canSyncHistory = permissionResult.permissions.includes("sepay.sync_history.manage");
@@ -55,7 +57,7 @@ export default async function SepayTransactionsPage({ searchParams }: SepayTrans
     || permissionResult.permissions.includes("sepay.allocate")
     || permissionResult.permissions.includes("payments.manage");
 
-  const transactionsResult = await getSepayTransactionsResult(accountPurposeFilter, page);
+  const transactionsResult = await getSepayTransactionsResult(accountPurposeFilter, page, queueFilter);
   if (!transactionsResult.ok) {
     return (
       <ErrorState
@@ -170,6 +172,8 @@ export default async function SepayTransactionsPage({ searchParams }: SepayTrans
       }
       page={transactionsResult.data.page}
       pageSize={transactionsResult.data.pageSize}
+      queueFilter={queueFilter}
+      reviewCount={transactionsResult.data.reviewCount}
       reconciliationError={canReconcile && !candidatesResult.ok}
       total={transactionsResult.data.total}
       transactions={transactionsResult.data.transactions}

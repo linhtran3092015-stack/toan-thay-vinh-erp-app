@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { SEPAY_REVIEW_MATCH_STATUSES } from "@/features/finance/sepay-transaction-url-state";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   CashflowRecordReadModel,
@@ -294,6 +295,7 @@ export async function getFinanceOverview(): Promise<FinanceOverviewReadModel> {
 export async function getSepayTransactionsResult(
   accountPurpose: "" | SepayTransactionReadModel["accountPurpose"] = "",
   page = 1,
+  queue: "" | "review" = "",
 ): Promise<
   FinanceReadResult<SepayTransactionsPageReadModel>
 > {
@@ -332,8 +334,18 @@ export async function getSepayTransactionsResult(
     if (accountPurpose) {
       query = query.eq("account_purpose", accountPurpose);
     }
+    if (queue === "review") {
+      query = query.in("match_status", [...SEPAY_REVIEW_MATCH_STATUSES]).eq("transfer_type", "in");
+    }
 
-    const { count, data, error } = await query;
+    const [{ count, data, error }, reviewResult] = await Promise.all([
+      query,
+      supabase
+        .from("sepay_transactions")
+        .select("id", { count: "exact", head: true })
+        .in("match_status", [...SEPAY_REVIEW_MATCH_STATUSES])
+        .eq("transfer_type", "in"),
+    ]);
 
     if (error) {
       return { ok: false };
@@ -343,6 +355,7 @@ export async function getSepayTransactionsResult(
       data: {
         page: safePage,
         pageSize,
+        reviewCount: reviewResult.error ? 0 : (reviewResult.count ?? 0),
         total: count ?? 0,
         transactions: (data ?? []).map((transaction) => toSepayTransactionReadModel(transaction)),
       },

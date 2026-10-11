@@ -4,6 +4,7 @@ import { ClassListPage } from "@/features/classes/class-list-page";
 import { getClassDirectory } from "@/features/classes/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function ClassesRoute() {
   const permissionResult =
     await getCachedDatabasePermissions();
@@ -24,7 +25,7 @@ export default async function ClassesRoute() {
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền classes.view."
+        description={permissionDeniedDescription("classes.view")}
         title="Không có quyền xem lớp học"
       />
     );

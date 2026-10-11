@@ -3,6 +3,7 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { ReportsPage } from "@/features/reports/reports-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function ReportsRoute() {
   const permissionResult =
     await getCachedDatabasePermissions();
@@ -23,7 +24,7 @@ export default async function ReportsRoute() {
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền reports.view."
+        description={permissionDeniedDescription("reports.view")}
         title="Không có quyền xem Báo cáo"
       />
     );

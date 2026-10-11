@@ -10,6 +10,7 @@ import { getCrmLeadDirectory, getLeadSources, getSaleOwners } from "@/features/c
 import { getCrmDirectoryQuery } from "@/features/crm/crm-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface CrmDirectoryPageProps {
   searchParams: Promise<{
     grade?: string;
@@ -36,7 +37,7 @@ export default async function CrmDirectoryPage({ searchParams }: CrmDirectoryPag
   if (!permissionResult.permissions.includes("crm.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền crm.view."
+        description={permissionDeniedDescription("crm.view")}
         title="Không có quyền xem danh sách CRM"
       />
     );

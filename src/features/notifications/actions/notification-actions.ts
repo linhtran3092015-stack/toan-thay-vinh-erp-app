@@ -8,6 +8,7 @@ import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.generated";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 type MarkNotificationReadArgs =
   Database["public"]["Functions"]["mark_notification_read"]["Args"];
 
@@ -21,7 +22,7 @@ async function requireNotificationPermission(): Promise<string | null> {
   }
 
   if (!permissionResult.permissions.includes("notifications.view")) {
-    return "Tài khoản hiện tại không có quyền notifications.view.";
+    return permissionDeniedMessage("notifications.view");
   }
 
   return null;

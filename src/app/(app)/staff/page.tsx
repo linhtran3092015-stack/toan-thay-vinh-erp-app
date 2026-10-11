@@ -5,6 +5,7 @@ import { getStaffDirectory } from "@/features/staff/data";
 import { StaffDirectoryPage } from "@/features/staff/staff-directory-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function StaffRoute() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -20,7 +21,7 @@ export default async function StaffRoute() {
   if (!permissionResult.permissions.includes("staff.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền staff.view."
+        description={permissionDeniedDescription("staff.view")}
         title="Không có quyền xem danh sách nhân sự"
       />
     );

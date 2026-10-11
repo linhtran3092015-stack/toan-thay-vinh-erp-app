@@ -66,7 +66,7 @@ describe("Staff 1 presentation", () => {
     expect(table.closest(".staff-directory-work-area")).not.toBeNull();
     expect(list.closest(".staff-directory-work-area")).not.toBeNull();
     expect(globals).toMatch(/\.staff-directory-work-area,[\s\S]*container-type: inline-size/);
-    expect(globals).toMatch(/@container \(min-width: 1182px\)[\s\S]*\.staff-directory-table/);
+    expect(globals).toMatch(/@container \(min-width: 1120px\)[\s\S]*\.staff-directory-table/);
     view.unmount();
 
     render(<StaffDetailPage canManageProfile={false} canManageRateVersions={false} canViewRateVersions canViewRoles detail={detail} />);

@@ -3,6 +3,7 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { StudentImportPage } from "@/features/imports/students/student-import-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function StudentImportRoute() {
   const permissionResult =
     await getCachedDatabasePermissions();
@@ -23,7 +24,7 @@ export default async function StudentImportRoute() {
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền imports.students."
+        description={permissionDeniedDescription("imports.students")}
         title="Không có quyền import học viên"
       />
     );

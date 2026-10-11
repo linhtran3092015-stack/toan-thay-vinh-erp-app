@@ -21,7 +21,7 @@ export function DataTableFrame({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border border-border-subtle bg-surface-base",
+        "overflow-x-auto rounded-lg border border-border-subtle bg-surface-base",
         className,
       )}
     >

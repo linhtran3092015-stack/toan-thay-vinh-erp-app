@@ -5,6 +5,7 @@ import { getSessionDirectoryQuery } from "@/features/sessions/session-directory-
 import { getSessionCreationOptions } from "@/features/sessions/create-data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface NewSessionRouteProps { searchParams: Promise<Record<string, string | string[] | undefined>>; }
 
 export default async function NewSessionRoute({ searchParams }: NewSessionRouteProps) {
@@ -31,7 +32,7 @@ export default async function NewSessionRoute({ searchParams }: NewSessionRouteP
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền sessions.manage."
+        description={permissionDeniedDescription("sessions.manage")}
         title="Không có quyền tạo buổi học"
       />
     );

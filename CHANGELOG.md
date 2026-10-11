@@ -2,6 +2,24 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.18.0] - 2026-10-13
+
+Đợt 2 — nhóm 2c (giao diện dùng chung, hàng đợi kế toán, dọn mã).
+
+### Added
+- **Primitive form dùng chung** `Field / Label / Input / Select / Textarea` (một chiều cao, một vòng focus, báo lỗi và gợi ý có aria); **Pagination** và **tiêu đề bảng sắp xếp được** (`SortableTableHeader` + hook `useSortedRows`) dùng chung. Trang Buổi học dùng pagination chung và sắp xếp theo ngày / lớp / trạng thái.
+- Thư viện `lib/format` (₫ thống nhất, "triệu/tỷ") và `lib/datetime` (ngày, giờ, ngày-giờ theo giờ Việt Nam, ngày nghiệp vụ hôm nay) để các module dùng chung; dashboard chuyển sang dùng thư viện này.
+- **Hàng đợi kế toán** trên trang Giao dịch SePay: nút "Cần đối soát (n)" lọc giao dịch tiền vào chưa khớp / sai số tiền / sai tài khoản / trùng nhận diện, giữ được bộ lọc tài khoản và phân trang; giao dịch chưa khớp hiện tone cảnh báo.
+- Nhãn quyền tiếng Việt (`lib/permissions/labels`): 71 thông báo "không có quyền sepay.view" kiểu mã thô đổi thành "chưa được cấp quyền xem giao dịch SePay".
+- Cấu hình Prettier (`npm run format`, `format:check`), chưa ép trong CI để tránh đổi định dạng hàng loạt.
+
+### Changed
+- Năm form tài chính chưa có style (tài khoản nhận SePay, mẫu phiếu học phí, phiếu thay thế, in phiếu, bộ lọc kỳ thu) dùng primitive mới; ô nhập không còn "vô hình".
+- Bảng rộng cuộn ngang trong khung thay vì bị cắt; ngưỡng hiện bảng của Phiếu thu, SePay, Đơn hàng, Tạm ứng, Nhân sự hạ từ 1182–1882px xuống 1120px (laptop 1440px thấy bảng thay vì thẻ).
+
+### Removed
+- 15 file mock cũ của module học sinh (trang chi tiết mock, 13 tab/section không được import, dữ liệu chi tiết giả) — khoảng 3.000 dòng không chạy tới.
+
 ## [0.6.17.0] - 2026-10-13
 
 Đợt 2 — nhóm 2b (CRM khép kín).

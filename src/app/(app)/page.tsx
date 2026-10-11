@@ -7,6 +7,7 @@ import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { getRoleAwareDashboardReadModel } from "@/features/dashboard/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface PageProps {
   searchParams?: Promise<{
     month?: string;
@@ -36,7 +37,7 @@ export default async function Home({ searchParams }: PageProps) {
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền dashboard.view."
+        description={permissionDeniedDescription("dashboard.view")}
         title="Không có quyền xem Dashboard"
       />
     );

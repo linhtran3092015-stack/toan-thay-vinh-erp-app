@@ -4,6 +4,7 @@ import { getAcademicYearManagementData } from "@/features/classes/academic-year-
 import { AcademicYearManagementPage } from "@/features/classes/management/academic-year-management-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function AcademicYearsRoute() {
   const permissionResult =
     await getCachedDatabasePermissions();
@@ -24,7 +25,7 @@ export default async function AcademicYearsRoute() {
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền classes.view."
+        description={permissionDeniedDescription("classes.view")}
         title="Không có quyền xem năm học"
       />
     );

@@ -7,12 +7,13 @@ import { getCachedDatabasePermissions } from "@/lib/permissions/database-permiss
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TuitionReissueForm } from "@/features/tuition/reissue-form";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface FeeNoticePageProps { params: Promise<{ itemId: string; periodId: string }> }
 
 export default async function FeeNoticePage({ params }: FeeNoticePageProps) {
   const { itemId, periodId } = await params;
   const permissions = await getCachedDatabasePermissions();
-  if (!permissions.ok || !permissions.permissions.includes("tuition_periods.view")) return <PermissionDeniedState title="Không có quyền xem Phiếu học phí" description="Tài khoản hiện tại không có quyền tuition_periods.view." />;
+  if (!permissions.ok || !permissions.permissions.includes("tuition_periods.view")) return <PermissionDeniedState title="Không có quyền xem Phiếu học phí" description={permissionDeniedDescription("tuition_periods.view")} />;
   const supabase = await createSupabaseServerClient();
   const { data: item } = await supabase.from("tuition_collection_items").select("id, payable_amount_vnd, payable_sessions, opening_balance_sessions, credit_offset_sessions, debit_carry_sessions, status, student_snapshot, source_snapshot, receipt_template_snapshot, payment_contract_snapshot, payment_request_id, period_id, receipt_template_version_id, reissued_from_item_id, created_at").eq("id", itemId).eq("period_id", periodId).maybeSingle();
   if (!item) notFound();

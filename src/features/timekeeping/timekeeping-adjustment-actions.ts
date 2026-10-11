@@ -15,6 +15,7 @@ import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import type { PermissionCode } from "@/lib/permissions/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 function createErrorState(
   message: string,
   fieldErrors?: TimekeepingAdjustmentActionState["fieldErrors"],
@@ -41,7 +42,7 @@ function getRequestRpcErrorMessage(message: string): string {
     AUTHENTICATED_USER_REQUIRED: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
     STAFF_PROFILE_NOT_FOUND: "Không tìm thấy hồ sơ nhân sự của bạn.",
     TIMEKEEPING_CHECK_PERMISSION_REQUIRED:
-      "Tài khoản hiện tại không có quyền timekeeping.check.",
+      permissionDeniedMessage("timekeeping.check"),
     TIME_ENTRY_ADJUSTMENT_ALREADY_APPROVED:
       "Lượt chấm công này đã có điều chỉnh được duyệt.",
     TIME_ENTRY_ADJUSTMENT_NO_CHANGE: "Thời điểm đề xuất không khác dữ liệu gốc.",
@@ -71,7 +72,7 @@ function getDecisionRpcErrorMessage(message: string): string {
     TIME_ENTRY_ADJUSTMENT_SELF_REVIEW_FORBIDDEN:
       "Bạn không thể tự duyệt yêu cầu điều chỉnh của mình.",
     TIMEKEEPING_ADJUSTMENT_APPROVAL_PERMISSION_REQUIRED:
-      "Tài khoản hiện tại không có quyền timekeeping.approve_adjustment.",
+      permissionDeniedMessage("timekeeping.approve_adjustment"),
   };
 
   for (const [databaseMessage, userMessage] of Object.entries(knownMessages)) {

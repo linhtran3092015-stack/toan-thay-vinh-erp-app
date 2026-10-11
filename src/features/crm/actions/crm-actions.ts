@@ -28,6 +28,7 @@ import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.generated";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 type CreateCrmCaseRpcArgs = Database["public"]["Functions"]["create_crm_case"]["Args"];
 type BookTrialRpcArgs = Database["public"]["Functions"]["book_crm_trial_session"]["Args"];
 
@@ -137,7 +138,7 @@ export async function createCrmCaseAction(
 ): Promise<CrmActionResultState> {
   const permissionResult = await getDatabasePermissions();
   if (!permissionResult.ok || !permissionResult.permissions.includes("crm.update")) {
-    return createErrorState("Tài khoản hiện tại không có quyền crm.update.");
+    return createErrorState(permissionDeniedMessage("crm.update"));
   }
 
   const parsed = createCrmCaseSchema.safeParse(input);
@@ -193,7 +194,7 @@ export async function transferLeadAction(
 ): Promise<CrmActionResultState> {
   const permissionResult = await getDatabasePermissions();
   if (!permissionResult.ok || !permissionResult.permissions.includes("crm.transfer")) {
-    return createErrorState("Tài khoản hiện tại không có quyền crm.transfer.");
+    return createErrorState(permissionDeniedMessage("crm.transfer"));
   }
 
   const parsed = transferLeadSchema.safeParse(input);
@@ -238,7 +239,7 @@ export async function bookTrialAction(
 ): Promise<CrmActionResultState> {
   const permissionResult = await getDatabasePermissions();
   if (!permissionResult.ok || !permissionResult.permissions.includes("crm.update")) {
-    return createErrorState("Tài khoản hiện tại không có quyền crm.update.");
+    return createErrorState(permissionDeniedMessage("crm.update"));
   }
 
   const parsed = bookTrialSchema.safeParse(input);
@@ -287,7 +288,7 @@ export async function convertStudentAction(
 ): Promise<CrmActionResultState> {
   const permissionResult = await getDatabasePermissions();
   if (!permissionResult.ok || !permissionResult.permissions.includes("students.confirm_official")) {
-    return createErrorState("Tài khoản hiện tại không có quyền students.confirm_official.");
+    return createErrorState(permissionDeniedMessage("students.confirm_official"));
   }
 
   const parsed = convertStudentSchema.safeParse(input);

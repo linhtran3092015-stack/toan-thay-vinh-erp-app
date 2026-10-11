@@ -5,6 +5,7 @@ import { getFinanceOrdersDashboardResult } from "@/features/finance/data";
 import { parseFinanceOrdersFilters } from "@/features/finance/finance-orders-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface FinanceOrdersRouteProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
@@ -17,7 +18,7 @@ export default async function FinanceOrdersRoute({ searchParams }: FinanceOrders
   }
 
   if (!permissionResult.permissions.includes("finance.view")) {
-    return <PermissionDeniedState description="Tài khoản hiện tại không có quyền finance.view." title="Không có quyền xem Đơn hàng" />;
+    return <PermissionDeniedState description={permissionDeniedDescription("finance.view")} title="Không có quyền xem Đơn hàng" />;
   }
 
   const resolvedSearchParams = await searchParams;

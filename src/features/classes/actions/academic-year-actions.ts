@@ -16,6 +16,7 @@ import {
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 function createErrorState(
   message: string,
   fieldErrors?: ClassManagementActionState["fieldErrors"],
@@ -39,7 +40,7 @@ async function getPermissionError(): Promise<string | null> {
       "classes.create",
     )
   ) {
-    return "Tài khoản hiện tại không có quyền classes.create.";
+    return permissionDeniedMessage("classes.create");
   }
 
   return null;

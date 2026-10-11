@@ -4,6 +4,7 @@ import { getStudentDirectory } from "@/features/students/data";
 import { StudentListPage } from "@/features/students/student-list-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function StudentsRoute() {
   const permissionResult =
     await getCachedDatabasePermissions();
@@ -24,7 +25,7 @@ export default async function StudentsRoute() {
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền students.view."
+        description={permissionDeniedDescription("students.view")}
         title="Không có quyền xem danh sách học viên"
       />
     );

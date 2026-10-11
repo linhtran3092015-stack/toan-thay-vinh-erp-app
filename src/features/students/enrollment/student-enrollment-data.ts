@@ -16,6 +16,7 @@ import type {
   PermissionCode,
 } from "@/lib/permissions/types";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 const VIETNAM_TIME_ZONE = "Asia/Ho_Chi_Minh";
 
 export async function getStudentEnrollmentUiModel(
@@ -257,7 +258,7 @@ function createClassActionAvailability({
     return {
       enabled: false,
       reason:
-        "Tài khoản hiện tại không có quyền classes.view.",
+        permissionDeniedMessage("classes.view"),
       visible: true,
     };
   }

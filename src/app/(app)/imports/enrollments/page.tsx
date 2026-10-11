@@ -3,6 +3,7 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { EnrollmentImportPage } from "@/features/imports/enrollments/enrollment-import-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function StudentEnrollmentImportRoute() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -18,7 +19,7 @@ export default async function StudentEnrollmentImportRoute() {
   if (!permissionResult.permissions.includes("imports.enrollments")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền imports.enrollments."
+        description={permissionDeniedDescription("imports.enrollments")}
         title="Không có quyền import ghi danh học viên"
       />
     );

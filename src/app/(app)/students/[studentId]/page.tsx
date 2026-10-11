@@ -11,6 +11,7 @@ import { DatabaseStudentDetailPage } from "@/features/students/detail/database-s
 import { withStudentDirectoryQuery } from "@/features/students/student-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface StudentDetailRouteProps {
   params: Promise<{
     studentId: string;
@@ -51,7 +52,7 @@ export default async function StudentDetailRoute({
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền students.view."
+        description={permissionDeniedDescription("students.view")}
         title="Không có quyền xem hồ sơ học viên"
       />
     );

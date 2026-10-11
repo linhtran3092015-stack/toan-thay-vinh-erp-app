@@ -6,6 +6,7 @@ import { getStaffDetail } from "@/features/staff/data";
 import { StaffDetailPage } from "@/features/staff/staff-detail-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface StaffDetailRouteProps {
   params: Promise<{
     staffId: string;
@@ -33,7 +34,7 @@ export default async function StaffDetailRoute({
   if (!permissionResult.permissions.includes("staff.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền staff.view."
+        description={permissionDeniedDescription("staff.view")}
         title="Không có quyền xem hồ sơ nhân sự"
       />
     );

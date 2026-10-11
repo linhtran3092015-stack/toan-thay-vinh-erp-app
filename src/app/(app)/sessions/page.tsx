@@ -8,6 +8,7 @@ import { getUnlockedSessionQueueResult } from "@/features/sessions/unlocked-sess
 import { SessionListPage } from "@/features/sessions/session-list-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function SessionsRoute() {
   const permissionResult =
     await getCachedDatabasePermissions();
@@ -28,7 +29,7 @@ export default async function SessionsRoute() {
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền sessions.view."
+        description={permissionDeniedDescription("sessions.view")}
         title="Không có quyền xem buổi học"
       />
     );

@@ -1,5 +1,6 @@
 "use client";
 
+import { controlClassName } from "@/components/ui/field";
 import { useState, useTransition } from "react";
 
 import { createTuitionPeriodAction, lockTuitionPeriodAction } from "@/features/tuition/actions";
@@ -32,10 +33,10 @@ export function TuitionPeriodDirectory({ canLock, canManage, periods, previewByP
 
   return <div className="grid min-w-0 gap-5">
     {canManage ? <form action={createPeriod} className="grid gap-3 rounded-lg border border-border-subtle bg-surface-base p-4 md:grid-cols-4" aria-label="Tạo kỳ thu học phí">
-      <label className="grid gap-1 text-label text-text-muted md:col-span-2">Tên kỳ<input className="h-10 rounded-md border border-border-subtle bg-surface-base px-3 text-text-strong" name="name" placeholder="Học phí tháng 08/2026" required /></label>
-      <label className="grid gap-1 text-label text-text-muted">Từ ngày<input className="h-10 rounded-md border border-border-subtle bg-surface-base px-3 text-text-strong" name="startsOn" type="date" required /></label>
-      <label className="grid gap-1 text-label text-text-muted">Đến ngày<input className="h-10 rounded-md border border-border-subtle bg-surface-base px-3 text-text-strong" name="endsOn" type="date" required /></label>
-      <label className="grid gap-1 text-label text-text-muted">Hạn thanh toán (tuỳ chọn)<input className="h-10 rounded-md border border-border-subtle bg-surface-base px-3 text-text-strong" name="dueOn" type="date" /></label>
+      <label className="grid gap-1 text-label text-text-muted md:col-span-2">Tên kỳ<input className={controlClassName} name="name" placeholder="Học phí tháng 08/2026" required /></label>
+      <label className="grid gap-1 text-label text-text-muted">Từ ngày<input className={controlClassName} name="startsOn" type="date" required /></label>
+      <label className="grid gap-1 text-label text-text-muted">Đến ngày<input className={controlClassName} name="endsOn" type="date" required /></label>
+      <label className="grid gap-1 text-label text-text-muted">Hạn thanh toán (tuỳ chọn)<input className={controlClassName} name="dueOn" type="date" /></label>
       <div className="flex items-end"><button className="inline-flex h-10 items-center rounded-md bg-action-primary px-4 font-semibold text-text-on-primary disabled:opacity-50" disabled={isPending} type="submit">Tạo kỳ thu</button></div>
     </form> : null}
     {message ? <p className="rounded-md border border-border-subtle bg-surface-base px-3 py-2 text-secondary text-text-default" role="status">{message}</p> : null}

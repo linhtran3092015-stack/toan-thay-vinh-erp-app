@@ -9,6 +9,7 @@ import {
   getCachedDatabasePermissions,
 } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface NewStudentRouteProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
@@ -39,7 +40,7 @@ export default async function NewStudentRoute({ searchParams }: NewStudentRouteP
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền students.create."
+        description={permissionDeniedDescription("students.create")}
         title="Không có quyền tạo học viên"
       />
     );

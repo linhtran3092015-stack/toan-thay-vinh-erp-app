@@ -5,6 +5,7 @@ import { getAuditLogsResult } from "@/features/audit/data";
 import type { AuditFilters } from "@/features/audit/read-models";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 type SearchValue = string | string[] | undefined;
 
 interface AuditRouteProps {
@@ -37,7 +38,7 @@ export default async function AuditRoute({
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền audit.view."
+        description={permissionDeniedDescription("audit.view")}
         title="Không có quyền xem nhật ký hệ thống"
       />
     );

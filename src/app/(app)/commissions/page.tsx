@@ -4,6 +4,7 @@ import { CommissionListPage } from "@/features/commissions/commission-list-page"
 import { getSalesCommissionAccrualsDashboardResult } from "@/features/commissions/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function CommissionsRoute() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -19,7 +20,7 @@ export default async function CommissionsRoute() {
   if (!permissionResult.permissions.includes("commissions.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền commissions.view."
+        description={permissionDeniedDescription("commissions.view")}
         title="Không có quyền xem hoa hồng Sale"
       />
     );

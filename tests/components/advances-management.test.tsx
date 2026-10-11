@@ -129,7 +129,7 @@ describe("Advances presentation", () => {
     const globals = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf8");
     const source = readFileSync(resolve(process.cwd(), "src/features/advances/advance-list-page.tsx"), "utf8");
     expect(globals).toMatch(/\.salary-advance-directory-work-area\s*\{\s*container-type: inline-size/);
-    expect(globals).toMatch(/@container \(min-width: 1202px\)[\s\S]*\.salary-advance-directory-table/);
+    expect(globals).toMatch(/@container \(min-width: 1120px\)[\s\S]*\.salary-advance-directory-table/);
     expect(source).toContain('min-w-[1200px]');
     expect(source).not.toContain(".reduce(");
     expect(source).not.toContain("approvedAmount");

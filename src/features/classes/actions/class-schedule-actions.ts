@@ -16,6 +16,7 @@ import {
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 function createErrorState(
   message: string,
   fieldErrors?: ClassManagementActionState["fieldErrors"],
@@ -40,7 +41,7 @@ async function getPermissionError(): Promise<string | null> {
       "classes.manage_schedule",
     )
   ) {
-    return "Tài khoản hiện tại không có quyền classes.manage_schedule.";
+    return permissionDeniedMessage("classes.manage_schedule");
   }
 
   return null;

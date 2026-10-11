@@ -7,6 +7,7 @@ import { ClassFormPage } from "@/features/classes/management/class-form-page";
 import { getClassDirectoryQuery } from "@/features/classes/class-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface EditClassRouteProps {
   params: Promise<{
     classId: string;
@@ -44,7 +45,7 @@ export default async function EditClassRoute({
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền classes.view."
+        description={permissionDeniedDescription("classes.view")}
         title="Không có quyền xem lớp học"
       />
     );
@@ -57,7 +58,7 @@ export default async function EditClassRoute({
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền classes.create."
+        description={permissionDeniedDescription("classes.create")}
         title="Không có quyền chỉnh sửa lớp"
       />
     );

@@ -6,6 +6,7 @@ import { getClassDirectoryQuery } from "@/features/classes/class-directory-url-s
 import { getClassDetail } from "@/features/classes/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface ClassDetailRouteProps {
   params: Promise<{
     classId: string;
@@ -44,7 +45,7 @@ export default async function ClassDetailRoute({
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền classes.view."
+        description={permissionDeniedDescription("classes.view")}
         title="Không có quyền xem lớp học"
       />
     );

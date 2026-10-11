@@ -22,6 +22,7 @@ import {
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 function createErrorState(
   message: string,
   fieldErrors?: TimekeepingManagementActionState["fieldErrors"],
@@ -41,7 +42,7 @@ async function getPermissionError(): Promise<string | null> {
   }
 
   if (!permissionResult.permissions.includes("staff.manage")) {
-    return "Tài khoản hiện tại không có quyền staff.manage.";
+    return permissionDeniedMessage("staff.manage");
   }
 
   return null;
@@ -59,7 +60,7 @@ function getRpcErrorMessage(message: string): string {
     ONLY_ACTIVE_WORK_SHIFT_CAN_BE_RETIRED:
       "Chỉ ca đang sử dụng mới có thể ngừng dùng.",
     STAFF_MANAGE_PERMISSION_REQUIRED:
-      "Tài khoản hiện tại không có quyền staff.manage.",
+      permissionDeniedMessage("staff.manage"),
     STAFF_PROFILE_NOT_FOUND: "Không tìm thấy hồ sơ nhân sự.",
     STAFF_SHIFT_ACTIVE_WEEKDAY_ALREADY_EXISTS:
       "Nhân sự này đã có một lịch đang hiệu lực vào thứ đã chọn.",

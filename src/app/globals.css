@@ -383,9 +383,9 @@ body::before {
   display: inline-flex;
 }
 
-/* The shared DataTableFrame owns one border pixel on each side. Keep its
-   1280px operational table fully inside the zero-padding work area. */
-@container (min-width: 1282px) {
+/* Wide operational tables appear from the shared 1120px work-area threshold
+   and scroll horizontally inside DataTableFrame on narrower laptops. */
+@container (min-width: 1120px) {
   .payment-request-filter-bar,
   .payment-request-directory-table {
     display: block;
@@ -437,8 +437,8 @@ body::before {
   display: grid;
 }
 
-/* DataTableFrame owns a one-pixel border on each side of its 1340px table. */
-@container (min-width: 1342px) {
+/* SePay table: shared 1120px threshold, horizontal scroll inside the frame. */
+@container (min-width: 1120px) {
   .sepay-transaction-directory-table {
     display: block;
   }
@@ -461,7 +461,7 @@ body::before {
   display: grid;
 }
 
-@container (min-width: 1882px) {
+@container (min-width: 1120px) {
   .finance-orders-directory-table {
     display: block;
   }
@@ -774,7 +774,7 @@ body::before {
   display: grid;
 }
 
-@container (min-width: 1202px) {
+@container (min-width: 1120px) {
   .salary-advance-directory-table {
     display: block;
   }
@@ -794,7 +794,7 @@ body::before {
   display: grid;
 }
 
-@container (min-width: 1182px) {
+@container (min-width: 1120px) {
   .staff-directory-table {
     display: block;
   }

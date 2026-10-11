@@ -14,6 +14,7 @@ import type {
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 const EMPTY_UUID = "00000000-0000-0000-0000-000000000000";
 
 const vietnamPhoneSchema = z
@@ -204,8 +205,8 @@ async function getPermissionError(
 
   if (!permissionResult.permissions.includes(requiredPermission)) {
     return requiredPermission === "students.create"
-      ? "Tài khoản hiện tại không có quyền students.create."
-      : "Tài khoản hiện tại không có quyền students.update.";
+      ? permissionDeniedMessage("students.create")
+      : permissionDeniedMessage("students.update");
   }
 
   return null;

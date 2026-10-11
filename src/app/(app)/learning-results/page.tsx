@@ -4,6 +4,7 @@ import { getLearningResultsDirectory } from "@/features/learning-results/data";
 import { LearningResultsPage } from "@/features/learning-results/learning-results-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function LearningResultsRoute() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -19,7 +20,7 @@ export default async function LearningResultsRoute() {
   if (!permissionResult.permissions.includes("results.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền results.view."
+        description={permissionDeniedDescription("results.view")}
         title="Không có quyền xem kết quả học tập"
       />
     );

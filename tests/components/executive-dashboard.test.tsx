@@ -241,11 +241,11 @@ describe("Executive Dashboard UI & Business Logic", () => {
     expect(screen.getByText("Doanh thu")).toBeInTheDocument();
     expect(screen.getAllByText("2,5 tỷ").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Chi phí")).toBeInTheDocument();
-    expect(screen.getAllByText("850 tr").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("850 triệu").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Dòng tiền ròng")).toBeInTheDocument();
     expect(screen.getAllByText("1,6 tỷ").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Công nợ phải thu")).toBeInTheDocument();
-    expect(screen.getAllByText("320,5 tr").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("320,5 triệu").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders attention center with action items", () => {
@@ -302,7 +302,7 @@ describe("Executive Dashboard UI & Business Logic", () => {
     render(<DashboardPage dashboard={dashboard} />);
 
     expect(screen.getByText("Quỹ lương & Cơ cấu nhân sự")).toBeInTheDocument();
-    expect(screen.getByText("185,5 tr")).toBeInTheDocument();
+    expect(screen.getByText("185,5 triệu")).toBeInTheDocument();
     expect(screen.getByText("Hoạt động học vụ & vận hành nổi bật")).toBeInTheDocument();
     expect(screen.getByText("Lớp học đang mở")).toBeInTheDocument();
     expect(screen.getByText("Buổi học đã diễn ra")).toBeInTheDocument();

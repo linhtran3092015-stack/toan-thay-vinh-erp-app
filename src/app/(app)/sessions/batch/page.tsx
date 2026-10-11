@@ -5,6 +5,7 @@ import { getBatchSessionCreationContext } from "@/features/sessions/batch-data";
 import { BatchSessionCreateWorkspace } from "@/features/sessions/components/batch-session-create-workspace";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface BatchSessionsRouteProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
@@ -36,7 +37,7 @@ export default async function BatchSessionsRoute({ searchParams }: BatchSessions
   if (!permissionResult.permissions.includes("sessions.manage")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền sessions.manage."
+        description={permissionDeniedDescription("sessions.manage")}
         title="Không có quyền quản lý buổi học"
       />
     );

@@ -55,7 +55,7 @@ describe("SePay transaction history presentation", () => {
   });
 
   it("maps reconciliation and receiving-account states with SePay-local meaning", () => {
-    expect(getSepayMatchPresentation("unmatched")).toEqual({ label: "Chưa khớp", tone: "neutral" });
+    expect(getSepayMatchPresentation("unmatched")).toEqual({ label: "Chưa khớp – cần đối soát", tone: "warning" });
     expect(getSepayMatchPresentation("auto_matched")).toEqual({ label: "Khớp tự động", tone: "success" });
     expect(getSepayMatchPresentation("manual_matched")).toEqual({ label: "Khớp thủ công", tone: "success" });
     expect(getSepayMatchPresentation("split_allocated")).toEqual({ label: "Đã phân bổ học phí", tone: "info" });
@@ -97,7 +97,7 @@ describe("SePay transaction history presentation", () => {
     expect(screen.getAllByText("Chưa có tham chiếu")).toHaveLength(2);
   });
 
-  it("uses the zero-padding work area and the approved 1342px container threshold", () => {
+  it("uses the zero-padding work area and the approved 1120px container threshold", () => {
     const { container } = render(<SepayTransactionHistory transactions={[transaction]} />);
     const table = screen.getByRole("table", { name: "Danh sách giao dịch SePay mới nhất" });
     const list = screen.getByRole("list", { name: "Danh sách giao dịch SePay mới nhất" });
@@ -109,7 +109,7 @@ describe("SePay transaction history presentation", () => {
     expect(container.querySelector(".sepay-transaction-directory-table")).not.toBeNull();
     expect(container.querySelector(".sepay-transaction-directory-record-list")).not.toBeNull();
     expect(globals).toMatch(/\.sepay-transaction-operational-work-area\s*\{\s*container-type: inline-size/);
-    expect(globals).toMatch(/@container \(min-width: 1342px\)[\s\S]*\.sepay-transaction-directory-table/);
+    expect(globals).toMatch(/@container \(min-width: 1120px\)[\s\S]*\.sepay-transaction-directory-table/);
   });
 
   it("keeps the feature-owned empty state without creating controls", () => {

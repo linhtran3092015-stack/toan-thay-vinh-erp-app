@@ -11,10 +11,11 @@ import { getFinanceOverviewResult } from "@/features/finance/data";
 import type { PaymentRequestReadModel } from "@/features/finance/read-models";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function FinanceOverviewPage() {
   const permissionResult = await getCachedDatabasePermissions();
   if (!permissionResult.ok) return <ErrorState description="Hệ thống chưa tải được quyền truy cập Tài chính." title="Không tải được quyền truy cập" />;
-  if (!permissionResult.permissions.includes("finance.view")) return <PermissionDeniedState description="Tài khoản hiện tại không có quyền finance.view." title="Không có quyền xem Tổng quan Tài chính" />;
+  if (!permissionResult.permissions.includes("finance.view")) return <PermissionDeniedState description={permissionDeniedDescription("finance.view")} title="Không có quyền xem Tổng quan Tài chính" />;
 
   const canCreatePaymentRequests = permissionResult.permissions.includes("payments.create_request") || permissionResult.permissions.includes("payments.manage");
   const canViewPaymentRequests = permissionResult.permissions.includes("payments.view") || permissionResult.permissions.includes("payments.manage");

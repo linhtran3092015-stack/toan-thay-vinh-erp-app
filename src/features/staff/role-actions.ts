@@ -7,6 +7,7 @@ import type { StaffRoleActionState } from "@/features/staff/role-action-types";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 const assignRoleSchema = z.object({
   reason: z
     .string()
@@ -65,7 +66,7 @@ async function canManageStaffRoles(): Promise<
     return {
       allowed: false,
       state: createErrorState(
-        "Tài khoản hiện tại không có quyền staff.roles.manage.",
+        permissionDeniedMessage("staff.roles.manage"),
       ),
     };
   }

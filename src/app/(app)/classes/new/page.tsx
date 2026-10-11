@@ -5,6 +5,7 @@ import { ClassFormPage } from "@/features/classes/management/class-form-page";
 import { getClassDirectoryQuery } from "@/features/classes/class-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface CreateClassRouteProps { searchParams: Promise<Record<string, string | string[] | undefined>>; }
 
 export default async function CreateClassRoute({ searchParams }: CreateClassRouteProps) {
@@ -29,7 +30,7 @@ export default async function CreateClassRoute({ searchParams }: CreateClassRout
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền classes.create."
+        description={permissionDeniedDescription("classes.create")}
         title="Không có quyền tạo lớp"
       />
     );

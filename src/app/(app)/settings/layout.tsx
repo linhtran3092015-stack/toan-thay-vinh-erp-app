@@ -5,6 +5,7 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { SettingsNavigation } from "@/features/settings/components/settings-navigation";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function SettingsLayout({
   children,
 }: {
@@ -24,7 +25,7 @@ export default async function SettingsLayout({
   if (!permissionResult.permissions.includes("settings.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền settings.view."
+        description={permissionDeniedDescription("settings.view")}
         title="Không có quyền xem cài đặt hệ thống"
       />
     );

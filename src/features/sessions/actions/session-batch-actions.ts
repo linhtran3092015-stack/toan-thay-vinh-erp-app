@@ -9,6 +9,7 @@ import {
 } from "../forms/session-batch-schema";
 import type { ExistingSessionSnapshot } from "../batch-data";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 const batchRpcErrorMessages: Record<string, string> = {
   AUTHENTICATION_REQUIRED: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
   SESSIONS_MANAGE_PERMISSION_DENIED: "Tài khoản hiện tại không có quyền tạo buổi học.",
@@ -97,7 +98,7 @@ export async function createBatchSessionsAction(
   if (!permissionResult.permissions.includes("sessions.manage")) {
     return {
       status: "error",
-      message: "Tài khoản hiện tại không có quyền sessions.manage.",
+      message: permissionDeniedMessage("sessions.manage"),
     };
   }
 

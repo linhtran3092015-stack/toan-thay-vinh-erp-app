@@ -7,6 +7,7 @@ import { SessionDetailPage } from "@/features/sessions/session-detail-page";
 import { getSessionDirectoryQuery } from "@/features/sessions/session-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface SessionDetailRouteProps {
   params: Promise<{
     sessionId: string;
@@ -46,7 +47,7 @@ export default async function SessionDetailRoute({
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền sessions.view."
+        description={permissionDeniedDescription("sessions.view")}
         title="Không có quyền xem buổi học"
       />
     );

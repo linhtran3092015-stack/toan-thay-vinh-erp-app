@@ -15,6 +15,7 @@ import {
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 function createErrorState(
   message: string,
   fieldErrors?: AttendanceActionFieldErrors,
@@ -40,7 +41,7 @@ async function getAttendancePermissionError():
       "attendance.mark",
     )
   ) {
-    return "Tài khoản hiện tại không có quyền attendance.mark.";
+    return permissionDeniedMessage("attendance.mark");
   }
 
   return null;

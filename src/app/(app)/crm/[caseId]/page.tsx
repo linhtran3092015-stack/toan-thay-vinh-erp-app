@@ -20,6 +20,7 @@ import { getCrmDirectoryHref } from "@/features/crm/crm-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface CrmCaseDetailPageProps {
   params: Promise<{
     caseId: string;
@@ -51,7 +52,7 @@ export default async function CrmCaseDetailPage({ params, searchParams }: CrmCas
   if (!permissionResult.permissions.includes("crm.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền crm.view."
+        description={permissionDeniedDescription("crm.view")}
         title="Không có quyền xem chi tiết CRM case"
       />
     );

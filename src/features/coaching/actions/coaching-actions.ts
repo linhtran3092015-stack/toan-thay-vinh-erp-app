@@ -16,6 +16,7 @@ import {
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 function createErrorState(
   message: string,
   fieldErrors?: CoachingManagementActionState["fieldErrors"],
@@ -31,7 +32,7 @@ async function getPermissionError(): Promise<string | null> {
   }
 
   if (!permissionResult.permissions.includes("coaching.manage")) {
-    return "Tài khoản hiện tại không có quyền coaching.manage.";
+    return permissionDeniedMessage("coaching.manage");
   }
 
   return null;

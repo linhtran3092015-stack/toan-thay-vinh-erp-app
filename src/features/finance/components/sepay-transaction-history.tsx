@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/patterns/page-header";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
-import { getSepayAccountPurposeQuery, type SepayAccountPurposeFilter } from "@/features/finance/sepay-transaction-url-state";
+import { getSepayDirectoryQuery, type SepayAccountPurposeFilter, type SepayQueueFilter } from "@/features/finance/sepay-transaction-url-state";
 import type { SepayTransactionReadModel } from "@/features/finance/read-models";
 import { SepayReconciliationActions, type SepayReconciliationCandidateView } from "@/features/finance/components/sepay-reconciliation-actions";
 import { SepayAllocationReversalDialog } from "@/features/finance/components/sepay-allocation-reversal-dialog";
@@ -25,7 +25,11 @@ interface SepayTransactionHistoryProps {
   managementPanel?: ReactNode;
   page?: number;
   pageSize?: number;
+  /** "review" narrows the list to inbound transfers that still need a decision. */
+  queueFilter?: SepayQueueFilter;
   reconciliationError?: boolean;
+  /** Count of transfers needing a decision, independent of the current filters. */
+  reviewCount?: number;
   total?: number;
   transactions: SepayTransactionReadModel[];
 }
@@ -72,7 +76,7 @@ export function getSepayMatchPresentation(
     case "ignored":
       return { label: "Đã bỏ qua", tone: "neutral" };
     case "unmatched":
-      return { label: "Chưa khớp", tone: "neutral" };
+      return { label: "Chưa khớp – cần đối soát", tone: "warning" };
   }
 }
 
@@ -86,7 +90,9 @@ export function SepayTransactionHistory({
   managementPanel,
   page = 1,
   pageSize = 50,
+  queueFilter = "",
   reconciliationError = false,
+  reviewCount = 0,
   transactions,
   total = transactions.length,
 }: SepayTransactionHistoryProps) {
@@ -125,11 +131,17 @@ export function SepayTransactionHistory({
         aria-labelledby="sepay-transaction-result-context"
         className="sepay-transaction-operational-work-area grid min-w-0 gap-4"
       >
+        <nav aria-label="Hàng đợi đối soát" className="flex flex-wrap gap-2">
+          <SepayQueueLink active={queueFilter === ""} href={`/finance/sepay${getSepayDirectoryQuery(accountPurposeFilter, "")}`}>Tất cả giao dịch</SepayQueueLink>
+          <SepayQueueLink active={queueFilter === "review"} href={`/finance/sepay${getSepayDirectoryQuery(accountPurposeFilter, "review")}`} tone="warning">
+            Cần đối soát{reviewCount > 0 ? ` (${reviewCount})` : ""}
+          </SepayQueueLink>
+        </nav>
         <nav aria-label="Lọc mục đích tài khoản nhận" className="flex flex-wrap gap-2">
-          <SepayPurposeFilterLink active={accountPurposeFilter === ""} purpose="">Tất cả tài khoản</SepayPurposeFilterLink>
-          <SepayPurposeFilterLink active={accountPurposeFilter === "new_enrollment"} purpose="new_enrollment">Tuyển mới</SepayPurposeFilterLink>
-          <SepayPurposeFilterLink active={accountPurposeFilter === "renewal"} purpose="renewal">Tái phí</SepayPurposeFilterLink>
-          <SepayPurposeFilterLink active={accountPurposeFilter === "unknown"} purpose="unknown">Chưa xác định</SepayPurposeFilterLink>
+          <SepayPurposeFilterLink active={accountPurposeFilter === ""} purpose="" queue={queueFilter}>Tất cả tài khoản</SepayPurposeFilterLink>
+          <SepayPurposeFilterLink active={accountPurposeFilter === "new_enrollment"} purpose="new_enrollment" queue={queueFilter}>Tuyển mới</SepayPurposeFilterLink>
+          <SepayPurposeFilterLink active={accountPurposeFilter === "renewal"} purpose="renewal" queue={queueFilter}>Tái phí</SepayPurposeFilterLink>
+          <SepayPurposeFilterLink active={accountPurposeFilter === "unknown"} purpose="unknown" queue={queueFilter}>Chưa xác định</SepayPurposeFilterLink>
         </nav>
         <p
           aria-live="polite"
@@ -154,7 +166,7 @@ export function SepayTransactionHistory({
             transactions={transactions}
           />
         )}
-        <SepayPagination accountPurposeFilter={accountPurposeFilter} page={page} pageSize={pageSize} total={total} />
+        <SepayPagination accountPurposeFilter={accountPurposeFilter} page={page} pageSize={pageSize} queue={queueFilter} total={total} />
       </section>
 
       {canReconcile ? (
@@ -367,22 +379,19 @@ function SepayPagination({
   accountPurposeFilter,
   page,
   pageSize,
+  queue,
   total,
 }: {
   accountPurposeFilter: SepayAccountPurposeFilter;
   page: number;
   pageSize: number;
+  queue: SepayQueueFilter;
   total: number;
 }) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   if (pageCount <= 1) return null;
 
-  const href = (target: number) => {
-    const params = new URLSearchParams();
-    if (accountPurposeFilter) params.set("accountPurpose", accountPurposeFilter);
-    params.set("page", String(target));
-    return `/finance/sepay?${params.toString()}`;
-  };
+  const href = (target: number) => `/finance/sepay${getSepayDirectoryQuery(accountPurposeFilter, queue, target) || "?page=1"}`;
 
   return (
     <nav aria-label="Phân trang giao dịch SePay" className="flex items-center justify-end gap-2">
@@ -397,16 +406,43 @@ function SepayPurposeFilterLink({
   active,
   children,
   purpose,
+  queue,
 }: {
   active: boolean;
   children: ReactNode;
   purpose: SepayAccountPurposeFilter;
+  queue: SepayQueueFilter;
 }) {
   return (
     <Link
       aria-current={active ? "page" : undefined}
       className={`inline-flex h-9 items-center rounded-md border px-3 text-control font-semibold transition-colors ${active ? "border-action-primary bg-action-primary text-text-on-primary" : "border-border-subtle bg-surface-base text-text-muted hover:bg-interactive-hover hover:text-text-strong"}`}
-      href={`/finance/sepay${getSepayAccountPurposeQuery(purpose)}`}
+      href={`/finance/sepay${getSepayDirectoryQuery(purpose, queue)}`}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function SepayQueueLink({
+  active,
+  children,
+  href,
+  tone = "neutral",
+}: {
+  active: boolean;
+  children: ReactNode;
+  href: string;
+  tone?: "neutral" | "warning";
+}) {
+  const activeClassName = tone === "warning"
+    ? "border-warning-border bg-warning-bg text-warning"
+    : "border-action-primary bg-action-primary text-text-on-primary";
+  return (
+    <Link
+      aria-current={active ? "page" : undefined}
+      className={`inline-flex h-9 items-center rounded-md border px-3 text-control font-semibold transition-colors ${active ? activeClassName : "border-border-subtle bg-surface-base text-text-muted hover:bg-interactive-hover hover:text-text-strong"}`}
+      href={href}
     >
       {children}
     </Link>

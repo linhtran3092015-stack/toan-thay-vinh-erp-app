@@ -3,6 +3,7 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { ClassScheduleImportPage } from "@/features/imports/classes/class-schedule-import-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function ClassScheduleImportRoute() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -18,7 +19,7 @@ export default async function ClassScheduleImportRoute() {
   if (!permissionResult.permissions.includes("imports.classes")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền imports.classes."
+        description={permissionDeniedDescription("imports.classes")}
         title="Không có quyền import lớp & lịch học"
       />
     );

@@ -13,6 +13,7 @@ import { parseAttendanceHeartbeatResult } from "@/features/timekeeping/attendanc
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 function createErrorState(
   message: string,
   fieldErrors?: TimekeepingEntryActionState["fieldErrors"],
@@ -28,7 +29,7 @@ async function getPermissionError(): Promise<string | null> {
   }
 
   if (!permissionResult.permissions.includes("timekeeping.check")) {
-    return "Tài khoản hiện tại không có quyền timekeeping.check.";
+    return permissionDeniedMessage("timekeeping.check");
   }
 
   return null;
@@ -39,7 +40,7 @@ function getRpcErrorMessage(message: string, isCheckIn: boolean): string {
     AUTHENTICATED_USER_REQUIRED: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
     STAFF_PROFILE_NOT_FOUND: "Không tìm thấy hồ sơ nhân sự đang hoạt động.",
     TIMEKEEPING_CHECK_PERMISSION_REQUIRED:
-      "Tài khoản hiện tại không có quyền timekeeping.check.",
+      permissionDeniedMessage("timekeeping.check"),
     TIME_ENTRY_CENTER_CONFIG_NOT_FOUND:
       "Hệ thống chưa được cấu hình tọa độ vị trí Trung tâm. Vui lòng liên hệ Quản trị viên.",
     TIME_ENTRY_GPS_ACCURACY_TOO_LOW:

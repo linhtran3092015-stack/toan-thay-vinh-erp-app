@@ -121,7 +121,7 @@ describe("createBatchSessionsAction", () => {
 
     const res = await createBatchSessionsAction(samplePayload);
     expect(res.status).toBe("error");
-    expect(res.message).toContain("sessions.manage");
+    expect(res.message).toContain("quản lý buổi học");
     expect(mocks.server).not.toHaveBeenCalled();
   });
 

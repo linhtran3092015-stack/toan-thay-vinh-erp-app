@@ -5,6 +5,7 @@ import { getGradingCreditsDashboardResult } from "@/features/grading-credits/dat
 import { GradingCreditListPage } from "@/features/grading-credits/grading-credit-list-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function GradingCreditsRoute() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -20,7 +21,7 @@ export default async function GradingCreditsRoute() {
   if (!permissionResult.permissions.includes("grading_credits.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền grading_credits.view."
+        description={permissionDeniedDescription("grading_credits.view")}
         title="Không có quyền xem tín chỉ chấm bài"
       />
     );

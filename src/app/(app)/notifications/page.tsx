@@ -9,6 +9,7 @@ import {
 } from "@/features/notifications/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function NotificationsRoute({ searchParams }: { searchParams?: Promise<{page?: string}> }) {
   const requestedPage = Number((await searchParams)?.page ?? 1);
   const page = Number.isInteger(requestedPage) ? Math.max(1, Math.min(100000, requestedPage)) : 1;
@@ -31,7 +32,7 @@ export default async function NotificationsRoute({ searchParams }: { searchParam
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền notifications.view."
+        description={permissionDeniedDescription("notifications.view")}
         title="Không có quyền xem thông báo"
       />
     );

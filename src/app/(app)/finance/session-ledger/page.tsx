@@ -4,6 +4,7 @@ import { SessionLedgerHistory } from "@/features/finance/components/session-ledg
 import { getCenterSessionLedgerEntriesResult } from "@/features/finance/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function CenterSessionLedgerPage() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -19,7 +20,7 @@ export default async function CenterSessionLedgerPage() {
   if (!permissionResult.permissions.includes("session_ledger.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền session_ledger.view."
+        description={permissionDeniedDescription("session_ledger.view")}
         title="Không có quyền xem Sổ cái số buổi"
       />
     );

@@ -19,6 +19,7 @@ import {
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 function createErrorState(
   message: string,
   fieldErrors?: SessionLifecycleFieldErrors,
@@ -44,7 +45,7 @@ async function getLifecyclePermissionError():
       "sessions.manage",
     )
   ) {
-    return "Tài khoản hiện tại không có quyền sessions.manage.";
+    return permissionDeniedMessage("sessions.manage");
   }
 
   return null;

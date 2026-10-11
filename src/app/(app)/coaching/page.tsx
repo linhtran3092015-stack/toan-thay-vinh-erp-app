@@ -7,6 +7,7 @@ import {
 } from "@/features/coaching/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function CoachingRoute() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -22,7 +23,7 @@ export default async function CoachingRoute() {
   if (!permissionResult.permissions.includes("coaching.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền coaching.view."
+        description={permissionDeniedDescription("coaching.view")}
         title="Không có quyền xem Coaching"
       />
     );

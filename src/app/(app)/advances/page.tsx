@@ -5,6 +5,7 @@ import { AdvanceListPage } from "@/features/advances/advance-list-page";
 import { getSalaryAdvancesDashboardResult } from "@/features/advances/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function AdvancesRoute() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -20,7 +21,7 @@ export default async function AdvancesRoute() {
   if (!permissionResult.permissions.includes("advances.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền advances.view."
+        description={permissionDeniedDescription("advances.view")}
         title="Không có quyền xem tạm ứng"
       />
     );

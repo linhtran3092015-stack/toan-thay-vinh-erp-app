@@ -6,6 +6,7 @@ import { getMyPayrollEstimateResult } from "@/features/payroll/estimate/data";
 import { PayrollPage } from "@/features/payroll/payroll-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function PayrollRoute() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -21,7 +22,7 @@ export default async function PayrollRoute() {
   if (!permissionResult.permissions.includes("payroll.view")) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền payroll.view."
+        description={permissionDeniedDescription("payroll.view")}
         title="Không có quyền xem bảng lương"
       />
     );

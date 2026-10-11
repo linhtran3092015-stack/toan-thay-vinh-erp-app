@@ -27,6 +27,7 @@ import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import type { PermissionCode } from "@/lib/permissions/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { permissionDeniedMessage } from "@/lib/permissions/labels";
 function createErrorState(
   message: string,
   fieldErrors?: StaffManagementActionState["fieldErrors"],
@@ -69,9 +70,9 @@ function getRpcErrorMessage(message: string): string {
       "Ngày nghỉ không thể trước ngày vào làm.",
     STAFF_EMPLOYMENT_STATUS_INVALID: "Trạng thái làm việc không hợp lệ.",
     STAFF_MANAGE_PERMISSION_REQUIRED:
-      "Tài khoản hiện tại không có quyền staff.manage.",
+      permissionDeniedMessage("staff.manage"),
     STAFF_MANAGE_RATES_PERMISSION_REQUIRED:
-      "Tài khoản hiện tại không có quyền staff.manage_rates.",
+      permissionDeniedMessage("staff.manage_rates"),
     STAFF_PAYROLL_PROFILE_PERMISSION_REQUIRED:
       "Tài khoản hiện tại không có quyền cấu hình lương nhân sự.",
     STAFF_DAILY_RATE_PERMISSION_REQUIRED:

@@ -4,6 +4,7 @@ import { getPaymentRequestsResult } from "@/features/finance/data";
 import { PaymentRequestDirectory } from "@/features/finance/payment-request-directory";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
+import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function PaymentRequestsPage() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -22,7 +23,7 @@ export default async function PaymentRequestsPage() {
   ) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại không có quyền payments.view."
+        description={permissionDeniedDescription("payments.view")}
         title="Không có quyền xem yêu cầu thanh toán"
       />
     );
