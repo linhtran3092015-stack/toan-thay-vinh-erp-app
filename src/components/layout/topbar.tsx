@@ -7,11 +7,14 @@ import { AuthUserMenu } from "@/features/auth/components/auth-user-menu";
 import type { AuthUser } from "@/features/auth/types";
 import { TopbarTimekeepingButton } from "@/components/layout/topbar-timekeeping-button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import type { AttendanceVerificationPolicy } from "@/features/timekeeping/types";
 import { NavigationLink } from "@/components/layout/navigation-link";
 
 interface TopbarProps {
+  attendancePolicy?: AttendanceVerificationPolicy;
   canCheckTimekeeping?: boolean;
   hasOpenTimekeepingEntry?: boolean;
+  openTimekeepingEntryId?: string | null;
   mobileMenuTriggerRef: RefObject<HTMLButtonElement | null>;
   onMenuClick: () => void;
   unreadNotificationCount: number;
@@ -19,8 +22,10 @@ interface TopbarProps {
 }
 
 export function Topbar({
+  attendancePolicy,
   canCheckTimekeeping = false,
   hasOpenTimekeepingEntry = false,
+  openTimekeepingEntryId = null,
   onMenuClick,
   mobileMenuTriggerRef,
   unreadNotificationCount,
@@ -46,7 +51,11 @@ export function Topbar({
 
       <div className="ml-auto flex items-center gap-2">
         {canCheckTimekeeping ? (
-          <TopbarTimekeepingButton hasOpenEntry={hasOpenTimekeepingEntry} />
+          <TopbarTimekeepingButton
+            attendancePolicy={attendancePolicy}
+            hasOpenEntry={hasOpenTimekeepingEntry}
+            openEntryId={openTimekeepingEntryId}
+          />
         ) : null}
 
         <ThemeToggle />

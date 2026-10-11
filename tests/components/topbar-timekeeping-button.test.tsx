@@ -21,7 +21,7 @@ describe("TopbarTimekeepingButton", () => {
   it("renders active attendance status button with explicit white text styling when an open entry exists", () => {
     render(<TopbarTimekeepingButton hasOpenEntry />);
 
-    const link = screen.getByRole("link", { name: "Đang trong ca chấm công - Xem chi tiết" });
+    const link = screen.getByRole("link", { name: "Đang trong ca chấm công - Ra ca" });
     expect(link).toHaveAttribute("href", "/timekeeping");
     expect(link).toHaveTextContent("Đang chấm công");
     expect(link.className).toContain("text-white");

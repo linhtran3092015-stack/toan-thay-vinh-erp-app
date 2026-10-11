@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/features/timekeeping/components/timekeeping-entry-dialog", () => ({
   TimekeepingEntryDialog: ({ operation }: { operation: "check-in" | "check-out" }) => (
-    <button type="button">{operation === "check-in" ? "Check-in" : "Check-out"}</button>
+    <button type="button">{operation === "check-in" ? "Vào ca" : "Ra ca"}</button>
   ),
 }));
 
@@ -108,10 +108,10 @@ describe("Timekeeping 1 day audit and personal panel", () => {
   it("shows a single permitted personal action from the authoritative personal entry state", () => {
     const openEntry: TimekeepingMyEntry = { ...baseEntry, status: "open", checkOutAt: null, checkOutMode: null };
     const { rerender } = render(<MyTimekeepingPanel canCheck entries={[]} />);
-    expect(screen.getByRole("button", { name: "Check-in" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Vào ca" })).toBeInTheDocument();
 
     rerender(<MyTimekeepingPanel canCheck entries={[openEntry]} />);
-    expect(screen.getByRole("button", { name: "Check-out" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ra ca" })).toBeInTheDocument();
     expect(screen.queryByText("Dữ liệu GPS khi ra")).not.toBeInTheDocument();
     expect(screen.queryByText("Thông tin Wi-Fi khi ra")).not.toBeInTheDocument();
     expect(screen.queryByText(/giờ làm|9 giờ|lương|đơn giá/i)).not.toBeInTheDocument();

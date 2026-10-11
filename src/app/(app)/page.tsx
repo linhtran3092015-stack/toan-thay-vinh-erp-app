@@ -3,7 +3,10 @@ import { Suspense } from "react";
 import { StudentCareDashboardCard } from "@/features/student-care/dashboard-card";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getCachedCurrentAuthUser } from "@/features/auth/current-user";
+import { DashboardTodayPanel } from "@/features/dashboard/components/dashboard-today-panel";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
+import { getDashboardTodayReadModel } from "@/features/dashboard/today-data";
+import { getCenterDisplayName } from "@/features/settings/system-settings-data";
 import { getRoleAwareDashboardReadModel } from "@/features/dashboard/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -45,10 +48,11 @@ export default async function Home({ searchParams }: PageProps) {
 
   const requestedMonth = resolvedSearchParams?.month;
 
-  const dashboard = await getRoleAwareDashboardReadModel(
-    permissionResult.permissions,
-    requestedMonth,
-  );
+  const [dashboard, today, centerDisplayName] = await Promise.all([
+    getRoleAwareDashboardReadModel(permissionResult.permissions, requestedMonth),
+    getDashboardTodayReadModel(permissionResult.permissions),
+    getCenterDisplayName(),
+  ]);
 
   const userDisplayName = authResult.ok ? authResult.user.displayName : null;
 
@@ -56,7 +60,9 @@ export default async function Home({ searchParams }: PageProps) {
     <div className="space-y-5">
     <Suspense fallback={<p>Đang tải chăm sóc học viên…</p>}><StudentCareDashboardCard /></Suspense>
     <DashboardPage
+      centerDisplayName={centerDisplayName}
       dashboard={dashboard}
+      todayPanel={<DashboardTodayPanel model={today} />}
       userDisplayName={userDisplayName}
     />
     </div>

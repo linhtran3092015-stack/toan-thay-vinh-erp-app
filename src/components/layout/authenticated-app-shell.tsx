@@ -9,6 +9,7 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { getCachedCurrentAuthUser } from "@/features/auth/current-user";
 import { getCachedUnreadNotificationCountResult } from "@/features/notifications/data";
 import { getCenterDisplayName } from "@/features/settings/system-settings-data";
+import { getAttendanceVerificationPolicy } from "@/features/timekeeping/data";
 import { getCachedMyTimekeepingEntries } from "@/features/timekeeping/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -57,7 +58,7 @@ export async function AuthenticatedAppShell({
     permissionResult.permissions.includes("timekeeping.check");
 
   // These requests are independent, but still run only after access is verified.
-  const [myEntriesResult, unreadNotificationCountResult, centerDisplayName, branding] = await Promise.all([
+  const [myEntriesResult, unreadNotificationCountResult, centerDisplayName, branding, policyResult] = await Promise.all([
     canCheckTimekeeping
       ? getCachedMyTimekeepingEntries()
       : Promise.resolve(null),
@@ -66,11 +67,16 @@ export async function AuthenticatedAppShell({
       : Promise.resolve({ data: 0, ok: true as const }),
     getCenterDisplayName(),
     readAppBranding(),
+    canCheckTimekeeping ? getAttendanceVerificationPolicy() : Promise.resolve(null),
   ]);
 
   const hasOpenTimekeepingEntry = myEntriesResult?.ok
     ? myEntriesResult.entries.some((entry) => entry.status === "open")
     : false;
+
+  const openEntry = myEntriesResult?.ok
+    ? myEntriesResult.entries.find((entry) => entry.status === "open")
+    : null;
 
   const openOfflineEntry = myEntriesResult?.ok
     ? myEntriesResult.entries.find(
@@ -89,7 +95,9 @@ export async function AuthenticatedAppShell({
       canCheckTimekeeping={canCheckTimekeeping}
       centerDisplayName={centerDisplayName}
       hasOpenTimekeepingEntry={hasOpenTimekeepingEntry}
+      attendancePolicy={policyResult?.ok ? policyResult.policy : undefined}
       openOfflineEntryId={openOfflineEntry?.id ?? null}
+      openTimekeepingEntryId={openEntry?.id ?? null}
       permissions={permissionResult.permissions}
       unreadNotificationCount={unreadNotificationCount}
     >

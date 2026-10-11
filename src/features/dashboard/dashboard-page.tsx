@@ -12,12 +12,16 @@ import { DashboardPayrollSummaryCard } from "./components/dashboard-payroll-summ
 import { DashboardOperationalHighlights } from "./components/dashboard-operational-highlights";
 
 interface DashboardPageProps {
+  centerDisplayName?: string;
   dashboard: RoleAwareDashboardReadModel;
+  todayPanel?: React.ReactNode;
   userDisplayName?: string | null;
 }
 
 export function DashboardPage({
+  centerDisplayName,
   dashboard,
+  todayPanel,
   userDisplayName,
 }: DashboardPageProps) {
   const sections = [
@@ -40,10 +44,13 @@ export function DashboardPage({
       {/* 1. Executive Header */}
       <DashboardHeader
         availableMonths={dashboard.availableMonths}
+        centerDisplayName={centerDisplayName}
         displayName={userDisplayName}
         lastUpdatedAt={dashboard.lastUpdatedAt}
         selectedMonth={dashboard.selectedMonth}
       />
+
+      {todayPanel}
 
       {visibleCount === 0 ? (
         <div className="rounded-2xl border border-hairline bg-surface-1 p-8 text-center shadow-xs">
@@ -51,7 +58,7 @@ export function DashboardPage({
             Chưa có quyền xem các khối dữ liệu chuyên sâu
           </p>
           <p className="mt-2 text-xs leading-relaxed text-ink-muted sm:text-sm">
-            Tài khoản đã đăng nhập thành công nhưng chưa được gán quyền truy cập các phân hệ nghiệp vụ (Tài chính, Tuyển sinh, Học vụ, Nhân sự).
+            Việc hôm nay của bạn hiển thị ở trên. Các khối tài chính, tuyển sinh, học vụ, nhân sự chỉ hiện với tài khoản được cấp quyền tương ứng.
           </p>
         </div>
       ) : null}

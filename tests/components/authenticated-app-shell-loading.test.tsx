@@ -14,7 +14,7 @@ vi.mock("@/components/layout/app-shell", () => ({ AppShell: () => null }));
 vi.mock("@/features/website/data", () => ({ readAppBranding: async () => null }));
 vi.mock("@/features/auth/current-user", () => ({ getCachedCurrentAuthUser: mocks.auth }));
 vi.mock("@/lib/permissions/database-permissions", () => ({ getCachedDatabasePermissions: mocks.permissions }));
-vi.mock("@/features/timekeeping/data", () => ({ getCachedMyTimekeepingEntries: mocks.entries }));
+vi.mock("@/features/timekeeping/data", () => ({ getAttendanceVerificationPolicy: () => Promise.resolve({ ok: false as const, error: { code: "verification_policy_query_failed" as const, message: "mock" } }),  getCachedMyTimekeepingEntries: mocks.entries }));
 vi.mock("@/features/notifications/data", () => ({ getCachedUnreadNotificationCountResult: mocks.notifications }));
 vi.mock("@/features/settings/system-settings-data", () => ({ getCenterDisplayName: mocks.centerName }));
 

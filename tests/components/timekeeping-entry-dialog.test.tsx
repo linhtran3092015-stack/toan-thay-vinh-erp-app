@@ -34,18 +34,18 @@ describe("Timekeeping entry dialog", () => {
     actions.checkInTimeEntryAction.mockResolvedValueOnce({ message: "Đã ghi nhận check-in.", status: "success" });
     render(<TimekeepingEntryDialog operation="check-in" />);
 
-    const trigger = screen.getByRole("button", { name: "Check-in" });
+    const trigger = screen.getByRole("button", { name: "Vào ca" });
     trigger.focus();
     fireEvent.click(trigger);
 
-    const dialog = screen.getByRole("dialog", { name: "Xác nhận check-in" });
+    const dialog = screen.getByRole("dialog", { name: "Xác nhận vào ca" });
     expect(screen.getByLabelText("Hình thức")).toHaveValue("offline");
     // Wi-Fi fields are hidden unless the owner requires them: phones cannot read SSID/BSSID.
     expect(screen.queryByLabelText("Tên mạng Wi-Fi")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("BSSID")).not.toBeInTheDocument();
     expect(screen.queryByText(/vị trí hợp lệ|wi-fi hợp lệ|đủ điều kiện chấm công/i)).not.toBeInTheDocument();
 
-    fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận check-in" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận vào ca" }));
 
     await waitFor(() => expect(actions.checkInTimeEntryAction).toHaveBeenCalledWith({
       gpsAccuracyMeters: null,
@@ -66,11 +66,11 @@ describe("Timekeeping entry dialog", () => {
     actions.checkOutTimeEntryAction.mockReturnValueOnce(pending.promise);
     render(<TimekeepingEntryDialog operation="check-out" />);
 
-    const trigger = screen.getByRole("button", { name: "Check-out" });
+    const trigger = screen.getByRole("button", { name: "Ra ca" });
     trigger.focus();
     fireEvent.click(trigger);
-    const dialog = screen.getByRole("dialog", { name: "Xác nhận check-out" });
-    const submit = within(dialog).getByRole("button", { name: "Xác nhận check-out" });
+    const dialog = screen.getByRole("dialog", { name: "Xác nhận ra ca" });
+    const submit = within(dialog).getByRole("button", { name: "Xác nhận ra ca" });
     fireEvent.click(submit);
 
     await waitFor(() => expect(actions.checkOutTimeEntryAction).toHaveBeenCalledWith({
@@ -99,13 +99,13 @@ describe("Timekeeping entry dialog", () => {
     actions.checkInTimeEntryAction.mockResolvedValueOnce({ message: "Đã ghi nhận check-in.", status: "success" });
     render(<TimekeepingEntryDialog operation="check-in" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vào ca" }));
     fireEvent.click(screen.getByRole("button", { name: "Lấy vị trí hiện tại" }));
 
     expect(screen.getByText("Đã lấy dữ liệu vị trí từ thiết bị.")).toBeInTheDocument();
     expect(screen.getByText(/Đã có dữ liệu vị trí, sai số khoảng 13 m/)).toBeInTheDocument();
     expect(screen.queryByText(/vị trí hợp lệ|đúng địa điểm|đủ điều kiện/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Xác nhận check-in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận vào ca" }));
 
     await waitFor(() => expect(actions.checkInTimeEntryAction).toHaveBeenCalledWith(expect.objectContaining({
       gpsAccuracyMeters: 13,
@@ -119,19 +119,19 @@ describe("Timekeeping entry dialog", () => {
     actions.checkInTimeEntryAction.mockReturnValueOnce(pending.promise);
     render(<TimekeepingEntryDialog operation="check-in" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
-    const dialog = screen.getByRole("dialog", { name: "Xác nhận check-in" });
-    const submit = within(dialog).getByRole("button", { name: "Xác nhận check-in" });
+    fireEvent.click(screen.getByRole("button", { name: "Vào ca" }));
+    const dialog = screen.getByRole("dialog", { name: "Xác nhận vào ca" });
+    const submit = within(dialog).getByRole("button", { name: "Xác nhận vào ca" });
     fireEvent.click(submit);
     await waitFor(() => expect(actions.checkInTimeEntryAction).toHaveBeenCalledOnce());
 
-    expect(dialog).toHaveTextContent("Đang check-in…");
+    expect(dialog).toHaveTextContent("Đang vào ca…");
     expect(submit).toBeDisabled();
     expect(within(dialog).getByRole("button", { name: "Hủy" })).toBeDisabled();
     fireEvent.keyDown(dialog, { key: "Escape" });
     fireEvent.mouseDown(dialog.parentElement!);
     fireEvent.click(submit);
-    expect(screen.getByRole("dialog", { name: "Xác nhận check-in" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Xác nhận vào ca" })).toBeInTheDocument();
     expect(actions.checkInTimeEntryAction).toHaveBeenCalledOnce();
 
     pending.resolve({ message: "Bạn đang có một lượt chấm công chưa kết thúc.", status: "error" });
@@ -143,15 +143,15 @@ describe("Timekeeping entry dialog", () => {
     Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition } });
     render(<TimekeepingEntryDialog operation="check-in" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
-    const dialog = screen.getByRole("dialog", { name: "Xác nhận check-in" });
+    fireEvent.click(screen.getByRole("button", { name: "Vào ca" }));
+    const dialog = screen.getByRole("dialog", { name: "Xác nhận vào ca" });
     fireEvent.click(screen.getByRole("button", { name: "Lấy vị trí hiện tại" }));
 
     expect(dialog).toHaveTextContent("Đang lấy vị trí…");
     expect(within(dialog).getByRole("button", { name: "Hủy" })).toBeDisabled();
     fireEvent.keyDown(dialog, { key: "Escape" });
     fireEvent.mouseDown(dialog.parentElement!);
-    expect(screen.getByRole("dialog", { name: "Xác nhận check-in" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Xác nhận vào ca" })).toBeInTheDocument();
     expect(actions.checkInTimeEntryAction).not.toHaveBeenCalled();
   });
 
@@ -159,7 +159,7 @@ describe("Timekeeping entry dialog", () => {
     Object.defineProperty(navigator, "geolocation", { configurable: true, value: undefined });
     render(<TimekeepingEntryDialog operation="check-in" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vào ca" }));
     fireEvent.click(screen.getByRole("button", { name: "Lấy vị trí hiện tại" }));
 
     expect(screen.getByText("Trình duyệt hiện tại không hỗ trợ định vị.")).toBeInTheDocument();
@@ -173,7 +173,7 @@ describe("Timekeeping entry dialog", () => {
     Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition } });
     render(<TimekeepingEntryDialog operation="check-in" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vào ca" }));
     fireEvent.click(screen.getByRole("button", { name: "Lấy vị trí hiện tại" }));
 
     expect(screen.getByText("Trình duyệt chưa được cấp quyền vị trí. Hãy cấp quyền hoặc gửi chấm công chờ duyệt.")).toBeInTheDocument();
@@ -196,7 +196,7 @@ describe("Timekeeping entry dialog", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vào ca" }));
     expect(screen.getByText(/bán kính 150 m và sai số không quá 60 m/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Tên mạng Wi-Fi")).toBeRequired();
     expect(screen.getByLabelText("BSSID")).toBeRequired();
@@ -209,8 +209,8 @@ describe("Timekeeping entry dialog", () => {
     const action = operation === "check-in" ? actions.checkInTimeEntryAction : actions.checkOutTimeEntryAction;
     action.mockRejectedValueOnce(new Error("transport unavailable"));
     render(<TimekeepingEntryDialog operation={operation} />);
-    fireEvent.click(screen.getByRole("button", { name: operation === "check-in" ? "Check-in" : "Check-out" }));
-    fireEvent.click(screen.getByRole("button", { name: `Xác nhận ${operation}` }));
+    fireEvent.click(screen.getByRole("button", { name: operation === "check-in" ? "Vào ca" : "Ra ca" }));
+    fireEvent.click(screen.getByRole("button", { name: operation === "check-in" ? "Xác nhận vào ca" : "Xác nhận ra ca" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Không thể kết nối tới hệ thống chấm công");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(router.refresh).not.toHaveBeenCalled();

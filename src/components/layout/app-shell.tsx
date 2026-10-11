@@ -11,6 +11,7 @@ import {
 import { ModuleNavigation } from "@/components/layout/module-navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import type { AttendanceVerificationPolicy } from "@/features/timekeeping/types";
 import { InstallAppPrompt } from "@/components/shared/install-app-prompt";
 import { StudentCareRefresh } from "@/features/student-care/refresh";
 import type { AuthUser } from "@/features/auth/types";
@@ -18,21 +19,25 @@ import type { PermissionCode } from "@/lib/permissions/types";
 
 interface AppShellProps {
   authUser: AuthUser;
+  attendancePolicy?: AttendanceVerificationPolicy;
   canCheckTimekeeping?: boolean;
   centerDisplayName: string;
   children: ReactNode;
   hasOpenTimekeepingEntry?: boolean;
   openOfflineEntryId?: string | null;
+  openTimekeepingEntryId?: string | null;
   permissions: readonly PermissionCode[];
   unreadNotificationCount: number;
 }
 
 export function AppShell({
   authUser,
+  attendancePolicy,
   canCheckTimekeeping = false,
   centerDisplayName,
   children,
   hasOpenTimekeepingEntry = false,
+  openTimekeepingEntryId = null,
   permissions,
   unreadNotificationCount,
 }: AppShellProps) {
@@ -68,8 +73,10 @@ export function AppShell({
 
       <div className="min-h-screen md:pl-[72px] xl:pl-[var(--sidebar-width)]">
         <Topbar
+          attendancePolicy={attendancePolicy}
           canCheckTimekeeping={canCheckTimekeeping}
           hasOpenTimekeepingEntry={hasOpenTimekeepingEntry}
+          openTimekeepingEntryId={openTimekeepingEntryId}
           mobileMenuTriggerRef={mobileMenuTriggerRef}
           onMenuClick={() => setMobileNavPath(pathname)}
           unreadNotificationCount={unreadNotificationCount}

@@ -18,8 +18,8 @@ afterEach(() => {
 describe("attendance exception submission", () => {
   it("records checkout intent with the current shift ID even without GPS or required Wi-Fi", async () => {
     actions.requestAttendanceExceptionAction.mockResolvedValue({ status: "success", message: "Đã ghi nhận chờ duyệt" });
-    render(<TimekeepingEntryDialog operation="check-out" timeEntryId="13000000-0000-0000-0000-000000000001" attendancePolicy={policy} />);
-    fireEvent.click(screen.getByRole("button", { name: "Check-out" }));
+    render(<TimekeepingEntryDialog autoLocate={false} operation="check-out" timeEntryId="13000000-0000-0000-0000-000000000001" attendancePolicy={policy} />);
+    fireEvent.click(screen.getByRole("button", { name: "Ra ca" }));
     expect(screen.getByRole("button", { name: "Gửi chấm công chờ duyệt" })).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Lý do cần duyệt"), { target: { value: "Máy tính không lấy được vị trí" } });
     fireEvent.click(screen.getByRole("button", { name: "Gửi chấm công chờ duyệt" }));
@@ -30,8 +30,8 @@ describe("attendance exception submission", () => {
   });
   it("reuses the request ID on network retry and never reports success before acknowledgement", async () => {
     actions.requestAttendanceExceptionAction.mockResolvedValueOnce({ status: "error", message: "Mất mạng" }).mockResolvedValueOnce({ status: "success", message: "Đã gửi" });
-    render(<TimekeepingEntryDialog operation="check-in" attendancePolicy={policy} />);
-    fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+    render(<TimekeepingEntryDialog autoLocate={false} operation="check-in" attendancePolicy={policy} />);
+    fireEvent.click(screen.getByRole("button", { name: "Vào ca" }));
     fireEvent.change(screen.getByLabelText("Lý do cần duyệt"), { target: { value: "GPS không khả dụng" } });
     fireEvent.click(screen.getByRole("button", { name: "Gửi chấm công chờ duyệt" }));
     await screen.findByText("Mất mạng");
@@ -44,12 +44,12 @@ describe("attendance exception submission", () => {
     let success!: PositionCallback;
     Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition: (cb: PositionCallback) => { success = cb; } } });
     const now = vi.spyOn(Date, "now").mockReturnValue(100_000);
-    render(<TimekeepingEntryDialog operation="check-in" attendancePolicy={{ ...policy, wifiRequiredForOffline: false }} />);
-    fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+    render(<TimekeepingEntryDialog autoLocate={false} operation="check-in" attendancePolicy={{ ...policy, wifiRequiredForOffline: false }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Vào ca" }));
     fireEvent.click(screen.getByRole("button", { name: "Lấy vị trí hiện tại" }));
     act(() => success({ coords: { latitude: 10, longitude: 106, accuracy: 5 } } as GeolocationPosition));
     now.mockReturnValue(160_001);
-    fireEvent.click(screen.getByRole("button", { name: "Xác nhận check-in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận vào ca" }));
     expect(actions.checkInTimeEntryAction).not.toHaveBeenCalled();
     expect(screen.getByText(/Vị trí đã quá 60 giây/)).toBeInTheDocument();
   });

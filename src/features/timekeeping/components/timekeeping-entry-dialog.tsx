@@ -29,8 +29,32 @@ type TimekeepingEntryOperation = "check-in" | "check-out";
 
 interface TimekeepingEntryDialogProps {
   attendancePolicy?: AttendanceVerificationPolicy;
+  /** Capture GPS as soon as the dialog opens in on-site mode (one-tap flow). */
+  autoLocate?: boolean;
   operation: TimekeepingEntryOperation;
+  /** Custom trigger content (e.g. the topbar pill); the dialog still owns the button. */
+  triggerChildren?: ReactNode;
+  triggerClassName?: string;
+  triggerTitle?: string;
   timeEntryId?: string;
+}
+
+const LAST_MODE_STORAGE_KEY = "timekeeping.lastMode";
+
+function readLastMode(): TimeEntryActionInput["mode"] {
+  try {
+    return window.localStorage.getItem(LAST_MODE_STORAGE_KEY) === "online" ? "online" : "offline";
+  } catch {
+    return "offline";
+  }
+}
+
+function rememberMode(mode: TimeEntryActionInput["mode"]): void {
+  try {
+    window.localStorage.setItem(LAST_MODE_STORAGE_KEY, mode);
+  } catch {
+    // Storage can be unavailable (private mode); remembering is a convenience only.
+  }
 }
 
 const defaultAttendancePolicy: AttendanceVerificationPolicy = {
@@ -46,12 +70,12 @@ const defaultAttendancePolicy: AttendanceVerificationPolicy = {
 const inputClassName =
   "min-h-11 w-full rounded-md border border-border-subtle bg-surface-base px-3 text-control text-text-default outline-none transition focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
 
-function createInitialValues(): TimeEntryActionInput {
+function createInitialValues(mode: TimeEntryActionInput["mode"] = "offline"): TimeEntryActionInput {
   return {
     gpsAccuracyMeters: null,
     gpsLatitude: null,
     gpsLongitude: null,
-    mode: "offline",
+    mode,
     wifiBssid: "",
     wifiSsid: "",
   };
@@ -60,8 +84,12 @@ function createInitialValues(): TimeEntryActionInput {
 /** Presentation for the existing check-in/out mutation; eligibility remains server-owned. */
 export function TimekeepingEntryDialog({
   attendancePolicy = defaultAttendancePolicy,
+  autoLocate = true,
   operation,
   timeEntryId,
+  triggerChildren,
+  triggerClassName,
+  triggerTitle,
 }: TimekeepingEntryDialogProps) {
   const router = useRouter();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -98,14 +126,19 @@ export function TimekeepingEntryDialog({
   const isInteractionLocked = isLocating || isMutationInteractionLocked;
 
   const openDialog = (): void => {
+    const lastMode = readLastMode();
     requestIdRef.current = crypto.randomUUID();
     sampledAtRef.current = null;
     setReviewReason("");
     setSubmittedMessage("");
-    setValues(createInitialValues());
+    setValues(createInitialValues(lastMode));
     setLocationMessage("");
     setActionState(initialTimekeepingEntryActionState);
     setIsOpen(true);
+    // One-tap: on-site check-in starts locating as soon as the dialog opens.
+    if (autoLocate && lastMode === "offline" && attendancePolicy.configured) {
+      captureLocation();
+    }
   };
 
   const closeDialog = (): void => {
@@ -213,6 +246,7 @@ export function TimekeepingEntryDialog({
         setActionState(result);
 
         if (result.status === "success") {
+          rememberMode(values.mode);
           setIsOpen(false);
           router.refresh();
         }
@@ -241,27 +275,40 @@ export function TimekeepingEntryDialog({
     });
   };
   const isOffline = values.mode === "offline";
-  const title = isCheckIn ? "Xác nhận check-in" : "Xác nhận check-out";
-  const triggerLabel = isCheckIn ? "Check-in" : "Check-out";
+  const title = isCheckIn ? "Xác nhận vào ca" : "Xác nhận ra ca";
+  const triggerLabel = isCheckIn ? "Vào ca" : "Ra ca";
   const pendingLabel = isLocating
     ? "Đang lấy vị trí…"
     : isCheckIn
-      ? "Đang check-in…"
-      : "Đang check-out…";
+      ? "Đang vào ca…"
+      : "Đang ra ca…";
 
   return (
     <>
       {submittedMessage ? <p role="status" className="text-secondary">{submittedMessage}</p> : null}
-      <Button
-        className="min-h-11"
-        onClick={openDialog}
-        ref={triggerRef}
-        size="lg"
-        type="button"
-        variant={isCheckIn ? "primary" : "secondary"}
-      >
-        {triggerLabel}
-      </Button>
+      {triggerChildren ? (
+        <button
+          aria-label={triggerTitle}
+          className={triggerClassName}
+          onClick={openDialog}
+          ref={triggerRef}
+          title={triggerTitle}
+          type="button"
+        >
+          {triggerChildren}
+        </button>
+      ) : (
+        <Button
+          className="min-h-11"
+          onClick={openDialog}
+          ref={triggerRef}
+          size="lg"
+          type="button"
+          variant={isCheckIn ? "primary" : "secondary"}
+        >
+          {triggerLabel}
+        </Button>
+      )}
 
       <Dialog
         ariaDescribedBy={descriptionId}
@@ -276,7 +323,7 @@ export function TimekeepingEntryDialog({
           <div>
             <h2 className="text-section-title font-semibold text-text-strong" id={titleId}>{title}</h2>
             <p className="mt-1 text-secondary text-text-muted" id={descriptionId}>
-              Thời điểm chấm công được ghi nhận theo giờ hệ thống.
+              Thời điểm chấm công ghi theo giờ hệ thống. Tại trung tâm: vị trí được lấy tự động khi mở; hình thức lần trước được ghi nhớ.
             </p>
           </div>
 
@@ -382,7 +429,7 @@ export function TimekeepingEntryDialog({
             {actionState.status === "error" ? (
               <ResultBanner
                 description={actionState.message}
-                title={isCheckIn ? "Không thể ghi nhận check-in" : "Không thể ghi nhận check-out"}
+                title={isCheckIn ? "Không thể ghi nhận vào ca" : "Không thể ghi nhận ra ca"}
                 tone="error"
               />
             ) : null}

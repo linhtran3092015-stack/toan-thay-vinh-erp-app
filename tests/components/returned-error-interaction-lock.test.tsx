@@ -170,21 +170,21 @@ describe("returned-error interaction locks", () => {
 
   it("allows Cancel after an entry error while preserving independent GPS locking", async () => {
     entryActions.checkInTimeEntryAction.mockResolvedValueOnce({
-      message: "Không thể ghi nhận check-in.",
+      message: "Không thể ghi nhận vào ca.",
       status: "error",
     });
 
     render(<TimekeepingEntryDialog operation="check-in" />);
-    fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
-    fireEvent.click(screen.getByRole("button", { name: "Xác nhận check-in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vào ca" }));
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận vào ca" }));
 
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(
-        "Không thể ghi nhận check-in.",
+        "Không thể ghi nhận vào ca.",
       ),
     );
 
-    const dialog = screen.getByRole("dialog", { name: "Xác nhận check-in" });
+    const dialog = screen.getByRole("dialog", { name: "Xác nhận vào ca" });
     expect(within(dialog).getByRole("button", { name: "Hủy" })).not.toBeDisabled();
     fireEvent.click(within(dialog).getByRole("button", { name: "Hủy" }));
 

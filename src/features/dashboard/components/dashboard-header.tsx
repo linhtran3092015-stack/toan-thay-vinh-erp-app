@@ -8,6 +8,7 @@ import { formatDateTime, formatMonthYear } from "@/features/dashboard/format";
 
 interface DashboardHeaderProps {
   availableMonths: readonly string[];
+  centerDisplayName?: string;
   displayName?: string | null;
   lastUpdatedAt: string;
   selectedMonth: string;
@@ -15,6 +16,7 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({
   availableMonths,
+  centerDisplayName = "Trung tâm",
   displayName = "Chủ trung tâm",
   lastUpdatedAt,
   selectedMonth,
@@ -30,12 +32,11 @@ export function DashboardHeader({
     });
   };
 
+  // Printing is the browser's own dialog; no fake progress.
   const handleExport = () => {
     setIsExporting(true);
-    setTimeout(() => {
-      setIsExporting(false);
-      window.print();
-    }, 400);
+    window.print();
+    setIsExporting(false);
   };
 
   return (
@@ -45,7 +46,7 @@ export function DashboardHeader({
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
             <p className="text-xs font-bold uppercase tracking-wider text-primary">
-              Trung tâm Toán Thầy Vinh · Trung tâm chỉ huy
+              {centerDisplayName} · Tổng quan điều hành
             </p>
           </div>
 

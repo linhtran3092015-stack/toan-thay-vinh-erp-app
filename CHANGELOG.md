@@ -2,6 +2,20 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.19.0] - 2026-10-13
+
+Đợt 2 — nhóm 2d (chấm công 1 chạm, trang chủ theo vai trò).
+
+### Added
+- **Chấm công 1 chạm trên điện thoại**: nút "Chấm công" trên thanh đầu trang mở thẳng hộp thoại (không còn chuyển sang trang Chấm công); hộp thoại tự lấy vị trí GPS ngay khi mở ở hình thức tại trung tâm, ghi nhớ hình thức lần trước, nhãn "Vào ca / Ra ca" thay cho Check-in / Check-out. Ô Wi-Fi vẫn chỉ hiện khi chủ trung tâm bắt buộc.
+- **Trang chủ theo vai trò**: khối "Hôm nay" đầu trang cho mọi tài khoản có quyền dashboard — trạng thái ca làm (vào/ra ca ngay tại chỗ), danh sách buổi học hôm nay, việc đang chờ (buổi chưa khóa, hẹn theo dõi lead đến hạn, thông báo chưa đọc) và thẻ lương ước tính tháng hiện tại (nếu có quyền xem lương). Nhân sự không có quyền tài chính/học vụ không còn thấy trang trống "Chưa có quyền xem".
+
+### Changed
+- Header dashboard lấy tên trung tâm từ cài đặt thay vì hard-code; nút "Xuất báo cáo" in ngay thay vì giả lập tiến trình 400 ms.
+
+### Fixed
+- Ba bộ test pgTAP phụ thuộc giờ hệ thống (giờ tự đóng ca 22:30/22:45) tự bỏ qua ngoài 06:00–21:30 giờ Việt Nam thay vì làm CI đỏ vào buổi tối.
+
 ## [0.6.18.0] - 2026-10-13
 
 Đợt 2 — nhóm 2c (giao diện dùng chung, hàng đợi kế toán, dọn mã).
