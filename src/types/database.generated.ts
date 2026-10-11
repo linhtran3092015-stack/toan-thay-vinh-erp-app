@@ -2733,7 +2733,12 @@ export type Database = {
           generated_at: string
           generated_by: string
           id: string
+          paid_at: string | null
+          paid_by: string | null
+          paid_on: string | null
           pay_date: string
+          payment_note: string | null
+          payment_reference: string | null
           period_month: string
           reviewed_at: string | null
           reviewed_by: string | null
@@ -2749,7 +2754,12 @@ export type Database = {
           generated_at?: string
           generated_by: string
           id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          paid_on?: string | null
           pay_date: string
+          payment_note?: string | null
+          payment_reference?: string | null
           period_month: string
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -2765,7 +2775,12 @@ export type Database = {
           generated_at?: string
           generated_by?: string
           id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          paid_on?: string | null
           pay_date?: string
+          payment_note?: string | null
+          payment_reference?: string | null
           period_month?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -2796,6 +2811,13 @@ export type Database = {
           {
             foreignKeyName: "payroll_periods_generated_by_fkey"
             columns: ["generated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_periods_paid_by_fkey"
+            columns: ["paid_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -6878,7 +6900,12 @@ export type Database = {
           generated_at: string
           generated_by: string
           id: string
+          paid_at: string | null
+          paid_by: string | null
+          paid_on: string | null
           pay_date: string
+          payment_note: string | null
+          payment_reference: string | null
           period_month: string
           reviewed_at: string | null
           reviewed_by: string | null
@@ -7243,7 +7270,12 @@ export type Database = {
           generated_at: string
           generated_by: string
           id: string
+          paid_at: string | null
+          paid_by: string | null
+          paid_on: string | null
           pay_date: string
+          payment_note: string | null
+          payment_reference: string | null
           period_month: string
           reviewed_at: string | null
           reviewed_by: string | null
@@ -7774,7 +7806,12 @@ export type Database = {
           generated_at: string
           generated_by: string
           id: string
+          paid_at: string | null
+          paid_by: string | null
+          paid_on: string | null
           pay_date: string
+          payment_note: string | null
+          payment_reference: string | null
           period_month: string
           reviewed_at: string | null
           reviewed_by: string | null
@@ -9288,6 +9325,41 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      mark_payroll_period_paid: {
+        Args: {
+          p_note?: string
+          p_paid_on: string
+          p_payment_reference?: string
+          p_payroll_period_id: string
+        }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          current_calculation_run_id: string | null
+          feedback_closed_at: string | null
+          feedback_closed_by: string | null
+          feedback_opened_at: string
+          generated_at: string
+          generated_by: string
+          id: string
+          paid_at: string | null
+          paid_by: string | null
+          paid_on: string | null
+          pay_date: string
+          payment_note: string | null
+          payment_reference: string | null
+          period_month: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payroll_periods"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       mark_session_attendance: {
         Args: {
           p_actual_learning_mode: string
@@ -9570,7 +9642,12 @@ export type Database = {
           generated_at: string
           generated_by: string
           id: string
+          paid_at: string | null
+          paid_by: string | null
+          paid_on: string | null
           pay_date: string
+          payment_note: string | null
+          payment_reference: string | null
           period_month: string
           reviewed_at: string | null
           reviewed_by: string | null
@@ -9595,7 +9672,12 @@ export type Database = {
           generated_at: string
           generated_by: string
           id: string
+          paid_at: string | null
+          paid_by: string | null
+          paid_on: string | null
           pay_date: string
+          payment_note: string | null
+          payment_reference: string | null
           period_month: string
           reviewed_at: string | null
           reviewed_by: string | null
@@ -10400,7 +10482,12 @@ export type Database = {
           generated_at: string
           generated_by: string
           id: string
+          paid_at: string | null
+          paid_by: string | null
+          paid_on: string | null
           pay_date: string
+          payment_note: string | null
+          payment_reference: string | null
           period_month: string
           reviewed_at: string | null
           reviewed_by: string | null

@@ -2,6 +2,19 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.14.0] - 2026-10-12
+
+Đợt 1 — nhóm 1d (khóa lương sau khi trả).
+
+### Added
+- **Ghi nhận đã trả lương** cho kỳ đã duyệt (ngày trả, tham chiếu chuyển khoản, ghi chú; quyền duyệt lương hoặc đối soát lương). Kỳ đã trả là cuối cùng: không mở lại, không tính lại; bảng lương hiển thị "Đã trả lương" kèm ngày và tham chiếu. RPC `mark_payroll_period_paid`.
+
+### Changed
+- Mở lại kỳ lương (về đối soát / về nháp) không còn dùng `session_replication_role = replica` (tắt toàn bộ trigger kể cả audit và khóa ngoại); trigger bảo vệ lịch sử cho phép đúng hai bước lùi khi RPC mở lại đặt cờ phạm vi giao dịch.
+
+### Database
+- `20261012150000_payroll_period_paid_and_scoped_reopen.sql`.
+
 ## [0.6.13.0] - 2026-10-12
 
 Đợt 1 — nhóm 1c (vòng đời phiếu thu).

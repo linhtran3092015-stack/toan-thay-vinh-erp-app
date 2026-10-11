@@ -68,6 +68,10 @@ export interface PayrollPeriodRead {
   status: string;
   pendingCorrectionCount: number;
   statements: readonly PayrollStatementRead[];
+  /** Set once the approved period has been marked paid; it is then final. */
+  paidAt?: string | null;
+  paidOn?: string | null;
+  paymentReference?: string | null;
 }
 
 export interface PayrollCorrectionRequestRead {

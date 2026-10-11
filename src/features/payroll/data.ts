@@ -104,22 +104,34 @@ export async function getPayrollPeriodsWithDetailsResult(): Promise<
         error: { message: string } | null;
       }>;
     };
-    const [detailsResult, explanationsResult] = await Promise.all([
+    const [detailsResult, explanationsResult, paymentResult] = await Promise.all([
       supabase.rpc("get_payroll_periods_with_details"),
       untypedRpcClient.rpc("get_payroll_explanations"),
+      // Payment facts live on the period row; the details RPC predates them.
+      supabase.from("payroll_periods").select("id, paid_at, paid_on, payment_reference"),
     ]);
 
-    if (detailsResult.error || explanationsResult.error) {
+    if (detailsResult.error || explanationsResult.error || paymentResult.error) {
       return { ok: false };
     }
 
-    return {
-      data: enrichPayrollPeriodsWithExplanations(
-        normalizePayrollPeriodsWithDetailsRows(detailsResult.data),
-        explanationsResult.data,
-      ),
-      ok: true,
-    };
+    const paymentById = new Map(
+      (paymentResult.data ?? []).map((row) => [row.id, row]),
+    );
+    const periods = enrichPayrollPeriodsWithExplanations(
+      normalizePayrollPeriodsWithDetailsRows(detailsResult.data),
+      explanationsResult.data,
+    ).map((period) => {
+      const payment = paymentById.get(period.id);
+      return {
+        ...period,
+        paidAt: payment?.paid_at ?? null,
+        paidOn: payment?.paid_on ?? null,
+        paymentReference: payment?.payment_reference ?? null,
+      };
+    });
+
+    return { data: periods, ok: true };
   } catch {
     return { ok: false };
   }

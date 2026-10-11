@@ -149,6 +149,14 @@ function getPayrollRpcErrorMessage(message: string): string {
     PAYROLL_FEEDBACK_WINDOW_CLOSED:
       "Thời gian gửi yêu cầu điều chỉnh đã đóng.",
     PAYROLL_STATEMENT_NOT_FOUND: "Không tìm thấy bảng lương nhân sự.",
+    PAYROLL_PERIOD_ALREADY_PAID:
+      "Kỳ lương đã được ghi nhận trả lương nên không thể mở lại hay thay đổi.",
+    PAYROLL_PAYMENT_PERMISSION_REQUIRED:
+      "Tài khoản hiện tại không có quyền ghi nhận trả lương.",
+    PAYROLL_PAID_ON_INVALID: "Ngày trả lương không hợp lệ hoặc ở tương lai.",
+    PAYROLL_PAYMENT_REFERENCE_INVALID: "Tham chiếu chuyển khoản quá dài (tối đa 160 ký tự).",
+    PAYROLL_PAYMENT_NOTE_INVALID: "Ghi chú quá dài (tối đa 2.000 ký tự).",
+    PAYROLL_PERIOD_NOT_APPROVED: "Chỉ ghi nhận trả lương cho kỳ đã duyệt và khóa.",
   };
 
   for (const [databaseMessage, userMessage] of Object.entries(knownMessages)) {
@@ -535,3 +543,37 @@ export async function reopenPayrollToDraftAction(
 }
 
 
+
+export async function markPayrollPeriodPaidAction(
+  input: PayrollPeriodActionInput & { note: string; paidOn: string; reference: string },
+): Promise<PayrollActionState> {
+  const permissionResult = await getDatabasePermissions();
+  if (
+    !permissionResult.ok ||
+    (!permissionResult.permissions.includes("payroll.owner_approve") &&
+      !permissionResult.permissions.includes("payroll.accountant_reconcile"))
+  ) {
+    return createErrorState("Tài khoản hiện tại không có quyền ghi nhận trả lương.");
+  }
+
+  const parsed = payrollPeriodActionSchema.safeParse(input);
+  if (!parsed.success) {
+    return createErrorState("Kỳ lương không hợp lệ.", parsed.error.flatten().fieldErrors);
+  }
+
+  const paidOn = (input.paidOn ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn)) {
+    return createErrorState("Vui lòng chọn ngày trả lương.", { paidOn: ["Ngày trả lương không hợp lệ."] });
+  }
+
+  const error = await runUntypedPayrollRpc("mark_payroll_period_paid", {
+    p_note: (input.note ?? "").trim() || null,
+    p_paid_on: paidOn,
+    p_payment_reference: (input.reference ?? "").trim() || null,
+    p_payroll_period_id: parsed.data.payrollPeriodId,
+  });
+  if (error) return error;
+  revalidatePath("/payroll");
+  revalidatePath("/payroll/dashboard");
+  return { message: "Đã ghi nhận trả lương. Kỳ lương được khóa hẳn.", status: "success" };
+}

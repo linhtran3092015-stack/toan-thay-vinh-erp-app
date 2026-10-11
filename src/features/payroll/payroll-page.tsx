@@ -13,6 +13,7 @@ import {
 } from "@/features/payroll/components/payroll-feedback-actions";
 import { PayrollPayslipDialog } from "@/features/payroll/components/payroll-payslip-dialog";
 import { PayrollPeriodTransitionAction } from "@/features/payroll/components/payroll-period-transition-action";
+import { MarkPayrollPaidDialog } from "@/features/payroll/components/mark-payroll-paid-dialog";
 import { ReopenPayrollPeriodAction } from "@/features/payroll/components/reopen-payroll-period-action";
 import { ReopenPayrollToDraftAction } from "@/features/payroll/components/reopen-payroll-to-draft-action";
 
@@ -261,7 +262,8 @@ function PayrollPeriodSection({
   currentStaffId: string;
   period: PayrollPeriodRead;
 }) {
-  const status = getPeriodStatus(period.status);
+  const isPaid = Boolean(period.paidAt);
+  const status = isPaid ? { label: "Đã trả lương", tone: "success" as const } : getPeriodStatus(period.status);
   const canAddManualLine = canManage && period.status === "draft" && !period.feedbackClosedAt;
 
   return (
@@ -280,6 +282,9 @@ function PayrollPeriodSection({
             </div>
             <p className="mt-1 text-secondary text-text-muted">
               Ngày trả lương: <span className="tabular-nums">{formatDate(period.payDate)}</span>
+              {isPaid && period.paidOn ? (
+                <> · Đã trả ngày <span className="tabular-nums">{formatDate(period.paidOn)}</span>{period.paymentReference ? ` · Tham chiếu ${period.paymentReference}` : ""}</>
+              ) : null}
             </p>
             <p className="mt-1 text-caption text-text-muted">
               Phiên bản tính #{period.currentRevision} · Tính lại gần nhất {period.lastCalculatedAt ? formatDateTime(period.lastCalculatedAt) : "chưa có thời điểm ghi nhận"} · {period.feedbackClosedAt ? "Đã đóng phản hồi" : "Đang nhận phản hồi"}
@@ -315,7 +320,10 @@ function PayrollPeriodSection({
                 periodMonth={period.periodMonth}
               />
             ) : null}
-            {period.status === "approved" && canApprove ? (
+            {period.status === "approved" && !isPaid && (canApprove || canReconcile) ? (
+              <MarkPayrollPaidDialog payrollPeriodId={period.id} periodMonth={period.periodMonth} />
+            ) : null}
+            {period.status === "approved" && !isPaid && canApprove ? (
               <ReopenPayrollPeriodAction
                 payrollPeriodId={period.id}
                 periodMonth={period.periodMonth}
