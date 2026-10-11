@@ -8,6 +8,7 @@ Sửa lỗi chặn vận hành buổi học, trợ giảng được bắt đầu
 
 ### Fixed
 - **Tạo buổi học hàng loạt** (`/sessions/batch`) và hàm tạo buổi theo năm học bị lỗi `42P10` trên production từ bản 0.6.16.0: chỉ mục duy nhất (lịch, ngày) đã đổi sang bỏ qua buổi hủy nhưng mệnh đề `on conflict` của `create_batch_class_sessions` và `materialize_class_sessions` chưa đổi theo. Hai hàm được tạo lại với đúng điều kiện; thêm kiểm thử DB tạo lại được buổi sau khi hủy.
+- Tiêu đề trang buổi học hiển thị lùi một ngày (ví dụ "Chủ Nhật 11/10" cho buổi Thứ 2 12/10) vì định dạng ngày trên máy chủ theo UTC; đã cố định múi giờ Việt Nam.
 - Thông báo lỗi rõ ràng khi bấm Bắt đầu trước giờ học, khi buổi không ở trạng thái bắt đầu được, và khi tạo buổi trên lớp ghép thay vì lớp thành phần.
 
 ### Changed

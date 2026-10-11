@@ -583,6 +583,7 @@ function formatDate(value: string): string {
   return new Intl.DateTimeFormat("vi-VN", {
     day: "2-digit",
     month: "2-digit",
+    timeZone: "Asia/Ho_Chi_Minh",
     weekday: "long",
     year: "numeric",
   }).format(
