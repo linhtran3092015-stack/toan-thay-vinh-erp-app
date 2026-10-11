@@ -181,6 +181,12 @@ function getLifecycleRpcErrorMessage(
       "Buổi bù phải diễn ra sau buổi gốc đã hủy.",
     SESSION_MANAGE_PERMISSION_DENIED:
       "Tài khoản hiện tại không có quyền quản lý buổi học.",
+    CLASS_SESSION_NOT_STARTED_YET:
+      "Chưa đến giờ bắt đầu buổi học. Hãy bấm Bắt đầu khi tới giờ học theo lịch.",
+    CLASS_SESSION_START_STATUS_INVALID:
+      "Buổi học không ở trạng thái có thể bắt đầu.",
+    COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION:
+      "Lớp ghép không có buổi học riêng. Hãy tạo buổi trên lớp thành phần (ví dụ 7A hoặc 7B).",
   };
 
   for (

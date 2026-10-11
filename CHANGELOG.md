@@ -2,6 +2,17 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.22.0] - 2026-10-13
+
+Sửa lỗi chặn vận hành buổi học, trợ giảng được bắt đầu/kết thúc buổi.
+
+### Fixed
+- **Tạo buổi học hàng loạt** (`/sessions/batch`) và hàm tạo buổi theo năm học bị lỗi `42P10` trên production từ bản 0.6.16.0: chỉ mục duy nhất (lịch, ngày) đã đổi sang bỏ qua buổi hủy nhưng mệnh đề `on conflict` của `create_batch_class_sessions` và `materialize_class_sessions` chưa đổi theo. Hai hàm được tạo lại với đúng điều kiện; thêm kiểm thử DB tạo lại được buổi sau khi hủy.
+- Thông báo lỗi rõ ràng khi bấm Bắt đầu trước giờ học, khi buổi không ở trạng thái bắt đầu được, và khi tạo buổi trên lớp ghép thay vì lớp thành phần.
+
+### Changed
+- Vai trò **Trợ giảng** có thêm quyền `sessions.manage` (bắt đầu, kết thúc, hủy, dời, tạo buổi) vì điểm danh chỉ thực hiện được khi buổi đã bắt đầu.
+
 ## [0.6.21.0] - 2026-10-13
 
 Tin nhắn phụ huynh qua nhóm Zalo sổ liên lạc (tích hợp ZaloCRM, thay cho kế hoạch Zalo OA/ZNS).
