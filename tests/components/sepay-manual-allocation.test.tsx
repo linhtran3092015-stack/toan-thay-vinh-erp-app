@@ -55,7 +55,7 @@ describe("manual SePay allocations",()=>{
   expect(screen.getByLabelText("Số buổi mua · HV001")).toHaveValue(8);
   // Since 20261012140000 the accountant may settle a request with a different amount (surplus / partial).
   expect(screen.getByLabelText("Số buổi mua · HV001")).toBeEnabled();
-  expect(screen.getByText(/Chuyển.*nhiều hơn/)).toBeInTheDocument();
+  expect(screen.getByText(/giữ số buổi theo phiếu/)).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Lý do phân bổ"),{target:{value:"Khớp theo yêu cầu"}});
   fireEvent.click(screen.getByRole("button",{name:"Kiểm tra phân bổ"}));fireEvent.click(screen.getByRole("button",{name:"Xác nhận phân bổ"}));
   expect(await screen.findByRole("alert")).toHaveTextContent("Yêu cầu đã thay đổi");
