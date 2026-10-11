@@ -23,7 +23,7 @@ import {
 
 export const PAYMENT_REQUEST_PAGE_SIZE = 20;
 
-export function PaymentRequestDirectory({ canCreatePaymentRequests, items }: { canCreatePaymentRequests: boolean; items: PaymentRequestReadModel[] }) {
+export function PaymentRequestDirectory({ canCancelPaymentRequests = false, canCreatePaymentRequests, items }: { canCancelPaymentRequests?: boolean; canCreatePaymentRequests: boolean; items: PaymentRequestReadModel[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
@@ -119,7 +119,7 @@ export function PaymentRequestDirectory({ canCreatePaymentRequests, items }: { c
               <SummaryItem description="Trong danh sách yêu cầu đang tải" label="Còn chờ nhận" value={formatCurrency(summary.outstandingVnd)} />
             </section>
 
-            <PaymentRequestTable items={pagination.items} />
+            <PaymentRequestTable canCancel={canCancelPaymentRequests} items={pagination.items} />
 
             <nav aria-label="Phân trang yêu cầu thanh toán" className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-base px-4 py-3 md:flex-row md:items-center md:justify-between">
               <p className="text-secondary text-text-muted">

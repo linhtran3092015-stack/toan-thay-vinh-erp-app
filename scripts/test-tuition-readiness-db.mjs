@@ -45,6 +45,8 @@ try {
  sql(migration('20261012130100_tuition_period_cutoff_balance_and_overlap.sql'));
  sql(readFileSync(new URL('../tests/database/tuition-readiness.sql',import.meta.url),'utf8'));
  sql(migration('20260928010000_sepay_manual_tuition_allocation.sql'));
+ // Phase 1c: request cancellation, partial and surplus settlement.
+ sql(migration('20261012140000_payment_request_lifecycle_partial_and_overpay.sql'));
  sql(readFileSync(new URL('../tests/database/sepay-manual-allocation.sql',import.meta.url),'utf8'));
  const concurrentSql = `set request.jwt.claim.sub='11111111-1111-4111-8111-111111111111'; set test.permissions='sepay.allocate';
  select public.allocate_sepay_tuition_manually('77777777-7777-4777-8777-000000000010',

@@ -2,6 +2,17 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.13.0] - 2026-10-12
+
+Đợt 1 — nhóm 1c (vòng đời phiếu thu).
+
+### Added
+- **Hủy phiếu thu** đang chờ (chưa thu đồng nào) ngay trên danh sách Yêu cầu thanh toán, bắt buộc lý do, có audit; phiếu đã gắn vào kỳ thu học phí phải tái phát hành thay vì hủy.
+- **Thanh toán dư / thiếu so với phiếu** khi phân bổ thủ công: chuyển nhiều hơn → phiếu thanh toán đủ, kế toán tự quyết tổng số buổi cộng (không ít hơn số buổi trên phiếu — quyết định chủ trung tâm 11/10/2026); chuyển ít hơn → phiếu chuyển `partially_paid`, cộng dồn số đã thu và vẫn mở để nhận lần chuyển sau. Trước đây hai trường hợp này kẹt vĩnh viễn ở "lệch số tiền".
+
+### Database
+- `20261012140000_payment_request_lifecycle_partial_and_overpay.sql` (RPC `cancel_payment_request`, `allocate_sepay_tuition_manually` chấp nhận thanh toán một phần/dư).
+
 ## [0.6.12.0] - 2026-10-12
 
 Đợt 1 — nhóm 1b (học phí đúng số).

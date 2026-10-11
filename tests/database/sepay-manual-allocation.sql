@@ -73,3 +73,44 @@ select test_assert((select count(*)=1 from search_sepay_reconciliation_candidate
 select match_sepay_historical_transaction_to_payment_request('77777777-7777-4777-8777-000000000006',
  (select id from student_payment_requests where student_id='22222222-2222-4222-8222-222222222223'),'Verified webhook manual match');
 select test_assert((select match_status='manual_matched' from sepay_transactions where bank_transaction_id='manual-6'),'webhook exact match records manual settlement');
+-- Phase 1c (20261012140000): partial / surplus settlement of a request, request cancellation.
+begin;
+set test.permissions='sepay.allocate,sepay.view,payments.manage';
+insert into student_payment_requests(id,public_code,student_id,guardian_id,expected_amount_vnd,purchased_sessions,bonus_sessions,calculated_unit_price_vnd,topup_type,transfer_code,created_by)
+values ('88888888-8888-4888-8888-000000000001','PAY-OVER','22222222-2222-4222-8222-222222222224','33333333-3333-4333-8333-333333333334',500000,5,0,100000,'renewal','OVER-REF-1',auth.uid());
+-- Surplus: 1,000,000 against a 500,000 request. The accountant grants 10 sessions.
+update sepay_transactions set amount_vnd=1000000 where bank_transaction_id='manual-7';
+select test_manual_reject('77777777-7777-4777-8777-000000000007',
+ '[{"student_id":"22222222-2222-4222-8222-222222222224","payment_request_id":"88888888-8888-4888-8888-000000000001","allocated_amount_vnd":1000000,"allocated_sessions":3,"bonus_sessions":0}]','PAYMENT_REQUEST_SESSIONS_BELOW_REQUEST');
+select allocate_sepay_tuition_manually('77777777-7777-4777-8777-000000000007',
+ '[{"student_id":"22222222-2222-4222-8222-222222222224","payment_request_id":"88888888-8888-4888-8888-000000000001","allocated_amount_vnd":1000000,"allocated_sessions":10,"bonus_sessions":0}]','Chuyển dư, cộng thêm 5 buổi theo xác nhận của kế toán');
+select test_assert((select status='paid' and paid_amount_vnd=1000000 from student_payment_requests where id='88888888-8888-4888-8888-000000000001'),'surplus settles the request with the full amount received');
+select test_assert((select total_sessions=10 and unit_price_vnd=100000 from student_credit_lots where sepay_transaction_id='77777777-7777-4777-8777-000000000007'),'surplus lot carries the accountant-decided sessions at the effective price');
+select test_assert((select sum(amount_vnd)=1000000 from finance_cashflow_records where sepay_transaction_id='77777777-7777-4777-8777-000000000007'),'receipt keeps the full money received');
+-- Partial: 300,000 then 500,000 against an 800,000 request.
+insert into student_payment_requests(id,public_code,student_id,guardian_id,expected_amount_vnd,purchased_sessions,bonus_sessions,calculated_unit_price_vnd,topup_type,transfer_code,created_by)
+values ('88888888-8888-4888-8888-000000000002','PAY-PART','22222222-2222-4222-8222-222222222224','33333333-3333-4333-8333-333333333334',800000,8,0,100000,'renewal','PART-REF-1',auth.uid());
+update sepay_transactions set amount_vnd=300000 where bank_transaction_id='manual-8';
+select allocate_sepay_tuition_manually('77777777-7777-4777-8777-000000000008',
+ '[{"student_id":"22222222-2222-4222-8222-222222222224","payment_request_id":"88888888-8888-4888-8888-000000000002","allocated_amount_vnd":300000,"allocated_sessions":3,"bonus_sessions":0}]','Phụ huynh trả trước một phần');
+select test_assert((select status='partially_paid' and paid_amount_vnd=300000 and paid_at is null from student_payment_requests where id='88888888-8888-4888-8888-000000000002'),'partial payment keeps the request open with the amount received');
+select test_manual_reject('77777777-7777-4777-8777-000000000009',
+ '[{"student_id":"22222222-2222-4222-8222-222222222224","allocated_amount_vnd":1000000,"allocated_sessions":10}]','STUDENT_HAS_OPEN_PAYMENT_REQUEST');
+update sepay_transactions set amount_vnd=500000 where bank_transaction_id='manual-9';
+select allocate_sepay_tuition_manually('77777777-7777-4777-8777-000000000009',
+ '[{"student_id":"22222222-2222-4222-8222-222222222224","payment_request_id":"88888888-8888-4888-8888-000000000002","allocated_amount_vnd":500000,"allocated_sessions":5,"bonus_sessions":0}]','Phụ huynh trả nốt phần còn lại');
+select test_assert((select status='paid' and paid_amount_vnd=800000 and paid_at is not null from student_payment_requests where id='88888888-8888-4888-8888-000000000002'),'second transfer completes the request');
+select test_assert((select sum(delta_sessions)=8 from student_session_ledger_entries where metadata->>'payment_request_id'='88888888-8888-4888-8888-000000000002'),'both transfers credit the sessions the accountant granted');
+-- Cancellation.
+insert into student_payment_requests(id,public_code,student_id,guardian_id,expected_amount_vnd,purchased_sessions,bonus_sessions,calculated_unit_price_vnd,topup_type,transfer_code,created_by)
+values ('88888888-8888-4888-8888-000000000003','PAY-CANCEL','22222222-2222-4222-8222-222222222224','33333333-3333-4333-8333-333333333334',200000,2,0,100000,'renewal','CANCEL-REF-1',auth.uid());
+select cancel_payment_request('88888888-8888-4888-8888-000000000003','Tạo nhầm phiếu');
+select test_assert((select status='cancelled' and cancelled_at is not null and cancellation_reason='Tạo nhầm phiếu' from student_payment_requests where id='88888888-8888-4888-8888-000000000003'),'pending request can be cancelled with a reason');
+do $$begin
+ begin perform cancel_payment_request('88888888-8888-4888-8888-000000000002','again');raise exception 'should reject';
+ exception when others then if sqlerrm<>'PAYMENT_REQUEST_NOT_PENDING' then raise;end if;end;
+ begin perform cancel_payment_request((select payment_request_id from tuition_collection_items where payment_request_id is not null limit 1),'linked');raise exception 'should reject';
+ exception when others then if sqlerrm not in ('PAYMENT_REQUEST_NOT_PENDING','PAYMENT_REQUEST_LINKED_TO_TUITION_ITEM') then raise;end if;end;
+end;$$;
+select test_assert(exists(select 1 from audit_logs where action='payment_request_cancelled' and entity_id='88888888-8888-4888-8888-000000000003'),'cancellation is audited');
+rollback;

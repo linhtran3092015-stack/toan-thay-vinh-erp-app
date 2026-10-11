@@ -40,6 +40,7 @@ export default async function PaymentRequestsPage() {
 
   return (
     <PaymentRequestDirectory
+      canCancelPaymentRequests={permissionResult.permissions.includes("payments.manage")}
       canCreatePaymentRequests={
         permissionResult.permissions.includes("payments.create_request") ||
         permissionResult.permissions.includes("payments.manage")

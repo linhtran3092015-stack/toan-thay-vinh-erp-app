@@ -111,16 +111,17 @@ function AllocationDialog({ titleId, transaction, readOnly, onClose, trigger }: 
                 updateRow(index, { requestId: e.target.value, amount: request ? String(request.amountVnd) : "", sessions: request ? String(request.sessions) : "", bonus: request ? String(request.bonusSessions) : "0" });
               }}>
                 <option value="">Chọn yêu cầu chưa thanh toán</option>
-                {row.student.requests.map((request) => <option key={request.id} value={request.id} disabled={request.status !== "pending" || request.topupType !== (transaction.accountPurpose === "renewal" ? "renewal" : "new")}>
+                {row.student.requests.map((request) => <option key={request.id} value={request.id} disabled={request.topupType !== (transaction.accountPurpose === "renewal" ? "renewal" : "new")}>
                   {request.code} · {money(request.amountVnd)} · {request.sessions} buổi{request.status === "partially_paid" ? " · Đã thanh toán một phần" : ""}{request.topupType !== (transaction.accountPurpose === "renewal" ? "renewal" : "new") ? " · Khác loại tài khoản nhận" : ""}
                 </option>)}
               </select>
               <span className="text-caption text-text-muted">Giữ nguyên tiền và số buổi của yêu cầu. Yêu cầu đã thanh toán một phần cần xử lý riêng.</span>
             </label> : <p className="text-secondary">Chưa có yêu cầu thanh toán: nhập tiền và số buổi theo học phí đã thống nhất.</p>}
             <div className="grid gap-3 sm:grid-cols-3">
-              <label className="text-label">Số tiền (đ) · {row.student.publicCode}<input type="number" min="1" max="1000000000000" step="1" className={inputClass} value={row.amount} disabled={busy || row.student.requests.length > 0} onChange={(e) => updateRow(index, { amount: e.target.value })} /></label>
-              <label className="text-label">Số buổi mua · {row.student.publicCode}<input type="number" min="1" max="100000" step="1" className={inputClass} value={row.sessions} disabled={busy || row.student.requests.length > 0} onChange={(e) => updateRow(index, { sessions: e.target.value })} /></label>
-              <label className="text-label">Số buổi tặng · {row.student.publicCode}<input type="number" min="0" max="100000" step="1" className={inputClass} value={row.bonus} disabled={busy || row.student.requests.length > 0} onChange={(e) => updateRow(index, { bonus: e.target.value })} /></label>
+              <label className="text-label">Số tiền (đ) · {row.student.publicCode}<input type="number" min="1" max="1000000000000" step="1" className={inputClass} value={row.amount} disabled={busy} onChange={(e) => updateRow(index, { amount: e.target.value })} /></label>
+              <label className="text-label">Số buổi mua · {row.student.publicCode}<input type="number" min="1" max="100000" step="1" className={inputClass} value={row.sessions} disabled={busy} onChange={(e) => updateRow(index, { sessions: e.target.value })} /></label>
+              <label className="text-label">Số buổi tặng · {row.student.publicCode}<input type="number" min="0" max="100000" step="1" className={inputClass} value={row.bonus} disabled={busy} onChange={(e) => updateRow(index, { bonus: e.target.value })} /></label>
+              {row.requestId ? <p className="sm:col-span-3 text-caption text-text-muted">Chuyển <strong>đúng</strong> số tiền → giữ số buổi theo phiếu. Chuyển <strong>nhiều hơn</strong> → phiếu thanh toán đủ, bạn quyết định tổng số buổi cộng (không ít hơn số buổi trên phiếu). Chuyển <strong>ít hơn</strong> → phiếu còn nợ phần còn lại và vẫn mở cho lần chuyển sau.</p> : null}
             </div>
             {Number(row.sessions) > 0 ? <p className="text-caption text-text-muted">Đơn giá quy đổi: {money(Math.floor(Number(row.amount) / Number(row.sessions)))}/buổi. Số tiền thu được giữ nguyên khi đơn giá có phần lẻ.</p> : null}
             <Button size="sm" variant="ghost" onClick={() => setRows((current) => current.filter((_, i) => i !== index))}>Bỏ {row.student.publicCode}</Button>

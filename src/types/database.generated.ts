@@ -7077,6 +7077,40 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cancel_payment_request: {
+        Args: { p_reason: string; p_request_id: string }
+        Returns: {
+          bonus_sessions: number
+          calculated_unit_price_vnd: number
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          created_at: string
+          created_by: string | null
+          crm_case_id: string | null
+          expected_amount_vnd: number
+          guardian_id: string | null
+          id: string
+          notes: string | null
+          paid_amount_vnd: number
+          paid_at: string | null
+          public_code: string
+          purchased_sessions: number
+          qr_payload_url: string | null
+          status: string
+          student_id: string | null
+          superseded_by_request_id: string | null
+          topup_type: string
+          transfer_code: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "student_payment_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       change_academic_year_status: {
         Args: {
           p_academic_year_id: string

@@ -3,18 +3,24 @@ import Link from "next/link";
 
 import { DataTableFrame } from "@/components/patterns/data-table-frame";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
+import { PaymentRequestCancelDialog } from "@/features/finance/components/payment-request-cancel-dialog";
 import { PaymentRequestStatusBadge } from "@/features/finance/components/payment-request-status-badge";
 import type { PaymentRequestReadModel } from "@/features/finance/read-models";
 
 interface PaymentRequestTableProps {
+  canCancel?: boolean;
   items: PaymentRequestReadModel[];
 }
 
-export function PaymentRequestTable({ items }: PaymentRequestTableProps) {
+function canCancelRequest(item: PaymentRequestReadModel): boolean {
+  return item.status === "pending" && item.paidAmountVnd === 0;
+}
+
+export function PaymentRequestTable({ canCancel = false, items }: PaymentRequestTableProps) {
   return (
     <div className="payment-request-results-work-area">
       <DataTableFrame
-        body={items.map((item) => <PaymentRequestTableRow item={item} key={item.id} />)}
+        body={items.map((item) => <PaymentRequestTableRow canCancel={canCancel} item={item} key={item.id} />)}
         caption="Danh sách yêu cầu thanh toán"
         className="payment-request-directory-table"
         header={(
@@ -38,13 +44,13 @@ export function PaymentRequestTable({ items }: PaymentRequestTableProps) {
         className="payment-request-directory-record-list"
         label="Danh sách yêu cầu thanh toán"
       >
-        {items.map((item) => <PaymentRequestRecord item={item} key={item.id} />)}
+        {items.map((item) => <PaymentRequestRecord canCancel={canCancel} item={item} key={item.id} />)}
       </ResponsiveRecordList>
     </div>
   );
 }
 
-function PaymentRequestTableRow({ item }: { item: PaymentRequestReadModel }) {
+function PaymentRequestTableRow({ canCancel, item }: { canCancel: boolean; item: PaymentRequestReadModel }) {
   return (
     <tr className="transition-colors hover:bg-[var(--table-row-hover)]">
       <TableCell className="w-[122px]">
@@ -75,22 +81,25 @@ function PaymentRequestTableRow({ item }: { item: PaymentRequestReadModel }) {
       <TableCell className="w-[150px] break-all font-mono text-caption font-semibold text-action-link">{item.transferCode}</TableCell>
       <TableCell className="w-[150px]"><PaymentRequestStatusBadge status={item.status} /></TableCell>
       <TableCell className="w-[116px] tabular-nums text-secondary text-text-muted">{formatDate(item.createdAt)}</TableCell>
-      <TableCell className="w-[120px] text-right">
-        {item.studentId ? (
-          <Link
-            aria-label={`Mở hồ sơ học viên ${item.studentFullName}`}
-            className="inline-flex h-8 items-center justify-center rounded-md px-2 text-control font-semibold text-action-link hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
-            href={`/students/${item.studentId}`}
-          >
-            Mở hồ sơ
-          </Link>
-        ) : <span className="text-caption text-text-subtle">Không có</span>}
+      <TableCell className="w-[170px] text-right">
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          {item.studentId ? (
+            <Link
+              aria-label={`Mở hồ sơ học viên ${item.studentFullName}`}
+              className="inline-flex h-8 items-center justify-center rounded-md px-2 text-control font-semibold text-action-link hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+              href={`/students/${item.studentId}`}
+            >
+              Mở hồ sơ
+            </Link>
+          ) : <span className="text-caption text-text-subtle">Không có</span>}
+          {canCancel && canCancelRequest(item) ? <PaymentRequestCancelDialog item={item} /> : null}
+        </div>
       </TableCell>
     </tr>
   );
 }
 
-function PaymentRequestRecord({ item }: { item: PaymentRequestReadModel }) {
+function PaymentRequestRecord({ canCancel, item }: { canCancel: boolean; item: PaymentRequestReadModel }) {
   return (
     <article className="rounded-lg border border-border-subtle bg-surface-base px-4 py-3" role="listitem">
       <div className="flex items-start justify-between gap-3">
@@ -117,6 +126,11 @@ function PaymentRequestRecord({ item }: { item: PaymentRequestReadModel }) {
         >
           Mở hồ sơ học viên
         </Link>
+      ) : null}
+      {canCancel && canCancelRequest(item) ? (
+        <div className="mt-2 [&>button]:min-h-11 [&>button]:w-full">
+          <PaymentRequestCancelDialog item={item} />
+        </div>
       ) : null}
     </article>
   );

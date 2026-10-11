@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import type {
   AllocatePaymentInput,
@@ -51,6 +52,14 @@ function getFinanceRpcErrorMessage(message: string): string {
 
     AUTHENTICATION_REQUIRED:
       "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+
+    PAYMENT_REQUEST_NOT_FOUND: "Không tìm thấy phiếu thu.",
+    PAYMENT_REQUEST_NOT_PENDING:
+      "Chỉ hủy được phiếu đang chờ và chưa thu đồng nào.",
+    PAYMENT_REQUEST_LINKED_TO_TUITION_ITEM:
+      "Phiếu này thuộc một kỳ thu học phí đã khóa. Hãy tái phát hành phiếu học phí thay vì hủy.",
+    PAYMENTS_MANAGE_PERMISSION_DENIED:
+      "Tài khoản hiện tại không có quyền hủy phiếu thu.",
 
     EMPTY_ALLOCATIONS:
       "Vui lòng chọn ít nhất 1 học viên để phân bổ học phí.",
@@ -313,5 +322,48 @@ export async function setFinanceOrderReviewAction(
       message: "Không thể cập nhật xác nhận đơn hàng. Vui lòng thử lại sau.",
       status: "error",
     };
+  }
+}
+
+const cancelPaymentRequestSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(3, "Nhập lý do hủy ít nhất 3 ký tự.")
+    .max(1000, "Lý do hủy không được vượt quá 1.000 ký tự."),
+  requestId: z.string().uuid("Phiếu thu không hợp lệ."),
+});
+
+export async function cancelPaymentRequestAction(input: {
+  reason: string;
+  requestId: string;
+}): Promise<FinanceActionResultState> {
+  const permissionResult = await getDatabasePermissions();
+  if (!permissionResult.ok || !permissionResult.permissions.includes("payments.manage")) {
+    return createErrorState("Tài khoản hiện tại không có quyền hủy phiếu thu.");
+  }
+
+  const parsed = cancelPaymentRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return createErrorState(
+      "Vui lòng kiểm tra lý do hủy phiếu.",
+      parsed.error.flatten().fieldErrors,
+    );
+  }
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.rpc("cancel_payment_request", {
+      p_reason: parsed.data.reason,
+      p_request_id: parsed.data.requestId,
+    });
+
+    if (error) return createErrorState(getFinanceRpcErrorMessage(error.message));
+
+    revalidatePath("/finance");
+    revalidatePath("/finance/payment-requests");
+    return { id: parsed.data.requestId, message: "Đã hủy phiếu thu.", status: "success" };
+  } catch {
+    return createErrorState("Không thể kết nối hệ thống tài chính.");
   }
 }

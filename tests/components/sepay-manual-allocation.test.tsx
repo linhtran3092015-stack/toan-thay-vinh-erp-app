@@ -46,14 +46,16 @@ describe("manual SePay allocations",()=>{
   await waitFor(()=>expect(allocateSepayTuitionAction).toHaveBeenCalledWith({transactionId:tx.id,reason:"Đã đối chiếu phụ huynh",allocations:[{studentId:student.id,paymentRequestId:null,amountVnd:1000000,sessions:10,bonusSessions:1}]}));
   expect(refresh).toHaveBeenCalled();
  });
- it("locks sessions to an existing request and preserves input after stale request error",async()=>{
+ it("prefills sessions from an existing request, keeps them editable for partial/surplus settlement, and preserves input after stale request error",async()=>{
   const request={id:"93000000-0000-4000-8000-000000000001",code:"PAY-001",amountVnd:1000000,sessions:8,bonusSessions:0,topupType:"renewal" as const,status:"pending" as const};
   vi.mocked(searchAllocationStudentsAction).mockResolvedValue({ok:true,data:[{...student,requests:[request]}]});
   vi.mocked(allocateSepayTuitionAction).mockResolvedValue({ok:false,message:"Yêu cầu đã thay đổi"});
   render(<SepayManualAllocation transaction={tx} canAllocate/>);await chooseStudent();
-  expect(screen.getByLabelText("Số buổi mua · HV001")).toBeDisabled();
   fireEvent.change(screen.getByRole("combobox"),{target:{value:request.id}});
   expect(screen.getByLabelText("Số buổi mua · HV001")).toHaveValue(8);
+  // Since 20261012140000 the accountant may settle a request with a different amount (surplus / partial).
+  expect(screen.getByLabelText("Số buổi mua · HV001")).toBeEnabled();
+  expect(screen.getByText(/Chuyển.*nhiều hơn/)).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Lý do phân bổ"),{target:{value:"Khớp theo yêu cầu"}});
   fireEvent.click(screen.getByRole("button",{name:"Kiểm tra phân bổ"}));fireEvent.click(screen.getByRole("button",{name:"Xác nhận phân bổ"}));
   expect(await screen.findByRole("alert")).toHaveTextContent("Yêu cầu đã thay đổi");
