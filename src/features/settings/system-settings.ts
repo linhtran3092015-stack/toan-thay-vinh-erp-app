@@ -8,6 +8,12 @@ export const SYSTEM_SETTING_DEFAULTS = {
   "center.address": "",
   "coaching.default_public_link_expiry_days": 7,
   "sessions.auto_lock_after_days": 3,
+  "zalo.center_account_id": "",
+  "zalo.center_account_name": "",
+  "zalo.absence_message_enabled": "on",
+  "zalo.comment_message_enabled": "on",
+  "zalo.absence_template": "{center} thông báo: {student} vắng buổi học {class} ngày {date} ({time}) không phép. Phụ huynh vui lòng phản hồi để trung tâm sắp xếp học bù.",
+  "zalo.comment_template": "{center} - nhận xét buổi {date} lớp {class} của {student}: {comment}{scores}",
 } as const;
 
 export type SystemSettingKey = keyof typeof SYSTEM_SETTING_DEFAULTS;

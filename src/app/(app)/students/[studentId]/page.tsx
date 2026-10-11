@@ -7,6 +7,7 @@ import { getStudentDetail } from "@/features/students/data";
 import { getStudentEnrollmentUiModel } from "@/features/students/enrollment/student-enrollment-data";
 import { getStudentLedgerSummary } from "@/features/students/ledger-data";
 import { getStudentTuitionProfile } from "@/features/students/tuition-profile-data";
+import { StudentZaloGroupCard } from "@/features/parent-messages/components/student-zalo-group-card";
 import { DatabaseStudentDetailPage } from "@/features/students/detail/database-student-detail-page";
 import { withStudentDirectoryQuery } from "@/features/students/student-directory-url-state";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
@@ -128,6 +129,7 @@ export default async function StudentDetailRoute({
     <div className="space-y-5">
     <Suspense fallback={<p>Đang tải chăm sóc học viên…</p>}><StudentCareDashboardCard studentId={studentId} /></Suspense>
     <DatabaseStudentDetailPage
+      zaloGroupCard={<StudentZaloGroupCard canUpdate={canUpdateStudent} studentId={detailResult.detail.id} studentName={detailResult.detail.fullName} />}
       canUpdateStudent={canUpdateStudent}
       canViewClasses={canViewClasses}
       canViewGuardians={canViewGuardians}

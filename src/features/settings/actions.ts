@@ -53,6 +53,12 @@ const updateSystemSettingsSchema = z.object({
   defaultPublicLinkExpiryDays: z.number().int().min(1, "Thời hạn tối thiểu là 1 ngày.").max(90, "Thời hạn tối đa là 90 ngày."),
   displayName: z.string().trim().min(1, "Bắt buộc nhập tên trung tâm.").max(160),
   sessionAutoLockAfterDays: z.number().int().min(0, "Số ngày tự khóa tối thiểu là 0 (tắt).").max(30, "Số ngày tự khóa tối đa là 30."),
+  zaloAbsenceMessageEnabled: z.boolean(),
+  zaloAbsenceTemplate: z.string().trim().min(1, "Bắt buộc nhập mẫu tin vắng không phép.").max(1000),
+  zaloCenterAccountId: z.string().trim().max(200),
+  zaloCenterAccountName: z.string().trim().max(200),
+  zaloCommentMessageEnabled: z.boolean(),
+  zaloCommentTemplate: z.string().trim().min(1, "Bắt buộc nhập mẫu tin nhận xét.").max(1000),
   teacherDisplayName: z.string().trim().min(1, "Bắt buộc nhập tên giáo viên / thương hiệu.").max(160),
 });
 
@@ -360,6 +366,12 @@ export async function updateSystemSettingsAction(input: UpdateSystemSettingsInpu
       "center.display_name": parsed.data.displayName,
       "coaching.default_public_link_expiry_days": parsed.data.defaultPublicLinkExpiryDays,
       "sessions.auto_lock_after_days": parsed.data.sessionAutoLockAfterDays,
+      "zalo.absence_message_enabled": parsed.data.zaloAbsenceMessageEnabled ? "on" : "off",
+      "zalo.absence_template": parsed.data.zaloAbsenceTemplate,
+      "zalo.center_account_id": parsed.data.zaloCenterAccountId,
+      "zalo.center_account_name": parsed.data.zaloCenterAccountName,
+      "zalo.comment_message_enabled": parsed.data.zaloCommentMessageEnabled ? "on" : "off",
+      "zalo.comment_template": parsed.data.zaloCommentTemplate,
       "teacher.display_name": parsed.data.teacherDisplayName,
     } });
     if (error) return createErrorState(getRpcErrorMessage(error.message));
@@ -367,6 +379,7 @@ export async function updateSystemSettingsAction(input: UpdateSystemSettingsInpu
     revalidatePath("/settings/general");
     revalidatePath("/coaching");
     revalidatePath("/sessions");
+    revalidatePath("/parent-messages");
     return { message: "Đã lưu cài đặt hệ thống.", status: "success" };
   } catch {
     return createErrorState("Không thể kết nối hệ thống cài đặt.");

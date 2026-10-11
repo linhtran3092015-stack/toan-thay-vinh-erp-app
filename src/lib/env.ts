@@ -165,3 +165,22 @@ export function getAlertWebhookUrl(): string | null {
     return null;
   }
 }
+
+export interface ZaloCrmEnv {
+  ZALOCRM_API_KEY: string;
+  ZALOCRM_BASE_URL: string;
+}
+
+/** ZaloCRM public API (X-Api-Key). Null when the integration is not configured. */
+export function getZaloCrmEnv(): ZaloCrmEnv | null {
+  const baseUrl = process.env.ZALOCRM_BASE_URL?.trim().replace(/\/+$/, "");
+  const apiKey = process.env.ZALOCRM_API_KEY?.trim();
+  if (!baseUrl || !apiKey) return null;
+  try {
+    const url = new URL(baseUrl);
+    if (url.protocol !== "https:" && url.hostname !== "localhost") return null;
+  } catch {
+    return null;
+  }
+  return { ZALOCRM_API_KEY: apiKey, ZALOCRM_BASE_URL: baseUrl };
+}

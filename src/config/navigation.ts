@@ -68,6 +68,12 @@ export const navigationDomains: readonly NavigationDomain[] = [
       },
       {
         available: true,
+        href: "/parent-messages",
+        label: "Tin nhắn phụ huynh",
+        permission: "attendance.view",
+      },
+      {
+        available: true,
         href: "/learning-results",
         label: "Kết quả học tập",
         permission: "results.view",

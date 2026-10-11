@@ -35,6 +35,7 @@ interface DatabaseStudentDetailPageProps {
   enrollmentUiModel: StudentEnrollmentUiModel;
   ledgerSummary?: StudentLedgerReadModel | null;
   tuitionProfile?: StudentTuitionProfile;
+  zaloGroupCard?: React.ReactNode;
 }
 
 export function DatabaseStudentDetailPage({
@@ -50,6 +51,7 @@ export function DatabaseStudentDetailPage({
   enrollmentUiModel,
   ledgerSummary = null,
   tuitionProfile,
+  zaloGroupCard,
 }: DatabaseStudentDetailPageProps) {
   const activeClass = detail.activeEnrollment?.classInfo;
   const learningLevel =
@@ -103,6 +105,8 @@ export function DatabaseStudentDetailPage({
             studentId={detail.id}
             studentName={detail.fullName}
           />
+
+          {zaloGroupCard}
 
           {canViewLedger ? (
             <StudentSessionLedgerCard summary={ledgerSummary} />

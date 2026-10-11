@@ -341,7 +341,7 @@ export async function getStudentDirectory(
       supabase
         .from("students")
         .select(
-          "id, public_code, full_name, nickname, birth_year, current_grade, province_city, learning_level, registered_mode, learning_goal, lifecycle_status, official_start_date, internal_notes, created_at, created_by, updated_at",
+          "id, public_code, full_name, nickname, birth_year, current_grade, province_city, learning_level, registered_mode, learning_goal, lifecycle_status, official_start_date, internal_notes, created_at, created_by, updated_at, zalo_group_thread_id, zalo_account_id, zalo_group_name_snapshot, zalo_group_linked_at, zalo_group_linked_by",
         )
         .order("full_name", { ascending: true })
         .order("id", { ascending: true })
@@ -467,7 +467,7 @@ export async function getStudentDetail(
     await supabase
       .from("students")
       .select(
-        "id, public_code, full_name, nickname, birth_year, current_grade, province_city, learning_level, registered_mode, learning_goal, lifecycle_status, official_start_date, internal_notes, created_at, created_by, updated_at",
+        "id, public_code, full_name, nickname, birth_year, current_grade, province_city, learning_level, registered_mode, learning_goal, lifecycle_status, official_start_date, internal_notes, created_at, created_by, updated_at, zalo_group_thread_id, zalo_account_id, zalo_group_name_snapshot, zalo_group_linked_at, zalo_group_linked_by",
       )
       .eq("id", studentId)
       .maybeSingle();

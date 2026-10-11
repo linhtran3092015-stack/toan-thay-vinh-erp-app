@@ -2,6 +2,16 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.21.0] - 2026-10-13
+
+Tin nhắn phụ huynh qua nhóm Zalo sổ liên lạc (tích hợp ZaloCRM, thay cho kế hoạch Zalo OA/ZNS).
+
+### Added
+- **Hàng đợi tin nhắn phụ huynh** (`/parent-messages`, menu Học vụ): tin được tạo tự động khi điểm danh **vắng không phép** và khi có **nhận xét cuối buổi** (kèm điểm), gửi vào nhóm Zalo sổ liên lạc của học sinh từ **nick trung tâm** qua ZaloCRM. **Trợ giảng kiểm tra, sửa nội dung rồi bấm Gửi**; có bỏ qua kèm lý do, gửi lại khi lỗi, lọc theo trạng thái. Sửa điểm danh hoặc xóa nhận xét thì tin chờ tự bỏ qua; tin chờ quá 3 ngày hết hạn.
+- **Liên kết nhóm sổ liên lạc** trên hồ sơ học sinh theo **mã nhóm Zalo (UID)**, không theo tên: tìm nhóm từ ZaloCRM theo tên/thành viên, một nhóm chỉ gắn một học sinh, nút "Kiểm tra liên kết" đọc lại tên nhóm hiện tại và tình trạng nick, gỡ liên kết có lý do.
+- Cài đặt → Chung: chọn nick trung tâm từ ZaloCRM, bật/tắt từng loại tin, sửa mẫu tin (biến `{center} {student} {class} {date} {time} {comment} {scores}`).
+- Client ZaloCRM (`lib/zalo-crm`), biến môi trường `ZALOCRM_BASE_URL`, `ZALOCRM_API_KEY`. Bản vá ZaloCRM (fork, commit `dc1f3829`): API public lọc nhóm theo tên/nick, tra nhóm theo UID, thành viên nhóm, danh sách nick, gửi tin trả `messageId`.
+
 ## [0.6.20.0] - 2026-10-13
 
 Đợt 2 — nhóm 2e (bảo mật & vận hành).

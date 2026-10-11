@@ -2210,6 +2210,120 @@ export type Database = {
           },
         ]
       }
+      parent_messages: {
+        Row: {
+          attempts: number
+          class_session_id: string | null
+          content: string
+          content_edited_by: string | null
+          created_at: string
+          dedupe_key: string
+          error_message: string | null
+          event_code: string
+          id: string
+          provider_message_id: string | null
+          sent_at: string | null
+          sent_by: string | null
+          skip_reason: string | null
+          skipped_at: string | null
+          skipped_by: string | null
+          source_id: string
+          source_type: string
+          status: string
+          student_id: string
+          thread_id: string
+          thread_type: string
+          updated_at: string
+          zalo_account_id: string
+        }
+        Insert: {
+          attempts?: number
+          class_session_id?: string | null
+          content: string
+          content_edited_by?: string | null
+          created_at?: string
+          dedupe_key: string
+          error_message?: string | null
+          event_code: string
+          id?: string
+          provider_message_id?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          skip_reason?: string | null
+          skipped_at?: string | null
+          skipped_by?: string | null
+          source_id: string
+          source_type: string
+          status?: string
+          student_id: string
+          thread_id: string
+          thread_type?: string
+          updated_at?: string
+          zalo_account_id: string
+        }
+        Update: {
+          attempts?: number
+          class_session_id?: string | null
+          content?: string
+          content_edited_by?: string | null
+          created_at?: string
+          dedupe_key?: string
+          error_message?: string | null
+          event_code?: string
+          id?: string
+          provider_message_id?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          skip_reason?: string | null
+          skipped_at?: string | null
+          skipped_by?: string | null
+          source_id?: string
+          source_type?: string
+          status?: string
+          student_id?: string
+          thread_id?: string
+          thread_type?: string
+          updated_at?: string
+          zalo_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parent_messages_class_session_id_fkey"
+            columns: ["class_session_id"]
+            isOneToOne: false
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parent_messages_content_edited_by_fkey"
+            columns: ["content_edited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parent_messages_sent_by_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parent_messages_skipped_by_fkey"
+            columns: ["skipped_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parent_messages_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_split_allocations: {
         Row: {
           allocated_amount_vnd: number
@@ -5913,6 +6027,11 @@ export type Database = {
           public_code: string
           registered_mode: string | null
           updated_at: string
+          zalo_account_id: string | null
+          zalo_group_linked_at: string | null
+          zalo_group_linked_by: string | null
+          zalo_group_name_snapshot: string | null
+          zalo_group_thread_id: string | null
         }
         Insert: {
           birth_year: number
@@ -5931,6 +6050,11 @@ export type Database = {
           public_code?: string
           registered_mode?: string | null
           updated_at?: string
+          zalo_account_id?: string | null
+          zalo_group_linked_at?: string | null
+          zalo_group_linked_by?: string | null
+          zalo_group_name_snapshot?: string | null
+          zalo_group_thread_id?: string | null
         }
         Update: {
           birth_year?: number
@@ -5949,11 +6073,23 @@ export type Database = {
           public_code?: string
           registered_mode?: string | null
           updated_at?: string
+          zalo_account_id?: string | null
+          zalo_group_linked_at?: string | null
+          zalo_group_linked_by?: string | null
+          zalo_group_name_snapshot?: string | null
+          zalo_group_thread_id?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "students_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_zalo_group_linked_by_fkey"
+            columns: ["zalo_group_linked_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -7642,6 +7778,11 @@ export type Database = {
           public_code: string
           registered_mode: string | null
           updated_at: string
+          zalo_account_id: string | null
+          zalo_group_linked_at: string | null
+          zalo_group_linked_by: string | null
+          zalo_group_name_snapshot: string | null
+          zalo_group_thread_id: string | null
         }
         SetofOptions: {
           from: "*"
@@ -8737,6 +8878,17 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      enqueue_parent_message: {
+        Args: {
+          p_class_session_id: string
+          p_content: string
+          p_event_code: string
+          p_source_id: string
+          p_source_type: string
+          p_student_id: string
+        }
+        Returns: string
+      }
       enroll_student_in_class: {
         Args: {
           p_class_id: string
@@ -8797,6 +8949,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      expire_stale_parent_messages: { Args: never; Returns: number }
       find_sepay_payment_candidates: {
         Args: { p_code: string; p_content: string }
         Returns: string[]
@@ -9239,6 +9392,31 @@ export type Database = {
         Args: { p_month: string; p_position_code?: string }
         Returns: Json
       }
+      get_parent_message_queue: {
+        Args: { p_limit?: number; p_status?: string }
+        Returns: {
+          attempts: number
+          class_code: string
+          class_session_id: string
+          content: string
+          created_at: string
+          error_message: string
+          event_code: string
+          message_id: string
+          sent_at: string
+          sent_by_name: string
+          session_date: string
+          skip_reason: string
+          start_time: string
+          status: string
+          student_id: string
+          student_name: string
+          student_public_code: string
+          thread_id: string
+          zalo_account_id: string
+          zalo_group_name: string
+        }[]
+      }
       get_payroll_dashboard: {
         Args: never
         Returns: {
@@ -9555,6 +9733,43 @@ export type Database = {
           link_id: string
         }[]
       }
+      link_student_zalo_group: {
+        Args: {
+          p_group_name: string
+          p_student_id: string
+          p_thread_id: string
+          p_zalo_account_id: string
+        }
+        Returns: {
+          birth_year: number
+          created_at: string
+          created_by: string | null
+          current_grade: number
+          full_name: string
+          id: string
+          internal_notes: string | null
+          learning_goal: string | null
+          learning_level: string | null
+          lifecycle_status: string
+          nickname: string | null
+          official_start_date: string | null
+          province_city: string | null
+          public_code: string
+          registered_mode: string | null
+          updated_at: string
+          zalo_account_id: string | null
+          zalo_group_linked_at: string | null
+          zalo_group_linked_by: string | null
+          zalo_group_name_snapshot: string | null
+          zalo_group_thread_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "students"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       lock_class_session: {
         Args: { p_class_session_id: string; p_reason: string }
         Returns: {
@@ -9775,6 +9990,10 @@ export type Database = {
         Args: { phone_value: string }
         Returns: string
       }
+      parent_message_vars: {
+        Args: { p_class_session_id: string; p_student_id: string }
+        Returns: Json
+      }
       post_session_balance_import_batch: {
         Args: { p_batch_id: string }
         Returns: {
@@ -9955,6 +10174,45 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_parent_message_result: {
+        Args: {
+          p_error_message?: string
+          p_message_id: string
+          p_provider_message_id?: string
+          p_success: boolean
+        }
+        Returns: {
+          attempts: number
+          class_session_id: string | null
+          content: string
+          content_edited_by: string | null
+          created_at: string
+          dedupe_key: string
+          error_message: string | null
+          event_code: string
+          id: string
+          provider_message_id: string | null
+          sent_at: string | null
+          sent_by: string | null
+          skip_reason: string | null
+          skipped_at: string | null
+          skipped_by: string | null
+          source_id: string
+          source_type: string
+          status: string
+          student_id: string
+          thread_id: string
+          thread_type: string
+          updated_at: string
+          zalo_account_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "parent_messages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       record_session_result: {
         Args: {
           p_class_session_id: string
@@ -10021,6 +10279,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      render_parent_message: {
+        Args: { p_template: string; p_vars: Json }
+        Returns: string
       }
       reopen_payroll_period: {
         Args: { p_payroll_period_id: string; p_reason: string }
@@ -10770,6 +11032,40 @@ export type Database = {
         }
         Returns: number
       }
+      skip_parent_message: {
+        Args: { p_message_id: string; p_reason: string }
+        Returns: {
+          attempts: number
+          class_session_id: string | null
+          content: string
+          content_edited_by: string | null
+          created_at: string
+          dedupe_key: string
+          error_message: string | null
+          event_code: string
+          id: string
+          provider_message_id: string | null
+          sent_at: string | null
+          sent_by: string | null
+          skip_reason: string | null
+          skipped_at: string | null
+          skipped_by: string | null
+          source_id: string
+          source_type: string
+          status: string
+          student_id: string
+          thread_id: string
+          thread_type: string
+          updated_at: string
+          zalo_account_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "parent_messages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       start_class_session: {
         Args: { p_class_session_id: string }
         Returns: {
@@ -10979,6 +11275,10 @@ export type Database = {
         Args: { p_period_month: string }
         Returns: number
       }
+      system_setting_text: {
+        Args: { p_default?: string; p_key: string }
+        Returns: string
+      }
       time_entry_is_verified: { Args: { p_entry_id: string }; Returns: boolean }
       timekeeping_daily_cutoff: {
         Args: { p_staff_id: string }
@@ -11062,6 +11362,38 @@ export type Database = {
       tuition_period_overlaps_locked: {
         Args: { p_ends_on: string; p_period_id: string; p_starts_on: string }
         Returns: boolean
+      }
+      unlink_student_zalo_group: {
+        Args: { p_reason: string; p_student_id: string }
+        Returns: {
+          birth_year: number
+          created_at: string
+          created_by: string | null
+          current_grade: number
+          full_name: string
+          id: string
+          internal_notes: string | null
+          learning_goal: string | null
+          learning_level: string | null
+          lifecycle_status: string
+          nickname: string | null
+          official_start_date: string | null
+          province_city: string | null
+          public_code: string
+          registered_mode: string | null
+          updated_at: string
+          zalo_account_id: string | null
+          zalo_group_linked_at: string | null
+          zalo_group_linked_by: string | null
+          zalo_group_name_snapshot: string | null
+          zalo_group_thread_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "students"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       update_class: {
         Args: {
@@ -11151,6 +11483,40 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "class_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_parent_message_content: {
+        Args: { p_content: string; p_message_id: string }
+        Returns: {
+          attempts: number
+          class_session_id: string | null
+          content: string
+          content_edited_by: string | null
+          created_at: string
+          dedupe_key: string
+          error_message: string | null
+          event_code: string
+          id: string
+          provider_message_id: string | null
+          sent_at: string | null
+          sent_by: string | null
+          skip_reason: string | null
+          skipped_at: string | null
+          skipped_by: string | null
+          source_id: string
+          source_type: string
+          status: string
+          student_id: string
+          thread_id: string
+          thread_type: string
+          updated_at: string
+          zalo_account_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "parent_messages"
           isOneToOne: true
           isSetofReturn: false
         }
