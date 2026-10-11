@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { raiseOpsAlert } from "@/lib/ops-alerts";
+
 import {
   parseSepayWebhookPayloadDetailed,
   toSepayTransactionTimestamp,
@@ -131,10 +133,24 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("SEPAY_WEBHOOK_PROCESSING_FAILED");
+      await raiseOpsAlert(supabase, {
+        code: "sepay_webhook_processing_failed",
+        dedupeKey: `ops.sepay_webhook_processing_failed:${payload.id}`,
+        href: "/finance/sepay?queue=review",
+        message: `Webhook SePay #${payload.id} (${payload.transferAmount.toLocaleString("vi-VN")} ₫) không ghi nhận được: ${error.message}. Dùng Đồng bộ lịch sử SePay để bù.`,
+        title: "Webhook SePay xử lý lỗi",
+      });
       return webhookResponse(false, 500);
     }
   } catch {
     console.error("SEPAY_WEBHOOK_PROCESSING_FAILED");
+    await raiseOpsAlert(supabase, {
+      code: "sepay_webhook_processing_failed",
+      dedupeKey: `ops.sepay_webhook_processing_failed:${payload.id}`,
+      href: "/finance/sepay?queue=review",
+      message: `Webhook SePay #${payload.id} không ghi nhận được do lỗi kết nối cơ sở dữ liệu. Dùng Đồng bộ lịch sử SePay để bù.`,
+      title: "Webhook SePay xử lý lỗi",
+    });
     return webhookResponse(false, 500);
   }
 

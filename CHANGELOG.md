@@ -2,6 +2,21 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.20.0] - 2026-10-13
+
+Đợt 2 — nhóm 2e (bảo mật & vận hành).
+
+### Added
+- **Security headers** cho toàn bộ ứng dụng: Content-Security-Policy (chỉ cho phép chính ứng dụng, Supabase, VietQR, Google Fonts; `frame-ancestors 'none'`), HSTS, nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy (chỉ mở geolocation cho chấm công), COOP.
+- **Cảnh báo vận hành trong ứng dụng**: RPC `raise_ops_alert` (chỉ service role) thông báo cho mọi tài khoản có quyền quản lý cài đặt kèm audit; worker pg_cron `ops-health-check` mỗi 15 phút báo tác vụ nền thất bại, tác vụ không chạy quá 3 giờ, webhook SePay lỗi. Route webhook SePay phát cảnh báo ngay khi ghi nhận thất bại.
+- **Kênh cảnh báo ngoài** tùy chọn qua biến `ALERT_WEBHOOK_URL` (Slack / Zalo / Discord qua bộ chuyển): nhận cảnh báo vận hành và mọi lỗi máy chủ chưa bắt được (`src/instrumentation.ts` ghi JSON cho log drain và POST tới webhook).
+- Workflow **Deploy (after Quality)**: deploy production bằng Vercel CLI chỉ sau khi CI xanh trên `main`; tự bỏ qua khi chưa có secrets. Hướng dẫn bật và tắt auto-deploy Git integration trong `docs/operations/monitoring.md`.
+- Tài liệu `docs/operations/backup-restore.md`: sao lưu, PITR, quy trình khôi phục và diễn tập hàng quý.
+
+### Notes
+- Chưa cài Sentry (tránh thêm SDK và chi phí); log drain + webhook cảnh báo đủ cho quy mô hiện tại, hướng dẫn thêm Sentry khi cần.
+- Cần chủ trung tâm chốt: bật PITR trên Supabase, tạo 3 secrets Vercel trên GitHub và đổi "Ignored Build Step" để deploy đi qua CI.
+
 ## [0.6.19.0] - 2026-10-13
 
 Đợt 2 — nhóm 2d (chấm công 1 chạm, trang chủ theo vai trò).

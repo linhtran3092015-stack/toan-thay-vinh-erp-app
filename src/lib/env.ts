@@ -150,3 +150,18 @@ export function getSepayApiV2Env(): SepayApiV2Env {
     token: result.data.SEPAY_API_TOKEN,
   };
 }
+
+/**
+ * Optional outbound alert webhook (Slack / Discord / Zalo OA / any HTTPS
+ * endpoint accepting JSON). Missing means in-app alerts only.
+ */
+export function getAlertWebhookUrl(): string | null {
+  const value = process.env.ALERT_WEBHOOK_URL?.trim();
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}

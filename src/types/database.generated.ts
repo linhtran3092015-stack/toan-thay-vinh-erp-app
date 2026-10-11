@@ -9880,6 +9880,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      raise_ops_alert: {
+        Args: {
+          p_code: string
+          p_dedupe_key?: string
+          p_href?: string
+          p_message: string
+          p_title: string
+        }
+        Returns: number
+      }
       read_app_branding: { Args: never; Returns: Json }
       read_published_website: { Args: never; Returns: Json }
       read_website_configuration: { Args: never; Returns: Json }
@@ -10620,6 +10630,7 @@ export type Database = {
       run_class_session_auto_lock_worker: { Args: never; Returns: number }
       run_class_session_lock_reminders: { Args: never; Returns: number }
       run_crm_follow_up_reminders: { Args: never; Returns: number }
+      run_ops_health_check: { Args: never; Returns: number }
       run_student_care_worker: { Args: never; Returns: Json }
       run_teaching_assistant_timekeeping_watchdog: {
         Args: never
