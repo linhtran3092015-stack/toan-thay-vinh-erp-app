@@ -10418,6 +10418,10 @@ export type Database = {
         Returns: number
       }
       time_entry_is_verified: { Args: { p_entry_id: string }; Returns: boolean }
+      timekeeping_daily_cutoff: {
+        Args: { p_staff_id: string }
+        Returns: string
+      }
       transfer_crm_case_lead: {
         Args: {
           p_crm_case_id: string

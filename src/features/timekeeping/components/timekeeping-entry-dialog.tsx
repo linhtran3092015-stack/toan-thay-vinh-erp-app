@@ -339,12 +339,12 @@ export function TimekeepingEntryDialog({
               {gpsErrors.length > 0 ? <p className="text-caption text-danger" id={gpsErrorId}>{gpsErrors.join(" ")}</p> : null}
             </fieldset> : null}
 
-            {isOffline ? <fieldset aria-describedby={wifiHelpId} className="grid gap-4 rounded-md border border-border-subtle p-4">
+            {/* Phones cannot read SSID/BSSID, so typed Wi-Fi proves nothing; only
+                show the fields when the owner explicitly requires them. */}
+            {isOffline && attendancePolicy.wifiRequiredForOffline ? <fieldset aria-describedby={wifiHelpId} className="grid gap-4 rounded-md border border-border-subtle p-4">
               <legend className="px-1 text-label text-text-default">Thông tin Wi-Fi</legend>
               <p className="text-secondary text-text-muted" id={wifiHelpId}>
-                {attendancePolicy.wifiRequiredForOffline
-                  ? "Bắt buộc nhập đúng tên Wi-Fi và BSSID đã được Chủ trung tâm đăng ký."
-                  : "Thông tin Wi-Fi là dữ liệu bổ sung, không bắt buộc."}
+                Bắt buộc nhập đúng tên Wi-Fi và BSSID đã được Chủ trung tâm đăng ký.
               </p>
               <FormField error={fieldErrors.wifiSsid?.[0]} id={wifiSsidId} label="Tên mạng Wi-Fi">
                 <input

@@ -22,7 +22,7 @@ function errorMessage(message: string) {
   if (message.includes("NOT_CLOSED")) return "Chờ nhân sự kết thúc ca trước khi duyệt.";
   if (message.includes("OPEN_ENTRY_ALREADY_EXISTS")) return "Bạn đang có ca mở. Vui lòng tải lại trang để check-out.";
   if (message.includes("OPEN_ENTRY_NOT_FOUND") || message.includes("USE_ADJUSTMENT")) return "Ca đã kết thúc hoặc qua ngày. Vui lòng tải lại trang và gửi yêu cầu điều chỉnh công.";
-  if (message.includes("CUTOFF_REACHED")) return "Không thể mở ca mới sau 23:30.";
+  if (message.includes("CUTOFF_REACHED")) return "Không thể mở ca mới sau giờ tự đóng ca (22:30 trợ giảng, 22:45 vị trí khác).";
   return "Chưa ghi nhận được yêu cầu. Vui lòng thử lại hoặc liên hệ quản lý.";
 }
 

@@ -134,7 +134,7 @@ describe("Teaching Assistant Attendance Redesign", () => {
       expect(getClockOutReasonLabel("manual")).toBe("Tự check-out");
       expect(getClockOutReasonLabel("left_geofence")).toBe("Rời khỏi Trung tâm");
       expect(getClockOutReasonLabel("location_lost")).toBe("Mất kết nối vị trí (>90s)");
-      expect(getClockOutReasonLabel("daily_cutoff")).toBe("Hết giờ ca (23:30)");
+      expect(getClockOutReasonLabel("daily_cutoff")).toBe("Hết giờ ca (tự đóng 22:30 / 22:45)");
     });
 
     it("presents open attendance status", () => {

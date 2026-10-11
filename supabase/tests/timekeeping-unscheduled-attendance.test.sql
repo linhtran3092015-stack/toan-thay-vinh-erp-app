@@ -22,10 +22,17 @@ values
 
 select set_config('request.jwt.claim.sub', '13000000-0000-0000-0000-000000000001', true);
 
-select lives_ok(
+-- Since 20261012120000 online attendance requires an assigned shift; an
+-- unscheduled entry can still exist (on-site or admin-created), so seed one.
+select throws_ok(
   $$ select * from public.check_in_time_entry('online', null, null, null, null, null) $$,
-  'a permitted active non-TA can check in with no effective shift'
+  '23514',
+  'TIME_ENTRY_ONLINE_REQUIRES_SCHEDULED_SHIFT',
+  'a non-TA without an effective shift cannot check in online'
 );
+
+insert into public.time_entries (staff_id, work_date, check_in_at, check_in_mode, status)
+values ('13000000-0000-0000-0000-000000000001', (now() at time zone 'Asia/Ho_Chi_Minh')::date, now(), 'offline', 'open');
 
 select ok(
   (

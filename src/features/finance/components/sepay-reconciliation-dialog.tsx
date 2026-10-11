@@ -149,8 +149,10 @@ function SepayReconciliationDialogContent({
   const reasonInputRef = useRef<HTMLTextAreaElement>(null);
 
   const hasIdentityConflict = transaction.matchStatus === "identity_conflict";
-  const canResolveHistory = Boolean(transaction.sepayV2Id)
-    && ["unmatched", "identity_conflict"].includes(transaction.matchStatus);
+  // Any inbound transfer that has not produced money effects can be closed as
+  // "already accounted" or "ignored" — not only API-history imports.
+  const canResolveHistory = ["unmatched", "identity_conflict", "amount_mismatch", "account_purpose_mismatch"]
+    .includes(transaction.matchStatus);
   const expectedTopupType = transaction.accountPurpose === "renewal" ? "renewal" : "new";
 
   const matchingCandidates = useMemo(() => {

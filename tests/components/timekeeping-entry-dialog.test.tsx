@@ -40,12 +40,11 @@ describe("Timekeeping entry dialog", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Xác nhận check-in" });
     expect(screen.getByLabelText("Hình thức")).toHaveValue("offline");
-    expect(screen.getByLabelText("Tên mạng Wi-Fi")).toBeInTheDocument();
-    expect(screen.getByLabelText("BSSID")).toBeInTheDocument();
+    // Wi-Fi fields are hidden unless the owner requires them: phones cannot read SSID/BSSID.
+    expect(screen.queryByLabelText("Tên mạng Wi-Fi")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("BSSID")).not.toBeInTheDocument();
     expect(screen.queryByText(/vị trí hợp lệ|wi-fi hợp lệ|đủ điều kiện chấm công/i)).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Tên mạng Wi-Fi"), { target: { value: "Campus" } });
-    fireEvent.change(screen.getByLabelText("BSSID"), { target: { value: "AA:BB:CC:DD:EE:FF" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận check-in" }));
 
     await waitFor(() => expect(actions.checkInTimeEntryAction).toHaveBeenCalledWith({
@@ -53,8 +52,8 @@ describe("Timekeeping entry dialog", () => {
       gpsLatitude: null,
       gpsLongitude: null,
       mode: "offline",
-      wifiBssid: "AA:BB:CC:DD:EE:FF",
-      wifiSsid: "Campus",
+      wifiBssid: "",
+      wifiSsid: "",
     }));
     expect(actions.checkInTimeEntryAction).toHaveBeenCalledOnce();
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());

@@ -2,6 +2,20 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.11.0] - 2026-10-12
+
+Đợt 1 — nhóm 1a (chấm công & kiểm soát).
+
+### Changed
+- Ca quên check-out tự đóng lúc **22:30 với trợ giảng, 22:45 với các vai trò còn lại** (trước đây 23:30 cho tất cả); không ai mở được ca mới sau mốc này. Ca tự đóng vẫn tính lương tới mốc đó (quyết định chủ trung tâm 11/10/2026).
+- **Check-in online chỉ được khi có ca trong phân công lịch** và trong khoảng 15 phút trước/sau ca; không có ca xếp thì không check-in online được. Check-in tại trung tâm vẫn xác minh GPS như cũ.
+- Hộp thoại chấm công ẩn ô Wi-Fi SSID/BSSID (điện thoại không đọc được, nhập tay không chứng minh gì); chỉ hiện khi chủ trung tâm bật yêu cầu Wi-Fi trong cấu hình xác minh.
+- Tạm ứng lương: không được tự đối soát hoặc tự duyệt yêu cầu của chính mình.
+- Giao dịch SePay chưa khớp từ **mọi nguồn** (kể cả webhook) đều có thể đánh dấu "đã hạch toán trước đây" hoặc "bỏ qua" kèm lý do, kể cả khi lệch số tiền/lệch tài khoản; trước đây chỉ áp dụng cho dòng nhập từ API lịch sử nên tiền không phải học phí kẹt mãi ở hàng đợi.
+
+### Database
+- `20261012120000_timekeeping_role_cutoff_and_online_shift_window.sql`, `20261012120100_salary_advance_no_self_decision.sql`, `20261012120200_sepay_exception_resolution_all_sources.sql`.
+
 ## [0.6.10.0] - 2026-10-11
 
 ### Added

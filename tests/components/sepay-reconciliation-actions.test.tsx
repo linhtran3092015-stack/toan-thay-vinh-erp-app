@@ -231,11 +231,13 @@ describe("SePay reconciliation UI and dialog interactions", () => {
     expect(reasonInput).toHaveValue("Đã đối chiếu sổ phụ chi tiết");
   });
 
-  it.each(["amount_mismatch", "account_purpose_mismatch"] as const)("does not offer history resolution for %s", (matchStatus) => {
+  // Since 20261012120200 any unmatched inbound transfer, including amount or
+  // account mismatches, can be closed as already accounted or ignored.
+  it.each(["amount_mismatch", "account_purpose_mismatch"] as const)("offers exception resolution for %s", (matchStatus) => {
     render(<SepayReconciliationActions candidates={[]} defaultOpen transaction={{ ...transaction, matchStatus }} />);
     expect(screen.getByRole("button", { name: "Khớp và ghi nhận học phí" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Đã hạch toán trước đây" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Bỏ qua" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Đã hạch toán trước đây" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Bỏ qua" })).toBeInTheDocument();
   });
 
   it("resets state when switching to a different transaction", () => {

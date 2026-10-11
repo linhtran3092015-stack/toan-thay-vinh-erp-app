@@ -69,6 +69,8 @@ function getAdvanceRpcErrorMessage(message: string): string {
     SALARY_ADVANCE_REJECTION_REASON_REQUIRED: "Cần nêu lý do từ chối.",
     SALARY_ADVANCE_REQUEST_NOTE_INVALID: "Lý do tạm ứng không hợp lệ.",
     SALARY_ADVANCE_REVIEW_DECISION_INVALID: "Quyết định đối soát không hợp lệ.",
+    SALARY_ADVANCE_SELF_DECISION_FORBIDDEN:
+      "Không thể tự đối soát hoặc tự duyệt tạm ứng của chính mình.",
   };
 
   for (const [databaseMessage, userMessage] of Object.entries(knownMessages)) {

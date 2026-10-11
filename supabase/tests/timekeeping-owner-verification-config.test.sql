@@ -119,6 +119,18 @@ select ok(
   'check-out Wi-Fi evidence is persisted'
 );
 
+-- Online attendance needs an assigned shift (20261012120000); give the staff
+-- member an all-day shift for today so only the GPS/Wi-Fi exemption is tested.
+insert into public.work_shifts (id, code, name, start_time, end_time)
+values ('34000000-0000-0000-0000-000000000001', 'VERIFYONL', 'Verification online shift', '00:00', '23:59');
+insert into public.staff_shift_assignments (staff_id, work_shift_id, weekday, effective_from)
+values (
+  '14000000-0000-0000-0000-000000000002',
+  '34000000-0000-0000-0000-000000000001',
+  extract(isodow from (now() at time zone 'Asia/Ho_Chi_Minh'))::smallint,
+  (now() at time zone 'Asia/Ho_Chi_Minh')::date
+);
+
 select lives_ok(
   $$ select * from public.check_in_time_entry('online', null, null, null, null, null) $$,
   'online attendance remains exempt from on-site GPS and Wi-Fi policy'

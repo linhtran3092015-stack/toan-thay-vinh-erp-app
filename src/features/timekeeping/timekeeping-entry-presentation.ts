@@ -46,7 +46,7 @@ export function getClockOutReasonLabel(reason?: string | null): string {
     case "location_lost":
       return "Mất kết nối vị trí (>90s)";
     case "daily_cutoff":
-      return "Hết giờ ca (23:30)";
+      return "Hết giờ ca (tự đóng 22:30 / 22:45)";
     default:
       return "Hệ thống tự động";
   }

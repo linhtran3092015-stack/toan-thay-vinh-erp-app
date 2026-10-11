@@ -58,7 +58,13 @@ function getRpcErrorMessage(message: string, isCheckIn: boolean): string {
     TIME_ENTRY_REQUIRES_ACTIVE_STAFF:
       "Chỉ nhân sự đang làm việc mới có thể chấm công.",
     TIME_ENTRY_TEACHING_ASSISTANT_CHECKIN_CUTOFF_REACHED:
-      "Trợ giảng không thể bắt đầu chấm công sau 23:30.",
+      "Không thể bắt đầu chấm công sau giờ tự đóng ca (22:30 với trợ giảng, 22:45 với vị trí khác).",
+    TIME_ENTRY_CHECKIN_CUTOFF_REACHED:
+      "Không thể bắt đầu chấm công sau giờ tự đóng ca (22:30 với trợ giảng, 22:45 với vị trí khác).",
+    TIME_ENTRY_ONLINE_REQUIRES_SCHEDULED_SHIFT:
+      "Chấm công online chỉ được khi bạn có ca trong phân công lịch hôm nay. Hãy liên hệ quản lý để xếp ca.",
+    TIME_ENTRY_ONLINE_OUTSIDE_SHIFT_WINDOW:
+      "Chưa đến giờ ca hoặc ca đã kết thúc. Chấm công online chỉ nhận trong khoảng 15 phút trước và sau ca xếp.",
     TIME_ENTRY_WIFI_EVIDENCE_INVALID: "Dữ liệu Wi-Fi chưa hợp lệ.",
     TIME_ENTRY_WIFI_NOT_ALLOWED:
       "Wi-Fi không khớp danh sách mạng Trung tâm đã đăng ký.",
