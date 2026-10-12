@@ -20,7 +20,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { RosterSearch, matchesRosterSearch } from "@/features/sessions/components/roster-search";
 
 import { Badge } from "@/components/ui/badge";
-import { DataTableFrame } from "@/components/patterns/data-table-frame";
+import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
+import { AttendanceStatusGroup, attendanceStatusLabels, attendanceStatusTones } from "@/features/sessions/components/attendance-status-group";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { ResultBanner } from "@/components/shared/result-banner";
 import type { AdditionalStudyCandidate } from "@/features/sessions/attendance-data";
@@ -206,7 +207,8 @@ export function SessionAttendanceManagement({
     );
   };
 
-  const quickPresent = (participant: SessionParticipantReadModel) => {
+  /** One tap saves the chosen status with the registered learning mode; notes and mode changes go through the editor. */
+  const quickMark = (participant: SessionParticipantReadModel, attendanceStatus: SessionAttendanceStatus) => {
     if (!canEdit || isPending || participant.attendanceId) return;
     setActionState(null);
     startTransition(async () => {
@@ -214,7 +216,7 @@ export function SessionAttendanceManagement({
         const result = await markSessionAttendanceAction({
           classSessionId: sessionId,
           studentId: participant.studentId,
-          attendanceStatus: "present",
+          attendanceStatus,
           actualLearningMode: getInitialLearningMode(participant, defaultLearningMode),
           notes: null,
         });
@@ -223,6 +225,44 @@ export function SessionAttendanceManagement({
       } catch {
         setActionState({ status: "error", message: "Chưa lưu được điểm danh. Vui lòng thử lại." });
       }
+    });
+  };
+
+  const unmarkedParticipants = participants.filter((participant) => !participant.attendanceId);
+
+  /** Marks every unmarked student present, one existing action per student. */
+  const markAllPresent = () => {
+    if (!canEdit || isPending || unmarkedParticipants.length === 0) return;
+    setActionState(null);
+    startTransition(async () => {
+      let saved = 0;
+      let failure: AttendanceActionState | null = null;
+      for (const participant of unmarkedParticipants) {
+        try {
+          const result = await markSessionAttendanceAction({
+            classSessionId: sessionId,
+            studentId: participant.studentId,
+            attendanceStatus: "present",
+            actualLearningMode: getInitialLearningMode(participant, defaultLearningMode),
+            notes: null,
+          });
+          if (result.status === "success") {
+            saved += 1;
+          } else {
+            failure = result;
+            break;
+          }
+        } catch {
+          failure = { status: "error", message: "Chưa lưu được điểm danh. Vui lòng thử lại." };
+          break;
+        }
+      }
+      setActionState(
+        failure
+          ? { ...failure, message: `Đã ghi có mặt ${saved}/${unmarkedParticipants.length}. ${failure.message}` }
+          : { status: "success", message: `Đã ghi có mặt cho ${saved} học sinh chưa chọn.`, attendanceId: "", classSessionId: sessionId },
+      );
+      router.refresh();
     });
   };
 
@@ -271,49 +311,22 @@ export function SessionAttendanceManagement({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          Quản lý điểm danh
-        </CardTitle>
+    <Card className="shadow-[var(--panel-shadow)]">
+      <CardHeader className="flex-wrap">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <CardTitle>Điểm danh</CardTitle>
+          <p className="text-secondary tabular-nums text-text-muted">
+            Có mặt {attendanceSummary.present} · Học thêm {attendanceSummary.additional_study} · Vắng có phép {attendanceSummary.excused_absence} · Vắng không phép {attendanceSummary.unexcused_absence} · Chưa điểm danh {attendanceSummary.unmarked}
+          </p>
+        </div>
+        {canEdit && unmarkedParticipants.length > 0 ? (
+          <Button className="max-md:hidden" disabled={isPending} onClick={markAllPresent} size="sm" type="button" variant="secondary">
+            Có mặt cho tất cả chưa chọn
+          </Button>
+        ) : null}
       </CardHeader>
 
       <CardContent className="grid gap-4">
-        <div className="flex flex-wrap gap-2">
-          <Badge tone="success">
-            Có mặt:{" "}
-            {attendanceSummary.present}
-          </Badge>
-
-          <Badge tone="neutral">
-            Vắng có phép:{" "}
-            {
-              attendanceSummary
-                .excused_absence
-            }
-          </Badge>
-
-          <Badge tone="neutral">
-            Vắng không phép:{" "}
-            {
-              attendanceSummary
-                .unexcused_absence
-            }
-          </Badge>
-
-          <Badge tone="info">
-            Học thêm:{" "}
-            {
-              attendanceSummary
-                .additional_study
-            }
-          </Badge>
-
-          <Badge tone="purple">
-            Chưa điểm danh:{" "}
-            {attendanceSummary.unmarked}
-          </Badge>
-        </div>
 
         <AttendancePermissionNotice
           canEdit={canEdit}
@@ -368,7 +381,7 @@ export function SessionAttendanceManagement({
         </Dialog>
 
         {actionState?.status === "error" && !editor ? <ResultBanner title={actionState.message} tone="error" /> : null}
-        <p className="text-secondary text-text-muted">Bấm Có mặt để lưu ngay theo hình thức đăng ký. Chọn Điểm danh để ghi vắng, đổi hình thức hoặc thêm ghi chú.</p>
+        <p className="text-secondary text-text-muted">Chọn trạng thái để lưu ngay theo hình thức đăng ký. Mở Điểm danh để đổi hình thức thực tế, thêm ghi chú, hoặc sửa một lượt đã lưu (cần lý do).</p>
         <RosterSearch
           search={search}
           onSearchChange={setSearch}
@@ -402,15 +415,15 @@ export function SessionAttendanceManagement({
                   index={participants.indexOf(participant)}
                   isPending={isPending}
                   key={participant.studentId}
-                  onQuickPresent={quickPresent}
+                  onQuickMark={quickMark}
                   onEdit={openEditor}
                   participant={participant}
                 />
               ))}
               caption="Danh sách điểm danh buổi học"
               className="session-attendance-table"
-              header={<tr><TableHeader>Học viên</TableHeader><TableHeader>Hình thức đăng ký</TableHeader><TableHeader>Trạng thái</TableHeader><TableHeader>Hình thức thực tế</TableHeader><TableHeader>Ghi chú</TableHeader><TableHeader className="text-right">Thao tác</TableHeader></tr>}
-              tableClassName="min-w-[960px] table-fixed text-table-body text-text-default"
+              header={<tr><TableHeaderCell className="w-12">#</TableHeaderCell><TableHeaderCell>Học sinh</TableHeaderCell><TableHeaderCell>Trạng thái</TableHeaderCell><TableHeaderCell>Hình thức</TableHeaderCell><TableHeaderCell>Ghi chú</TableHeaderCell><TableHeaderCell numeric>Thao tác</TableHeaderCell></tr>}
+              tableClassName="min-w-[960px]"
             />
             <ResponsiveRecordList className="session-attendance-record-list" label="Danh sách điểm danh buổi học">
               {visibleParticipants.map((participant) => (
@@ -420,7 +433,7 @@ export function SessionAttendanceManagement({
                   index={participants.indexOf(participant)}
                   isPending={isPending}
                   key={participant.studentId}
-                  onQuickPresent={quickPresent}
+                  onQuickMark={quickMark}
                   onEdit={openEditor}
                   participant={participant}
                 />
@@ -428,64 +441,102 @@ export function SessionAttendanceManagement({
             </ResponsiveRecordList>
           </div>
         )}
+
+        {canEdit && participants.length > 0 ? (
+          <div className="sticky bottom-0 z-20 -mx-5 -mb-5 border-t border-border-subtle bg-surface-base px-4 py-3 shadow-[var(--elevation-2)] md:hidden">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-semibold tabular-nums text-text-strong">Đã điểm danh {participants.length - attendanceSummary.unmarked}/{participants.length}</span>
+              <span className="tabular-nums text-text-muted">{attendanceSummary.unmarked} chưa chọn</span>
+            </div>
+            <div aria-hidden="true" className="mt-2 h-1.5 overflow-hidden rounded-full bg-border-row">
+              <div className="progress-grow h-full rounded-full bg-action-primary" style={{ width: `${participants.length === 0 ? 0 : Math.round(((participants.length - attendanceSummary.unmarked) / participants.length) * 100)}%` }} />
+            </div>
+            {unmarkedParticipants.length > 0 ? (
+              <Button className="mt-3 w-full" disabled={isPending} onClick={markAllPresent} size="lg" type="button" variant="secondary">
+                Có mặt cho {unmarkedParticipants.length} bạn chưa chọn
+              </Button>
+            ) : (
+              <p className="mt-2 text-secondary text-text-muted">Đã điểm danh đủ. Chuyển sang Kết quả.</p>
+            )}
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
 }
 
-function AttendanceTableRow({
-  canEdit,
-  canViewStudents,
-  index,
-  isPending,
-  onQuickPresent,
-  onEdit,
-  participant,
-}: {
+interface AttendanceRowProps {
   canEdit: boolean;
   canViewStudents: boolean;
   index: number;
   isPending: boolean;
-  onQuickPresent: (participant: SessionParticipantReadModel) => void;
+  onQuickMark: (participant: SessionParticipantReadModel, status: SessionAttendanceStatus) => void;
   onEdit: (participant: SessionParticipantReadModel) => void;
   participant: SessionParticipantReadModel;
-}) {
+}
+
+/** Unmarked rows save on tap; marked rows open the editor because a change needs a reason. */
+function statusButtonLabel(participant: SessionParticipantReadModel) {
+  return (status: SessionAttendanceStatus, label: string) =>
+    participant.attendanceId
+      ? `Đổi sang ${label} cho học viên`
+      : status === "present"
+        ? "Ghi có mặt cho học viên"
+        : `Ghi ${label} cho học viên`;
+}
+
+function AttendanceTableRow({ canEdit, canViewStudents, index, isPending, onQuickMark, onEdit, participant }: AttendanceRowProps) {
   return (
-    <tr className="transition-colors hover:bg-[var(--table-row-hover)]">
-      <TableCell className="w-[190px]">
+    <TableRow>
+      <TableCell className="w-12 text-secondary tabular-nums text-text-muted">{index + 1}</TableCell>
+      <TableCell className="w-[220px]">
         <ParticipantIdentity canViewStudents={canViewStudents} index={index} participant={participant} />
       </TableCell>
-      <TableCell className="w-[140px] text-secondary text-text-muted">{formatRegisteredMode(participant.registeredMode)}</TableCell>
-      <TableCell className="w-[170px]"><AttendanceBadge status={participant.attendanceStatus} />{participant.isLateUpdate ? <p className="mt-1 text-caption font-semibold text-warning">Cập nhật muộn</p> : null}</TableCell>
-      <TableCell className="w-[145px] text-secondary text-text-muted">{formatActualMode(participant.actualLearningMode)}</TableCell>
-      <TableCell className="max-w-[260px] text-secondary text-text-muted">{participant.attendanceNotes ?? "Chưa có ghi chú"}</TableCell>
-      <TableCell className="w-[132px] text-right"><AttendanceAction onQuickPresent={onQuickPresent} canEdit={canEdit} isPending={isPending} onEdit={onEdit} participant={participant} /></TableCell>
-    </tr>
+      <TableCell className="w-[440px]">
+        {canEdit ? (
+          <AttendanceStatusGroup
+            buttonLabel={statusButtonLabel(participant)}
+            disabled={isPending}
+            label={`Trạng thái điểm danh học viên ${index + 1}`}
+            onSelect={(status) => (participant.attendanceId ? onEdit(participant) : onQuickMark(participant, status))}
+            value={participant.attendanceStatus}
+          />
+        ) : (
+          <AttendanceBadge status={participant.attendanceStatus} />
+        )}
+        {participant.isLateUpdate ? <p className="mt-1 text-caption font-semibold text-warning">Cập nhật muộn</p> : null}
+      </TableCell>
+      <TableCell className="w-[120px] text-secondary text-text-default">{formatActualMode(participant.actualLearningMode)}</TableCell>
+      <TableCell className="max-w-[260px] text-secondary text-text-muted">{participant.attendanceNotes ?? <span className="text-text-subtle">—</span>}</TableCell>
+      <TableCell className="w-[140px] text-right"><AttendanceAction canEdit={canEdit} isPending={isPending} onEdit={onEdit} participant={participant} /></TableCell>
+    </TableRow>
   );
 }
 
-function AttendanceRecord({
-  canEdit,
-  canViewStudents,
-  index,
-  isPending,
-  onQuickPresent,
-  onEdit,
-  participant,
-}: {
-  canEdit: boolean;
-  canViewStudents: boolean;
-  index: number;
-  isPending: boolean;
-  onQuickPresent: (participant: SessionParticipantReadModel) => void;
-  onEdit: (participant: SessionParticipantReadModel) => void;
-  participant: SessionParticipantReadModel;
-}) {
+function AttendanceRecord({ canEdit, canViewStudents, index, isPending, onQuickMark, onEdit, participant }: AttendanceRowProps) {
   return (
-    <article className="rounded-lg border border-border-subtle bg-surface-base px-4 py-3" role="listitem">
-      <div className="flex items-start justify-between gap-3"><ParticipantIdentity canViewStudents={canViewStudents} index={index} participant={participant} /><AttendanceBadge status={participant.attendanceStatus} /></div>
-      <div className="mt-3 grid gap-1.5 text-secondary text-text-muted"><p>Đăng ký: {formatRegisteredMode(participant.registeredMode)} · Thực tế: {formatActualMode(participant.actualLearningMode)}</p><p>{participant.attendanceNotes ?? "Chưa có ghi chú"}</p>{participant.isLateUpdate ? <p className="font-semibold text-warning">Cập nhật muộn</p> : null}</div>
-      <div className="mt-3"><AttendanceAction onQuickPresent={onQuickPresent} canEdit={canEdit} fullWidth isPending={isPending} onEdit={onEdit} participant={participant} /></div>
+    <article className="rounded-lg border border-border-subtle bg-surface-base px-4 py-3 shadow-[var(--panel-shadow)]" role="listitem">
+      <div className="flex items-start justify-between gap-3">
+        <ParticipantIdentity canViewStudents={canViewStudents} index={index} participant={participant} />
+        {!canEdit || participant.attendanceId ? <AttendanceBadge status={participant.attendanceStatus} /> : null}
+      </div>
+      {canEdit ? (
+        <AttendanceStatusGroup
+          buttonLabel={statusButtonLabel(participant)}
+          className="mt-2.5"
+          disabled={isPending}
+          label={`Trạng thái điểm danh học viên ${index + 1}`}
+          layout="grid"
+          onSelect={(status) => (participant.attendanceId ? onEdit(participant) : onQuickMark(participant, status))}
+          value={participant.attendanceStatus}
+        />
+      ) : null}
+      <div className="mt-2 grid gap-1 text-secondary text-text-muted">
+        <p>Đăng ký: {formatRegisteredMode(participant.registeredMode)} · Thực tế: {formatActualMode(participant.actualLearningMode)}</p>
+        {participant.attendanceNotes ? <p>{participant.attendanceNotes}</p> : null}
+        {participant.isLateUpdate ? <p className="font-semibold text-warning">Cập nhật muộn</p> : null}
+      </div>
+      <div className="mt-2"><AttendanceAction canEdit={canEdit} fullWidth isPending={isPending} onEdit={onEdit} participant={participant} /></div>
     </article>
   );
 }
@@ -494,21 +545,12 @@ function ParticipantIdentity({ canViewStudents, index, participant }: { canViewS
   return <div className="min-w-0"><p className="text-body font-semibold text-text-strong">{canViewStudents ? participant.studentName ?? "Chưa có tên học viên" : `Học viên ${index + 1}`}</p>{canViewStudents && participant.studentCode ? <p className="mt-0.5 font-mono text-caption text-text-muted">{participant.studentCode}</p> : null}</div>;
 }
 
-function AttendanceAction({ canEdit, fullWidth = false, isPending, onEdit, onQuickPresent, participant }: { canEdit: boolean; fullWidth?: boolean; isPending: boolean; onEdit: (participant: SessionParticipantReadModel) => void; onQuickPresent: (participant: SessionParticipantReadModel) => void; participant: SessionParticipantReadModel }) {
+function AttendanceAction({ canEdit, fullWidth = false, isPending, onEdit, participant }: { canEdit: boolean; fullWidth?: boolean; isPending: boolean; onEdit: (participant: SessionParticipantReadModel) => void; participant: SessionParticipantReadModel }) {
   if (!canEdit) return <span className="text-caption text-text-muted">Chỉ đọc</span>;
   const action = participant.attendanceId ? "Sửa điểm danh" : "Điểm danh";
   return <div className={`flex flex-wrap gap-1 ${fullWidth ? "" : "justify-end"}`}>
-    {!participant.attendanceId ? <Button aria-label="Ghi có mặt cho học viên" disabled={isPending} onClick={() => onQuickPresent(participant)} size="sm" type="button" variant="secondary">Có mặt</Button> : null}
-    <Button aria-label={`${action} cho học viên`} className={fullWidth ? "min-h-11" : undefined} disabled={isPending} onClick={() => onEdit(participant)} size={fullWidth ? "md" : "sm"} type="button" variant="ghost">{action}</Button>
+    <Button aria-label={`${action} cho học viên`} className={fullWidth ? "w-full" : undefined} disabled={isPending} onClick={() => onEdit(participant)} size={fullWidth ? "lg" : "sm"} type="button" variant={fullWidth ? "secondary" : "ghost"}>{action}</Button>
   </div>;
-}
-
-function TableHeader({ children, className }: { children: ReactNode; className?: string }) {
-  return <th className={`h-10 border-b border-border-subtle px-3 text-left font-semibold ${className ?? ""}`} scope="col">{children}</th>;
-}
-
-function TableCell({ children, className }: { children: ReactNode; className?: string }) {
-  return <td className={`h-14 px-3 align-middle text-table-body ${className ?? ""}`}>{children}</td>;
 }
 
 function AdditionalStudyPanel({
@@ -1167,29 +1209,9 @@ function AttendanceBadge({
     );
   }
 
-  const labels: Record<
-    SessionAttendanceStatus,
-    string
-  > = {
-    additional_study: "Học thêm",
-    excused_absence: "Vắng có phép",
-    present: "Có mặt",
-    unexcused_absence: "Vắng không phép",
-  };
-
-  const tones: Record<
-    SessionAttendanceStatus,
-    "info" | "neutral" | "success"
-  > = {
-    additional_study: "info",
-    excused_absence: "neutral",
-    present: "success",
-    unexcused_absence: "neutral",
-  };
-
   return (
-    <Badge tone={tones[status]}>
-      {labels[status]}
+    <Badge tone={attendanceStatusTones[status]}>
+      {attendanceStatusLabels[status]}
     </Badge>
   );
 }

@@ -1,6 +1,8 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { getButtonClassName } from "@/components/ui/button";
 import { PageHeader } from "@/components/patterns/page-header";
 import type { AdditionalStudyCandidate } from "@/features/sessions/attendance-data";
 import {
@@ -34,59 +36,102 @@ interface SessionDetailPageProps {
   canManageResults: boolean;
   canManageSessions: boolean;
   canMarkAttendance: boolean;
+  canReverseLedger?: boolean;
   canViewAttendance: boolean;
+  canViewPayroll?: boolean;
   canViewResults: boolean;
   canViewStudents: boolean;
   detail: SessionDetailReadModel;
   directoryQuery?: string;
 }
 
+/**
+ * Session workbench (design 04): state → attendance → results → lock. The
+ * read-model and server actions are unchanged; this page only arranges them.
+ */
 export function SessionDetailPage({
   additionalStudyCandidates,
   canLockSession,
   canManageResults,
   canManageSessions,
   canMarkAttendance,
+  canReverseLedger = false,
   canViewAttendance,
+  canViewPayroll = false,
   canViewResults,
   canViewStudents,
   detail,
   directoryQuery = "",
 }: SessionDetailPageProps) {
+  const rosterCount = detail.participants.length;
+  const markedCount = detail.participants.filter((participant) => participant.attendanceStatus !== null).length;
+  const eligible = detail.participants.filter(
+    (participant) => participant.attendanceStatus === "present" || participant.attendanceStatus === "additional_study",
+  );
+  const resultCount = eligible.filter((participant) => participant.resultId !== null).length;
+  const showsAttendance = canViewAttendance || canMarkAttendance;
+  const showsResults = canViewResults || canManageResults;
+  const lockTile = detail.lockedAt
+    ? { tone: "neutral" as const, value: "Đã khóa vĩnh viễn" }
+    : detail.status !== "completed"
+      ? { tone: "neutral" as const, value: "Chưa thể khóa" }
+      : markedCount < rosterCount
+        ? { tone: "warning" as const, value: `Bị chặn · thiếu ${rosterCount - markedCount} điểm danh` }
+        : { tone: "success" as const, value: "Sẵn sàng" };
+
   return (
-    <div className="grid min-w-0 gap-6">
-      <section className="grid gap-4">
-        <nav aria-label="Điều hướng buổi học" className="flex flex-wrap items-center gap-2 text-secondary text-text-muted">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
+      <PageHeader
+        actions={
+          <Link className={getButtonClassName({ variant: "secondary" })} href={`/classes/${detail.classId}`}>
+            Xem lớp học
+          </Link>
+        }
+        context={
+          <>
+            <SessionStatusBadge status={detail.status} />
+            {detail.lockedAt ? <Badge tone="neutral">Đã khóa</Badge> : null}
+          </>
+        }
+        title={`${detail.classCode} · ${detail.className}`}
+      >
+        <p className="mt-1 text-secondary text-text-muted">
+          {formatDate(detail.sessionDate)} · {formatTime(detail.startTime)}–{formatTime(detail.endTime)}
+          {detail.roomName ? ` · ${detail.roomName}` : ""} · {formatKind(detail.sessionKind)}
+          {detail.componentCode ? ` · ${detail.componentCode}` : ""} · {formatMode(detail.learningMode)} · Khối {detail.grade} · Mức {detail.level}
+          {rosterCount > 0 ? ` · ${rosterCount} học sinh` : ""}
+        </p>
+        <nav aria-label="Điều hướng buổi học" className="mt-2 text-secondary">
           <Link
-            className="font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+            className="font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
             href={directoryQuery ? `/sessions?${directoryQuery}` : "/sessions"}
           >
-            Buổi học
+            ← Danh sách buổi học
           </Link>
-
-          <span>/</span>
-
-          <span className="font-semibold text-ink">
-            {formatDate(detail.sessionDate)}
-          </span>
         </nav>
+      </PageHeader>
 
-        <PageHeader
-          context={<><SessionStatusBadge status={detail.status} />{detail.lockedAt ? <Badge tone="neutral">Đã khóa</Badge> : null}</>}
-          title={`${detail.classCode} – ${detail.className}`}
-          actions={<Link className="inline-flex min-h-10 items-center justify-center rounded-md border border-border-subtle bg-surface-base px-4 text-control font-semibold text-text-strong hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={`/classes/${detail.classId}`}>Xem lớp học</Link>}
-        >
-            <p className="mt-1 text-secondary text-text-muted">
-              {formatDate(detail.sessionDate)}
-              {" · "}
-              {formatTime(detail.startTime)}
-              {" – "}
-              {formatTime(detail.endTime)}
-            </p>
-
-            <p className="mt-2 text-secondary text-text-muted">{formatKind(detail.sessionKind)}{detail.componentCode ? ` · ${detail.componentCode}` : ""} · {formatMode(detail.learningMode)} · Khối {detail.grade} · Mức {detail.level}{detail.roomName ? ` · ${detail.roomName}` : ""}</p>
-        </PageHeader>
-      </section>
+      {rosterCount > 0 && (showsAttendance || showsResults || canLockSession) ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {showsAttendance ? (
+            <WorkbenchTile
+              label="Điểm danh"
+              tone={markedCount === rosterCount ? "success" : "warning"}
+              value={`${markedCount}/${rosterCount}`}
+              hint={markedCount === rosterCount ? "đủ roster" : `${rosterCount - markedCount} chưa điểm danh`}
+            />
+          ) : null}
+          {showsResults ? (
+            <WorkbenchTile
+              label="Kết quả"
+              tone={eligible.length > 0 && resultCount === eligible.length ? "success" : "neutral"}
+              value={`${resultCount}/${eligible.length}`}
+              hint={eligible.length === 0 ? "chưa có học sinh đủ điều kiện" : resultCount === eligible.length ? "đủ cho học sinh có mặt" : `thiếu ${eligible.length - resultCount}`}
+            />
+          ) : null}
+          {canLockSession ? <WorkbenchTile label="Khóa buổi" tone={lockTile.tone} value={lockTile.value} /> : null}
+        </div>
+      ) : null}
 
       {canManageSessions ? (
         <SessionLifecycleActions
@@ -120,162 +165,78 @@ export function SessionDetailPage({
       ) : null}
 
       <SessionWorkspace
-      attendance={canViewAttendance ||
-      canMarkAttendance ? (
-        <SessionAttendanceManagement
-          additionalStudyCandidates={
-            additionalStudyCandidates
-          }
-          canMarkAttendance={
-            canMarkAttendance
-          }
-          canViewStudents={
-            canViewStudents
-          }
-          defaultLearningMode={
-            detail.learningMode
-          }
-          lockedAt={detail.lockedAt}
-          participants={
-            detail.participants
-          }
-          sessionId={detail.id}
-          sessionStatus={detail.status}
-        />
-      ) : null}
-
-      results={canViewResults ||
-      canManageResults ? (
-        <SessionResultManagement
-          canManageResults={
-            canManageResults
-          }
-          canViewStudents={
-            canViewStudents
-          }
-          lockedAt={detail.lockedAt}
-          participants={
-            detail.participants
-          }
-          sessionId={detail.id}
-          sessionStatus={detail.status}
-        />
-      ) : null}
-
+        attendance={
+          showsAttendance ? (
+            <SessionAttendanceManagement
+              additionalStudyCandidates={additionalStudyCandidates}
+              canMarkAttendance={canMarkAttendance}
+              canViewStudents={canViewStudents}
+              defaultLearningMode={detail.learningMode}
+              lockedAt={detail.lockedAt}
+              participants={detail.participants}
+              sessionId={detail.id}
+              sessionStatus={detail.status}
+            />
+          ) : null
+        }
+        attendancePending={detail.lockedAt ? 0 : rosterCount - markedCount}
+        results={
+          showsResults ? (
+            <SessionResultManagement
+              canManageResults={canManageResults}
+              canViewStudents={canViewStudents}
+              lockedAt={detail.lockedAt}
+              participants={detail.participants}
+              sessionId={detail.id}
+              sessionStatus={detail.status}
+            />
+          ) : null
+        }
+        resultsPending={detail.lockedAt ? 0 : eligible.length - resultCount}
       />
 
       {canLockSession ? (
         <SessionLockActions
+          canReverseLedger={canReverseLedger}
+          canViewPayroll={canViewPayroll}
           lockedAt={detail.lockedAt}
           lockReason={detail.lockReason}
+          markedCount={markedCount}
+          rosterCount={rosterCount}
           sessionId={detail.id}
           sessionStatus={detail.status}
         />
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
         <div className="grid content-start gap-4">
           <Card>
             <CardHeader>
-              <CardTitle>
-                Thông tin buổi học
-              </CardTitle>
+              <CardTitle>Thông tin buổi học</CardTitle>
             </CardHeader>
 
             <CardContent className="grid gap-3">
-              <InfoLine
-                label="Ngày học"
-                value={formatDate(
-                  detail.sessionDate,
-                )}
-              />
-
-              <InfoLine
-                label="Thời gian"
-                value={`${formatTime(
-                  detail.startTime,
-                )} – ${formatTime(
-                  detail.endTime,
-                )}`}
-              />
-
-              <InfoLine
-                label="Loại buổi"
-                value={formatKind(
-                  detail.sessionKind,
-                )}
-              />
-
-              <InfoLine
-                label="Hình thức"
-                value={formatMode(
-                  detail.learningMode,
-                )}
-              />
-
-              <InfoLine
-                label="Phòng học"
-                value={
-                  detail.roomName ??
-                  "Chưa xác định"
-                }
-              />
-
-              <InfoLine
-                label="Đường dẫn học"
-                value={
-                  detail.meetingUrl ??
-                  "Chưa xác định"
-                }
-              />
-
-              <InfoLine
-                label="Bắt đầu"
-                value={formatDateTime(
-                  detail.startedAt,
-                )}
-              />
-
-              <InfoLine
-                label="Hoàn thành"
-                value={formatDateTime(
-                  detail.completedAt,
-                )}
-              />
-
-              <InfoLine
-                label="Ghi chú"
-                value={
-                  detail.notes ??
-                  "Chưa có ghi chú"
-                }
-              />
+              <InfoLine label="Ngày học" value={formatDate(detail.sessionDate)} />
+              <InfoLine label="Thời gian" value={`${formatTime(detail.startTime)} – ${formatTime(detail.endTime)}`} />
+              <InfoLine label="Loại buổi" value={formatKind(detail.sessionKind)} />
+              <InfoLine label="Hình thức" value={formatMode(detail.learningMode)} />
+              <InfoLine label="Phòng học" value={detail.roomName ?? "Chưa xác định"} />
+              <InfoLine label="Đường dẫn học" value={detail.meetingUrl ?? "Chưa xác định"} />
+              <InfoLine label="Bắt đầu" value={formatDateTime(detail.startedAt)} />
+              <InfoLine label="Hoàn thành" value={formatDateTime(detail.completedAt)} />
+              <InfoLine label="Ghi chú" value={detail.notes ?? "Chưa có ghi chú"} />
             </CardContent>
           </Card>
 
           {detail.status === "cancelled" ? (
             <Card>
               <CardHeader>
-                <CardTitle>
-                  Thông tin hủy buổi
-                </CardTitle>
+                <CardTitle>Thông tin hủy buổi</CardTitle>
               </CardHeader>
 
               <CardContent className="grid gap-3">
-                <InfoLine
-                  label="Thời điểm hủy"
-                  value={formatDateTime(
-                    detail.cancelledAt,
-                  )}
-                />
-
-                <InfoLine
-                  label="Lý do"
-                  value={
-                    detail.cancellationReason ??
-                    "Không có lý do"
-                  }
-                />
+                <InfoLine label="Thời điểm hủy" value={formatDateTime(detail.cancelledAt)} />
+                <InfoLine label="Lý do" value={detail.cancellationReason ?? "Không có lý do"} />
               </CardContent>
             </Card>
           ) : null}
@@ -283,27 +244,12 @@ export function SessionDetailPage({
           {detail.lockedAt ? (
             <Card>
               <CardHeader>
-                <CardTitle>
-                  Thông tin khóa dữ liệu
-                </CardTitle>
+                <CardTitle>Thông tin khóa dữ liệu</CardTitle>
               </CardHeader>
 
               <CardContent className="grid gap-3">
-                <InfoLine
-                  label="Thời điểm khóa"
-                  value={formatDateTime(
-                    detail.lockedAt,
-                  )}
-                />
-
-                <InfoLine
-                  label="Lý do khóa"
-                  value={
-                    detail.lockReason ??
-                    "Không có lý do"
-                  }
-                />
-
+                <InfoLine label="Thời điểm khóa" value={formatDateTime(detail.lockedAt)} />
+                <InfoLine label="Lý do khóa" value={detail.lockReason ?? "Không có lý do"} />
                 <InfoLine
                   label="Ghi nhận sổ cái"
                   value={
@@ -320,44 +266,56 @@ export function SessionDetailPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>
-              Học viên trong buổi học
-            </CardTitle>
+            <CardTitle>Học sinh trong buổi học</CardTitle>
           </CardHeader>
 
           <CardContent>
-            {!canViewAttendance &&
-            !canViewResults &&
-            !canViewStudents ? (
-              <p className="text-sm text-ink-muted">
-                Tài khoản hiện tại không có
-                quyền xem roster, điểm danh hoặc
-                kết quả của buổi học.
+            {!canViewAttendance && !canViewResults && !canViewStudents ? (
+              <p className="text-body text-text-muted">
+                Tài khoản hiện tại không có quyền xem roster, điểm danh hoặc kết quả của buổi học.
               </p>
-            ) : detail.participants.length ===
-              0 ? (
-              <p className="text-sm text-ink-muted">
-                Chưa có học viên hoặc dữ liệu
-                điểm danh trong buổi học này.
+            ) : detail.participants.length === 0 ? (
+              <p className="text-body text-text-muted">
+                Chưa có học sinh hoặc dữ liệu điểm danh trong buổi học này.
               </p>
             ) : (
               <ParticipantTable
-                canViewAttendance={
-                  canViewAttendance
-                }
-                canViewResults={
-                  canViewResults
-                }
-                canViewStudents={
-                  canViewStudents
-                }
-                participants={
-                  detail.participants
-                }
+                canViewAttendance={canViewAttendance}
+                canViewResults={canViewResults}
+                canViewStudents={canViewStudents}
+                participants={detail.participants}
               />
             )}
           </CardContent>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+function WorkbenchTile({
+  hint,
+  label,
+  tone,
+  value,
+}: {
+  hint?: string;
+  label: string;
+  tone: "success" | "warning" | "neutral";
+  value: string;
+}) {
+  const dot =
+    tone === "success" ? "bg-success" : tone === "warning" ? "bg-warning" : "bg-text-subtle";
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface-base px-4 py-3 shadow-[var(--panel-shadow)]">
+      <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
+      <div className="min-w-0">
+        <p className="text-secondary text-text-muted">{label}</p>
+        <p className="text-body font-semibold tabular-nums text-text-strong">
+          {value}
+          {hint ? <span className="ml-1.5 text-secondary font-normal text-text-muted">· {hint}</span> : null}
+        </p>
       </div>
     </div>
   );
@@ -375,111 +333,54 @@ function ParticipantTable({
   participants: SessionParticipantReadModel[];
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-        <thead className="bg-surface-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+    <div className="overflow-x-auto rounded-md border border-border-subtle">
+      <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-table-body">
+        <thead className="bg-table-header text-table-header text-text-muted">
           <tr>
-            <th className="px-3 py-3">
-              Học viên
-            </th>
-
-            <th className="px-3 py-3">
-              Hình thức đăng ký
-            </th>
-
-            {canViewAttendance ? (
-              <th className="px-3 py-3">
-                Điểm danh
-              </th>
-            ) : null}
-
+            <Th>Học sinh</Th>
+            <Th>Hình thức đăng ký</Th>
+            {canViewAttendance ? <Th>Điểm danh</Th> : null}
             {canViewResults ? (
               <>
-                <th className="px-3 py-3">
-                  Điểm kiểm tra
-                </th>
-
-                <th className="px-3 py-3">
-                  Điểm vở
-                </th>
-
-                <th className="px-3 py-3">
-                  Nhận xét
-                </th>
+                <Th numeric>Điểm kiểm tra</Th>
+                <Th>Vở bài tập</Th>
+                <Th>Nhận xét</Th>
               </>
             ) : null}
           </tr>
         </thead>
 
-        <tbody>
+        <tbody className="[&>tr+tr>td]:border-t [&>tr+tr>td]:border-border-row">
           {participants.map((participant) => (
-            <tr
-              className="border-t border-hairline align-top"
-              key={participant.studentId}
-            >
-              <td className="px-3 py-4">
-                <p className="font-semibold text-ink">
+            <tr className="h-12 align-middle" key={participant.studentId}>
+              <td className="px-3 py-1.5">
+                <p className="font-semibold text-text-strong">
                   {canViewStudents
-                    ? participant.studentName ??
-                      "Chưa có tên học viên"
+                    ? participant.studentName ?? "Chưa có tên học viên"
                     : "Học viên ẩn"}
                 </p>
-
-                {canViewStudents &&
-                participant.studentCode ? (
-                  <p className="mt-1 font-mono text-xs text-ink-muted">
-                    {participant.studentCode}
-                  </p>
+                {canViewStudents && participant.studentCode ? (
+                  <p className="text-caption tabular-nums text-text-muted">{participant.studentCode}</p>
                 ) : null}
               </td>
-
-              <td className="px-3 py-4">
-                {formatRegisteredMode(
-                  participant.registeredMode,
-                )}
-              </td>
-
+              <td className="px-3 text-secondary text-text-default">{formatRegisteredMode(participant.registeredMode)}</td>
               {canViewAttendance ? (
-                <td className="px-3 py-4">
-                  <AttendanceBadge
-                    status={
-                      participant.attendanceStatus
-                    }
-                  />
-
+                <td className="px-3">
+                  <AttendanceBadge status={participant.attendanceStatus} />
                   {participant.isLateUpdate ? (
-                    <p className="mt-2 text-xs font-semibold text-amber-700">
-                      Cập nhật muộn
-                    </p>
+                    <p className="mt-1 text-caption font-semibold text-warning">Cập nhật muộn</p>
                   ) : null}
                 </td>
               ) : null}
-
               {canViewResults ? (
                 <>
-                  <td className="px-3 py-4 font-semibold text-ink">
-                    {formatScore(
-                      participant.testScore,
-                    )}
+                  <td className="px-3 text-right font-semibold tabular-nums text-text-strong">{formatScore(participant.testScore)}</td>
+                  <td className="px-3">
+                    <p className="font-medium text-text-strong">{formatNotebookStatus(participant.notebookStatus)}</p>
+                    <p className="text-caption text-text-muted">Điểm vở: {formatScore(participant.notebookScore)}</p>
                   </td>
-
-                  <td className="px-3 py-4">
-                    <p className="font-semibold text-ink">
-                      {formatScore(
-                        participant.notebookScore,
-                      )}
-                    </p>
-
-                    <p className="mt-1 text-xs text-ink-muted">
-                      {formatNotebookStatus(
-                        participant.notebookStatus,
-                      )}
-                    </p>
-                  </td>
-
-                  <td className="max-w-[260px] px-3 py-4 text-ink-muted">
-                    {participant.resultComment ??
-                      "Chưa có nhận xét"}
+                  <td className="max-w-[260px] px-3 text-secondary text-text-muted">
+                    {participant.resultComment ?? "Chưa có nhận xét"}
                   </td>
                 </>
               ) : null}
@@ -491,90 +392,59 @@ function ParticipantTable({
   );
 }
 
-function AttendanceBadge({
-  status,
-}: {
-  status: SessionAttendanceStatus | null;
-}) {
+function Th({ children, numeric }: { children: ReactNode; numeric?: boolean }) {
+  return (
+    <th className={`h-10 whitespace-nowrap px-3 font-semibold ${numeric ? "text-right" : "text-left"}`} scope="col">
+      {children}
+    </th>
+  );
+}
+
+function AttendanceBadge({ status }: { status: SessionAttendanceStatus | null }) {
   if (!status) {
-    return (
-      <Badge tone="neutral">
-        Chưa điểm danh
-      </Badge>
-    );
+    return <Badge tone="neutral">Chưa điểm danh</Badge>;
   }
 
-  const labels: Record<
-    SessionAttendanceStatus,
-    string
-  > = {
+  const labels: Record<SessionAttendanceStatus, string> = {
     additional_study: "Học thêm",
     excused_absence: "Vắng có phép",
     present: "Có mặt",
     unexcused_absence: "Vắng không phép",
   };
 
-  const tones: Record<
-    SessionAttendanceStatus,
-    "info" | "neutral" | "success"
-  > = {
-    additional_study: "info",
-    excused_absence: "neutral",
+  const tones: Record<SessionAttendanceStatus, "info" | "success" | "warning" | "danger"> = {
+    additional_study: "warning",
+    excused_absence: "info",
     present: "success",
-    unexcused_absence: "neutral",
+    unexcused_absence: "danger",
   };
 
-  return (
-    <Badge tone={tones[status]}>
-      {labels[status]}
-    </Badge>
-  );
+  return <Badge tone={tones[status]}>{labels[status]}</Badge>;
 }
 
 function SessionStatusBadge({ status }: { status: SessionStatus }) {
-  const labels: Record<
-    SessionStatus,
-    string
-  > = {
+  const labels: Record<SessionStatus, string> = {
     cancelled: "Đã hủy",
     completed: "Đã hoàn thành",
-    in_progress: "Đang học",
-    scheduled: "Đã lên lịch",
+    in_progress: "Đang diễn ra",
+    scheduled: "Sắp diễn ra",
   };
 
-  const tones: Record<
-    SessionStatus,
-    "info" | "neutral" | "success"
-  > = {
+  const tones: Record<SessionStatus, "info" | "neutral" | "success"> = {
     cancelled: "neutral",
     completed: "success",
     in_progress: "info",
     scheduled: "info",
   };
 
-  return (
-    <Badge tone={tones[status]}>
-      {labels[status]}
-    </Badge>
-  );
+  return <Badge tone={tones[status]}>{labels[status]}</Badge>;
 }
 
-function InfoLine({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function InfoLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-hairline pb-3 last:border-0 last:pb-0">
-      <dt className="text-sm font-medium text-ink-muted">
-        {label}
-      </dt>
-
-      <dd className="max-w-[65%] text-right text-sm font-semibold text-ink">
-        {value}
-      </dd>
+    <div className="flex items-start justify-between gap-4 border-b border-border-row pb-3 last:border-0 last:pb-0">
+      <dt className="text-body text-text-muted">{label}</dt>
+      <dd className="max-w-[65%] text-right text-body font-medium text-text-strong">{value}</dd>
     </div>
   );
 }
@@ -586,14 +456,10 @@ function formatDate(value: string): string {
     timeZone: "Asia/Ho_Chi_Minh",
     weekday: "long",
     year: "numeric",
-  }).format(
-    new Date(`${value}T00:00:00+07:00`),
-  );
+  }).format(new Date(`${value}T00:00:00+07:00`));
 }
 
-function formatDateTime(
-  value: string | null,
-): string {
+function formatDateTime(value: string | null): string {
   if (!value) {
     return "Chưa có";
   }
@@ -609,36 +475,27 @@ function formatTime(value: string): string {
   return value.slice(0, 5);
 }
 
-function formatKind(
-  value: SessionKind,
-): string {
+function formatKind(value: SessionKind): string {
   const labels: Record<SessionKind, string> = {
     additional: "Buổi bổ sung",
     makeup: "Buổi bù",
-    regular: "Buổi chính",
+    regular: "Buổi chính khóa",
   };
 
   return labels[value];
 }
 
-function formatMode(
-  value: SessionLearningMode,
-): string {
-  const labels: Record<
-    SessionLearningMode,
-    string
-  > = {
+function formatMode(value: SessionLearningMode): string {
+  const labels: Record<SessionLearningMode, string> = {
     hybrid: "Kết hợp",
-    offline: "Offline",
-    online: "Online",
+    offline: "Tại lớp",
+    online: "Trực tuyến",
   };
 
   return labels[value];
 }
 
-function formatRegisteredMode(
-  value: string | null,
-): string {
+function formatRegisteredMode(value: string | null): string {
   if (value === "online") {
     return "Online";
   }
@@ -650,9 +507,7 @@ function formatRegisteredMode(
   return "Học thêm/Chưa xác định";
 }
 
-function formatScore(
-  value: number | null,
-): string {
+function formatScore(value: number | null): string {
   if (value === null) {
     return "—";
   }
@@ -662,17 +517,12 @@ function formatScore(
   }).format(value);
 }
 
-function formatNotebookStatus(
-  value: SessionNotebookStatus | null,
-): string {
+function formatNotebookStatus(value: SessionNotebookStatus | null): string {
   if (!value) {
     return "Chưa có dữ liệu";
   }
 
-  const labels: Record<
-    SessionNotebookStatus,
-    string
-  > = {
+  const labels: Record<SessionNotebookStatus, string> = {
     not_required: "Không yêu cầu",
     not_submitted: "Chưa nộp",
     submitted: "Đã nộp",

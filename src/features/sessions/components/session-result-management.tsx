@@ -21,7 +21,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { RosterSearch, matchesRosterSearch } from "@/features/sessions/components/roster-search";
 
 import { Badge } from "@/components/ui/badge";
-import { DataTableFrame } from "@/components/patterns/data-table-frame";
+import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
+import { attendanceStatusLabels, attendanceStatusTones } from "@/features/sessions/components/attendance-status-group";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
@@ -282,34 +283,18 @@ export function SessionResultManagement({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          Kết quả cuối buổi
-        </CardTitle>
+    <Card className="shadow-[var(--panel-shadow)]">
+      <CardHeader className="flex-wrap">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <CardTitle>Kết quả buổi học</CardTitle>
+          <p className="text-secondary text-text-muted">Điểm kiểm tra 0–10 (2 số lẻ) · Vở: đã nộp phải có điểm vở · nhận xét ≤ 1.000 ký tự</p>
+        </div>
+        <p className="text-secondary tabular-nums text-text-muted">
+          Đủ điều kiện {summary.eligible} · Đã có kết quả {summary.resultRecorded} · Chưa có kết quả {summary.missingResult} · Thiếu điểm kiểm tra {summary.missingTestScore}
+        </p>
       </CardHeader>
 
       <CardContent className="grid gap-4">
-        <div className="flex flex-wrap gap-2">
-          <Badge tone="info">
-            Đủ điều kiện: {summary.eligible}
-          </Badge>
-
-          <Badge tone="success">
-            Đã có kết quả:{" "}
-            {summary.resultRecorded}
-          </Badge>
-
-          <Badge tone="neutral">
-            Chưa có kết quả:{" "}
-            {summary.missingResult}
-          </Badge>
-
-          <Badge tone="neutral">
-            Thiếu điểm kiểm tra:{" "}
-            {summary.missingTestScore}
-          </Badge>
-        </div>
 
         <ResultPermissionNotice
           canEdit={canEdit}
@@ -386,17 +371,20 @@ export function SessionResultManagement({
             ))}
             caption="Danh sách kết quả cuối buổi"
             className="session-result-table"
+            footer={<ResultFooter participants={visibleParticipants} total={participants.length} />}
             header={
               <tr>
-                <TableHeader>Học viên</TableHeader>
-                <TableHeader>Điểm danh</TableHeader>
-                <TableHeader className="text-right">Điểm kiểm tra</TableHeader>
-                <TableHeader>Vở</TableHeader>
-                <TableHeader>Nhận xét</TableHeader>
-                <TableHeader className="text-right">Thao tác</TableHeader>
+                <TableHeaderCell className="w-12">#</TableHeaderCell>
+                <TableHeaderCell>Học sinh</TableHeaderCell>
+                <TableHeaderCell>Điểm danh</TableHeaderCell>
+                <TableHeaderCell numeric>Điểm KT (/10)</TableHeaderCell>
+                <TableHeaderCell>Vở bài tập</TableHeaderCell>
+                <TableHeaderCell numeric>Điểm vở</TableHeaderCell>
+                <TableHeaderCell>Nhận xét ngắn</TableHeaderCell>
+                <TableHeaderCell numeric>Thao tác</TableHeaderCell>
               </tr>
             }
-            tableClassName="min-w-[1120px] table-fixed text-table-body text-text-default"
+            tableClassName="min-w-[1120px]"
           />
 
           <ResponsiveRecordList className="session-result-record-list" label="Danh sách kết quả cuối buổi">
@@ -435,39 +423,41 @@ function ResultTableRow({
   participant: SessionParticipantReadModel;
 }) {
   const eligible = isResultEligible(participant);
+  const missing = eligible && participant.resultId === null;
 
   return (
-    <tr className="transition-colors hover:bg-[var(--table-row-hover)]">
-      <TableCell className="w-[190px]">
+    <TableRow>
+      <TableCell className="w-12 text-secondary tabular-nums text-text-muted">{index + 1}</TableCell>
+      <TableCell className={`w-[220px] ${eligible ? "" : "[&_p]:text-text-muted"}`}>
         <ParticipantIdentity
           canViewStudents={canViewStudents}
           index={index}
           participant={participant}
         />
       </TableCell>
-      <TableCell className="w-[170px]">
+      <TableCell className="w-[150px]">
         <AttendanceStatusBadge status={participant.attendanceStatus} />
-        {!eligible ? (
-          <p className="mt-1 text-caption text-text-muted">
-            Không được nhập kết quả
-          </p>
-        ) : null}
       </TableCell>
-      <TableCell className="w-[132px] text-right font-medium tabular-nums text-text-strong">
+      <TableCell className={`w-[112px] font-semibold ${participant.testScore === null ? "text-text-subtle" : "text-text-strong"}`} numeric>
         {formatScore(participant.testScore)}
       </TableCell>
-      <TableCell className="w-[180px]">
-        <p className="font-medium text-text-strong">
-          {formatNotebookStatus(participant.notebookStatus)}
-        </p>
-        <p className="mt-1 text-caption text-text-muted">
-          Điểm: {formatScore(participant.notebookScore)}
-        </p>
+      <TableCell className={`w-[150px] text-secondary ${eligible ? "text-text-default" : "text-text-subtle"}`}>
+        {eligible ? formatNotebookStatus(participant.notebookStatus) : "—"}
+      </TableCell>
+      <TableCell className={`w-[96px] ${participant.notebookScore === null ? "text-text-subtle" : "text-text-strong"}`} numeric>
+        {eligible ? formatScore(participant.notebookScore) : "—"}
       </TableCell>
       <TableCell className="max-w-[300px] text-secondary text-text-muted">
-        {participant.resultComment ?? "Chưa có nhận xét"}
+        {!eligible ? (
+          <span className="text-text-subtle">Không nhập cho học sinh vắng</span>
+        ) : missing ? (
+          <span className="font-medium text-danger">Bắt buộc: học sinh có mặt phải có kết quả</span>
+        ) : (
+          participant.resultComment ?? <span className="text-text-subtle">—</span>
+        )}
+        {!eligible ? <span className="sr-only">Không được nhập kết quả</span> : null}
       </TableCell>
-      <TableCell className="w-[142px] text-right">
+      <TableCell className="w-[132px]" numeric>
         <ResultAction
           canEdit={canEdit}
           eligible={eligible}
@@ -476,7 +466,23 @@ function ResultTableRow({
           participant={participant}
         />
       </TableCell>
-    </tr>
+    </TableRow>
+  );
+}
+
+function ResultFooter({ participants, total }: { participants: SessionParticipantReadModel[]; total: number }) {
+  const scores = participants.map((participant) => participant.testScore).filter((score): score is number => score !== null);
+  const average = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null;
+
+  return (
+    <p className="tabular-nums">
+      Hiển thị {participants.length} trong {total}
+      {average !== null ? (
+        <>
+          {" "}· Điểm trung bình đã nhập: <strong className="font-semibold text-text-strong">{formatScore(Math.round(average * 10) / 10)}</strong>
+        </>
+      ) : null}
+    </p>
   );
 }
 
@@ -498,18 +504,20 @@ function ResultRecord({
   const eligible = isResultEligible(participant);
 
   return (
-    <article className="rounded-lg border border-border-subtle bg-surface-base px-4 py-3" role="listitem">
+    <article className="rounded-lg border border-border-subtle bg-surface-base px-4 py-3 shadow-[var(--panel-shadow)]" role="listitem">
       <div className="flex items-start justify-between gap-3">
         <ParticipantIdentity canViewStudents={canViewStudents} index={index} participant={participant} />
         <AttendanceStatusBadge status={participant.attendanceStatus} />
       </div>
-      <div className="mt-3 grid gap-1.5 text-secondary text-text-muted">
-        <p>Điểm kiểm tra: <span className="font-medium text-text-strong">{formatScore(participant.testScore)}</span></p>
-        <p>Vở: {formatNotebookStatus(participant.notebookStatus)} · Điểm: {formatScore(participant.notebookScore)}</p>
-        <p>{participant.resultComment ?? "Chưa có nhận xét"}</p>
-        {!eligible ? <p>Không được nhập kết quả</p> : null}
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-border-row pt-2 text-secondary text-text-default">
+        <span>Điểm KT <strong className="font-semibold tabular-nums">{formatScore(participant.testScore)}</strong></span>
+        <span>Vở <strong className="font-semibold">{eligible ? formatNotebookStatus(participant.notebookStatus) : "—"}</strong></span>
+        <span>Điểm vở <strong className="font-semibold tabular-nums">{eligible ? formatScore(participant.notebookScore) : "—"}</strong></span>
       </div>
-      <div className="mt-3"><ResultAction canEdit={canEdit} eligible={eligible} fullWidth isPending={isPending} onEdit={onEdit} participant={participant} /></div>
+      <div className="mt-1.5 text-secondary text-text-muted">
+        {!eligible ? <p>Không được nhập kết quả</p> : eligible && participant.resultId === null ? <p className="font-medium text-danger">Bắt buộc: học sinh có mặt phải có kết quả</p> : <p>{participant.resultComment ?? "Chưa có nhận xét"}</p>}
+      </div>
+      <div className="mt-2"><ResultAction canEdit={canEdit} eligible={eligible} fullWidth isPending={isPending} onEdit={onEdit} participant={participant} /></div>
     </article>
   );
 }
@@ -521,15 +529,7 @@ function ParticipantIdentity({ canViewStudents, index, participant }: { canViewS
 function ResultAction({ canEdit, eligible, fullWidth = false, isPending, onEdit, participant }: { canEdit: boolean; eligible: boolean; fullWidth?: boolean; isPending: boolean; onEdit: (participant: SessionParticipantReadModel) => void; participant: SessionParticipantReadModel }) {
   if (!canEdit || !eligible) return <span className="text-caption text-text-muted">Chỉ đọc</span>;
   const action = participant.resultId ? "Sửa kết quả" : "Nhập kết quả";
-  return <Button aria-label={`${action} cho học viên`} className={fullWidth ? "min-h-11 w-full" : undefined} disabled={isPending} onClick={() => onEdit(participant)} size={fullWidth ? "md" : "sm"} type="button" variant="ghost">{action}</Button>;
-}
-
-function TableHeader({ children, className }: { children: ReactNode; className?: string }) {
-  return <th className={`h-10 border-b border-border-subtle px-3 text-left font-semibold ${className ?? ""}`} scope="col">{children}</th>;
-}
-
-function TableCell({ children, className }: { children: ReactNode; className?: string }) {
-  return <td className={`h-14 px-3 align-middle text-table-body ${className ?? ""}`}>{children}</td>;
+  return <Button aria-label={`${action} cho học viên`} className={fullWidth ? "w-full" : undefined} disabled={isPending} onClick={() => onEdit(participant)} size={fullWidth ? "lg" : "sm"} type="button" variant={fullWidth ? "secondary" : "ghost"}>{action}</Button>;
 }
 
 function ResultEditor({
@@ -880,29 +880,9 @@ function AttendanceStatusBadge({
     );
   }
 
-  const labels: Record<
-    SessionAttendanceStatus,
-    string
-  > = {
-    additional_study: "Học thêm",
-    excused_absence: "Vắng có phép",
-    present: "Có mặt",
-    unexcused_absence: "Vắng không phép",
-  };
-
-  const tones: Record<
-    SessionAttendanceStatus,
-    "info" | "neutral" | "success"
-  > = {
-    additional_study: "info",
-    excused_absence: "neutral",
-    present: "success",
-    unexcused_absence: "neutral",
-  };
-
   return (
-    <Badge tone={tones[status]}>
-      {labels[status]}
+    <Badge tone={attendanceStatusTones[status]}>
+      {attendanceStatusLabels[status]}
     </Badge>
   );
 }
