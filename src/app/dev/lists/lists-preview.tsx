@@ -114,7 +114,7 @@ const classes: ClassDirectoryItem[] = classRows.map(([name, code, grade, level, 
 export function ListsPreview({ view }: { view: "students" | "classes" }) {
   return (
     <AppShell
-      authUser={{ displayName: "Phạm Thu Hạnh", email: "hanh@toanthayvinh.vn", id: "dev-user", initials: "PH" }}
+      authUser={{ displayName: "Phạm Thu Hạnh", email: "hanh@example.com", id: "dev-user", initials: "PH" }}
       centerDisplayName="Toán Thầy Vinh"
       permissions={DATABASE_PERMISSION_CODES.filter((code) => code !== "student_care.view")}
       previewPathname={view === "classes" ? "/classes" : "/students"}

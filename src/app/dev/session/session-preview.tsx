@@ -132,7 +132,7 @@ export function SessionPreview({ role, state }: { role: "owner" | "ta"; state: S
     <AppShell
       authUser={{
         displayName: isOwner ? "Nguyễn Văn Vinh" : "Lê Bích Ngọc",
-        email: isOwner ? "vinh@toanthayvinh.vn" : "ngoc@toanthayvinh.vn",
+        email: isOwner ? "vinh@example.com" : "ngoc@example.com",
         id: "dev-user",
         initials: isOwner ? "NV" : "LN",
       }}

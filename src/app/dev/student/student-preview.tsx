@@ -292,7 +292,7 @@ export function StudentPreview({
 
   return (
     <AppShell
-      authUser={{ displayName: role === "ta" ? "Lê Thu Trang" : "Phạm Thu Hạnh", email: "hanh@toanthayvinh.vn", id: "dev-user", initials: role === "ta" ? "LT" : "PH" }}
+      authUser={{ displayName: role === "ta" ? "Lê Thu Trang" : "Phạm Thu Hạnh", email: "hanh@example.com", id: "dev-user", initials: role === "ta" ? "LT" : "PH" }}
       centerDisplayName="Toán Thầy Vinh"
       permissions={permissions}
       previewPathname="/students/student-preview"
