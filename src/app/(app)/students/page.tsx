@@ -56,6 +56,9 @@ export default async function StudentsRoute() {
       canCreateStudent={permissionResult.permissions.includes(
         "students.create",
       )}
+      canImportStudents={permissionResult.permissions.includes(
+        "imports.students",
+      )}
       canManageStatus={permissionResult.permissions.includes(
         "students.manage_status",
       )}

@@ -1,11 +1,14 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent, type ReactNode, type RefObject } from "react";
-import { X } from "lucide-react";
+import { useId, useRef, useState, type ChangeEvent, type ReactNode, type RefObject } from "react";
 
-import { FilterBar } from "@/components/patterns/filter-bar";
-import { Dialog } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import {
+  FilterBar,
+  FilterField,
+  FilterInput,
+  FilterSelect,
+  FilterSheet,
+} from "@/components/patterns/filter-bar";
 import type { StudentDirectoryFiltersState } from "@/features/students/read-models";
 import {
   hasActiveStudentFilters,
@@ -23,6 +26,8 @@ interface StudentFiltersProps {
   ) => void;
   onCloseMobile: () => void;
   onReset: () => void;
+  /** Result count shown on the sheet's confirm button. */
+  resultCount?: number;
   returnFocusRef: RefObject<HTMLElement | null>;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
@@ -37,12 +42,14 @@ export function StudentFilters({
   onFilterChange,
   onCloseMobile,
   onReset,
+  resultCount,
   returnFocusRef,
   searchValue,
   onSearchChange,
   onSearchSubmit,
 }: StudentFiltersProps) {
   const [internalSearch, setInternalSearch] = useState(filters.search);
+  const sheetTitleId = useId();
 
   // Sync internal search when external filters.search changes and no controlled searchValue is provided
   if (searchValue === undefined && internalSearch !== filters.search) {
@@ -71,7 +78,6 @@ export function StudentFilters({
     <FilterFields
       classNames={classNames}
       filters={filters}
-      onReset={onReset}
       onSearchChange={handleSearchInput}
       onSearchSubmit={onSearchSubmit}
       onSelectChange={handleSelectChange}
@@ -80,41 +86,33 @@ export function StudentFilters({
     />
   );
 
+  const isActive = hasActiveStudentFilters({ ...filters, search: currentSearch });
+
   return (
     <>
-      <FilterBar className="students-filter-bar">{fields("desktop")}</FilterBar>
+      <FilterBar
+        activeCount={isActive ? Math.max(activeFilterCount, 1) : 0}
+        className="students-filter-bar"
+        fieldCount={5}
+        label="Bộ lọc học sinh"
+        onReset={onReset}
+      >
+        {fields("desktop")}
+      </FilterBar>
 
-      <Dialog
-        ariaLabelledBy="student-filter-drawer-title"
-        className="ml-auto flex h-full max-h-none max-w-[360px] flex-col rounded-none sm:max-h-[92vh] sm:rounded-xl"
+      <FilterSheet
+        activeCount={activeFilterCount}
         isOpen={isMobileOpen}
         onClose={onCloseMobile}
+        onReset={onReset}
+        resetTestId="mobile-student-reset-filters"
+        resultLabel={resultCount === undefined ? "Xem kết quả" : `Xem ${resultCount} học sinh`}
         returnFocusRef={returnFocusRef}
+        subject="học viên"
+        titleId={sheetTitleId}
       >
-        <div className="flex h-16 items-center justify-between border-b border-border-subtle px-4">
-          <div>
-            <h2 className="text-section-title font-semibold text-text-strong" id="student-filter-drawer-title">
-              Bộ lọc
-            </h2>
-            <p className="text-caption text-text-muted">
-              {activeFilterCount > 0
-                ? `${activeFilterCount} bộ lọc đang áp dụng`
-                : "Lọc danh sách học viên hiện có"}
-            </p>
-          </div>
-
-          <button
-            aria-label="Đóng bộ lọc"
-            className="flex h-11 w-11 items-center justify-center rounded-md text-text-muted hover:bg-interactive-hover hover:text-text-strong focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
-            onClick={onCloseMobile}
-            type="button"
-          >
-            <X aria-hidden="true" size={20} strokeWidth={1.8} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4">{fields("mobile")}</div>
-      </Dialog>
+        {fields("mobile")}
+      </FilterSheet>
     </>
   );
 }
@@ -122,7 +120,6 @@ export function StudentFilters({
 interface FilterFieldsProps {
   classNames: string[];
   filters: StudentDirectoryFiltersState;
-  onReset: () => void;
   onSearchChange: (value: string) => void;
   onSearchSubmit?: () => void;
   onSelectChange: (
@@ -136,7 +133,6 @@ interface FilterFieldsProps {
 function FilterFields({
   classNames,
   filters,
-  onReset,
   onSearchChange,
   onSearchSubmit,
   onSelectChange,
@@ -146,13 +142,12 @@ function FilterFields({
   const isComposingRef = useRef(false);
 
   return (
-    <div className="students-filter-fields grid gap-3">
-      <label className="grid gap-1.5 text-label font-medium text-text-muted">
-        Tìm kiếm
-        <input
+    <>
+      <FilterField label="Tìm kiếm">
+        <FilterInput
+          active={searchValue.trim().length > 0}
           autoComplete="off"
           autoCorrect="off"
-          className="h-10 rounded-md border border-border-subtle bg-field-bg px-3 text-body text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring"
           data-testid={`${scope}-student-search`}
           onChange={(event) => onSearchChange(event.target.value)}
           onCompositionStart={() => {
@@ -168,14 +163,26 @@ function FilterFields({
               onSearchSubmit?.();
             }
           }}
-          placeholder="Tên, mã, phụ huynh hoặc SĐT"
+          placeholder="Tên, mã TTV, SĐT phụ huynh"
           spellCheck={false}
           type="search"
           value={searchValue}
         />
-      </label>
+      </FilterField>
 
-      <FilterSelect
+      <SelectFilter
+        label="Lớp"
+        onChange={(event) => onSelectChange("className", event)}
+        testId={`${scope}-student-class`}
+        value={filters.className}
+      >
+        <option value="all">Tất cả lớp</option>
+        {classNames.map((className) => (
+          <option key={className} value={className}>{className}</option>
+        ))}
+      </SelectFilter>
+
+      <SelectFilter
         label="Trạng thái"
         onChange={(event) => onSelectChange("status", event)}
         testId={`${scope}-student-status`}
@@ -185,21 +192,9 @@ function FilterFields({
         {studentStatusOptions.map((status) => (
           <option key={status.value} value={status.value}>{status.label}</option>
         ))}
-      </FilterSelect>
+      </SelectFilter>
 
-      <FilterSelect
-        label="Lớp chính"
-        onChange={(event) => onSelectChange("className", event)}
-        testId={`${scope}-student-class`}
-        value={filters.className}
-      >
-        <option value="all">Tất cả lớp</option>
-        {classNames.map((className) => (
-          <option key={className} value={className}>{className}</option>
-        ))}
-      </FilterSelect>
-
-      <FilterSelect
+      <SelectFilter
         label="Khối"
         onChange={(event) => onSelectChange("grade", event)}
         testId={`${scope}-student-grade`}
@@ -209,9 +204,9 @@ function FilterFields({
         {Array.from({ length: 12 }).map((_, index) => (
           <option key={index + 1} value={String(index + 1)}>Khối {index + 1}</option>
         ))}
-      </FilterSelect>
+      </SelectFilter>
 
-      <FilterSelect
+      <SelectFilter
         label="Mức"
         onChange={(event) => onSelectChange("learningLevel", event)}
         testId={`${scope}-student-level`}
@@ -221,9 +216,9 @@ function FilterFields({
         <option value="A">Mức A</option>
         <option value="B">Mức B</option>
         <option value="CLC">CLC</option>
-      </FilterSelect>
+      </SelectFilter>
 
-      <FilterSelect
+      <SelectFilter
         label="Hình thức"
         onChange={(event) => onSelectChange("registeredMode", event)}
         testId={`${scope}-student-mode`}
@@ -232,25 +227,12 @@ function FilterFields({
         <option value="all">Tất cả</option>
         <option value="online">Online</option>
         <option value="offline">Offline</option>
-      </FilterSelect>
-
-      {hasActiveStudentFilters({ ...filters, search: searchValue }) ? (
-        <div className="flex items-end">
-          <Button
-            className="min-h-10 w-full"
-            data-testid={`${scope}-student-reset-filters`}
-            onClick={onReset}
-            variant="ghost"
-          >
-            Xóa lọc
-          </Button>
-        </div>
-      ) : null}
-    </div>
+      </SelectFilter>
+    </>
   );
 }
 
-interface FilterSelectProps {
+interface SelectFilterProps {
   children: ReactNode;
   label: string;
   onChange: (event: ChangeEvent<HTMLSelectElement>) => void;
@@ -258,24 +240,12 @@ interface FilterSelectProps {
   value: string;
 }
 
-function FilterSelect({
-  children,
-  label,
-  onChange,
-  testId,
-  value,
-}: FilterSelectProps) {
+function SelectFilter({ children, label, onChange, testId, value }: SelectFilterProps) {
   return (
-    <label className="grid gap-1.5 text-label font-medium text-text-muted">
-      {label}
-      <select
-        className="h-10 rounded-md border border-border-subtle bg-field-bg px-3 text-body text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring"
-        data-testid={testId}
-        onChange={onChange}
-        value={value}
-      >
+    <FilterField label={label}>
+      <FilterSelect active={value !== "all"} data-testid={testId} onChange={onChange} value={value}>
         {children}
-      </select>
-    </label>
+      </FilterSelect>
+    </FilterField>
   );
 }

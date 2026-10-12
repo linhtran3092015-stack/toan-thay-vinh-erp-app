@@ -3,6 +3,11 @@
 import { useEffect, useDeferredValue, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { BulkActionBar } from "@/components/patterns/bulk-action-bar";
+import { FilterInput } from "@/components/patterns/filter-bar";
+import { TableState } from "@/components/patterns/data-table-frame";
+import { Pagination } from "@/components/patterns/pagination";
+import { QuickFilterChips, type QuickFilterChip } from "@/components/patterns/quick-filter-chips";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { Button } from "@/components/ui/button";
 import { BulkStatusTransitionDialog } from "./components/bulk-status-transition-dialog";
@@ -21,6 +26,7 @@ import {
   hasActiveStudentFilters,
   countActiveStudentFilters,
   paginateStudents,
+  studentStatusMeta,
 } from "./student-filters";
 import {
   getStudentDirectoryHref,
@@ -33,12 +39,18 @@ import type { StudentLifecycleStatus } from "@/types/domain";
 
 interface StudentListPageProps {
   canCreateStudent?: boolean;
+  canImportStudents?: boolean;
   canManageStatus?: boolean;
   students: StudentDirectoryItem[];
 }
 
+/** Quick chips map straight onto the lifecycle status filter. */
+const quickStatusValues = ["all", "active", "reserved", "waiting_class", "withdrawn"] as const;
+type QuickStatusValue = (typeof quickStatusValues)[number];
+
 export function StudentListPage({
   canCreateStudent = false,
+  canImportStudents = false,
   canManageStatus = false,
   students,
 }: StudentListPageProps) {
@@ -46,6 +58,7 @@ export function StudentListPage({
   const searchParams = useSearchParams();
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [isBulkTransitionOpen, setIsBulkTransitionOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
 
   const classNames = useMemo(
@@ -131,6 +144,28 @@ export function StudentListPage({
     [indexedStudents, deferredFilters],
   );
 
+  // Chip counts respect every other filter so the numbers match what a click shows.
+  const statusCounts = useMemo(() => {
+    const base = filterIndexedStudents(indexedStudents, { ...deferredFilters, status: "all" });
+    const counts = new Map<string, number>();
+    for (const student of base) {
+      counts.set(student.lifecycleStatus, (counts.get(student.lifecycleStatus) ?? 0) + 1);
+    }
+    return { counts, total: base.length };
+  }, [indexedStudents, deferredFilters]);
+
+  const quickChips: QuickFilterChip<QuickStatusValue>[] = quickStatusValues.map((value) => ({
+    value,
+    label: value === "all" ? "Tất cả" : studentStatusMeta[value as StudentLifecycleStatus].label,
+    count: value === "all" ? statusCounts.total : (statusCounts.counts.get(value) ?? 0),
+  }));
+
+  const lifecycleSummary = useMemo(() => {
+    const count = (status: StudentLifecycleStatus) =>
+      students.filter((student) => student.lifecycleStatus === status).length;
+    return `${count("active")} đang học · ${count("reserved")} bảo lưu · ${count("withdrawn")} đã nghỉ`;
+  }, [students]);
+
   const pagination = useMemo(
     () => paginateStudents(filteredStudents, page),
     [filteredStudents, page],
@@ -180,6 +215,34 @@ export function StudentListPage({
     }
   };
 
+  const toggleStudent = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleAll = (ids: string[], checked: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const id of ids) {
+        if (checked) {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
   const directoryQuery = useMemo(() => {
     const params = serializeStudentDirectoryViewState(new URLSearchParams(), {
       filters,
@@ -193,20 +256,49 @@ export function StudentListPage({
   const createHref = directoryQuery
     ? `/students/new?${directoryQuery}`
     : "/students/new";
+  const isEmptyByFilter = filteredStudents.length === 0 && hasActiveFilters;
+  const summarySuffix =
+    filters.className !== "all" ? `lọc theo lớp ${filters.className}` : undefined;
+
+  const emptyByFilterState = (
+    <TableState>
+      <p className="text-body font-semibold text-text-strong">Không có học sinh khớp bộ lọc</p>
+      <p className="text-secondary text-text-muted">Nới rộng điều kiện hoặc xóa bộ lọc để xem lại danh sách.</p>
+      <Button className="mt-2" onClick={resetFilters} size="sm" variant="secondary">
+        Xóa lọc
+      </Button>
+    </TableState>
+  );
 
   return (
-    <div className="students-directory grid gap-6">
+    <div className="students-directory grid gap-5">
       <StudentListToolbar
         activeFilterCount={activeFilterCount}
         canCreateStudent={canCreateStudent}
+        canImportStudents={canImportStudents}
         canManageStatus={canManageStatus}
         createHref={createHref}
         filterButtonRef={filterTriggerRef}
         onOpenBulkTransition={() => setIsBulkTransitionOpen(true)}
         onOpenFilters={() => setIsMobileFiltersOpen(true)}
         resultCount={filteredStudents.length}
+        summary={lifecycleSummary}
         totalCount={students.length}
       />
+
+      {/* Narrow layouts search inline (design 06c); the other fields live in the sheet. */}
+      <div className="students-mobile-search">
+        <FilterInput
+          active={filters.search.trim().length > 0}
+          aria-label="Tìm học sinh"
+          autoComplete="off"
+          className="h-11"
+          onChange={(event) => handleSearchChange(event.target.value)}
+          placeholder="Tên, mã, SĐT phụ huynh"
+          type="search"
+          value={filters.search}
+        />
+      </div>
 
       <StudentFilters
         activeFilterCount={activeFilterCount}
@@ -218,47 +310,96 @@ export function StudentListPage({
         onReset={resetFilters}
         onSearchChange={handleSearchChange}
         onSearchSubmit={handleSearchSubmit}
+        resultCount={filteredStudents.length}
         returnFocusRef={filterTriggerRef}
         searchValue={filters.search}
       />
 
-      {filteredStudents.length === 0 ? (
-        <StudentListEmptyState
-          hasActiveFilters={hasActiveFilters}
-        />
-      ) : (
-        <>
-          <div className="students-directory-results">
-            <p aria-live="polite" className="mb-3 text-secondary text-text-muted">
-              Hiển thị {pagination.start}-{pagination.end} của {filteredStudents.length} học viên
-            </p>
-            <StudentTable
-              directoryQuery={directoryQuery}
-              students={pagination.rows}
-            />
-            <ResponsiveRecordList
-              className="students-directory-record-list"
-              label="Danh sách học viên"
-            >
-              {pagination.rows.map((student) => (
-                <StudentMobileCard
-                  directoryQuery={directoryQuery}
-                  key={student.id}
-                  student={student}
-                />
-              ))}
-            </ResponsiveRecordList>
-          </div>
+      <QuickFilterChips
+        chips={quickChips}
+        label="Lọc nhanh theo trạng thái"
+        onChange={(value) => updateFilter("status", value)}
+        value={(quickStatusValues as readonly string[]).includes(filters.status) ? (filters.status as QuickStatusValue) : "all"}
+      />
 
-          <StudentPagination
-            end={pagination.end}
-            onPageChange={updatePage}
-            page={pagination.page}
-            pageCount={pagination.pageCount}
-            start={pagination.start}
-            total={filteredStudents.length}
+      {canManageStatus ? (
+        <BulkActionBar onClear={clearSelection} selectedCount={selectedIds.size} subject="học sinh">
+          <Button onClick={() => setIsBulkTransitionOpen(true)} size="sm" variant="secondary">
+            Chuyển trạng thái…
+          </Button>
+        </BulkActionBar>
+      ) : null}
+
+      {filteredStudents.length === 0 && !hasActiveFilters ? (
+        <StudentListEmptyState hasActiveFilters={false} />
+      ) : (
+        <div className="students-directory-results grid gap-3">
+          <p aria-live="polite" className="sr-only">
+            Hiển thị {pagination.start}-{pagination.end} của {filteredStudents.length} học sinh
+          </p>
+          <StudentTable
+            directoryQuery={directoryQuery}
+            empty={emptyByFilterState}
+            footer={
+              <Pagination
+                itemLabel="học sinh"
+                label="Phân trang học sinh"
+                onPageChange={updatePage}
+                page={pagination.page}
+                pageCount={pagination.pageCount}
+                rangeEnd={pagination.end}
+                rangeStart={pagination.start}
+                summarySuffix={summarySuffix}
+                total={filteredStudents.length}
+                variant="frame"
+              />
+            }
+            onToggleAll={toggleAll}
+            onToggleStudent={toggleStudent}
+            selectable={canManageStatus}
+            selectedIds={selectedIds}
+            status={isEmptyByFilter ? "empty" : "ready"}
+            students={pagination.rows}
           />
-        </>
+
+          <div className="students-directory-record-list grid gap-2">
+            <p className="flex items-center justify-between text-secondary text-text-muted">
+              <span>
+                {filteredStudents.length} học sinh{summarySuffix ? ` · ${filters.className}` : ""}
+              </span>
+              {hasActiveFilters ? (
+                <button className="font-semibold text-action-primary" onClick={resetFilters} type="button">
+                  Xóa lọc
+                </button>
+              ) : null}
+            </p>
+            {isEmptyByFilter ? (
+              <div className="rounded-lg border border-border-subtle bg-surface-base">{emptyByFilterState}</div>
+            ) : (
+              <>
+                <ResponsiveRecordList label="Danh sách học sinh">
+                  {pagination.rows.map((student) => (
+                    <StudentMobileCard
+                      directoryQuery={directoryQuery}
+                      key={student.id}
+                      student={student}
+                    />
+                  ))}
+                </ResponsiveRecordList>
+                <Pagination
+                  itemLabel="học sinh"
+                  label="Phân trang học sinh (danh sách gọn)"
+                  onPageChange={updatePage}
+                  page={pagination.page}
+                  pageCount={pagination.pageCount}
+                  rangeEnd={pagination.end}
+                  rangeStart={pagination.start}
+                  total={filteredStudents.length}
+                />
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       <BulkStatusTransitionDialog
@@ -270,72 +411,11 @@ export function StudentListPage({
         isOpen={isBulkTransitionOpen}
         onClose={() => setIsBulkTransitionOpen(false)}
         onSuccess={() => {
+          clearSelection();
           router.refresh();
         }}
+        selectedStudentIds={Array.from(selectedIds)}
       />
     </div>
-  );
-}
-
-interface StudentPaginationProps {
-  end: number;
-  onPageChange: (page: number) => void;
-  page: number;
-  pageCount: number;
-  start: number;
-  total: number;
-}
-
-function StudentPagination({
-  end,
-  onPageChange,
-  page,
-  pageCount,
-  start,
-  total,
-}: StudentPaginationProps) {
-  const pages = Array.from({ length: pageCount }, (_, index) => index + 1);
-
-  return (
-    <nav
-      aria-label="Phân trang học viên"
-      className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-base px-4 py-3 text-body text-text-muted md:flex-row md:items-center md:justify-between"
-    >
-      <p>
-        Hiển thị {start}-{end} của {total} học viên · Trang {page}/{pageCount}
-      </p>
-
-      <div className="flex flex-wrap gap-2">
-        <Button
-          className="min-h-11"
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
-          variant="outline"
-        >
-          Trước
-        </Button>
-
-        {pages.map((pageNumber) => (
-          <Button
-            aria-current={pageNumber === page ? "page" : undefined}
-            className="min-h-11 min-w-11"
-            key={pageNumber}
-            onClick={() => onPageChange(pageNumber)}
-            variant={pageNumber === page ? "secondary" : "ghost"}
-          >
-            {pageNumber}
-          </Button>
-        ))}
-
-        <Button
-          className="min-h-11"
-          disabled={page >= pageCount}
-          onClick={() => onPageChange(page + 1)}
-          variant="outline"
-        >
-          Sau
-        </Button>
-      </div>
-    </nav>
   );
 }

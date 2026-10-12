@@ -52,6 +52,9 @@ export default async function ClassesRoute() {
       canCreateClass={permissionResult.permissions.includes(
         "classes.create",
       )}
+      canImportClasses={permissionResult.permissions.includes(
+        "imports.classes",
+      )}
       classes={directoryResult.classes}
     />
   );

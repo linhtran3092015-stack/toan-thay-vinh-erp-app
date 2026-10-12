@@ -121,6 +121,37 @@ const sizes: Record<ButtonSize, { base: string; iconOnly: string; padding?: stri
   lg: { base: "h-11 rounded-md text-control", iconOnly: "w-11" },
 };
 
+const baseClassName =
+  "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus focus-visible:shadow-[0_0_0_5px_var(--focus-ring)] disabled:pointer-events-none";
+
+/**
+ * Button presentation for non-button elements (e.g. a `Link` that must look
+ * like the page's primary action). Keeps one source of truth for the styles.
+ */
+export function getButtonClassName({
+  className,
+  iconOnly = false,
+  size = "md",
+  variant = "primary",
+}: {
+  className?: string;
+  iconOnly?: boolean;
+  size?: ButtonSize;
+  variant?: ButtonVariant;
+} = {}): string {
+  const presentation = variants[variant];
+  const sizing = sizes[size];
+
+  return cn(
+    baseClassName,
+    presentation.base,
+    presentation.disabled,
+    sizing.base,
+    iconOnly ? cn("px-0", sizing.iconOnly) : (sizing.padding ?? presentation.padding),
+    className,
+  );
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
   className,
   size = "md",
@@ -149,7 +180,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
           : ariaDescribedBy
       }
       className={cn(
-        "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus focus-visible:shadow-[0_0_0_5px_var(--focus-ring)] disabled:pointer-events-none",
+        baseClassName,
         presentation.base,
         isLoading ? presentation.pending : presentation.disabled,
         sizing.base,

@@ -345,19 +345,23 @@ body::before {
   display: inline-flex;
 }
 
-@container (min-width: 1120px) {
-  .students-filter-bar,
+.students-mobile-search {
+  display: flex;
+}
+
+@container (min-width: 1042px) {
+  .students-filter-bar {
+    display: grid;
+  }
+
   .students-directory-table {
     display: block;
   }
 
   .students-filter-trigger,
+  .students-mobile-search,
   .students-directory-record-list {
     display: none;
-  }
-
-  .students-filter-fields {
-    grid-template-columns: minmax(260px, 1.5fr) repeat(5, minmax(132px, 1fr)) auto;
   }
 }
 
@@ -379,19 +383,23 @@ body::before {
   display: inline-flex;
 }
 
-@container (min-width: 1200px) {
-  .classes-filter-bar,
+.classes-mobile-search {
+  display: flex;
+}
+
+@container (min-width: 1082px) {
+  .classes-filter-bar {
+    display: grid;
+  }
+
   .classes-directory-table {
     display: block;
   }
 
   .classes-filter-trigger,
+  .classes-mobile-search,
   .classes-directory-record-list {
     display: none;
-  }
-
-  .classes-filter-fields {
-    grid-template-columns: minmax(240px, 1.45fr) repeat(5, minmax(120px, 1fr)) auto;
   }
 }
 
