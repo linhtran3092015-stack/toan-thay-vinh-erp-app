@@ -22,7 +22,7 @@ import { RosterSearch, matchesRosterSearch } from "@/features/sessions/component
 
 import { Badge } from "@/components/ui/badge";
 import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
-import { attendanceStatusLabels, attendanceStatusTones } from "@/features/sessions/components/attendance-status-group";
+import { attendanceStatusLabels, attendanceStatusTones, formatScore, notebookStatusLabels } from "@/features/sessions/components/attendance-status-group";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
@@ -439,17 +439,17 @@ function ResultTableRow({
         <AttendanceStatusBadge status={participant.attendanceStatus} />
       </TableCell>
       <TableCell className={`w-[112px] font-semibold ${participant.testScore === null ? "text-text-subtle" : "text-text-strong"}`} numeric>
-        {formatScore(participant.testScore)}
+        {formatScore(participant.testScore, "Chưa nhập")}
       </TableCell>
       <TableCell className={`w-[150px] text-secondary ${eligible ? "text-text-default" : "text-text-subtle"}`}>
         {eligible ? formatNotebookStatus(participant.notebookStatus) : "—"}
       </TableCell>
       <TableCell className={`w-[96px] ${participant.notebookScore === null ? "text-text-subtle" : "text-text-strong"}`} numeric>
-        {eligible ? formatScore(participant.notebookScore) : "—"}
+        {eligible ? formatScore(participant.notebookScore, "Chưa nhập") : "—"}
       </TableCell>
       <TableCell className="max-w-[300px] text-secondary text-text-muted">
         {!eligible ? (
-          <span className="text-text-subtle">Không nhập cho học sinh vắng</span>
+          <span className="text-text-muted">Không nhập cho học sinh vắng</span>
         ) : missing ? (
           <span className="font-medium text-danger">Bắt buộc: học sinh có mặt phải có kết quả</span>
         ) : (
@@ -510,9 +510,9 @@ function ResultRecord({
         <AttendanceStatusBadge status={participant.attendanceStatus} />
       </div>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-border-row pt-2 text-secondary text-text-default">
-        <span>Điểm KT <strong className="font-semibold tabular-nums">{formatScore(participant.testScore)}</strong></span>
+        <span>Điểm KT <strong className="font-semibold tabular-nums">{formatScore(participant.testScore, "Chưa nhập")}</strong></span>
         <span>Vở <strong className="font-semibold">{eligible ? formatNotebookStatus(participant.notebookStatus) : "—"}</strong></span>
-        <span>Điểm vở <strong className="font-semibold tabular-nums">{eligible ? formatScore(participant.notebookScore) : "—"}</strong></span>
+        <span>Điểm vở <strong className="font-semibold tabular-nums">{eligible ? formatScore(participant.notebookScore, "Chưa nhập") : "—"}</strong></span>
       </div>
       <div className="mt-1.5 text-secondary text-text-muted">
         {!eligible ? <p>Không được nhập kết quả</p> : eligible && participant.resultId === null ? <p className="font-medium text-danger">Bắt buộc: học sinh có mặt phải có kết quả</p> : <p>{participant.resultComment ?? "Chưa có nhận xét"}</p>}
@@ -523,7 +523,7 @@ function ResultRecord({
 }
 
 function ParticipantIdentity({ canViewStudents, index, participant }: { canViewStudents: boolean; index: number; participant: SessionParticipantReadModel }) {
-  return <div className="min-w-0"><p className="text-body font-semibold text-text-strong">{canViewStudents ? participant.studentName ?? "Chưa có tên học viên" : `Học viên ${index + 1}`}</p>{canViewStudents && participant.studentCode ? <p className="mt-0.5 font-mono text-caption text-text-muted">{participant.studentCode}</p> : null}</div>;
+  return <div className="min-w-0"><p className="text-body font-semibold text-text-strong">{canViewStudents ? participant.studentName ?? "Chưa có tên học viên" : `Học viên ${index + 1}`}</p>{canViewStudents && participant.studentCode ? <p className="mt-0.5 text-caption tabular-nums text-text-muted">{participant.studentCode}</p> : null}</div>;
 }
 
 function ResultAction({ canEdit, eligible, fullWidth = false, isPending, onEdit, participant }: { canEdit: boolean; eligible: boolean; fullWidth?: boolean; isPending: boolean; onEdit: (participant: SessionParticipantReadModel) => void; participant: SessionParticipantReadModel }) {
@@ -1022,39 +1022,12 @@ function optionalText(
     : null;
 }
 
-function formatScore(
-  value: number | null,
-): string {
-  if (value === null) {
-    return "Chưa nhập";
-  }
-
-  return new Intl.NumberFormat(
-    "vi-VN",
-    {
-      maximumFractionDigits: 2,
-    },
-  ).format(value);
-}
-
 function formatNotebookStatus(
   value:
     | SessionNotebookStatus
     | null,
 ): string {
-  if (value === "submitted") {
-    return "Đã nộp";
-  }
-
-  if (value === "not_required") {
-    return "Không yêu cầu";
-  }
-
-  if (value === "not_submitted") {
-    return "Chưa nộp";
-  }
-
-  return "Chưa có kết quả";
+  return value ? notebookStatusLabels[value] : "Chưa có kết quả";
 }
 
 function firstError(

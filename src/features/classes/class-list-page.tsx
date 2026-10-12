@@ -43,6 +43,7 @@ import {
   resetClassDirectoryViewState,
 } from "./class-directory-url-state";
 import type { ClassDirectoryItem } from "./read-models";
+import { formatLearningMode } from "@/lib/format";
 
 interface ClassListPageProps { canCreateClass: boolean; canImportClasses?: boolean; classes: ClassDirectoryItem[]; }
 
@@ -155,7 +156,7 @@ function ClassFilterFields({ filters, onFilterChange, scope, years }: { filters:
     <SelectField label="Năm học" testId={`${scope}-class-year`} value={filters.year} onChange={update("year")}><option value="all">Tất cả năm học</option>{years.map((year) => <option key={year} value={year}>{year}</option>)}</SelectField>
     <SelectField label="Khối" testId={`${scope}-class-grade`} value={filters.grade} onChange={update("grade")}><option value="all">Khối 1–12</option>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>Khối {index + 1}</option>)}</SelectField>
     <SelectField label="Mức" testId={`${scope}-class-level`} value={filters.level} onChange={update("level")}><option value="all">A/B/CLC</option><option value="A">Mức A</option><option value="B">Mức B</option><option value="CLC">CLC</option></SelectField>
-    <SelectField label="Hình thức" testId={`${scope}-class-mode`} value={filters.mode} onChange={update("mode")}><option value="all">Tất cả</option><option value="offline">Offline</option><option value="online">Online</option><option value="hybrid">Kết hợp</option></SelectField>
+    <SelectField label="Hình thức" testId={`${scope}-class-mode`} value={filters.mode} onChange={update("mode")}><option value="all">Tất cả</option><option value="offline">Tại lớp</option><option value="online">Trực tuyến</option><option value="hybrid">Kết hợp</option></SelectField>
     <SelectField label="Trạng thái" testId={`${scope}-class-status`} value={filters.status} onChange={update("status")}><option value="all">Tất cả</option><option value="draft">Nháp</option><option value="active">Đang hoạt động</option><option value="closed">Đã đóng</option><option value="archived">Lưu trữ</option></SelectField>
   </>;
 }
@@ -169,18 +170,18 @@ function ClassTableRow({ directoryQuery, item }: { directoryQuery: string; item:
   const href = classHref(item.id, directoryQuery);
   return <TableRow tall>
     <TableCell><Link className="font-semibold text-text-strong hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus" href={href}>{item.name}</Link><span className="block text-caption leading-[14px] tabular-nums text-text-muted">{item.code}{item.academicYear?.code ? ` · ${item.academicYear.code}` : ""}</span></TableCell>
-    <TableCell className="w-[120px] text-secondary text-text-default">{item.academicYear?.code ?? <span className="text-text-subtle">Chưa xác định</span>}</TableCell>
-    <TableCell className="w-[200px] text-secondary text-text-default">{item.grade} · {item.level} · {formatMode(item.defaultLearningMode)}</TableCell>
+    <TableCell className="w-[120px] text-secondary text-text-default">{item.academicYear?.code ?? <span className="text-text-muted">Chưa xác định</span>}</TableCell>
+    <TableCell className="w-[200px] text-secondary text-text-default">{item.grade} · {item.level} · {formatLearningMode(item.defaultLearningMode)}</TableCell>
     <TableCell className="w-[96px]" numeric>{item.weeklySessionCount}</TableCell>
     <TableCell className="w-[112px]" numeric>{item.activeScheduleCount === 0 ? <Badge tone="warning">Chưa xếp</Badge> : item.activeScheduleCount}</TableCell>
-    <TableCell className="w-[104px]" numeric>{item.activeStudentCount ?? <span className="text-caption text-text-subtle">Không có quyền</span>}</TableCell>
+    <TableCell className="w-[104px]" numeric>{item.activeStudentCount ?? <span className="text-caption text-text-muted">Không có quyền</span>}</TableCell>
     <TableCell className="w-[150px]"><ClassStatusBadge status={item.status} /></TableCell>
     <TableCell className="w-[80px]" numeric><Link aria-label={`Mở lớp ${item.name}`} className="inline-flex h-8 items-center rounded-md px-2 text-secondary font-semibold text-action-link hover:bg-interactive-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus" href={href}>Mở</Link></TableCell>
   </TableRow>;
 }
 function ClassRecord({ directoryQuery, item }: { directoryQuery: string; item: ClassDirectoryItem }) {
   const href = classHref(item.id, directoryQuery);
-  return <RecordListItem ariaLabel={`Mở lớp ${item.name}`} badge={<ClassStatusBadge status={item.status} />} href={href} meta={`${item.code} · ${item.academicYear?.code ?? "Chưa xác định"} · Khối ${item.grade} · ${item.level} · ${formatMode(item.defaultLearningMode)}`} metrics={<>
+  return <RecordListItem ariaLabel={`Mở lớp ${item.name}`} badge={<ClassStatusBadge status={item.status} />} href={href} meta={`${item.code} · ${item.academicYear?.code ?? "Chưa xác định"} · Khối ${item.grade} · ${item.level} · ${formatLearningMode(item.defaultLearningMode)}`} metrics={<>
     <span>Buổi/tuần <strong className="font-semibold">{item.weeklySessionCount}</strong></span>
     <span>Lịch <strong className="font-semibold">{item.activeScheduleCount === 0 ? "Chưa xếp" : item.activeScheduleCount}</strong></span>
     <span className="ml-auto">Học viên: <strong className="font-semibold">{item.activeStudentCount ?? "Không có quyền"}</strong></span>
@@ -188,4 +189,3 @@ function ClassRecord({ directoryQuery, item }: { directoryQuery: string; item: C
 }
 function ClassStatusBadge({ status }: { status: string }) { const value = Object.hasOwn(classStatusMeta, status) ? classStatusMeta[status as keyof typeof classStatusMeta] : { label: `Trạng thái chưa hỗ trợ: ${status}`, tone: "neutral" as const }; return <Badge tone={value.tone}>{value.label}</Badge>; }
 function classHref(id: string, query: string) { return query ? `/classes/${id}?${query}` : `/classes/${id}`; }
-function formatMode(mode: ClassDirectoryItem["defaultLearningMode"]) { return mode === "offline" ? "Tại lớp" : mode === "online" ? "Trực tuyến" : "Kết hợp"; }

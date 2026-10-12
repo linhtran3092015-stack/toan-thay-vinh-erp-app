@@ -36,12 +36,3 @@ export function SortableTableHeader<K extends string>({ children, className, num
     </th>
   );
 }
-
-/** Plain header cell with the same spacing, for columns that do not sort. */
-export function TableHeaderCell({ children, className, numeric }: { children: ReactNode; className?: string; numeric?: boolean }) {
-  return (
-    <th className={cn("h-10 whitespace-nowrap px-3 text-left font-semibold first:pl-4 last:pr-4", numeric && "text-right", className)} scope="col">
-      {children}
-    </th>
-  );
-}

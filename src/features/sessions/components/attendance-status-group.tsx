@@ -1,12 +1,11 @@
-import type { SessionAttendanceStatus } from "@/features/sessions/detail-read-models";
+import {
+  SESSION_ATTENDANCE_STATUSES,
+  type SessionAttendanceStatus,
+  type SessionNotebookStatus,
+} from "@/features/sessions/detail-read-models";
 import { cn } from "@/lib/utils";
 
-export const attendanceStatusOrder: readonly SessionAttendanceStatus[] = [
-  "present",
-  "additional_study",
-  "excused_absence",
-  "unexcused_absence",
-];
+export const attendanceStatusOrder: readonly SessionAttendanceStatus[] = SESSION_ATTENDANCE_STATUSES;
 
 export const attendanceStatusLabels: Record<SessionAttendanceStatus, string> = {
   additional_study: "Học thêm",
@@ -14,6 +13,20 @@ export const attendanceStatusLabels: Record<SessionAttendanceStatus, string> = {
   present: "Có mặt",
   unexcused_absence: "Vắng không phép",
 };
+
+export const notebookStatusLabels: Record<SessionNotebookStatus, string> = {
+  not_required: "Không yêu cầu",
+  not_submitted: "Chưa nộp",
+  submitted: "Đã nộp",
+};
+
+/** Scores are 0–10 stored as numeric(4,2) and entered in 0.01 steps, so keep two decimals. */
+export const scoreFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
+
+/** Formats a 0–10 score; `emptyLabel` replaces a missing score (defaults to "—"). */
+export function formatScore(value: number | null, emptyLabel = "—"): string {
+  return value === null ? emptyLabel : scoreFormatter.format(value);
+}
 
 /** Compact labels for the 4-up mobile grid. */
 const compactLabels: Record<SessionAttendanceStatus, string> = {

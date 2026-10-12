@@ -1,4 +1,8 @@
-import type { SessionAttendanceStatus } from "@/features/sessions/detail-read-models";
+import {
+  isSessionAttendanceStatus,
+  SESSION_ATTENDANCE_STATUSES,
+  type SessionAttendanceStatus,
+} from "@/features/sessions/detail-read-models";
 
 /**
  * Plain read models and pure summaries for the student profile activity feeds.
@@ -37,16 +41,9 @@ export interface StudentAttendanceHistory {
   total: number;
 }
 
-export const attendanceStatuses: readonly SessionAttendanceStatus[] = [
-  "present",
-  "additional_study",
-  "excused_absence",
-  "unexcused_absence",
-];
-
-export function isAttendanceStatus(value: string): value is SessionAttendanceStatus {
-  return (attendanceStatuses as readonly string[]).includes(value);
-}
+/** Aliases kept for existing importers; the source of truth lives in sessions/detail-read-models. */
+export const attendanceStatuses = SESSION_ATTENDANCE_STATUSES;
+export const isAttendanceStatus = isSessionAttendanceStatus;
 
 export function summarizeAttendance(
   items: StudentAttendanceHistoryItem[],

@@ -1,14 +1,35 @@
 import { createRef, useRef, useState } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudentFilters } from "@/features/students/components/student-filters";
+import { StudentListPage } from "@/features/students/student-list-page";
 import { StudentMobileCard } from "@/features/students/components/student-mobile-card";
 import {
   countActiveStudentFilters,
   defaultStudentFilters,
 } from "@/features/students/student-filters";
 import type { StudentDirectoryItem } from "@/features/students/read-models";
+
+/** StudentListPage reads the query once and then owns filter state; only the initial params matter here. */
+const navigation = vi.hoisted(() => ({
+  refresh: vi.fn(),
+  state: { params: new URLSearchParams() },
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: navigation.refresh, replace: vi.fn() }),
+  useSearchParams: () => navigation.state.params,
+}));
+vi.mock("@/features/students/bulk-status-actions", () => ({
+  executeBulkStudentStatusTransitionAction: vi.fn(),
+  previewBulkStudentStatusTransitionAction: vi.fn(),
+}));
+
+afterEach(() => {
+  cleanup();
+  navigation.state.params = new URLSearchParams();
+  window.history.replaceState(window.history.state, "", "/");
+});
 
 const student: StudentDirectoryItem = {
   activeEnrollment: null,
@@ -178,5 +199,39 @@ describe("Students directory presentation", () => {
     fireEvent.click(screen.getByTestId("mobile-student-reset-filters"));
     expect(screen.getByText("Lọc danh sách học viên hiện có")).toBeInTheDocument();
     expect(screen.queryByText(/bộ lọc đang áp dụng/)).not.toBeInTheDocument();
+  });
+});
+
+// Value: protects=bulk status transition only targets students visible under the current filter; fails_when=selectedIds survives a status chip/filter/search/page change so "Chuyển trạng thái…" acts on hidden rows, or "Tất cả" stays pressed while the list is narrowed to a non-chip status; why_new=no test rendered StudentListPage, so selection lifecycle and chip pressed-state were unprotected; seam=none; no_claim=does not prove the bulk server action or URL history sync
+describe("Students directory page selection and quick chips", () => {
+  const reservedStudent: StudentDirectoryItem = {
+    ...student,
+    fullName: "Trần Gia Bảo",
+    id: "student-2",
+    lifecycleStatus: "reserved",
+    primaryGuardian: null,
+    publicCode: "HV-002",
+  };
+
+  it("clears bulk selection when the filter changes", () => {
+    render(<StudentListPage canManageStatus students={[student, reservedStudent]} />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Chọn Nguyễn Thảo Vy" }));
+    expect(screen.getByRole("region", { name: "Đã chọn 1 học sinh" })).toBeInTheDocument();
+
+    const chips = screen.getByRole("group", { name: "Lọc nhanh theo trạng thái" });
+    fireEvent.click(within(chips).getByRole("button", { name: /Bảo lưu/ }));
+
+    expect(screen.queryByRole("region", { name: /Đã chọn/ })).not.toBeInTheDocument();
+  });
+
+  it("leaves every quick chip unpressed for a status outside the chips", () => {
+    navigation.state.params = new URLSearchParams("status=completed");
+    render(<StudentListPage students={[student, { ...reservedStudent, lifecycleStatus: "completed" }]} />);
+
+    const chips = screen.getByRole("group", { name: "Lọc nhanh theo trạng thái" });
+    for (const chip of within(chips).getAllByRole("button")) {
+      expect(chip).toHaveAttribute("aria-pressed", "false");
+    }
   });
 });

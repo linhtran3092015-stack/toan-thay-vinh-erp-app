@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
@@ -123,7 +125,14 @@ export default async function StudentDetailRoute({
       canViewGuardians={canViewGuardians}
       canViewLedger={canViewLedger}
       canViewPayments={canViewPayments}
-      careCard={canViewCare ? <StudentCareDashboardCard studentId={studentId} /> : null}
+      canViewSessions={canViewSessions}
+      careCard={
+        canViewCare ? (
+          <Suspense fallback={<p className="text-secondary text-text-muted">Đang tải chăm sóc học viên…</p>}>
+            <StudentCareDashboardCard dashboard={careDashboard} studentId={studentId} />
+          </Suspense>
+        ) : null
+      }
       careTaskCount={careDashboard?.total ?? null}
       detail={detail}
       directoryHref={directoryHref}

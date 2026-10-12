@@ -108,12 +108,3 @@ function visiblePages(page: number, pageCount: number): (number | null)[] {
   }
   return result;
 }
-
-/** Slice helper so features share one pagination arithmetic. */
-export function paginate<T>(rows: readonly T[], requestedPage: number, pageSize: number) {
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  const page = Math.min(Math.max(1, requestedPage), pageCount);
-  const rangeStart = rows.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const rangeEnd = Math.min(page * pageSize, rows.length);
-  return { page, pageCount, rangeEnd, rangeStart, rows: rows.slice((page - 1) * pageSize, page * pageSize), total: rows.length };
-}

@@ -2,6 +2,7 @@ import { RecordListItem } from "@/components/patterns/responsive-record-list";
 import { StudentStatusBadge } from "@/features/students/components/student-status-badge";
 import { getStudentDetailHref } from "@/features/students/detail/helpers";
 import type { StudentDirectoryItem } from "@/features/students/read-models";
+import { formatLearningMode } from "@/lib/format";
 
 interface StudentMobileCardProps {
   directoryQuery: string;
@@ -34,7 +35,7 @@ export function StudentMobileCard({ directoryQuery, student }: StudentMobileCard
             Khối <strong className="font-semibold">{student.currentGrade}{learningLevel ? ` · ${learningLevel}` : ""}</strong>
           </span>
           {registeredMode ? (
-            <span className="ml-auto text-text-muted">{registeredMode === "online" ? "Online" : "Offline"}</span>
+            <span className="ml-auto text-text-muted">{formatLearningMode(registeredMode)}</span>
           ) : null}
         </>
       }

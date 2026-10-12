@@ -11,6 +11,7 @@ import {
 import { StudentStatusBadge } from "@/features/students/components/student-status-badge";
 import { getStudentDetailHref } from "@/features/students/detail/helpers";
 import type { StudentDirectoryItem } from "@/features/students/read-models";
+import { formatLearningMode } from "@/lib/format";
 
 interface StudentTableProps {
   directoryQuery: string;
@@ -84,17 +85,17 @@ export function StudentTable({
                   <span className="block text-caption leading-[14px] tabular-nums text-text-muted">{student.primaryGuardian.phone}</span>
                 </>
               ) : (
-                <span className="text-text-subtle">Chưa liên kết</span>
+                <span className="text-text-muted">Chưa liên kết</span>
               )}
             </TableCell>
             <TableCell className="w-[180px] text-text-default">
-              {classInfo?.name ?? <span className="text-text-subtle">Chưa xếp lớp</span>}
+              {classInfo?.name ?? <span className="text-text-muted">Chưa xếp lớp</span>}
             </TableCell>
             <TableCell className="w-[112px] text-secondary text-text-default">
               Khối {student.currentGrade}{learningLevel ? ` · ${learningLevel}` : ""}
             </TableCell>
             <TableCell className="w-[96px] text-secondary text-text-muted">
-              {registeredMode === "online" ? "Online" : registeredMode === "offline" ? "Offline" : "—"}
+              {registeredMode ? formatLearningMode(registeredMode) : "—"}
             </TableCell>
             <TableCell className="w-[150px]">
               <StudentStatusBadge status={student.lifecycleStatus} />

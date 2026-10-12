@@ -9,11 +9,10 @@ import {
   TableState,
 } from "@/components/patterns/data-table-frame";
 import { ResultBanner } from "@/components/shared/result-banner";
-import { Badge } from "@/components/ui/badge";
 import { getButtonClassName } from "@/components/ui/button";
+import { PaymentRequestStatusBadge } from "@/features/finance/components/payment-request-status-badge";
 import type {
   StudentPaymentRequestItem,
-  StudentPaymentRequestStatus,
   StudentPaymentSummary,
 } from "@/features/students/detail/student-activity-models";
 import { formatIsoDate } from "@/lib/datetime";
@@ -24,22 +23,13 @@ interface StudentPaymentsTabProps {
   canViewPayments: boolean;
   /** Session ledger card (needs session_ledger.view); rendered under the requests. */
   ledgerCard?: ReactNode;
+  /** Max requests rendered; the footer says how many are hidden. */
+  limit?: number;
   /** `null` means the feed failed to load. */
   payments: StudentPaymentSummary | null;
   /** Tuition rate / source card; rendered last. */
   tuitionCard?: ReactNode;
 }
-
-export const paymentRequestStatusMeta: Record<
-  StudentPaymentRequestStatus,
-  { label: string; tone: "success" | "warning" | "neutral" | "danger" }
-> = {
-  cancelled: { label: "Đã hủy", tone: "neutral" },
-  expired: { label: "Hết hạn", tone: "danger" },
-  paid: { label: "Đã thu", tone: "success" },
-  partially_paid: { label: "Thu một phần", tone: "warning" },
-  pending: { label: "Chờ thanh toán", tone: "warning" },
-};
 
 function describeRequest(request: StudentPaymentRequestItem): string {
   const kind = request.topupType === "renewal" ? "Tái phí" : "Tuyển mới";
@@ -56,6 +46,7 @@ export function StudentPaymentsTab({
   canCreatePaymentRequest,
   canViewPayments,
   ledgerCard,
+  limit = 30,
   payments,
   tuitionCard,
 }: StudentPaymentsTabProps) {
@@ -99,8 +90,7 @@ export function StudentPaymentsTab({
   } else {
     requestsBlock = (
       <DataTableFrame
-        body={payments.requests.map((request) => {
-          const status = paymentRequestStatusMeta[request.status];
+        body={payments.requests.slice(0, limit).map((request) => {
           const isOpen = request.status === "pending" || request.status === "partially_paid";
 
           return (
@@ -118,7 +108,7 @@ export function StudentPaymentsTab({
                 {formatVnd(request.paidAmountVnd)}
               </TableCell>
               <TableCell className="whitespace-nowrap">
-                <Badge tone={status.tone}>{status.label}</Badge>
+                <PaymentRequestStatusBadge status={request.status} />
               </TableCell>
             </TableRow>
           );
@@ -135,6 +125,11 @@ export function StudentPaymentsTab({
               <span className={payments.outstandingVnd > 0 ? "font-semibold text-danger" : "text-text-muted"}>
                 {payments.outstandingVnd > 0 ? `Còn nợ ${formatVnd(payments.outstandingVnd)}` : "Không còn nợ"}
               </span>
+              {payments.requests.length > limit ? (
+                <span className="text-text-muted">
+                  Hiển thị {limit}/{payments.requests.length} yêu cầu
+                </span>
+              ) : null}
             </>
           ) : undefined
         }

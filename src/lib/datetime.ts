@@ -32,12 +32,16 @@ export function formatIsoDate(value: string | null | undefined): string {
   return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
 }
 
-/** `2026-10-13` → `Thứ 2, 13/10/2026`. */
-export function formatWeekdayDate(value: string): string {
+/**
+ * `2026-10-13` → `Thứ 2, 13/10/2026`; with `{ year: false }` → `Thứ 2 13/10`
+ * (compact form for tight spaces such as KPI tiles).
+ */
+export function formatWeekdayDate(value: string, options?: { year?: boolean }): string {
   const match = ISO_DATE_PATTERN.exec(value);
   if (!match) return value;
   const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
   const weekday = VI_SHORT_WEEKDAYS[new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay()];
+  if (options?.year === false) return `${weekday} ${match[3]}/${match[2]}`;
   return `${weekday}, ${match[3]}/${match[2]}/${match[1]}`;
 }
 
@@ -58,6 +62,21 @@ export function getVietnamToday(now: Date = new Date()): string {
   const parts = dateOnlyFormatter.formatToParts(now);
   const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${value.year}-${value.month}-${value.day}`;
+}
+
+const timeOnlyFormatter = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  hourCycle: "h23",
+  minute: "2-digit",
+  second: "2-digit",
+  timeZone: VIETNAM_TIME_ZONE,
+});
+
+/** Current wall-clock time in Vietnam as `HH:MM:SS` (comparable with `time` columns). */
+export function getVietnamTime(now: Date = new Date()): string {
+  const parts = timeOnlyFormatter.formatToParts(now);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.hour}:${value.minute}:${value.second}`;
 }
 
 /** Timestamp → Vietnam business date `YYYY-MM-DD`. */

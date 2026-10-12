@@ -47,8 +47,8 @@ export function StudentSessionLedgerCard({ limit = 30, summary }: StudentSession
         {summary ? <SessionBalanceBadge balance={summary.balanceSessions} /> : null}
       </div>
 
-      {summary?.alerts.map((alert) => (
-        <ResultBanner description={alert.description} key={alert.alertType} title={alert.title} tone={alert.severity} />
+      {summary?.alerts.map((alert, index) => (
+        <ResultBanner description={alert.description} key={`${alert.alertType}-${index}`} title={alert.title} tone={alert.severity} />
       ))}
 
       {summary ? (

@@ -13,7 +13,7 @@ import sharp from "sharp";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const iconsDir = path.join(root, "public", "icons");
 
-const BRAND = "#B83C30"; // --erp-accent (default "terracotta" palette)
+const BRAND = "#4F6B5A"; // --erp-accent (default "moss" palette, handoff 12/10/2026)
 
 function markSvg({ rounded }) {
   const radius = rounded ? 112 : 0;

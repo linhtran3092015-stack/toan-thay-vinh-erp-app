@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
 
@@ -41,7 +42,7 @@ import type {
 import type { StudentLedgerReadModel } from "@/features/students/ledger-data";
 import type { StudentDetailReadModel } from "@/features/students/read-models";
 import type { StudentTuitionProfile } from "@/features/students/tuition-profile-data";
-import { formatIsoDate, formatTime } from "@/lib/datetime";
+import { formatIsoDate, formatTime, formatWeekdayDate } from "@/lib/datetime";
 import { formatVnd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +59,7 @@ export interface StudentProfilePageProps {
   canViewGuardians: boolean;
   canViewLedger?: boolean;
   canViewPayments?: boolean;
+  canViewSessions?: boolean;
   /** Server-rendered care card for the "Chăm sóc" tab. */
   careCard?: ReactNode;
   careTaskCount?: number | null;
@@ -97,6 +99,7 @@ export function StudentProfilePage({
   canViewGuardians,
   canViewLedger = false,
   canViewPayments = false,
+  canViewSessions = false,
   careCard,
   careTaskCount = null,
   detail,
@@ -195,10 +198,11 @@ export function StudentProfilePage({
       <header className="grid gap-4">
         <nav aria-label="Điều hướng hồ sơ học sinh" className="text-secondary">
           <Link
-            className="font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+            className="inline-flex items-center gap-1 font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
             href={directoryHref}
           >
-            ← Danh sách học sinh
+            <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.8} />
+            Danh sách học sinh
           </Link>
         </nav>
 
@@ -304,19 +308,23 @@ export function StudentProfilePage({
         />
         <KpiTile
           hint={
-            upcomingSession
-              ? `${upcomingSession.className}${upcomingSession.roomName ? ` · ${upcomingSession.roomName}` : ""}`
-              : activeClass
-                ? "lớp chưa có buổi sắp tới"
-                : "học sinh chưa có lớp"
+            !canViewSessions
+              ? "sessions.view"
+              : upcomingSession
+                ? `${upcomingSession.className}${upcomingSession.roomName ? ` · ${upcomingSession.roomName}` : ""}`
+                : activeClass
+                  ? "lớp chưa có buổi sắp tới"
+                  : "học sinh chưa có lớp"
           }
           label="Buổi tới"
           value={
-            upcomingSession
-              ? `${formatShortWeekdayDate(upcomingSession.sessionDate)} · ${formatTime(upcomingSession.startTime)}`
-              : activeClass
-                ? "Chưa xếp lịch"
-                : "Chưa có lớp"
+            !canViewSessions
+              ? "Không có quyền"
+              : upcomingSession
+                ? `${formatWeekdayDate(upcomingSession.sessionDate, { year: false })} · ${formatTime(upcomingSession.startTime)}`
+                : activeClass
+                  ? "Chưa xếp lịch"
+                  : "Chưa có lớp"
           }
         />
       </section>
@@ -485,14 +493,4 @@ function KpiTile({
       {hint ? <p className="mt-0.5 break-words text-caption text-text-muted md:truncate">{hint}</p> : null}
     </div>
   );
-}
-
-const shortWeekdays = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"] as const;
-
-/** `2026-10-14` → `Thứ 4 14/10` (design 05 KPI tile; the year would overflow the tile). */
-function formatShortWeekdayDate(value: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  if (!match) return value;
-  const weekday = shortWeekdays[new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12)).getUTCDay()];
-  return `${weekday} ${match[3]}/${match[2]}`;
 }

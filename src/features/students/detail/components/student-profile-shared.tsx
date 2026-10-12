@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { formatLearningMode } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type StudentProfileTab =
@@ -22,10 +23,7 @@ export function isStudentProfileTab(value: unknown): value is StudentProfileTab 
 }
 
 export function formatMode(value: string | null | undefined): string {
-  if (value === "online") return "Online";
-  if (value === "offline") return "Offline";
-  if (value === "hybrid") return "Kết hợp";
-  return value ?? "Chưa xác định";
+  return formatLearningMode(value);
 }
 
 const weekdayLabels: Record<number, string> = {

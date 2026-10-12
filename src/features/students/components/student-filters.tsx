@@ -225,8 +225,8 @@ function FilterFields({
         value={filters.registeredMode}
       >
         <option value="all">Tất cả</option>
-        <option value="online">Online</option>
-        <option value="offline">Offline</option>
+        <option value="online">Trực tuyến</option>
+        <option value="offline">Tại lớp</option>
       </SelectFilter>
     </>
   );

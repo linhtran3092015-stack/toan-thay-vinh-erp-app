@@ -310,6 +310,7 @@ export function StudentPreview({
         canViewGuardians={can("guardians.view")}
         canViewLedger={can("session_ledger.view")}
         canViewPayments={can("payments.view")}
+        canViewSessions={can("sessions.view")}
         careCard={
           can("student_care.view") ? (
             <ProfilePanel title="Chăm sóc học viên" titleId="dev-care-title">

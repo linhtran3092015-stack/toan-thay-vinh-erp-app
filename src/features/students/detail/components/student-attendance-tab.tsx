@@ -16,6 +16,8 @@ import {
   attendanceStatusLabels,
   attendanceStatusOrder,
   attendanceStatusTones,
+  formatScore,
+  notebookStatusLabels,
 } from "@/features/sessions/components/attendance-status-group";
 import type { StudentAttendanceHistory } from "@/features/students/detail/student-activity-models";
 import { formatIsoDate } from "@/lib/datetime";
@@ -28,15 +30,8 @@ interface StudentAttendanceTabProps {
   limit?: number;
 }
 
-const notebookLabels: Record<string, string> = {
-  not_required: "Không yêu cầu",
-  not_submitted: "Chưa nộp",
-  submitted: "Đã nộp",
-};
-
-function formatScore(value: number | null): string {
-  return value === null ? "—" : new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(value);
-}
+/** Notebook status arrives as free text from the feed; unknown codes render as-is. */
+const notebookLabels: Record<string, string> = notebookStatusLabels;
 
 /** Tab "Điểm danh" (design 05b): class chips, status totals, recent sessions. */
 export function StudentAttendanceTab({ canViewAttendance, history, limit = 30 }: StudentAttendanceTabProps) {

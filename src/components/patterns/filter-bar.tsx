@@ -20,7 +20,7 @@ interface FilterBarProps {
 
 /**
  * Desktop filter bar (design 06): labels above 40px controls, search first,
- * grid `minmax(260px,1.4fr) repeat(n,1fr) auto`, "Xóa lọc (n)" only when
+ * grid `minmax(220px,1.4fr) repeat(n,minmax(0,1fr)) auto`, "Xóa lọc (n)" only when
  * something is filtered. Features own every value and behavior.
  */
 export function FilterBar({

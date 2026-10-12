@@ -56,11 +56,11 @@ export function buildStudentHistory({
     });
   }
 
-  for (const source of tuitionProfile?.sourceHistory ?? []) {
+  for (const [index, source] of (tuitionProfile?.sourceHistory ?? []).entries()) {
     events.push({
       date: source.assignedAt,
       detail: source.reason,
-      id: `source-${source.assignedAt}-${source.reason}`,
+      id: `source-${index}-${source.assignedAt}-${source.reason}`,
       title: "Hiệu chỉnh nguồn học viên",
     });
   }

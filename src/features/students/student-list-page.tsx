@@ -171,6 +171,9 @@ export function StudentListPage({
     [filteredStudents, page],
   );
 
+  // Bulk selection only covers rows the user can see; any view change drops it.
+  const clearSelection = () => setSelectedIds(new Set());
+
   const updateFilter = (
     key: keyof StudentDirectoryFiltersState,
     value: string,
@@ -178,6 +181,7 @@ export function StudentListPage({
     const nextFilters = { ...filters, [key]: value };
     setFilters(nextFilters);
     setPage(1);
+    clearSelection();
     syncUrlState(nextFilters, 1, true);
   };
 
@@ -185,6 +189,7 @@ export function StudentListPage({
     const nextFilters = { ...filters, search: value };
     setFilters(nextFilters);
     setPage(1);
+    clearSelection();
     syncUrlState(nextFilters, 1, false);
   };
 
@@ -200,11 +205,13 @@ export function StudentListPage({
     const nextViewState = resetStudentDirectoryViewState();
     setFilters(nextViewState.filters);
     setPage(1);
+    clearSelection();
     syncUrlState(nextViewState.filters, 1, true);
   };
 
   const updatePage = (newPage: number) => {
     setPage(newPage);
+    clearSelection();
     if (typeof window !== "undefined") {
       const currentParams = new URLSearchParams(window.location.search);
       const nextHref = getStudentDirectoryHref(currentParams, {
@@ -240,8 +247,6 @@ export function StudentListPage({
       return next;
     });
   };
-
-  const clearSelection = () => setSelectedIds(new Set());
 
   const directoryQuery = useMemo(() => {
     const params = serializeStudentDirectoryViewState(new URLSearchParams(), {
@@ -315,11 +320,12 @@ export function StudentListPage({
         searchValue={filters.search}
       />
 
-      <QuickFilterChips
+      {/* A lifecycle status outside the quick chips (e.g. completed) leaves every chip unpressed. */}
+      <QuickFilterChips<QuickStatusValue | "">
         chips={quickChips}
         label="Lọc nhanh theo trạng thái"
         onChange={(value) => updateFilter("status", value)}
-        value={(quickStatusValues as readonly string[]).includes(filters.status) ? (filters.status as QuickStatusValue) : "all"}
+        value={(quickStatusValues as readonly string[]).includes(filters.status) ? (filters.status as QuickStatusValue) : ""}
       />
 
       {canManageStatus ? (
@@ -331,7 +337,7 @@ export function StudentListPage({
       ) : null}
 
       {filteredStudents.length === 0 && !hasActiveFilters ? (
-        <StudentListEmptyState hasActiveFilters={false} />
+        <StudentListEmptyState />
       ) : (
         <div className="students-directory-results grid gap-3">
           <p aria-live="polite" className="sr-only">

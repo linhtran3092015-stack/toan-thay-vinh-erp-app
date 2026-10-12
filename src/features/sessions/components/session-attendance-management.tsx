@@ -158,6 +158,7 @@ export function SessionAttendanceManagement({
 
   const openEditor = (
     participant: SessionParticipantReadModel,
+    status?: SessionAttendanceStatus,
   ) => {
     triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setActionState(null);
@@ -171,6 +172,7 @@ export function SessionAttendanceManagement({
       attendanceId:
         participant.attendanceId,
       attendanceStatus:
+        status ??
         participant.attendanceStatus ??
         "present",
       notes:
@@ -228,7 +230,9 @@ export function SessionAttendanceManagement({
     });
   };
 
-  const unmarkedParticipants = participants.filter((participant) => !participant.attendanceId);
+  /** Bulk marking follows the roster the TA is looking at: search/filter narrow it, and the label says so. */
+  const unmarkedParticipants = visibleParticipants.filter((participant) => !participant.attendanceId);
+  const isRosterNarrowed = visibleParticipants.length !== participants.length;
 
   /** Marks every unmarked student present, one existing action per student. */
   const markAllPresent = () => {
@@ -321,7 +325,7 @@ export function SessionAttendanceManagement({
         </div>
         {canEdit && unmarkedParticipants.length > 0 ? (
           <Button className="max-md:hidden" disabled={isPending} onClick={markAllPresent} size="sm" type="button" variant="secondary">
-            Có mặt cho tất cả chưa chọn
+            {isRosterNarrowed ? `Có mặt cho ${unmarkedParticipants.length} đang hiển thị` : "Có mặt cho tất cả chưa chọn"}
           </Button>
         ) : null}
       </CardHeader>
@@ -453,7 +457,7 @@ export function SessionAttendanceManagement({
             </div>
             {unmarkedParticipants.length > 0 ? (
               <Button className="mt-3 w-full" disabled={isPending} onClick={markAllPresent} size="lg" type="button" variant="secondary">
-                Có mặt cho {unmarkedParticipants.length} bạn chưa chọn
+                Có mặt cho {unmarkedParticipants.length} bạn {isRosterNarrowed ? "đang hiển thị" : "chưa chọn"}
               </Button>
             ) : (
               <p className="mt-2 text-secondary text-text-muted">Đã điểm danh đủ. Chuyển sang Kết quả.</p>
@@ -471,7 +475,7 @@ interface AttendanceRowProps {
   index: number;
   isPending: boolean;
   onQuickMark: (participant: SessionParticipantReadModel, status: SessionAttendanceStatus) => void;
-  onEdit: (participant: SessionParticipantReadModel) => void;
+  onEdit: (participant: SessionParticipantReadModel, status?: SessionAttendanceStatus) => void;
   participant: SessionParticipantReadModel;
 }
 
@@ -498,7 +502,7 @@ function AttendanceTableRow({ canEdit, canViewStudents, index, isPending, onQuic
             buttonLabel={statusButtonLabel(participant)}
             disabled={isPending}
             label={`Trạng thái điểm danh học viên ${index + 1}`}
-            onSelect={(status) => (participant.attendanceId ? onEdit(participant) : onQuickMark(participant, status))}
+            onSelect={(status) => (participant.attendanceId ? onEdit(participant, status) : onQuickMark(participant, status))}
             value={participant.attendanceStatus}
           />
         ) : (
@@ -527,7 +531,7 @@ function AttendanceRecord({ canEdit, canViewStudents, index, isPending, onQuickM
           disabled={isPending}
           label={`Trạng thái điểm danh học viên ${index + 1}`}
           layout="grid"
-          onSelect={(status) => (participant.attendanceId ? onEdit(participant) : onQuickMark(participant, status))}
+          onSelect={(status) => (participant.attendanceId ? onEdit(participant, status) : onQuickMark(participant, status))}
           value={participant.attendanceStatus}
         />
       ) : null}
@@ -542,10 +546,10 @@ function AttendanceRecord({ canEdit, canViewStudents, index, isPending, onQuickM
 }
 
 function ParticipantIdentity({ canViewStudents, index, participant }: { canViewStudents: boolean; index: number; participant: SessionParticipantReadModel }) {
-  return <div className="min-w-0"><p className="text-body font-semibold text-text-strong">{canViewStudents ? participant.studentName ?? "Chưa có tên học viên" : `Học viên ${index + 1}`}</p>{canViewStudents && participant.studentCode ? <p className="mt-0.5 font-mono text-caption text-text-muted">{participant.studentCode}</p> : null}</div>;
+  return <div className="min-w-0"><p className="text-body font-semibold text-text-strong">{canViewStudents ? participant.studentName ?? "Chưa có tên học viên" : `Học viên ${index + 1}`}</p>{canViewStudents && participant.studentCode ? <p className="mt-0.5 text-caption tabular-nums text-text-muted">{participant.studentCode}</p> : null}</div>;
 }
 
-function AttendanceAction({ canEdit, fullWidth = false, isPending, onEdit, participant }: { canEdit: boolean; fullWidth?: boolean; isPending: boolean; onEdit: (participant: SessionParticipantReadModel) => void; participant: SessionParticipantReadModel }) {
+function AttendanceAction({ canEdit, fullWidth = false, isPending, onEdit, participant }: { canEdit: boolean; fullWidth?: boolean; isPending: boolean; onEdit: (participant: SessionParticipantReadModel, status?: SessionAttendanceStatus) => void; participant: SessionParticipantReadModel }) {
   if (!canEdit) return <span className="text-caption text-text-muted">Chỉ đọc</span>;
   const action = participant.attendanceId ? "Sửa điểm danh" : "Điểm danh";
   return <div className={`flex flex-wrap gap-1 ${fullWidth ? "" : "justify-end"}`}>

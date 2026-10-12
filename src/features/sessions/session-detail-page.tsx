@@ -1,9 +1,10 @@
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { getButtonClassName } from "@/components/ui/button";
 import { PageHeader } from "@/components/patterns/page-header";
+import { TableHeaderCell } from "@/components/patterns/data-table-frame";
 import type { AdditionalStudyCandidate } from "@/features/sessions/attendance-data";
 import {
   Card,
@@ -12,6 +13,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { SessionWorkspace } from "@/features/sessions/components/session-workspace";
+import {
+  attendanceStatusLabels,
+  attendanceStatusTones,
+  formatScore,
+  notebookStatusLabels,
+} from "@/features/sessions/components/attendance-status-group";
 import { SessionAttendanceManagement } from "@/features/sessions/components/session-attendance-management";
 import { SessionResultManagement } from "@/features/sessions/components/session-result-management";
 import { SessionLockActions } from "@/features/sessions/components/session-lock-actions";
@@ -103,10 +110,11 @@ export function SessionDetailPage({
         </p>
         <nav aria-label="Điều hướng buổi học" className="mt-2 text-secondary">
           <Link
-            className="font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+            className="inline-flex items-center gap-1 font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
             href={directoryQuery ? `/sessions?${directoryQuery}` : "/sessions"}
           >
-            ← Danh sách buổi học
+            <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.8} />
+            Danh sách buổi học
           </Link>
         </nav>
       </PageHeader>
@@ -337,20 +345,20 @@ function ParticipantTable({
       <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-table-body">
         <thead className="bg-table-header text-table-header text-text-muted">
           <tr>
-            <Th>Học sinh</Th>
-            <Th>Hình thức đăng ký</Th>
-            {canViewAttendance ? <Th>Điểm danh</Th> : null}
+            <TableHeaderCell>Học sinh</TableHeaderCell>
+            <TableHeaderCell>Hình thức đăng ký</TableHeaderCell>
+            {canViewAttendance ? <TableHeaderCell>Điểm danh</TableHeaderCell> : null}
             {canViewResults ? (
               <>
-                <Th numeric>Điểm kiểm tra</Th>
-                <Th>Vở bài tập</Th>
-                <Th>Nhận xét</Th>
+                <TableHeaderCell numeric>Điểm kiểm tra</TableHeaderCell>
+                <TableHeaderCell>Vở bài tập</TableHeaderCell>
+                <TableHeaderCell>Nhận xét</TableHeaderCell>
               </>
             ) : null}
           </tr>
         </thead>
 
-        <tbody className="[&>tr+tr>td]:border-t [&>tr+tr>td]:border-border-row">
+        <tbody className="[&>tr+tr>td]:border-t [&>tr+tr>td]:border-border-row [&>tr>td:first-child]:pl-4 [&>tr>td:last-child]:pr-4">
           {participants.map((participant) => (
             <tr className="h-12 align-middle" key={participant.studentId}>
               <td className="px-3 py-1.5">
@@ -392,34 +400,12 @@ function ParticipantTable({
   );
 }
 
-function Th({ children, numeric }: { children: ReactNode; numeric?: boolean }) {
-  return (
-    <th className={`h-10 whitespace-nowrap px-3 font-semibold ${numeric ? "text-right" : "text-left"}`} scope="col">
-      {children}
-    </th>
-  );
-}
-
 function AttendanceBadge({ status }: { status: SessionAttendanceStatus | null }) {
   if (!status) {
     return <Badge tone="neutral">Chưa điểm danh</Badge>;
   }
 
-  const labels: Record<SessionAttendanceStatus, string> = {
-    additional_study: "Học thêm",
-    excused_absence: "Vắng có phép",
-    present: "Có mặt",
-    unexcused_absence: "Vắng không phép",
-  };
-
-  const tones: Record<SessionAttendanceStatus, "info" | "success" | "warning" | "danger"> = {
-    additional_study: "warning",
-    excused_absence: "info",
-    present: "success",
-    unexcused_absence: "danger",
-  };
-
-  return <Badge tone={tones[status]}>{labels[status]}</Badge>;
+  return <Badge tone={attendanceStatusTones[status]}>{attendanceStatusLabels[status]}</Badge>;
 }
 
 function SessionStatusBadge({ status }: { status: SessionStatus }) {
@@ -507,28 +493,8 @@ function formatRegisteredMode(value: string | null): string {
   return "Học thêm/Chưa xác định";
 }
 
-function formatScore(value: number | null): string {
-  if (value === null) {
-    return "—";
-  }
-
-  return new Intl.NumberFormat("vi-VN", {
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
 function formatNotebookStatus(value: SessionNotebookStatus | null): string {
-  if (!value) {
-    return "Chưa có dữ liệu";
-  }
-
-  const labels: Record<SessionNotebookStatus, string> = {
-    not_required: "Không yêu cầu",
-    not_submitted: "Chưa nộp",
-    submitted: "Đã nộp",
-  };
-
-  return labels[value];
+  return value ? notebookStatusLabels[value] : "Chưa có dữ liệu";
 }
 
 function formatIsoDate(value: string): string {

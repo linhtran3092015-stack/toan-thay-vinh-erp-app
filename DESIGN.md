@@ -1,6 +1,128 @@
 # Design System — Toán Thầy Vinh ERP
 
+## Update approved 2026-10-12 — Stumana handoff
+
+This update supersedes the 2026-09-09 terracotta update and the original navy anchor for **colors, radius, badge shape, and motion**. Module structure, permissions, operational density, and the semantic status families (success / warning / danger / info / neutral) remain authoritative. The token source of truth is the `:root` block in `src/app/globals.css`; the design handoff is `HANDOFF.md` (12/10/2026). Terracotta (`#B83C30`) and the other palettes remain selectable under Settings → Thương hiệu & Giao diện; moss is the default. Legacy `--color-*` aliases stay in `globals.css` for features not yet redesigned. No route, permission, RPC, schema, or state-machine change is authorized.
+
+### Foundation tokens (2026-10-12)
+
+#### Color roles
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--surface-canvas` | `#FAF9F6` | Application background (warm light canvas). |
+| `--surface-base` | `#FFFFFF` | Page, table, form, and panel surface. |
+| `--surface-raised` | `#FCFBF9` | Popovers, dropdowns. |
+| `--surface-sunken` | `#F3F1EC` | Filter field background, disabled interior. |
+| `--surface-selected` | `#EDF2EE` | Selected row, active filter. |
+| `--surface-hover` | `#F8F6F2` | Row and surface hover. |
+| `--text-strong` / `--text-default` | `#2B3444` / `#4A5566` | Titles and primary values / body copy. |
+| `--text-muted` / `--text-subtle` / `--text-disabled` | `#647083` / `#98A2B3` / `#A9B2C1` | Secondary metadata / timestamps / disabled only. |
+| `--border-subtle` | `#ECE8E1` | Default panel, field, and separator border. |
+| `--border-strong` | `#E1DCD3` | Secondary button and stronger division (hover `--border-strong-hover` `#C9C3B8`). |
+| `--border-row` | `#F1EEE8` | Table row divider (`border-top: 1px`). |
+| `--border-focus` | `#315FCC` | Focused control border. Focus stays blue, not moss. |
+| `--action-primary` | `#4F6B5A` | One primary page action, active navigation, identity anchor (moss). |
+| `--action-primary-hover` | `#3F5749` | Primary hover/pressed. |
+| `--action-primary-soft` / `--action-primary-soft-border` | `#EDF2EE` / `#C9D8CE` | Quiet emphasis, active chip/filter. |
+| `--action-primary-shadow` | `0 1px 2px rgba(63,87,73,.18)` | Primary button 1px shadow. |
+| `--action-link` | `#4F6B5A` | Text links. |
+| `--focus-ring` | `rgba(49, 95, 204, 0.28)` | Two-layer keyboard focus halo. |
+| `--disabled-bg` / `--disabled-border` | `#F1F3F7` / `#E1E6EE` | Disabled control. |
+
+#### Semantic state roles
+
+Each family now carries an `-ink` token for text on its soft surface (badges, banners). `--status-*` stays the icon/accent foreground.
+
+| Family | Foreground | Soft surface | Border | Ink (text on soft) |
+| --- | --- | --- | --- | --- |
+| Success | `#16794C` | `#EAF8F1` | `#B7E9D0` | `--status-success-ink: #0F5A38` |
+| Warning | `#A85B09` | `#FFF5E5` | `#F3D3A6` | `--status-warning-ink: #7A4306` |
+| Danger | `#BE123C` | `#FFF1F2` | `#FECDD3` | `--status-danger-ink: #881337` |
+| Info | `#215FC7` | `#EDF4FF` | `#BED4FB` | `--status-info-ink: #1A4B9E` |
+| Neutral | `#536174` | `#F1F3F6` | `#D5DCE6` | `--status-neutral-ink: #3F4C5E` |
+
+Danger changed from `#C33752` to `#BE123C`. Feature code still maps its own domain status to a family; vocabulary must match source code (HANDOFF.md §4b), for example attendance is present / excused_absence / unexcused_absence / additional_study with no "late" state, and a session lock is permanent.
+
+#### Navigation, elevation, table, and form roles
+
+| Token family | Approved role |
+| --- | --- |
+| `--nav-sidebar-*` | Light sidebar: `bg #FFFFFF`, `fg #3B465A`, `muted #647083`, `hover #F6F3EE`, `active-bg #EDF2EE`, `active-fg #4F6B5A`, `indicator #4F6B5A`, `border #E7E3DC`. Active item = soft background + `box-shadow: inset 3px 0 0 var(--nav-sidebar-indicator)`. |
+| `--panel-shadow` | `0 1px 2px rgba(32,43,64,.04)`. Ordinary panels only; replaces the older "no default card shadow" rule at this strength. |
+| `--elevation-1` / `-2` / `-3` | `0 1px 2px rgba(32,43,64,.06)` / `0 8px 24px rgba(32,43,64,.12), 0 2px 8px rgba(32,43,64,.06)` / `0 20px 56px rgba(32,43,64,.20), 0 4px 16px rgba(32,43,64,.10)`. |
+| `--overlay-scrim` / `--toast-bg` | `rgba(32,43,64,.44)` / `#202B40` (toast only for background jobs). |
+| `--table-header` / `--table-row-hover` / `--table-row-selected` | `#F7F5F1` / `#F8F6F2` / `#EDF2EE`. |
+| `--field-bg` / `--field-placeholder` / `--field-error-*` | `#FFFFFF` / `#98A2B3` / danger family. |
+
+#### Radius
+
+| Token | Default | `data-erp-rounded="false"` | Use |
+| --- | --- | --- | --- |
+| `--radius-sm` | 6px | 4px | Badges, compact row actions, chips, icon tiles. |
+| `--radius-md` | 10px | 6px | Inputs, selects, buttons, tabs, filter controls. |
+| `--radius-lg` | 12px | 8px | Tables, panels, cards, drawers. |
+| `--radius-xl` | 16px | 12px | Dialogs only. |
+| `--radius-full` | `9999px` | `9999px` | Avatar, count dot, toggle. Never a control or badge shape. |
+
+Setting `data-erp-rounded="false"` on the root element restores the earlier tight 4/6/8/12 scale. Corners are softer but controls and badges are still not pills.
+
+#### Badge and button spec
+
+| Element | Spec |
+| --- | --- |
+| Status badge | 12px / 500, padding 3px 9px, `--radius-sm`, soft surface + `-ink` text + family border. Always carries text; optional 12–14px icon. |
+| Primary button | Weight 500, horizontal padding 18px, `--action-primary-shadow` (1px), `active:translate-y-px`. One per page. |
+| Secondary button | Weight 500, `--border-strong` border, padding 18px, hover `--border-strong-hover` + `--interactive-hover`. |
+| Danger | Danger-outline for in-page destructive actions; danger-solid only inside a confirm dialog. Never a page primary. |
+| Titles | Weight 600 with `-0.01em` letter-spacing (handoff 1a) instead of 700. Body uses `-webkit-font-smoothing: antialiased`. |
+
+#### Control, row, and layout metrics
+
+| Token | Value |
+| --- | --- |
+| `--control-h-compact` / `--control-h` / `--control-h-touch` | 32px / 40px / 44px. |
+| `--row-h` / `--row-h-2` | 48px / 56px (56px only when a secondary line is needed). |
+| `--sidebar-w` / `--rail-w` | 240px (light sidebar) / 72px (icon rail with tooltip + `aria-label`). |
+| `--topbar-h` / `--module-strip-h` | 64px / 48px. |
+
+#### Motion timings
+
+| Motion | Spec |
+| --- | --- |
+| Hover/focus feedback | `background-color / border-color / color / box-shadow` 150ms ease-out on button, a, input, select. |
+| `.panel-rise` | `rise` keyframe (opacity 0→1, translateY 4px→0), 240ms ease-out, `backwards`. Applies from 768px (tablet) up only; phones open menus without motion. |
+| `.progress-grow` | `grow` keyframe (width 0→value), 800ms ease-out, `backwards`, for progress bars. |
+| Skeleton | 1.2s pulse. |
+| Reduced motion | Global `@media (prefers-reduced-motion: reduce)` sets `animation: none` and `transition: none` on every element. |
+
+Menus, drawers, and dialogs keep the 150–200ms guidance from the older Motion section; page-entry choreography remains prohibited apart from `.panel-rise`.
+
+### Hard rules (HANDOFF.md §5)
+
+1. One primary button per page; danger is never a page's primary action.
+2. Color and icon never carry meaning alone: badges, lock conditions, and GPS state always include text.
+3. Loading / empty / error / forbidden states live inside the table or panel frame and never change the page geometry.
+4. A consequential action states its consequence in words and shows its result next to the button; no anonymous toasts for it.
+5. Components never decide permissions; they only receive `available / blocked / reason` from the feature. On mobile there is no bottom navigation; a bottom bar is only a form's action bar.
+
+### Implementation guardrails (dev preview routes)
+
+Development-only preview routes render redesigned components with fixture data inside the real shell. They answer 404 when `NODE_ENV === "production"`; `src/proxy.ts` treats `/dev/*` as public only outside production.
+
+| Route | Shows |
+| --- | --- |
+| `/dev/ui` | Component library preview: button, badge, tabs, result banner, and token primitives. |
+| `/dev/shell` | App shell: light sidebar, rail, topbar, module strip, mobile drawer. |
+| `/dev/lists` | Student and class directory previews: DataTableFrame, FilterBar, quick filter chips, bulk bar, record list. |
+| `/dev/session` | Session workbench with fixture data: attendance group, results, guarded lock panel. Buttons call real server actions, so look only. |
+| `/dev/student` | Student profile with fixture data. Enrollment dialogs open but their server actions fail on fixture ids. |
+
+---
+
 ## Update approved 2026-09-09
+
+> Superseded for colors, radius, badge, and motion by the 2026-10-12 update above.
 
 The user selected warm red, soft corners, and a closer Stumana feel. The ERP now defaults to terracotta (#B83C30), a warm light canvas, and configurable corner radii. This supersedes the navy visual anchor below; existing module structure, permissions, operational density, and semantic status colors remain authoritative. Settings → Thương hiệu & Giao diện controls center appearance; browser-local palette choice overrides the center default. Settings → Trang web công khai edits explicit public content with separate saved drafts and published snapshots.
 
@@ -34,6 +156,8 @@ Wave 1 defines these as semantic tokens. Values below are the approved light-the
 
 ### Color roles
 
+_Superseded by the 2026-10-12 update above._
+
 | Token | Value | Use |
 | --- | --- | --- |
 | `--surface-canvas` | `#F6F8FC` | Application background. |
@@ -59,6 +183,8 @@ Wave 1 defines these as semantic tokens. Values below are the approved light-the
 
 ### Semantic state roles
 
+_Superseded by the 2026-10-12 update above._
+
 | Family | Foreground | Soft surface | Border | Meaning |
 | --- | --- | --- | --- | --- |
 | Success | `--status-success: #16794C` | `--status-success-soft: #EAF8F1` | `--status-success-border: #B7E9D0` | Confirmed, completed, valid, or positive outcome. |
@@ -70,6 +196,8 @@ Wave 1 defines these as semantic tokens. Values below are the approved light-the
 The feature maps its own domain status to a semantic family. This system does not centralize mappings for student lifecycle, session lifecycle, payment state, or permissions.
 
 ### Navigation, elevation, table, and form roles
+
+_Superseded by the 2026-10-12 update above._
 
 | Token family | Approved role |
 | --- | --- |
@@ -115,6 +243,8 @@ Do not use arbitrary per-component type sizes or weights once these roles exist.
 
 ### Radius
 
+_Superseded by the 2026-10-12 update above._
+
 | Token | Value | Use |
 | --- | --- | --- |
 | `--radius-sm` | 4px | Badges, compact row actions, inner field grouping. |
@@ -146,6 +276,8 @@ The radius hierarchy is deliberately tight. It makes a dense ERP feel engineered
 - Icons support labels; they never encode permission, business state, or confirmation meaning by themselves.
 
 ### Motion
+
+_Timings extended by the 2026-10-12 update above (`.panel-rise`, `.progress-grow`, global reduced motion)._
 
 - **Approach:** Minimal-functional.
 - Hover/focus feedback: 100–150ms ease-out, color/border/background only.
@@ -312,6 +444,8 @@ A `PageHeader` is a compact structural region, not a hero.
 
 ### Status badges
 
+_Badge shape superseded by the 2026-10-12 update above (radius-sm, 12px/500, padding 3/9, `-ink` text); the text, icon, and feature-ownership rules below still apply._
+
 - Badge shape is 4px radius, 12px/600, compact horizontal padding, and a semantic soft surface with foreground and optional border. It is not a default pill.
 - Every badge contains readable text. An optional 14–16px icon may reinforce familiar meaning but is never sufficient alone.
 - Feature code supplies domain wording and tone. Do not centralize `scheduled`, `in_progress`, `completed`, `locked`, `cancelled`, student enrollment, finance, or permission mapping in a shared badge.
@@ -377,6 +511,7 @@ Responsive behavior changes layout, not data availability, permissions, route ac
 - This document directs Wave 1+ presentation work only. It authorizes no route, permission, action, RPC, schema, RLS, RBAC, audit, state-machine, server filtering, or pagination change.
 - `components/ui` implements domain-agnostic tokens/primitives; `components/shared` presents generic loading/empty/error/permission/result/pending states; `components/patterns` composes reusable page and operational presentation. Features keep all domain behavior.
 - New pattern primitives require two real workflow uses or an approved contractual need.
+- Dev preview routes (`/dev/ui`, `/dev/shell`, `/dev/lists`, `/dev/session`, `/dev/student`) are public only outside production and use fixture data; see the 2026-10-12 update at the top.
 - Preserve non-A–E visual debt until its feature enters a later approved wave, except for the smallest compatibility fix required by the global typography foundation.
 
 ## Decisions log
@@ -387,3 +522,4 @@ Responsive behavior changes layout, not data availability, permissions, route ac
 | 2026-08-09 | Tight 4/6/8/12px shape scale and border-led surfaces. | Avoids decorative cards, excessive pills, and shadow-heavy dashboard styling. |
 | 2026-08-09 | Sessions detail is the A–E reference workbench. | Attendance, results, and lock are state-dependent work within the existing Session route. |
 | 2026-08-09 | Semantic visual states are shared; policy and action meaning remain feature-owned. | Protects the approved permission/RPC/workflow boundaries while making outcomes consistent. |
+| 2026-10-12 | Adopt the Stumana-style handoff: moss `#4F6B5A` accent, warm `#FAF9F6` canvas, light 240px sidebar with 3px indicator, 6/10/12/16 radii (`data-erp-rounded="false"` restores 4/6/8/12), 12px/500 badges with `-ink` tokens, danger `#BE123C`, 240ms `.panel-rise` (tablet+) and 800ms `.progress-grow`. | Owner-approved redesign supersedes the 2026-09-09 terracotta update and the navy anchor for color, radius, badge, and motion; structure, permissions, density, and semantic families are unchanged. |

@@ -1,5 +1,7 @@
+import "server-only";
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getVietnamToday } from "@/lib/datetime";
+import { getVietnamTime, getVietnamToday } from "@/lib/datetime";
 
 import {
   isAttendanceStatus,
@@ -14,15 +16,6 @@ import {
   type StudentUpcomingSession,
 } from "./student-activity-models";
 
-export type {
-  StudentAttendanceHistory,
-  StudentAttendanceHistoryItem,
-  StudentPaymentRequestItem,
-  StudentPaymentRequestStatus,
-  StudentPaymentSummary,
-  StudentUpcomingSession,
-} from "./student-activity-models";
-
 /**
  * Read-only activity feeds for the student profile (design 05): attendance by
  * session, payment requests, and the next scheduled session. Every loader
@@ -30,9 +23,12 @@ export type {
  * instead of pretending the student has no activity.
  */
 
+/** Max rows each activity feed loads; the tabs paginate on top of this. */
+const ACTIVITY_FEED_LIMIT = 200;
+
 export async function getStudentAttendanceHistory(
   studentId: string,
-  limit = 200,
+  limit = ACTIVITY_FEED_LIMIT,
 ): Promise<StudentAttendanceHistory | null> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -136,6 +132,7 @@ export async function getStudentAttendanceHistory(
 
 export async function getStudentPaymentRequests(
   studentId: string,
+  limit = ACTIVITY_FEED_LIMIT,
 ): Promise<StudentPaymentSummary | null> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -146,27 +143,31 @@ export async function getStudentPaymentRequests(
       )
       .eq("student_id", studentId)
       .order("created_at", { ascending: false })
-      .limit(200);
+      .limit(limit);
 
     if (error) {
       return null;
     }
 
-    const requests: StudentPaymentRequestItem[] = (data ?? []).map((row) => ({
-      bonusSessions: row.bonus_sessions,
-      createdAt: row.created_at,
-      expectedAmountVnd: Number(row.expected_amount_vnd),
-      id: row.id,
-      notes: row.notes,
-      paidAmountVnd: Number(row.paid_amount_vnd),
-      paidAt: row.paid_at,
-      publicCode: row.public_code,
-      purchasedSessions: row.purchased_sessions,
-      status: (paymentRequestStatuses as readonly string[]).includes(row.status)
-        ? (row.status as StudentPaymentRequestStatus)
-        : "pending",
-      topupType: row.topup_type === "renewal" ? "renewal" : "new",
-    }));
+    // Unknown statuses are skipped rather than coerced: counting them as
+    // "pending" would inflate the student's open debt.
+    const requests: StudentPaymentRequestItem[] = (data ?? [])
+      .filter((row): row is typeof row & { status: StudentPaymentRequestStatus } =>
+        (paymentRequestStatuses as readonly string[]).includes(row.status),
+      )
+      .map((row) => ({
+        bonusSessions: row.bonus_sessions,
+        createdAt: row.created_at,
+        expectedAmountVnd: Number(row.expected_amount_vnd),
+        id: row.id,
+        notes: row.notes,
+        paidAmountVnd: Number(row.paid_amount_vnd),
+        paidAt: row.paid_at,
+        publicCode: row.public_code,
+        purchasedSessions: row.purchased_sessions,
+        status: row.status,
+        topupType: row.topup_type === "renewal" ? "renewal" : "new",
+      }));
 
     return summarizePaymentRequests(requests);
   } catch {
@@ -178,9 +179,7 @@ export async function getStudentPaymentRequests(
  * Next scheduled or running session of the student's active class. Composite
  * classes hold their sessions on component classes, so those are included.
  */
-export async function getStudentUpcomingSession(
-  classId: string,
-): Promise<StudentUpcomingSession | null> {
+export async function getStudentUpcomingSession(classId: string): Promise<StudentUpcomingSession | null> {
   try {
     const supabase = await createSupabaseServerClient();
     const today = getVietnamToday();
@@ -190,7 +189,7 @@ export async function getStudentUpcomingSession(
       .eq("parent_class_id", classId)
       .is("effective_to", null);
     const classIds = [classId, ...(links ?? []).map((link) => link.component_class_id)];
-    const { data, error } = await supabase
+    const { data: rows, error } = await supabase
       .from("class_sessions")
       .select(
         `
@@ -209,10 +208,17 @@ export async function getStudentUpcomingSession(
       .in("status", ["scheduled", "in_progress"])
       .order("session_date", { ascending: true })
       .order("start_time", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .limit(3);
 
-    if (error || !data) {
+    if (error) {
+      return null;
+    }
+
+    // A session that already ended today is not "next"; the auto-end job may lag.
+    const now = getVietnamTime();
+    const data = (rows ?? []).find((row) => !(row.session_date === today && row.end_time < now));
+
+    if (!data) {
       return null;
     }
 
