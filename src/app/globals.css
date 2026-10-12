@@ -71,9 +71,6 @@ body::before {
   --font-sans: var(--font-erp), "Be Vietnam Pro", sans-serif;
   --font-body: var(--font-erp), "Be Vietnam Pro", sans-serif;
 
-  --sidebar-width: 240px;
-  --topbar-height: 64px;
-
   /* Surface tokens (Light Mode) */
   --color-canvas: oklch(0.975 0.005 250);
   --color-surface-1: oklch(1 0 0);
@@ -244,8 +241,6 @@ body::before {
   --rail-w: 72px;
   --topbar-h: 64px;
   --module-strip-h: 48px;
-  --sidebar-width: var(--sidebar-w);
-  --topbar-height: var(--topbar-h);
   --space-0: 0;
   --space-1: 4px;
   --space-2: 8px;

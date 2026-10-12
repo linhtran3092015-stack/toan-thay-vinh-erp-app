@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -49,22 +49,30 @@ export function RecordListItem({
   metrics,
   title,
 }: RecordListItemProps) {
+  // The short aria-label names the link; the status, meta and metrics stay
+  // announced as its description instead of being hidden behind the label.
+  const id = useId();
+  const describedBy = [badge && `${id}-badge`, meta && `${id}-meta`, metrics && `${id}-metrics`]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <article className={cn("min-w-0", className)} role="listitem">
       <Link
+        aria-describedby={describedBy || undefined}
         aria-label={ariaLabel}
         className="block rounded-lg border border-border-subtle bg-surface-base px-4 py-3 text-text-strong shadow-[var(--panel-shadow)] hover:border-border-strong hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
         href={href}
       >
         <div className="flex items-center justify-between gap-2">
           <span className="min-w-0 truncate text-[15px] font-semibold leading-5">{title}</span>
-          {badge ? <span className="shrink-0">{badge}</span> : null}
+          {badge ? <span className="shrink-0" id={`${id}-badge`}>{badge}</span> : null}
         </div>
         {meta ? (
-          <div className="mt-0.5 text-secondary tabular-nums text-text-muted">{meta}</div>
+          <div className="mt-0.5 text-secondary tabular-nums text-text-muted" id={`${id}-meta`}>{meta}</div>
         ) : null}
         {metrics ? (
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border-row pt-2 text-secondary text-text-default">
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border-row pt-2 text-secondary text-text-default" id={`${id}-metrics`}>
             {metrics}
           </div>
         ) : null}

@@ -9,22 +9,30 @@ import {
 import { countActiveClassFilters, defaultClassFilters } from "@/features/classes/class-filters";
 import type { ClassDirectoryItem } from "@/features/classes/read-models";
 
-/** URL state lives in the query string; `replace` feeds the next render's search params like Next would. */
+/**
+ * URL state lives in the query string. The page writes it through the History API
+ * (Next syncs that with useSearchParams); the spies feed the next render's params like Next would.
+ */
 const navigation = vi.hoisted(() => {
   const state = { params: new URLSearchParams() };
-  const apply = (href: string) => {
-    state.params = new URLSearchParams(href.split("?")[1] ?? "");
+  const apply = (_state: unknown, _unused: string, href?: string | URL | null) => {
+    state.params = new URLSearchParams(String(href ?? "").split("?")[1] ?? "");
   };
-  return { push: vi.fn(apply), replace: vi.fn(apply), state };
+  return { apply, state };
 });
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: navigation.push, replace: navigation.replace }),
   useSearchParams: () => navigation.state.params,
 }));
+const historySpies = {
+  push: vi.spyOn(window.history, "pushState").mockImplementation(navigation.apply),
+  replace: vi.spyOn(window.history, "replaceState").mockImplementation(navigation.apply),
+};
 
 afterEach(() => {
   cleanup();
   navigation.state.params = new URLSearchParams();
+  historySpies.push.mockClear();
+  historySpies.replace.mockClear();
 });
 
 const classWithoutStudentCount: ClassDirectoryItem = {
@@ -84,7 +92,7 @@ describe("Classes directory presentation", () => {
 // Value: protects=/classes status chips carry live counts and narrow the table via the URL, and a no-match filter shows the in-frame empty state whose Xóa lọc restores rows;
 // fails_when=chip counts drift, a zero chip is clickable, pressing Nháp keeps active rows, a no-match search still paints rows, or Xóa lọc restores nothing;
 // why_new=the cases above cover the drawer and the withheld count, none drive the chips or the empty-by-filter path of ClassListPage (flow F7);
-// seam=none; no_claim=does not prove Next re-renders on router.replace (the harness applies the href to the search params itself)
+// seam=none; no_claim=does not prove Next re-renders on history.replaceState (the harness applies the href to the search params itself)
 describe("Classes directory quick chips and empty-by-filter (design 06b)", () => {
   const classes: ClassDirectoryItem[] = [
     { ...classWithoutStudentCount, activeStudentCount: 18 },
@@ -106,7 +114,7 @@ describe("Classes directory quick chips and empty-by-filter (design 06b)", () =>
     expect(dataRows()).toHaveLength(3);
 
     fireEvent.click(within(chips).getByRole("button", { name: chip("Nháp", 1) }));
-    expect(navigation.replace).toHaveBeenLastCalledWith("/classes?status=draft", { scroll: false });
+    expect(historySpies.replace).toHaveBeenLastCalledWith(window.history.state, "", "/classes?status=draft");
     view.rerender(<ClassListPage canCreateClass={false} classes={classes} />);
 
     expect(screen.getByRole("button", { name: chip("Nháp", 1) })).toHaveAttribute("aria-pressed", "true");
@@ -130,7 +138,7 @@ describe("Classes directory quick chips and empty-by-filter (design 06b)", () =>
     expect(within(frame).getByText("Nới rộng điều kiện hoặc xóa bộ lọc để xem lại danh sách.")).toBeInTheDocument();
 
     fireEvent.click(within(frame).getByRole("button", { name: "Xóa lọc" }));
-    expect(navigation.replace).toHaveBeenLastCalledWith("/classes", { scroll: false });
+    expect(historySpies.replace).toHaveBeenLastCalledWith(window.history.state, "", "/classes");
     rerender();
 
     expect(dataRows()).toHaveLength(3);

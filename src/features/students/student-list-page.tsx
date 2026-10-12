@@ -121,6 +121,7 @@ export function StudentListPage({
       const parsed = parseStudentDirectoryViewState(currentParams, classNames);
       setFilters(parsed.filters);
       setPage(parsed.page);
+      setSelectedIds(new Set());
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -374,7 +375,11 @@ export function StudentListPage({
                 {filteredStudents.length} học sinh{summarySuffix ? ` · ${filters.className}` : ""}
               </span>
               {hasActiveFilters ? (
-                <button className="font-semibold text-action-primary" onClick={resetFilters} type="button">
+                <button
+                  className="-my-3 min-h-11 rounded-md px-2 font-semibold text-action-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+                  onClick={resetFilters}
+                  type="button"
+                >
                   Xóa lọc
                 </button>
               ) : null}

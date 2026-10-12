@@ -3,7 +3,7 @@
 import type { ChangeEvent, ReactNode } from "react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import {
   DataTableFrame,
@@ -58,7 +58,6 @@ type QuickStatusValue = (typeof quickStatusValues)[number];
 
 /** Classes directory (design 06b): one table to compare roster, schedule and status across classes. */
 export function ClassListPage({ canCreateClass, canImportClasses = false, classes }: ClassListPageProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
@@ -88,14 +87,16 @@ export function ClassListPage({ canCreateClass, canImportClasses = false, classe
   const updateFilter = (key: keyof ClassDirectoryFiltersState, value: string) => {
     const filters = mergePendingClassDirectoryFilter(pendingFiltersRef.current, viewState.filters, key, value);
     pendingFiltersRef.current = filters;
-    router.replace(getClassDirectoryHref(searchParams, { filters, page: 1 }), { scroll: false });
+    // Filtering is client-side over the `classes` prop, so update the URL through the
+    // History API (synced with useSearchParams) instead of a server round trip per keystroke.
+    window.history.replaceState(window.history.state, "", getClassDirectoryHref(searchParams, { filters, page: 1 }));
   };
   const resetFilters = () => {
     const state = resetClassDirectoryViewState();
     pendingFiltersRef.current = state.filters;
-    router.replace(getClassDirectoryHref(searchParams, state), { scroll: false });
+    window.history.replaceState(window.history.state, "", getClassDirectoryHref(searchParams, state));
   };
-  const updatePage = (page: number) => router.push(getClassDirectoryHref(searchParams, { filters: viewState.filters, page }), { scroll: false });
+  const updatePage = (page: number) => window.history.pushState(window.history.state, "", getClassDirectoryHref(searchParams, { filters: viewState.filters, page }));
   const createHref = directoryQuery ? `/classes/new?${directoryQuery}` : "/classes/new";
   const isEmptyByFilter = filteredClasses.length === 0 && hasFilters;
   const emptyByFilterState = (
@@ -128,7 +129,7 @@ export function ClassListPage({ canCreateClass, canImportClasses = false, classe
       <p aria-live="polite" className="sr-only">Hiển thị {pagination.start}-{pagination.end} của {filteredClasses.length} lớp học</p>
       <ClassTable classes={pagination.rows} directoryQuery={directoryQuery} empty={emptyByFilterState} footer={<Pagination itemLabel="lớp" label="Phân trang lớp học" onPageChange={updatePage} page={pagination.page} pageCount={pagination.pageCount} rangeEnd={pagination.end} rangeStart={pagination.start} summarySuffix={viewState.filters.year !== "all" ? `năm học ${viewState.filters.year}` : undefined} total={filteredClasses.length} variant="frame" />} status={isEmptyByFilter ? "empty" : "ready"} />
       <div className="classes-directory-record-list grid gap-2">
-        <p className="flex items-center justify-between text-secondary text-text-muted"><span>{filteredClasses.length} lớp học</span>{hasFilters ? <button className="font-semibold text-action-primary" onClick={resetFilters} type="button">Xóa lọc</button> : null}</p>
+        <p className="flex items-center justify-between text-secondary text-text-muted"><span>{filteredClasses.length} lớp học</span>{hasFilters ? <button className="-my-3 min-h-11 rounded-md px-2 font-semibold text-action-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus" onClick={resetFilters} type="button">Xóa lọc</button> : null}</p>
         {isEmptyByFilter ? <div className="rounded-lg border border-border-subtle bg-surface-base">{emptyByFilterState}</div> : <>
           <ResponsiveRecordList label="Danh sách lớp học">
             {pagination.rows.map((item) => <ClassRecord directoryQuery={directoryQuery} item={item} key={item.id} />)}
@@ -144,7 +145,7 @@ export function ClassFilters({ activeFilterCount, filters, isOpen, onClose, onFi
   const titleId = useId();
   const fields = (scope: "desktop" | "mobile") => <ClassFilterFields filters={filters} onFilterChange={onFilterChange} scope={scope} years={years} />;
   return <>
-    <FilterBar activeCount={hasActiveClassFilters(filters) ? Math.max(activeFilterCount, 1) : 0} className="classes-filter-bar" fieldCount={5} label="Bộ lọc lớp học" onReset={onReset}>{fields("desktop")}</FilterBar>
+    <FilterBar activeCount={activeFilterCount} className="classes-filter-bar" fieldCount={5} label="Bộ lọc lớp học" onReset={onReset}>{fields("desktop")}</FilterBar>
     <FilterSheet activeCount={activeFilterCount} isOpen={isOpen} onClose={onClose} onReset={onReset} resetTestId="mobile-class-reset-filters" resultLabel={resultCount === undefined ? "Xem kết quả" : `Xem ${resultCount} lớp`} returnFocusRef={returnFocusRef} subject="lớp học" titleId={titleId}>{fields("mobile")}</FilterSheet>
   </>;
 }
@@ -169,7 +170,7 @@ function ClassTable({ classes, directoryQuery, empty, footer, status }: { classe
 function ClassTableRow({ directoryQuery, item }: { directoryQuery: string; item: ClassDirectoryItem }) {
   const href = classHref(item.id, directoryQuery);
   return <TableRow tall>
-    <TableCell><Link className="font-semibold text-text-strong hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus" href={href}>{item.name}</Link><span className="block text-caption leading-[14px] tabular-nums text-text-muted">{item.code}{item.academicYear?.code ? ` · ${item.academicYear.code}` : ""}</span></TableCell>
+    <TableCell><Link className="font-semibold text-text-strong hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus" href={href}>{item.name}</Link><span className="block text-caption leading-[14px] tabular-nums text-text-muted">{item.code}</span></TableCell>
     <TableCell className="w-[120px] text-secondary text-text-default">{item.academicYear?.code ?? <span className="text-text-muted">Chưa xác định</span>}</TableCell>
     <TableCell className="w-[200px] text-secondary text-text-default">{item.grade} · {item.level} · {formatLearningMode(item.defaultLearningMode)}</TableCell>
     <TableCell className="w-[96px]" numeric>{item.weeklySessionCount}</TableCell>

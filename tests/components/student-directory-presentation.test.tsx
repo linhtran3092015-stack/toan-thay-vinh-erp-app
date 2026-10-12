@@ -95,10 +95,11 @@ describe("Students directory presentation", () => {
     const record = screen.getByRole("listitem");
     expect(record).toHaveTextContent("Nguyễn Thảo Vy");
     expect(within(record).getByText("Đang học")).toBeInTheDocument();
-    expect(within(record).getByRole("link", { name: "Mở hồ sơ học viên Nguyễn Thảo Vy" })).toHaveAttribute(
-      "href",
-      "/students/student-1?status=active",
-    );
+    const link = within(record).getByRole("link", { name: "Mở hồ sơ học viên Nguyễn Thảo Vy" });
+    expect(link).toHaveAttribute("href", "/students/student-1?status=active");
+    // The short link name must not hide the status and guardian from screen readers.
+    expect(link).toHaveAccessibleDescription(/Đang học/);
+    expect(link).toHaveAccessibleDescription(/Lê Minh/);
   });
 
   it("labels the filter drawer and supports Escape dismissal", () => {
@@ -258,30 +259,61 @@ describe("Directory import entry points and bulk transition submit", () => {
     expect(screen.getByRole("link", { name: "Nhập lớp từ file" })).toHaveAttribute("href", "/imports/classes");
   });
 
-  // Value: protects=a bulk transition from the directory previews and executes against exactly the selected students under the filtered source status, then clears the selection and refreshes once; fails_when=selectedStudentIds is not passed (the batch hits every student in that status), the chip status is not the source, or success leaves a stale selection/no refresh; why_new=the dialog test renders it standalone and the page test stops at selection; seam=none; no_claim=does not prove the RPC count guard or RLS (actions mocked)
+  // Value: protects=a bulk transition from the directory previews and executes against exactly the selected students under the chip status as source, then clears the selection and refreshes once; fails_when=selectedStudentIds is not passed (the batch hits every student in that status), the chip status is not the source, or success leaves a stale selection/no refresh; why_new=the dialog test renders it standalone and the page test stops at selection; seam=none; no_claim=does not prove the RPC count guard or RLS (actions mocked)
   it("submits the selected students only and clears the selection after a successful transition", async () => {
     navigation.refresh.mockClear();
-    vi.mocked(bulkActions.previewBulkStudentStatusTransitionAction).mockResolvedValueOnce({ data: { count: 1, sourceStatus: "active" }, ok: true });
-    vi.mocked(bulkActions.executeBulkStudentStatusTransitionAction).mockResolvedValueOnce({ data: { affectedCount: 1, sourceStatus: "active", targetStatus: "reserved" }, ok: true } as never);
-    const other = { ...student, fullName: "Phạm Quốc Huy", id: "student-3", publicCode: "HV-003" };
-    render(<StudentListPage canManageStatus students={[student, other]} />);
+    vi.mocked(bulkActions.previewBulkStudentStatusTransitionAction).mockClear().mockResolvedValueOnce({ data: { count: 1, sourceStatus: "waiting_class" }, ok: true });
+    vi.mocked(bulkActions.executeBulkStudentStatusTransitionAction).mockClear().mockResolvedValueOnce({ data: { affectedCount: 1, sourceStatus: "waiting_class", targetStatus: "interested" }, ok: true } as never);
+    const waiting = { ...student, lifecycleStatus: "waiting_class" as const };
+    const other = { ...waiting, fullName: "Phạm Quốc Huy", id: "student-3", publicCode: "HV-003" };
+    render(<StudentListPage canManageStatus students={[waiting, other]} />);
 
-    fireEvent.click(within(screen.getByRole("group", { name: "Lọc nhanh theo trạng thái" })).getByRole("button", { name: /Đang học/ }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Lọc nhanh theo trạng thái" })).getByRole("button", { name: /Chờ chọn lớp/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Chọn Nguyễn Thảo Vy" }));
     const bar = screen.getByRole("region", { name: "Đã chọn 1 học sinh" });
     fireEvent.click(within(bar).getByRole("button", { name: "Chuyển trạng thái…" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Preview chuyển trạng thái" }));
-    expect(bulkActions.previewBulkStudentStatusTransitionAction).toHaveBeenCalledWith(expect.objectContaining({ studentIds: ["student-1"] }));
+    expect(bulkActions.previewBulkStudentStatusTransitionAction).toHaveBeenCalledWith({ sourceStatus: "waiting_class", studentIds: ["student-1"] });
     const confirm = await screen.findByRole("button", { name: "Xác nhận chuyển 1 học sinh" });
     fireEvent.change(screen.getByLabelText(/Ghi chú \/ Lý do chuyển/), { target: { value: "Nghỉ hè" } });
     fireEvent.click(confirm);
 
     await waitFor(() => expect(navigation.refresh).toHaveBeenCalledOnce());
-    expect(bulkActions.executeBulkStudentStatusTransitionAction).toHaveBeenCalledWith(expect.objectContaining({ expectedCount: 1, reason: "Nghỉ hè", studentIds: ["student-1"] }));
+    expect(bulkActions.executeBulkStudentStatusTransitionAction).toHaveBeenCalledWith(expect.objectContaining({ expectedCount: 1, reason: "Nghỉ hè", sourceStatus: "waiting_class", studentIds: ["student-1"] }));
     expect(screen.queryByRole("region", { name: /Đã chọn/ })).not.toBeInTheDocument();
-    // The page hands the active chip status to the dialog as its source; the selected students are all "active".
-    // Last on purpose so every assertion above is verified even while this one fails.
-    expect(vi.mocked(bulkActions.previewBulkStudentStatusTransitionAction).mock.calls[0]?.[0]).toEqual({ sourceStatus: "active", studentIds: ["student-1"] });
+  });
+
+  // Value: protects=the header checkbox selects exactly the current page, shows indeterminate for a partial page, and feeds the bulk bar; fails_when=select-all misses rows, keeps rows from other pages, or the mixed state is lost; why_new=only single-row checkboxes were driven; seam=none; no_claim=does not prove selections on other pages survive (single page here)
+  it("selects every student on the page from the header checkbox and shows a mixed state after one is cleared", () => {
+    const other = { ...student, fullName: "Phạm Quốc Huy", id: "student-3", publicCode: "HV-003" };
+    render(<StudentListPage canManageStatus students={[student, other]} />);
+
+    const all = screen.getByRole("checkbox", { name: "Chọn tất cả trên trang" }) as HTMLInputElement;
+    fireEvent.click(all);
+    expect(screen.getByRole("region", { name: "Đã chọn 2 học sinh" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Chọn Nguyễn Thảo Vy" }));
+    expect(screen.getByRole("region", { name: "Đã chọn 1 học sinh" })).toBeInTheDocument();
+    expect(all.indeterminate).toBe(true);
+
+    fireEvent.click(all);
+    expect(screen.getByRole("region", { name: "Đã chọn 2 học sinh" })).toBeInTheDocument();
+    expect(all.indeterminate).toBe(false);
+  });
+
+  // Value: protects=the dialog never previews a status its source select cannot show; fails_when=an enrollment-bound chip (Đang học) seeds the source, so the select reads "Đang quan tâm" while the preview counts active students; why_new=QA finding 001 in ship review cycle 3; seam=none; no_claim=does not prove the RPC rejects active as a source
+  it("falls back to a bulk-eligible source when the chip status cannot be bulk-transitioned", () => {
+    vi.mocked(bulkActions.previewBulkStudentStatusTransitionAction).mockClear().mockResolvedValueOnce({ data: { count: 0, sourceStatus: "interested" }, ok: true });
+    render(<StudentListPage canManageStatus students={[student]} />);
+
+    fireEvent.click(within(screen.getByRole("group", { name: "Lọc nhanh theo trạng thái" })).getByRole("button", { name: /Đang học/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Chuyển trạng thái hàng loạt" }));
+
+    const source = screen.getByLabelText(/Trạng thái hiện tại \(Nguồn\)/) as HTMLSelectElement;
+    expect(source.value).toBe("interested");
+    expect(Array.from(source.options).map((option) => option.value)).not.toContain("active");
+    fireEvent.click(screen.getByRole("button", { name: "Preview chuyển trạng thái" }));
+    expect(bulkActions.previewBulkStudentStatusTransitionAction).toHaveBeenCalledWith(expect.objectContaining({ sourceStatus: source.value }));
   });
 });
