@@ -1,0 +1,11 @@
+# Exact spans the gstack-redact env.kv rule flags as "secret-named assignment".
+# Each one is a React `key` prop value or a navigation group key, not a credential.
+{rowIndex}
+{cellIndex}
+{chip.value}
+{item.value}
+{operation}
+{schedule.id}
+{event.id}
+{student.id}
+operations
