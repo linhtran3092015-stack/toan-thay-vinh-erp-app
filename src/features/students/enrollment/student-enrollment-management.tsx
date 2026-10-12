@@ -4,6 +4,7 @@ import {
   useState,
   useRef,
   type FormEvent,
+  type ReactNode,
   type RefObject,
 } from "react";
 import { X } from "lucide-react";
@@ -59,7 +60,7 @@ const operationOrder: StudentEnrollmentOperation[] = [
   "resume",
 ];
 
-const operationLabels: Record<
+export const operationLabels: Record<
   StudentEnrollmentOperation,
   string
 > = {
@@ -86,11 +87,36 @@ const operationDescriptions: Record<
     "Kết thúc lớp hiện tại và chuyển sang lớp mới ngay hôm nay.",
 };
 
-export function StudentEnrollmentManagement({
+export interface StudentEnrollmentOperationsOptions {
+  model: StudentEnrollmentUiModel;
+  studentId: string;
+  studentName: string;
+}
+
+export interface StudentEnrollmentOperationsController {
+  /** The dialog element; render it once wherever the feature lives. */
+  dialog: ReactNode;
+  isPending: boolean;
+  /** Opens the dialog for an enabled operation; ignores disabled ones. */
+  open: (
+    operation: StudentEnrollmentOperation,
+    trigger?: HTMLButtonElement | null,
+  ) => void;
+  successMessage: string | null;
+  visibleOperations: StudentEnrollmentOperation[];
+}
+
+/**
+ * Enrollment operations (enroll, transfer, reserve, end, resume) share one
+ * dialog and one success banner. The hook owns that state so a page can put
+ * the primary action in its header, the rest in an overflow menu, and still
+ * open the same dialog from an enrollment card.
+ */
+export function useStudentEnrollmentOperations({
   model,
   studentId,
   studentName,
-}: StudentEnrollmentManagementProps) {
+}: StudentEnrollmentOperationsOptions): StudentEnrollmentOperationsController {
   const router = useRouter();
 
   const [activeOperation, setActiveOperation] =
@@ -111,20 +137,16 @@ export function StudentEnrollmentManagement({
 
   const [successMessage, setSuccessMessage] =
     useState<string | null>(null);
-  const activeTriggerRef = useRef<HTMLButtonElement>(null);
+  const activeTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const visibleOperations = operationOrder.filter(
     (operation) =>
       model.actions[operation].visible,
   );
 
-  if (visibleOperations.length === 0) {
-    return null;
-  }
-
-  function openDialog(
+  function open(
     operation: StudentEnrollmentOperation,
-    trigger: HTMLButtonElement,
+    trigger?: HTMLButtonElement | null,
   ) {
     if (!model.actions[operation].enabled) {
       return;
@@ -135,7 +157,7 @@ export function StudentEnrollmentManagement({
     );
     setActionState(null);
     setSuccessMessage(null);
-    activeTriggerRef.current = trigger;
+    activeTriggerRef.current = trigger ?? null;
     setActiveOperation(operation);
   }
 
@@ -177,6 +199,36 @@ export function StudentEnrollmentManagement({
     } finally {
       setIsPending(false);
     }
+  }
+
+  const dialog = activeOperation ? (
+    <EnrollmentOperationDialog
+      actionState={actionState}
+      isPending={isPending}
+      model={model}
+      onClose={closeDialog}
+      onSubmit={handleSubmit}
+      operation={activeOperation}
+      setValues={setValues}
+      studentName={studentName}
+      returnFocusRef={activeTriggerRef}
+      values={values}
+    />
+  ) : null;
+
+  return { dialog, isPending, open, successMessage, visibleOperations };
+}
+
+export function StudentEnrollmentManagement({
+  model,
+  studentId,
+  studentName,
+}: StudentEnrollmentManagementProps) {
+  const { dialog, open, successMessage, visibleOperations } =
+    useStudentEnrollmentOperations({ model, studentId, studentName });
+
+  if (visibleOperations.length === 0) {
+    return null;
   }
 
   return (
@@ -228,7 +280,7 @@ export function StudentEnrollmentManagement({
                           !availability.enabled
                         }
                         onClick={(event) =>
-                          openDialog(operation, event.currentTarget)
+                          open(operation, event.currentTarget)
                         }
                         size="sm"
                         type="button"
@@ -262,20 +314,7 @@ export function StudentEnrollmentManagement({
         </CardContent>
       </Card>
 
-      {activeOperation ? (
-        <EnrollmentOperationDialog
-          actionState={actionState}
-          isPending={isPending}
-          model={model}
-          onClose={closeDialog}
-          onSubmit={handleSubmit}
-          operation={activeOperation}
-          setValues={setValues}
-          studentName={studentName}
-          returnFocusRef={activeTriggerRef}
-          values={values}
-        />
-      ) : null}
+      {dialog}
     </>
   );
 }
