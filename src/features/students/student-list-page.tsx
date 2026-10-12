@@ -408,20 +408,23 @@ export function StudentListPage({
         </div>
       )}
 
-      <BulkStatusTransitionDialog
-        initialSourceStatus={
-          filters.status !== "all"
-            ? (filters.status as StudentLifecycleStatus)
-            : "interested"
-        }
-        isOpen={isBulkTransitionOpen}
-        onClose={() => setIsBulkTransitionOpen(false)}
-        onSuccess={() => {
-          clearSelection();
-          router.refresh();
-        }}
-        selectedStudentIds={Array.from(selectedIds)}
-      />
+      {/* Mounted only while open so each opening reads the current chip as its source and starts with no stale preview. */}
+      {isBulkTransitionOpen ? (
+        <BulkStatusTransitionDialog
+          initialSourceStatus={
+            filters.status !== "all"
+              ? (filters.status as StudentLifecycleStatus)
+              : "interested"
+          }
+          isOpen
+          onClose={() => setIsBulkTransitionOpen(false)}
+          onSuccess={() => {
+            clearSelection();
+            router.refresh();
+          }}
+          selectedStudentIds={Array.from(selectedIds)}
+        />
+      ) : null}
     </div>
   );
 }
