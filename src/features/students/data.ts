@@ -66,6 +66,7 @@ const lifecycleStatuses: readonly StudentLifecycleStatus[] = [
   "trial_booked",
   "trial_completed",
   "waiting_class",
+  "withdrawn",
 ];
 
 function createDataError(

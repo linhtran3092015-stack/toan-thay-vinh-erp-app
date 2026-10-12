@@ -24,6 +24,11 @@ Giao diện mới theo phong cách Stumana: menu gọn theo nhóm, danh sách h�
 - Màu xanh rêu là mặc định mới và không có migration dữ liệu. Nếu rollback về bản cũ sau khi ai đó đã lưu lựa chọn "moss", bản cũ không nhận ra giá trị này.
 - Việc ẩn mức học phí với trợ giảng mới làm ở giao diện và khâu tải dữ liệu. Chính sách RLS của `student_tuition_rate_versions` và `student_acquisition_source_assignments` vẫn cho đọc trực tiếp qua API; sẽ thu hẹp bằng migration riêng.
 
+## [0.6.22.1] - 2026-10-13
+
+### Fixed
+- Danh sách học sinh (`/students`) và hồ sơ của học sinh đã nghỉ không còn báo lỗi dữ liệu. Trước đây, chỉ cần một học sinh được kết thúc ghi danh bằng "Nghỉ học" (trạng thái `withdrawn`, có từ 0.6.16.0) là toàn bộ danh sách học sinh báo lỗi với mọi nhân viên.
+
 ## [0.6.22.0] - 2026-10-13
 
 Sửa lỗi chặn vận hành buổi học, trợ giảng được bắt đầu/kết thúc buổi.
