@@ -21,5 +21,6 @@ export function formatDeltaSessions(value: number): string {
     return `+${value}`;
   }
 
-  return String(value);
+  // Typographic minus, like the ledger totals and the directory's balance column.
+  return value < 0 ? `−${Math.abs(value)}` : String(value);
 }

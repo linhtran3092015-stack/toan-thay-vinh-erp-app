@@ -90,10 +90,12 @@ export function StudentTable({
                 {student.nickname ? ` · ${student.nickname}` : ""}
               </span>
             </TableCell>
-            <TableCell className="w-[150px]">
+            <TableCell className="w-[150px] max-w-[150px]">
               {student.primaryGuardian ? (
                 <>
-                  <span className="block truncate text-text-default">{student.primaryGuardian.fullName}</span>
+                  <span className="block truncate text-text-default" title={student.primaryGuardian.fullName}>
+                    {student.primaryGuardian.fullName}
+                  </span>
                   <span className="block text-caption leading-[14px] tabular-nums text-text-muted">{student.primaryGuardian.phone}</span>
                 </>
               ) : (

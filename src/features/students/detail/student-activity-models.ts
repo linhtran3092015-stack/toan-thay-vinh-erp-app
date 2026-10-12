@@ -1,4 +1,5 @@
 import type { SessionAttendanceStatus } from "@/features/sessions/detail-read-models";
+import { PAYMENT_REQUEST_OVERDUE_DAYS } from "@/features/students/student-directory-metrics";
 
 /**
  * Plain read models and pure summaries for the student profile activity feeds.
@@ -41,6 +42,8 @@ export interface StudentAttendanceHistory {
 
 /** Options for the summaries; `truncated` comes from the loader (raw rows === limit). */
 export interface ActivitySummaryOptions {
+  /** Clock for the overdue rule; defaults to now. */
+  now?: Date;
   truncated?: boolean;
 }
 
@@ -128,6 +131,8 @@ export interface StudentPaymentRequestItem {
 export interface StudentPaymentSummary {
   /** Pending + partially paid requests. */
   openCount: number;
+  /** A pending request is older than PAYMENT_REQUEST_OVERDUE_DAYS (same rule as the directory and dashboard). */
+  overdue: boolean;
   /** Expected minus paid across open requests. */
   outstandingVnd: number;
   requests: StudentPaymentRequestItem[];
@@ -139,9 +144,11 @@ export interface StudentPaymentSummary {
 
 export function summarizePaymentRequests(
   requests: StudentPaymentRequestItem[],
-  { truncated = false }: ActivitySummaryOptions = {},
+  { now = new Date(), truncated = false }: ActivitySummaryOptions = {},
 ): StudentPaymentSummary {
+  const overdueBefore = now.getTime() - PAYMENT_REQUEST_OVERDUE_DAYS * 24 * 60 * 60 * 1000;
   let openCount = 0;
+  let overdue = false;
   let outstandingVnd = 0;
   let totalExpectedVnd = 0;
   let totalPaidVnd = 0;
@@ -157,10 +164,11 @@ export function summarizePaymentRequests(
     if (request.status === "pending" || request.status === "partially_paid") {
       openCount += 1;
       outstandingVnd += Math.max(request.expectedAmountVnd - request.paidAmountVnd, 0);
+      overdue ||= request.status === "pending" && Date.parse(request.createdAt) < overdueBefore;
     }
   }
 
-  return { openCount, outstandingVnd, requests, totalExpectedVnd, totalPaidVnd, truncated };
+  return { openCount, outstandingVnd, overdue, requests, totalExpectedVnd, totalPaidVnd, truncated };
 }
 
 export interface StudentUpcomingSession {

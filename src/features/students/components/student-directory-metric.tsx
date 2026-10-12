@@ -48,10 +48,13 @@ export function AttendanceRateBar({ cell }: { cell: StudentDirectoryMetricCell }
 export function StudentMetricValue({
   cell,
   format,
+  prefix,
   strong = false,
 }: {
   cell: StudentDirectoryMetricCell;
   format: "attendance" | "sessions" | "vnd";
+  /** Label rendered inside the toned value (mobile "Nợ"), so label and amount share one colour. */
+  prefix?: string;
   /** The mobile metric row bolds every value (design 06c); table cells stay regular. */
   strong?: boolean;
 }) {
@@ -77,8 +80,9 @@ export function StudentMetricValue({
     );
   }
 
-  // Design 06: overdue debt is danger, other open debt warning, zero muted so the
-  // rows that owe stand out. "Quá hạn" is spelled out so colour never carries it alone.
+  // Design 06: overdue debt is danger, other open debt warning, zero muted (text-muted,
+  // not text-subtle, to keep AA contrast) so the rows that owe stand out. "Quá hạn" is
+  // spelled out so colour never carries it alone.
   const overdue = value > 0 && cell.overdue === true;
 
   return (
@@ -86,10 +90,11 @@ export function StudentMetricValue({
       className={cn(
         "tabular-nums",
         strong && "font-semibold",
-        value === 0 && "text-text-subtle",
+        value === 0 && "text-text-muted",
         value > 0 && (overdue ? "font-semibold text-danger" : "font-semibold text-warning"),
       )}
     >
+      {prefix ? `${prefix} ` : null}
       {formatVnd(value)}
       {overdue ? (
         strong ? (

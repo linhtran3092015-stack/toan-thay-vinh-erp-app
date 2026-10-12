@@ -318,11 +318,12 @@ export function StudentProfilePage({
                 : payments?.truncated
                   ? `${payments.openCount} yêu cầu chờ · tính trên ${payments.requests.length} yêu cầu gần nhất`
                   : payments && payments.openCount > 0
-                    ? `${payments.openCount} yêu cầu chờ thanh toán`
+                    ? `${payments.openCount} yêu cầu chờ thanh toán${payments.overdue ? " · có yêu cầu quá hạn" : ""}`
                     : "không có yêu cầu chờ"
           }
           label="Công nợ"
-          tone={payments && payments.outstandingVnd > 0 ? "danger" : "default"}
+          // Same two levels as the directory: overdue debt is danger, other open debt warning.
+          tone={payments && payments.outstandingVnd > 0 ? (payments.overdue ? "danger" : "warning") : "default"}
           value={!canViewPayments ? "Không có quyền" : payments ? formatVnd(payments.outstandingVnd) : "—"}
         />
         <KpiTile
@@ -505,7 +506,7 @@ function KpiTile({
   className?: string;
   hint?: string;
   label: string;
-  tone?: "default" | "danger";
+  tone?: "default" | "danger" | "warning";
   value: string;
 }) {
   return (
@@ -514,7 +515,7 @@ function KpiTile({
       <p
         className={cn(
           "mt-0.5 break-words text-[20px] font-semibold leading-7 tabular-nums md:truncate",
-          tone === "danger" ? "text-danger" : "text-text-strong",
+          tone === "danger" ? "text-danger" : tone === "warning" ? "text-warning" : "text-text-strong",
         )}
       >
         {value}

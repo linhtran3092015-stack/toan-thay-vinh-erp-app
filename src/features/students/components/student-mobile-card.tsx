@@ -72,9 +72,13 @@ function DebtLabel({ cell }: { cell: ReturnType<typeof getStudentDirectoryMetric
     return <span className="text-text-muted">Không nợ</span>;
   }
 
-  return (
-    <>
-      Nợ <StudentMetricValue cell={cell} format="vnd" strong />
-    </>
-  );
+  if (cell.kind !== "value") {
+    return (
+      <>
+        Nợ <StudentMetricValue cell={cell} format="vnd" />
+      </>
+    );
+  }
+
+  return <StudentMetricValue cell={cell} format="vnd" prefix="Nợ" strong />;
 }

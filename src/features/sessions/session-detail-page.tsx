@@ -25,6 +25,7 @@ import { SessionLockActions } from "@/features/sessions/components/session-lock-
 import { SessionLifecycleActions } from "@/features/sessions/components/session-lifecycle-actions";
 import { SessionRescheduleDialog } from "@/features/sessions/components/session-reschedule-dialog";
 import { getParticipantDisplayName, getSessionLockReadiness } from "@/features/sessions/lock-readiness";
+import { formatLearningMode } from "@/lib/format";
 import type {
   SessionAttendanceStatus,
   SessionDetailReadModel,
@@ -33,7 +34,6 @@ import type {
 } from "@/features/sessions/detail-read-models";
 import type {
   SessionKind,
-  SessionLearningMode,
   SessionStatus,
 } from "@/features/sessions/read-models";
 
@@ -121,7 +121,7 @@ export function SessionDetailPage({
         <p className="mt-1 text-secondary text-text-muted">
           {formatDate(detail.sessionDate)} · {formatTime(detail.startTime)}–{formatTime(detail.endTime)}
           {detail.roomName ? ` · ${detail.roomName}` : ""} · {formatKind(detail.sessionKind)}
-          {detail.componentCode ? ` · ${detail.componentCode}` : ""} · {formatMode(detail.learningMode)} · Khối {detail.grade} · Mức {detail.level}
+          {detail.componentCode ? ` · ${detail.componentCode}` : ""} · {formatLearningMode(detail.learningMode)} · Khối {detail.grade} · Mức {detail.level}
           {participantCount > 0 ? ` · ${participantCount} học sinh` : ""}
         </p>
         <nav aria-label="Điều hướng buổi học" className="mt-2 text-secondary">
@@ -247,7 +247,7 @@ export function SessionDetailPage({
               <InfoLine label="Ngày học" value={formatDate(detail.sessionDate)} />
               <InfoLine label="Thời gian" value={`${formatTime(detail.startTime)} – ${formatTime(detail.endTime)}`} />
               <InfoLine label="Loại buổi" value={formatKind(detail.sessionKind)} />
-              <InfoLine label="Hình thức" value={formatMode(detail.learningMode)} />
+              <InfoLine label="Hình thức" value={formatLearningMode(detail.learningMode)} />
               <InfoLine label="Phòng học" value={detail.roomName ?? "Chưa xác định"} />
               <InfoLine label="Đường dẫn học" value={detail.meetingUrl ?? "Chưa xác định"} />
               <InfoLine label="Bắt đầu" value={formatDateTime(detail.startedAt)} />
@@ -491,15 +491,6 @@ function formatKind(value: SessionKind): string {
   return labels[value];
 }
 
-function formatMode(value: SessionLearningMode): string {
-  const labels: Record<SessionLearningMode, string> = {
-    hybrid: "Kết hợp",
-    offline: "Tại lớp",
-    online: "Trực tuyến",
-  };
-
-  return labels[value];
-}
 
 function formatRegisteredMode(value: string | null): string {
   if (value === "online") {
