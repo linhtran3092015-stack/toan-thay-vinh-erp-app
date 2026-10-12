@@ -146,3 +146,26 @@ describe("Classes directory quick chips and empty-by-filter (design 06b)", () =>
     expect(screen.queryByRole("button", { name: "Xóa lọc" })).not.toBeInTheDocument();
   });
 });
+
+// Value: protects=changing page pushes a history entry (Back returns to the previous page) that keeps the active filter, while filter edits still replace; fails_when=updatePage uses replaceState (Back skips pages), drops the filter, or omits page=2; why_new=existing cases only assert replaceState for filters; seam=none; no_claim=does not prove Next re-renders on pushState (the harness feeds the href back itself)
+describe("Classes directory pagination history", () => {
+  const manyClasses: ClassDirectoryItem[] = Array.from({ length: 21 }, (_, index) => ({
+    ...classWithoutStudentCount,
+    activeStudentCount: 10,
+    code: `7-${index + 1}`,
+    id: `class-${index + 1}`,
+    name: `Toán 7-${index + 1}`,
+  }));
+
+  it("pushes a history entry for the next page and keeps the active filter", () => {
+    navigation.state.params = new URLSearchParams("status=active");
+    render(<ClassListPage canCreateClass={false} classes={manyClasses} />);
+
+    const pager = screen.getByRole("navigation", { name: "Phân trang lớp học" });
+    fireEvent.click(within(pager).getByRole("button", { name: "Sau" }));
+
+    expect(historySpies.push).toHaveBeenCalledTimes(1);
+    expect(historySpies.push).toHaveBeenLastCalledWith(window.history.state, "", "/classes?status=active&page=2");
+    expect(historySpies.replace).not.toHaveBeenCalled();
+  });
+});

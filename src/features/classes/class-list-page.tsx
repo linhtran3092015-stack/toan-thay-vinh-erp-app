@@ -35,7 +35,6 @@ import {
   type ClassDirectoryFiltersState,
 } from "./class-filters";
 import {
-  areClassDirectoryFiltersEqual,
   getClassDirectoryHref,
   getClassDirectoryQuery,
   mergePendingClassDirectoryFilter,
@@ -64,7 +63,8 @@ export function ClassListPage({ canCreateClass, canImportClasses = false, classe
   const pendingFiltersRef = useRef<ClassDirectoryFiltersState | null>(null);
   const years = useMemo(() => Array.from(new Set(classes.map((item) => item.academicYear?.code).filter((value): value is string => Boolean(value)))).sort((a, b) => b.localeCompare(a, "vi")), [classes]);
   const viewState = useMemo(() => parseClassDirectoryViewState(searchParams, years), [searchParams, years]);
-  useEffect(() => { if (pendingFiltersRef.current === null || areClassDirectoryFiltersEqual(pendingFiltersRef.current, viewState.filters)) pendingFiltersRef.current = viewState.filters; }, [viewState.filters]);
+  // The History API updates search params synchronously, so the rendered filters (Back/Forward included) are the base for the next change.
+  useEffect(() => { pendingFiltersRef.current = viewState.filters; }, [viewState.filters]);
   const filteredClasses = useMemo(() => filterClasses(classes, viewState.filters), [classes, viewState.filters]);
   const pagination = useMemo(() => paginateClasses(filteredClasses, viewState.page), [filteredClasses, viewState.page]);
   const activeFilterCount = countActiveClassFilters(viewState.filters);

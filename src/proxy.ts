@@ -21,9 +21,10 @@ const PUBLIC_PATHS = new Set([
   "/api/webhooks/sepay",
 ]);
 
-function isPublicPath(pathname: string): boolean {
-  // Component preview routes exist only outside production builds.
-  if (process.env.NODE_ENV !== "production" && pathname.startsWith("/dev/")) {
+function isPublicPath(pathname: string, method: string): boolean {
+  // Component preview routes exist only outside production builds. Only reads
+  // bypass auth: a POST to /dev/* can carry any server action id.
+  if (process.env.NODE_ENV !== "production" && pathname.startsWith("/dev/") && (method === "GET" || method === "HEAD")) {
     return true;
   }
 
@@ -73,7 +74,7 @@ export async function proxy(request: NextRequest) {
   // Public Coaching links are intentionally anonymous, opaque-token routes.
   // They must bypass the ERP staff session/allowed-email gate; authorization is
   // enforced exclusively by the token-bound public RPCs.
-  if (isPublicPath(pathname)) {
+  if (isPublicPath(pathname, request.method)) {
     return NextResponse.next({ request });
   }
 

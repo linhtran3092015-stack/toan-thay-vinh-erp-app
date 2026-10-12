@@ -44,9 +44,11 @@ export function Pagination({
   }
 
   const pages = visiblePages(page, pageCount);
+  // The standalone pager sits under phone record lists: keep 44px touch targets there.
+  const touchClassName = variant === "standalone" ? "max-md:h-11 max-md:min-w-11" : undefined;
   const controls = (
     <div className="flex flex-wrap items-center gap-1">
-      <Button disabled={page <= 1} onClick={() => onPageChange(page - 1)} size="sm" type="button" variant="secondary">
+      <Button className={touchClassName} disabled={page <= 1} onClick={() => onPageChange(page - 1)} size="sm" type="button" variant="secondary">
         Trước
       </Button>
       {pages.map((value, index) =>
@@ -57,7 +59,7 @@ export function Pagination({
         ) : (
           <Button
             aria-current={value === page ? "page" : undefined}
-            className={cn("min-w-8 px-2 tabular-nums", value === page && "border-action-primary bg-action-primary-soft text-action-primary")}
+            className={cn("min-w-8 px-2 tabular-nums", touchClassName, value === page && "border-action-primary bg-action-primary-soft text-action-primary")}
             key={value}
             onClick={() => onPageChange(value)}
             size="sm"
@@ -68,7 +70,7 @@ export function Pagination({
           </Button>
         ),
       )}
-      <Button disabled={page >= pageCount} onClick={() => onPageChange(page + 1)} size="sm" type="button" variant="secondary">
+      <Button className={touchClassName} disabled={page >= pageCount} onClick={() => onPageChange(page + 1)} size="sm" type="button" variant="secondary">
         Sau
       </Button>
     </div>

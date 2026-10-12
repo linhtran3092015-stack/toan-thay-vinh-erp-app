@@ -1,5 +1,5 @@
 import { createRef, useRef, useState } from "react";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ClassListPage } from "@/features/classes/class-list-page";
@@ -225,6 +225,30 @@ describe("Students directory page selection and quick chips", () => {
     const chips = screen.getByRole("group", { name: "Lọc nhanh theo trạng thái" });
     fireEvent.click(within(chips).getByRole("button", { name: /Bảo lưu/ }));
 
+    expect(screen.queryByRole("region", { name: /Đã chọn/ })).not.toBeInTheDocument();
+  });
+
+  // Value: protects=browser Back/Forward applies the URL's filter and drops the bulk selection; fails_when=the popstate handler stops calling setSelectedIds(new Set()), so a hidden row stays selected and the bulk bar acts on students no longer in view; why_new=selection clearing was only tested for in-page filter changes; seam=none; no_claim=does not prove Next fires popstate on its own router navigation
+  it("clears bulk selection when browser history changes the filter", () => {
+    render(<StudentListPage canManageStatus students={[student, reservedStudent]} />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Chọn Nguyễn Thảo Vy" }));
+    expect(screen.getByRole("region", { name: "Đã chọn 1 học sinh" })).toBeInTheDocument();
+
+    act(() => {
+      window.history.replaceState(null, "", "/students?status=reserved");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(screen.queryByRole("region", { name: /Đã chọn/ })).not.toBeInTheDocument();
+    const chips = screen.getByRole("group", { name: "Lọc nhanh theo trạng thái" });
+    expect(within(chips).getByRole("button", { name: /Bảo lưu/ })).toHaveAttribute("aria-pressed", "true");
+
+    // Going back to the unfiltered list must not resurrect the earlier selection.
+    act(() => {
+      window.history.replaceState(null, "", "/students");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
     expect(screen.queryByRole("region", { name: /Đã chọn/ })).not.toBeInTheDocument();
   });
 

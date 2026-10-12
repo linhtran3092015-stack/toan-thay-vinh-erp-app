@@ -56,6 +56,14 @@ describe("component preview route access (/dev/)", () => {
     expect(response.headers.get("location")).toContain("/login");
   });
 
+  // Value: protects=the /dev/ bypass never lets a server-action POST skip the staff session gate on a dev server; fails_when=the method check is dropped; why_new=review pass B; seam=none; no_claim=does not prove server actions re-check auth themselves
+  it("keeps non-read requests to /dev/ behind the login gate", async () => {
+    const response = await proxy(new NextRequest("http://localhost:3001/dev/session", { method: "POST" }));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/login");
+  });
+
   it("does not widen the bypass to routes that merely start with /dev", async () => {
     const response = await proxy(new NextRequest("http://localhost:3001/devices"));
 

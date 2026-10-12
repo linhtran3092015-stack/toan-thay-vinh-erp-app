@@ -15,7 +15,7 @@ const levels = new Set(["A", "B", "CLC"]);
 const modes = new Set(["offline", "online", "hybrid"]);
 const statuses = new Set(["draft", "active", "closed", "archived"]);
 
-/** Classes-local composition buffer for consecutive replaces before routing settles. */
+/** Classes-local composition buffer: merges a change onto the filters of the last update, even before the page re-renders. */
 export function mergePendingClassDirectoryFilter(
   pending: ClassDirectoryFiltersState | null,
   rendered: ClassDirectoryFiltersState,

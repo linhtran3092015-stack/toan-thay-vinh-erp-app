@@ -330,7 +330,7 @@ export function StudentListPage({
       />
 
       {canManageStatus ? (
-        <BulkActionBar onClear={clearSelection} selectedCount={selectedIds.size} subject="học sinh">
+        <BulkActionBar onClear={clearSelection} returnFocusRef={filterTriggerRef} selectedCount={selectedIds.size} subject="học sinh">
           <Button onClick={() => setIsBulkTransitionOpen(true)} size="sm" variant="secondary">
             Chuyển trạng thái…
           </Button>

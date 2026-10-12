@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,8 @@ interface BulkActionBarProps {
   children?: ReactNode;
   className?: string;
   onClear: () => void;
+  /** Receives focus when "Bỏ chọn" removes the bar, so keyboard users keep their place. */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
 /**
@@ -22,6 +24,7 @@ export function BulkActionBar({
   children,
   className,
   onClear,
+  returnFocusRef,
   selectedCount,
   subject,
 }: BulkActionBarProps) {
@@ -44,7 +47,14 @@ export function BulkActionBar({
       </span>
       <div className="ml-auto flex flex-wrap items-center gap-2 [&>button]:h-8 [&>button]:text-[13px]/[18px]">
         {children}
-        <Button onClick={onClear} size="sm" variant="ghost">
+        <Button
+          onClick={() => {
+            returnFocusRef?.current?.focus();
+            onClear();
+          }}
+          size="sm"
+          variant="ghost"
+        >
           Bỏ chọn
         </Button>
       </div>
