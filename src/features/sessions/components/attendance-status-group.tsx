@@ -21,7 +21,7 @@ export const notebookStatusLabels: Record<SessionNotebookStatus, string> = {
 };
 
 /** Scores are 0–10 stored as numeric(4,2) and entered in 0.01 steps, so keep two decimals. */
-export const scoreFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
+const scoreFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 
 /** Formats a 0–10 score; `emptyLabel` replaces a missing score (defaults to "—"). */
 export function formatScore(value: number | null, emptyLabel = "—"): string {

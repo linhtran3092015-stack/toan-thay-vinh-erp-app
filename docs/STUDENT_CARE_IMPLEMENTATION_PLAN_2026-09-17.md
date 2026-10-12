@@ -44,7 +44,7 @@ Rà soát mã nguồn và migration, chưa truy cập database production để 
 | Điểm danh | `supabase/migrations/20260725050000_session_attendance_schema_foundation.sql`, `20260817090000_class_component_roster_foundation.sql` | Đã có buổi học, roster, vắng CP/KP; cần xác định chính xác các buổi học viên phải tham gia |
 | Điểm cuối buổi | `src/features/sessions/detail-data.ts:313` | Có `session_results.test_score`, điểm 0–10, cho phép null; dùng làm nguồn thật |
 | Cảnh báo mẫu | `src/features/students/detail/mock-student-detail.ts:35` | Chỉ demo, không dùng làm bộ phát hiện |
-| Hồ sơ học viên thật | `src/app/(app)/students/[studentId]/page.tsx` | Dùng `DatabaseStudentDetailPage`; phải gắn lịch sử chăm sóc vào trang này |
+| Hồ sơ học viên thật | `src/app/(app)/students/[studentId]/page.tsx` | Dùng `StudentProfilePage` (từ 2026-10-12; trước đó `DatabaseStudentDetailPage`); lịch sử chăm sóc nằm ở tab Chăm sóc |
 | Coaching | `supabase/migrations/20260729123000_coaching_foundation.sql`, `20260802193000_coaching_management_workflows.sql` | Đã có tạo phiếu, owner, review_at, ghi chú, kết quả, đóng phiếu |
 | Lịch sử Coaching | Cùng migration nền tảng | Records/events bất biến; không cập nhật trực tiếp owner hoặc review_at trên phiếu cũ |
 | Form Coaching | `supabase/migrations/20260815100000_coaching_forms_wave_b.sql` | Đã có version, public link, phản hồi; có thể dùng thu thập thông tin nhưng gửi form không đồng nghĩa chăm sóc hoàn thành |
@@ -268,7 +268,7 @@ Các vùng code dự kiến:
 - Module mới `src/features/student-care/`, routes `src/app/(app)/student-care/`.
 - `src/features/dashboard/data.ts`, `read-models.ts`, `dashboard-page.tsx` và component chăm sóc.
 - `src/features/notifications/data.ts`, `notification-list-page.tsx`, thành phần chuông hiện hành: phân trang, nhãn và refresh.
-- `src/features/students/detail/database-student-detail-page.tsx` và route student thật: bảng tóm tắt/lịch sử.
+- `src/features/students/detail/student-profile-page.tsx` (thay `database-student-detail-page.tsx` từ 2026-10-12) và route student thật: bảng tóm tắt/lịch sử.
 - `src/features/coaching/`: liên kết care, danh sách phân trang, dùng RPC Coaching cũ tạo phiếu; không phá public form.
 - `src/lib/permissions/types.ts`, navigation config hiện hành, `src/types/database.generated.ts`: quyền, menu, types.
 - Kiểm thử DB trong `supabase/tests/`, unit/component trong `tests/`, E2E theo cấu hình Playwright hiện tại.

@@ -459,6 +459,8 @@ export function SessionAttendanceManagement({
               <Button className="mt-3 w-full" disabled={isPending} onClick={markAllPresent} size="lg" type="button" variant="secondary">
                 Có mặt cho {unmarkedParticipants.length} bạn {isRosterNarrowed ? "đang hiển thị" : "chưa chọn"}
               </Button>
+            ) : attendanceSummary.unmarked > 0 ? (
+              <p className="mt-2 text-secondary text-text-muted">Còn {attendanceSummary.unmarked} chưa điểm danh ngoài bộ lọc.</p>
             ) : (
               <p className="mt-2 text-secondary text-text-muted">Đã điểm danh đủ. Chuyển sang Kết quả.</p>
             )}
@@ -479,7 +481,24 @@ interface AttendanceRowProps {
   participant: SessionParticipantReadModel;
 }
 
-/** Unmarked rows save on tap; marked rows open the editor because a change needs a reason. */
+/**
+ * Unmarked rows save on tap; marked rows open the editor because a change needs a reason.
+ * Tapping the status a row already has is a no-op: there is nothing to save.
+ */
+function selectAttendanceStatus(
+  participant: SessionParticipantReadModel,
+  status: SessionAttendanceStatus,
+  onEdit: AttendanceRowProps["onEdit"],
+  onQuickMark: AttendanceRowProps["onQuickMark"],
+) {
+  if (!participant.attendanceId) {
+    onQuickMark(participant, status);
+  } else if (status !== participant.attendanceStatus) {
+    onEdit(participant, status);
+  }
+}
+
+/** Accessible label for each status button: "Ghi …" before marking, "Đổi sang …" after. */
 function statusButtonLabel(participant: SessionParticipantReadModel) {
   return (status: SessionAttendanceStatus, label: string) =>
     participant.attendanceId
@@ -502,7 +521,7 @@ function AttendanceTableRow({ canEdit, canViewStudents, index, isPending, onQuic
             buttonLabel={statusButtonLabel(participant)}
             disabled={isPending}
             label={`Trạng thái điểm danh học viên ${index + 1}`}
-            onSelect={(status) => (participant.attendanceId ? onEdit(participant, status) : onQuickMark(participant, status))}
+            onSelect={(status) => selectAttendanceStatus(participant, status, onEdit, onQuickMark)}
             value={participant.attendanceStatus}
           />
         ) : (
@@ -531,7 +550,7 @@ function AttendanceRecord({ canEdit, canViewStudents, index, isPending, onQuickM
           disabled={isPending}
           label={`Trạng thái điểm danh học viên ${index + 1}`}
           layout="grid"
-          onSelect={(status) => (participant.attendanceId ? onEdit(participant, status) : onQuickMark(participant, status))}
+          onSelect={(status) => selectAttendanceStatus(participant, status, onEdit, onQuickMark)}
           value={participant.attendanceStatus}
         />
       ) : null}

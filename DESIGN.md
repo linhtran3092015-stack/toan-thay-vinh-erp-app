@@ -32,7 +32,7 @@ This update supersedes the 2026-09-09 terracotta update and the original navy an
 
 #### Semantic state roles
 
-Each family now carries an `-ink` token for text on its soft surface (badges, banners). `--status-*` stays the icon/accent foreground.
+Each family now carries an `-ink` token for long text on its soft surface (result banners); badges keep the family foreground. `--status-*` stays the icon/accent foreground.
 
 | Family | Foreground | Soft surface | Border | Ink (text on soft) |
 | --- | --- | --- | --- | --- |
@@ -71,7 +71,7 @@ Setting `data-erp-rounded="false"` on the root element restores the earlier tigh
 
 | Element | Spec |
 | --- | --- |
-| Status badge | 12px / 500, padding 3px 9px, `--radius-sm`, soft surface + `-ink` text + family border. Always carries text; optional 12–14px icon. |
+| Status badge | 12px / 500, padding 3px 9px, `--radius-sm`, soft surface + family foreground (`--status-*`) text + family border; `-ink` text is used by result banners. Always carries text; optional 12–14px icon. |
 | Primary button | Weight 500, horizontal padding 18px, `--action-primary-shadow` (1px), `active:translate-y-px`. One per page. |
 | Secondary button | Weight 500, `--border-strong` border, padding 18px, hover `--border-strong-hover` + `--interactive-hover`. |
 | Danger | Danger-outline for in-page destructive actions; danger-solid only inside a confirm dialog. Never a page primary. |
@@ -92,8 +92,8 @@ Setting `data-erp-rounded="false"` on the root element restores the earlier tigh
 | --- | --- |
 | Hover/focus feedback | `background-color / border-color / color / box-shadow` 150ms ease-out on button, a, input, select. |
 | `.panel-rise` | `rise` keyframe (opacity 0→1, translateY 4px→0), 240ms ease-out, `backwards`. Applies from 768px (tablet) up only; phones open menus without motion. |
-| `.progress-grow` | `grow` keyframe (width 0→value), 800ms ease-out, `backwards`, for progress bars. |
-| Skeleton | 1.2s pulse. |
+| `.progress-grow` | `grow` keyframe (`transform: scaleX(0)` → 1, `transform-origin: left`), 800ms ease-out, `backwards`, for progress bars. |
+| Skeleton | Tailwind `animate-pulse` (2s), `motion-safe` only. |
 | Reduced motion | Global `@media (prefers-reduced-motion: reduce)` sets `animation: none` and `transition: none` on every element. |
 
 Menus, drawers, and dialogs keep the 150–200ms guidance from the older Motion section; page-entry choreography remains prohibited apart from `.panel-rise`.
@@ -221,6 +221,8 @@ No default card shadow is permitted. Borders establish ordinary grouping; elevat
 - **Case:** Vietnamese labels remain sentence case. Do not force uppercase body labels. Table headers may use restrained 12px uppercase only where it improves dense scanning.
 
 ### Semantic type roles
+
+_Superseded for title weight by the 2026-10-12 update above (600, -0.01em tracking)._
 
 | Role | Desktop token | Mobile token | Weight / leading | Use |
 | --- | --- | --- | --- | --- |

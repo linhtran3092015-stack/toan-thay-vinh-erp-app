@@ -1,10 +1,10 @@
 import "server-only";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isSessionAttendanceStatus } from "@/features/sessions/detail-read-models";
 import { getVietnamTime, getVietnamToday } from "@/lib/datetime";
 
 import {
-  isAttendanceStatus,
   paymentRequestStatuses,
   summarizeAttendance,
   summarizePaymentRequests,
@@ -92,7 +92,7 @@ export async function getStudentAttendanceHistory(
         start_time: string;
       } | null;
 
-      if (!session || !isAttendanceStatus(row.attendance_status)) {
+      if (!session || !isSessionAttendanceStatus(row.attendance_status)) {
         continue;
       }
 
@@ -189,7 +189,7 @@ export async function getStudentUpcomingSession(classId: string): Promise<Studen
       .eq("parent_class_id", classId)
       .is("effective_to", null);
     const classIds = [classId, ...(links ?? []).map((link) => link.component_class_id)];
-    const { data: rows, error } = await supabase
+    const { data, error } = await supabase
       .from("class_sessions")
       .select(
         `
@@ -205,20 +205,15 @@ export async function getStudentUpcomingSession(classId: string): Promise<Studen
       )
       .in("class_id", classIds)
       .gte("session_date", today)
+      // A session that already ended today is not "next"; the auto-end job may lag.
+      .or(`session_date.gt.${today},end_time.gte.${getVietnamTime()}`)
       .in("status", ["scheduled", "in_progress"])
       .order("session_date", { ascending: true })
       .order("start_time", { ascending: true })
-      .limit(3);
+      .limit(1)
+      .maybeSingle();
 
-    if (error) {
-      return null;
-    }
-
-    // A session that already ended today is not "next"; the auto-end job may lag.
-    const now = getVietnamTime();
-    const data = (rows ?? []).find((row) => !(row.session_date === today && row.end_time < now));
-
-    if (!data) {
+    if (error || !data) {
       return null;
     }
 

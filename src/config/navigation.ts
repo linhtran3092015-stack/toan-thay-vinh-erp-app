@@ -342,7 +342,7 @@ export const navigationGroups: readonly NavigationGroup[] = [
   },
 ];
 
-/** Flat domain list in sidebar order; flat alias used by breadcrumb helpers and tests; the shell consumes navigationGroups. */
+/** Flat domain list in sidebar order; backs getVisibleNavigationDomains. The shell consumes navigationGroups. */
 export const navigationDomains: readonly NavigationDomain[] = navigationGroups.flatMap(
   (group) => group.domains,
 );

@@ -289,6 +289,23 @@ describe("Attendance status group and bulk marking (design 04)", () => {
     expect(attendanceActions.markSessionAttendanceAction).not.toHaveBeenCalledWith(expect.objectContaining({ studentId: "b" }));
   });
 
+  // Value: protects=the mobile bar only claims a complete roster when the whole roster is marked, and re-tapping the current status saves nothing; fails_when=the bar trusts the filtered list or a same-status tap opens the reason editor; why_new=review cycle 2 (bulk scope moved to visible rows); seam=none; no_claim=desktop layout (md:hidden is not applied in jsdom)
+  it("keeps the mobile bar honest under a search filter and ignores a tap on the current status", () => {
+    attendanceActions.markSessionAttendanceAction.mockClear();
+    render(<SessionAttendanceManagement {...attendanceProps({ participants: [
+      { ...participant, studentId: "a", studentName: "An", attendanceId: "att-a", attendanceStatus: "present" },
+      { ...participant, studentId: "b", studentName: "Bình", attendanceStatus: null },
+    ] })} />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Đổi sang Có mặt cho học viên" })[0]);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(attendanceActions.markSessionAttendanceAction).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByPlaceholderText("Tên hoặc mã học viên · có thể gõ không dấu"), { target: { value: "An" } });
+    expect(screen.queryByText("Đã điểm danh đủ. Chuyển sang Kết quả.")).not.toBeInTheDocument();
+    expect(screen.getByText("Còn 1 chưa điểm danh ngoài bộ lọc.")).toBeInTheDocument();
+  });
+
   it("hides the bulk action when nothing is left to mark or the session is read-only", () => {
     const allMarked = render(<SessionAttendanceManagement {...attendanceProps({ participants: [{ ...participant, attendanceId: "att-1" }] })} />);
     expect(screen.queryByRole("button", { name: /^Có mặt cho (tất cả|\d+ bạn) chưa chọn$/ })).not.toBeInTheDocument();
