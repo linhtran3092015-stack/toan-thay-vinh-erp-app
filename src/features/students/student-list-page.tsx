@@ -35,12 +35,18 @@ import {
   resetStudentDirectoryViewState,
   serializeStudentDirectoryViewState,
 } from "./student-directory-url-state";
+import {
+  unavailableStudentDirectoryMetrics,
+  type StudentDirectoryMetrics,
+} from "./student-directory-metrics";
 import type { StudentLifecycleStatus } from "@/types/domain";
 
 interface StudentListPageProps {
   canCreateStudent?: boolean;
   canImportStudents?: boolean;
   canManageStatus?: boolean;
+  /** Attendance, balance and debt columns; omitted = shown as unavailable. */
+  metrics?: StudentDirectoryMetrics;
   students: StudentDirectoryItem[];
 }
 
@@ -52,6 +58,7 @@ export function StudentListPage({
   canCreateStudent = false,
   canImportStudents = false,
   canManageStatus = false,
+  metrics = unavailableStudentDirectoryMetrics,
   students,
 }: StudentListPageProps) {
   const router = useRouter();
@@ -347,6 +354,7 @@ export function StudentListPage({
           </p>
           <StudentTable
             directoryQuery={directoryQuery}
+            metrics={metrics}
             selectAllRef={selectAllRef}
             empty={emptyByFilterState}
             footer={
@@ -395,6 +403,7 @@ export function StudentListPage({
                     <StudentMobileCard
                       directoryQuery={directoryQuery}
                       key={student.id}
+                      metrics={metrics}
                       student={student}
                     />
                   ))}

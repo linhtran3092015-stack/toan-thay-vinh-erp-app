@@ -344,7 +344,8 @@ body::before {
   display: flex;
 }
 
-@container (min-width: 1042px) {
+/* 1120px = the table's min width with the attendance, balance and debt columns. */
+@container (min-width: 1120px) {
   .students-filter-bar {
     display: grid;
   }

@@ -1,19 +1,22 @@
 import { RecordListItem } from "@/components/patterns/responsive-record-list";
+import { StudentMetricValue } from "@/features/students/components/student-directory-metric";
 import { StudentStatusBadge } from "@/features/students/components/student-status-badge";
 import { getStudentDetailHref } from "@/features/students/detail/helpers";
 import type { StudentDirectoryItem } from "@/features/students/read-models";
-import { formatLearningMode } from "@/lib/format";
+import {
+  getStudentDirectoryMetricCell,
+  type StudentDirectoryMetrics,
+} from "@/features/students/student-directory-metrics";
 
 interface StudentMobileCardProps {
   directoryQuery: string;
+  metrics: StudentDirectoryMetrics;
   student: StudentDirectoryItem;
 }
 
-/** Narrow record (design 06c): name + status, code · guardian · phone, then class/grade/mode. */
-export function StudentMobileCard({ directoryQuery, student }: StudentMobileCardProps) {
+/** Narrow record (design 06c): name + status, code · guardian · phone, then class, attendance, balance, debt. */
+export function StudentMobileCard({ directoryQuery, metrics, student }: StudentMobileCardProps) {
   const classInfo = student.activeEnrollment?.classInfo;
-  const registeredMode = student.activeEnrollment?.registeredMode ?? student.registeredMode;
-  const learningLevel = classInfo?.level ?? student.learningLevel;
   const detailHref = getStudentDetailHref(student, directoryQuery);
 
   return (
@@ -28,18 +31,42 @@ export function StudentMobileCard({ directoryQuery, student }: StudentMobileCard
       }
       metrics={
         <>
-          <span>
+          <span className="basis-full truncate">
             Lớp <strong className="font-semibold">{classInfo?.name ?? "Chưa xếp"}</strong>
           </span>
           <span>
-            Khối <strong className="font-semibold">{student.currentGrade}{learningLevel ? ` · ${learningLevel}` : ""}</strong>
+            Chuyên cần{" "}
+            <StudentMetricValue
+              cell={getStudentDirectoryMetricCell(metrics, "attendanceRate", student.id)}
+              format="attendance"
+            />
           </span>
-          {registeredMode ? (
-            <span className="ml-auto text-text-muted">{formatLearningMode(registeredMode)}</span>
-          ) : null}
+          <span>
+            Số dư{" "}
+            <StudentMetricValue
+              cell={getStudentDirectoryMetricCell(metrics, "balanceSessions", student.id)}
+              format="sessions"
+            />
+          </span>
+          <span className="ml-auto">
+            <DebtLabel cell={getStudentDirectoryMetricCell(metrics, "outstandingVnd", student.id)} />
+          </span>
         </>
       }
       title={student.fullName}
     />
+  );
+}
+
+/** "Nợ 2.400.000 ₫", "Không nợ", or "Nợ —" with the reason when debt is unavailable. */
+function DebtLabel({ cell }: { cell: ReturnType<typeof getStudentDirectoryMetricCell> }) {
+  if (cell.kind === "value" && cell.value === 0) {
+    return <span className="text-text-muted">Không nợ</span>;
+  }
+
+  return (
+    <>
+      Nợ <StudentMetricValue cell={cell} format="vnd" />
+    </>
   );
 }

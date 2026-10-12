@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ClassListPage } from "@/features/classes/class-list-page";
 import type { ClassDirectoryItem } from "@/features/classes/read-models";
 import type { StudentDirectoryItem } from "@/features/students/read-models";
+import type { StudentDirectoryMetrics } from "@/features/students/student-directory-metrics";
 import { StudentListPage } from "@/features/students/student-list-page";
 import { DATABASE_PERMISSION_CODES } from "@/lib/permissions/types";
 import type { StudentLifecycleStatus } from "@/types/domain";
@@ -80,6 +81,28 @@ const students: StudentDirectoryItem[] = people.map(([fullName, guardian, phone,
   };
 });
 
+// Design 06 sample values; index 5 (waiting for a class) has no attendance in the window.
+const attendanceRates = [96, 71, 100, 89, 93, null, 84, 62, 97, 90, 100, 78];
+const balances = [-1, 4, 7, 2, 5, 0, 9, 0, 3, 12, 6, 1];
+const debts = [2_400_000, 0, 0, 2_400_000, 0, 0, 1_200_000, 0, 0, 0, 0, 600_000];
+
+const studentMetrics: StudentDirectoryMetrics = {
+  attendanceRate: {
+    byStudentId: Object.fromEntries(
+      attendanceRates.flatMap((rate, index) => (rate === null ? [] : [[`student-${index}`, rate]])),
+    ),
+    status: "ready",
+  },
+  balanceSessions: {
+    byStudentId: Object.fromEntries(balances.map((value, index) => [`student-${index}`, value])),
+    status: "ready",
+  },
+  outstandingVnd: {
+    byStudentId: Object.fromEntries(debts.flatMap((value, index) => (value > 0 ? [[`student-${index}`, value]] : []))),
+    status: "ready",
+  },
+};
+
 const year = { code: "2026-2027", endsOn: "2027-05-31", id: "year-1", isCurrent: true, name: "Năm học 2026–2027", startsOn: "2026-08-01", status: "active" };
 
 const classRows: Array<[string, string, number, "A" | "B" | "CLC", "offline" | "online" | "hybrid", number, number, number | null, string]> = [
@@ -123,7 +146,7 @@ export function ListsPreview({ view }: { view: "students" | "classes" }) {
       {view === "classes" ? (
         <ClassListPage canCreateClass canImportClasses classes={classes} />
       ) : (
-        <StudentListPage canCreateStudent canImportStudents canManageStatus students={students} />
+        <StudentListPage canCreateStudent canImportStudents canManageStatus metrics={studentMetrics} students={students} />
       )}
     </AppShell>
   );

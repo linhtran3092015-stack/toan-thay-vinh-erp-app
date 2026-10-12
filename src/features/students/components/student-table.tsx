@@ -8,13 +8,21 @@ import {
   TableRow,
   type DataTableFrameStatus,
 } from "@/components/patterns/data-table-frame";
+import { AttendanceRateBar, StudentMetricValue } from "@/features/students/components/student-directory-metric";
 import { StudentStatusBadge } from "@/features/students/components/student-status-badge";
 import { getStudentDetailHref } from "@/features/students/detail/helpers";
 import type { StudentDirectoryItem } from "@/features/students/read-models";
+import {
+  getStudentDirectoryMetricCell,
+  STUDENT_ATTENDANCE_WINDOW_DAYS,
+  type StudentDirectoryMetrics,
+} from "@/features/students/student-directory-metrics";
 import { formatLearningMode } from "@/lib/format";
 
 interface StudentTableProps {
   directoryQuery: string;
+  /** Attendance, balance and debt columns; blank with a reason when unavailable. */
+  metrics: StudentDirectoryMetrics;
   students: StudentDirectoryItem[];
   /** Row selection for bulk actions; off by default. */
   selectable?: boolean;
@@ -34,6 +42,7 @@ const checkboxClassName =
 
 export function StudentTable({
   directoryQuery,
+  metrics,
   students,
   selectable = false,
   selectedIds,
@@ -78,10 +87,12 @@ export function StudentTable({
               >
                 {student.fullName}
               </Link>
-              <span className="ml-2 text-secondary tabular-nums text-text-muted">{student.publicCode}</span>
-              {student.nickname ? <span className="ml-2 text-caption text-text-muted">· {student.nickname}</span> : null}
+              <span className="block text-caption leading-[14px] tabular-nums text-text-muted">
+                {student.publicCode}
+                {student.nickname ? ` · ${student.nickname}` : ""}
+              </span>
             </TableCell>
-            <TableCell className="w-[200px]">
+            <TableCell className="w-[170px]">
               {student.primaryGuardian ? (
                 <>
                   <span className="block truncate text-text-default">{student.primaryGuardian.fullName}</span>
@@ -91,19 +102,34 @@ export function StudentTable({
                 <span className="text-text-muted">Chưa liên kết</span>
               )}
             </TableCell>
-            <TableCell className="w-[180px] text-text-default">
-              {classInfo?.name ?? <span className="text-text-muted">Chưa xếp lớp</span>}
+            <TableCell className="w-[170px]">
+              <span className="block truncate text-text-default">
+                {classInfo?.name ?? <span className="text-text-muted">Chưa xếp lớp</span>}
+              </span>
+              <span className="block text-caption leading-[14px] text-text-muted">
+                Khối {student.currentGrade}{learningLevel ? ` · ${learningLevel}` : ""}
+                {registeredMode ? ` · ${formatLearningMode(registeredMode)}` : ""}
+              </span>
             </TableCell>
-            <TableCell className="w-[112px] text-secondary text-text-default">
-              Khối {student.currentGrade}{learningLevel ? ` · ${learningLevel}` : ""}
+            <TableCell className="w-[140px]">
+              <AttendanceRateBar cell={getStudentDirectoryMetricCell(metrics, "attendanceRate", student.id)} />
             </TableCell>
-            <TableCell className="w-[96px] text-secondary text-text-muted">
-              {registeredMode ? formatLearningMode(registeredMode) : "—"}
+            <TableCell className="w-[96px]" numeric>
+              <StudentMetricValue
+                cell={getStudentDirectoryMetricCell(metrics, "balanceSessions", student.id)}
+                format="sessions"
+              />
             </TableCell>
-            <TableCell className="w-[150px]">
+            <TableCell className="w-[120px]" numeric>
+              <StudentMetricValue
+                cell={getStudentDirectoryMetricCell(metrics, "outstandingVnd", student.id)}
+                format="vnd"
+              />
+            </TableCell>
+            <TableCell className="w-[144px]">
               <StudentStatusBadge status={student.lifecycleStatus} />
             </TableCell>
-            <TableCell className="w-[80px] text-right">
+            <TableCell className="w-[72px] text-right">
               <Link
                 aria-label={`Mở hồ sơ ${student.fullName}`}
                 className="inline-flex h-8 items-center rounded-md px-2 text-secondary font-semibold text-action-link hover:bg-interactive-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
@@ -139,15 +165,18 @@ export function StudentTable({
           <TableHeaderCell>Học sinh</TableHeaderCell>
           <TableHeaderCell>Phụ huynh</TableHeaderCell>
           <TableHeaderCell>Lớp</TableHeaderCell>
-          <TableHeaderCell>Khối · mức</TableHeaderCell>
-          <TableHeaderCell>Hình thức</TableHeaderCell>
+          <TableHeaderCell title={`Có mặt trên buổi chính khóa trong ${STUDENT_ATTENDANCE_WINDOW_DAYS} ngày qua; không tính Học thêm`}>
+            Chuyên cần
+          </TableHeaderCell>
+          <TableHeaderCell numeric>Số dư buổi</TableHeaderCell>
+          <TableHeaderCell numeric>Công nợ</TableHeaderCell>
           <TableHeaderCell>Trạng thái</TableHeaderCell>
           <TableHeaderCell numeric>Thao tác</TableHeaderCell>
         </tr>
       }
       loading={loading}
       status={status}
-      tableClassName="min-w-[1040px]"
+      tableClassName="min-w-[1120px]"
     />
   );
 }
