@@ -297,6 +297,7 @@ describe("Student profile interactions (design 05)", () => {
   });
 });
 
+// Value: protects=back link keeps its accessible name with the icon and the payments tab caps rows with a visible count; fails_when=the ArrowLeft swap drops the link text or the slice/footer disappears; why_new=review-cycle behaviors not covered by the design-05 cases; seam=none; no_claim=visual icon rendering
 describe("Student profile review fixes", () => {
   it("links back to the directory with an icon instead of a text arrow", () => {
     render(<StudentProfilePage {...ownerProps} detail={buildDetail()} enrollmentUiModel={buildModel()} />);
