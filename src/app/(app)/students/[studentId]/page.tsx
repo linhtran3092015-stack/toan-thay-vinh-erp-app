@@ -74,6 +74,9 @@ export default async function StudentDetailRoute({
   const canViewPayments = has("payments.view");
   const canViewSessions = has("sessions.view");
   const canViewCare = has("student_care.view");
+  // Same gate as the profile's payments tab: without it the rate never reaches the client.
+  const canViewTuition =
+    canViewPayments || canViewLedger || has("students.manage_tuition_rates") || has("students.correct_acquisition_source");
 
   const detailResult = await getStudentDetail(studentId, {
     includeClasses: canViewClasses || canManageEnrollment,
@@ -105,7 +108,7 @@ export default async function StudentDetailRoute({
     await Promise.all([
       getStudentEnrollmentUiModel(detail, permissions),
       canViewLedger ? getStudentLedgerSummary(studentId) : Promise.resolve(null),
-      getStudentTuitionProfile(studentId),
+      canViewTuition ? getStudentTuitionProfile(studentId) : Promise.resolve(undefined),
       canViewAttendance ? getStudentAttendanceHistory(studentId) : Promise.resolve(undefined),
       canViewPayments ? getStudentPaymentRequests(studentId) : Promise.resolve(undefined),
       // `null` = the feed failed; a student without a class has nothing scheduled.

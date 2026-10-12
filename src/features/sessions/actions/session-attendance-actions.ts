@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import type {
   AttendanceActionFieldErrors,
   AttendanceActionState,
+  AttendanceErrorCode,
+  AttendanceRpcErrorCode,
   MarkSessionAttendanceActionInput,
   UpdateSessionAttendanceActionInput,
 } from "@/features/sessions/forms/attendance-action-types";
@@ -17,14 +19,14 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { permissionDeniedMessage } from "@/lib/permissions/labels";
 interface AttendanceError {
-  code?: string;
+  code?: AttendanceErrorCode;
   message: string;
 }
 
 function createErrorState(
   message: string,
   fieldErrors?: AttendanceActionFieldErrors,
-  code?: string,
+  code?: AttendanceErrorCode,
 ): AttendanceActionState {
   return {
     ...(code ? { code } : {}),
@@ -82,7 +84,8 @@ function revalidateAttendanceRoutes(
 function getAttendanceRpcError(
   message: string,
 ): AttendanceError {
-  const knownMessages: Record<string, string> = {
+  // Keyed by ATTENDANCE_RPC_ERROR_CODES: a missing, extra or misspelled code fails typecheck.
+  const knownMessages: Record<AttendanceRpcErrorCode, string> = {
     ATTENDANCE_LEARNING_MODE_INVALID:
       "Hình thức học thực tế không hợp lệ.",
 
@@ -143,7 +146,7 @@ function getAttendanceRpcError(
 
   for (
     const [databaseMessage, userMessage]
-    of Object.entries(knownMessages)
+    of Object.entries(knownMessages) as [AttendanceRpcErrorCode, string][]
   ) {
     if (message.includes(databaseMessage)) {
       return {

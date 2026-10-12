@@ -476,6 +476,14 @@ interface StudentDirectoryMetricsOptions {
   includeDebt: boolean;
 }
 
+/**
+ * Offset pages can shift when rows are inserted mid-read (attendance is marked and
+ * payment requests change during class hours), so a row may come back twice.
+ */
+function uniqueById<Row extends { id: string }>(rows: Row[]): Row[] {
+  return [...new Map(rows.map((row) => [row.id, row])).values()];
+}
+
 async function loadMetricColumn<Row, T>(
   enabled: boolean,
   fetchRows: () => Promise<PageResult<Row>>,
@@ -515,7 +523,7 @@ export async function getStudentDirectoryMetrics(
     loadMetricColumn(
       options.includeAttendance,
       () =>
-        fetchAllPages<DirectoryAttendanceRow>((from, to) =>
+        fetchAllPages<DirectoryAttendanceRow & { id: string }>((from, to) =>
           supabase
             .from("session_attendance")
             .select("id, student_id, attendance_status, session:class_sessions!inner(session_date)")
@@ -524,7 +532,7 @@ export async function getStudentDirectoryMetrics(
             .order("id", { ascending: true })
             .range(from, to),
         ),
-      summarizeDirectoryAttendance,
+      (rows) => summarizeDirectoryAttendance(uniqueById(rows)),
     ),
     loadMetricColumn(
       options.includeBalance,
@@ -549,15 +557,15 @@ export async function getStudentDirectoryMetrics(
     loadMetricColumn(
       options.includeDebt,
       () =>
-        fetchAllPages<DirectoryPaymentRequestRow>((from, to) =>
+        fetchAllPages<DirectoryPaymentRequestRow & { id: string }>((from, to) =>
           supabase
             .from("student_payment_requests")
-            .select("id, student_id, expected_amount_vnd, paid_amount_vnd, status")
+            .select("id, student_id, expected_amount_vnd, paid_amount_vnd, status, created_at")
             .in("status", ["pending", "partially_paid"])
             .order("id", { ascending: true })
             .range(from, to),
         ),
-      summarizeDirectoryDebt,
+      (rows) => summarizeDirectoryDebt(uniqueById(rows)),
     ),
   ]);
 

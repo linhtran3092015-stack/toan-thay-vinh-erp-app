@@ -130,6 +130,9 @@ export function StudentProfilePage({
   // role that can edit it keeps the tab even without payments/ledger view.
   const canEditTuition = Boolean(tuitionProfile) && (canManageTuitionRates || canCorrectAcquisitionSource);
   const showPaymentsTab = canViewPayments || canViewLedger || canEditTuition;
+  // Rate and source details follow the payments tab: a role that cannot open it
+  // (a TA) does not read the tuition rate elsewhere on the page either.
+  const visibleTuitionProfile = showPaymentsTab ? tuitionProfile : undefined;
 
   if (canViewClasses) {
     tabItems.push({ count: detail.activeEnrollment ? 1 : 0, label: "Lớp", value: "classes" });
@@ -389,12 +392,15 @@ export function StudentProfilePage({
                 { label: "Hình thức", value: registeredMode ? formatMode(registeredMode) : "Chưa xác định" },
                 { label: "Tỉnh/TP", value: detail.provinceCity ?? "Chưa cập nhật" },
                 { label: "Học chính thức", value: formatIsoDate(detail.officialStartDate) },
-                ...(tuitionProfile
+                ...(visibleTuitionProfile
                   ? [
-                      { label: "Nguồn", value: tuitionProfile.sourceName ?? "Chưa gán nguồn" },
+                      { label: "Nguồn", value: visibleTuitionProfile.sourceName ?? "Chưa gán nguồn" },
                       {
                         label: "Học phí/buổi",
-                        value: tuitionProfile.currentRateVnd === null ? "Chưa thiết lập" : formatVnd(tuitionProfile.currentRateVnd),
+                        value:
+                          visibleTuitionProfile.currentRateVnd === null
+                            ? "Chưa thiết lập"
+                            : formatVnd(visibleTuitionProfile.currentRateVnd),
                       },
                     ]
                   : []),
@@ -478,7 +484,7 @@ export function StudentProfilePage({
             <StudentHistoryTab
               canViewClasses={canViewClasses}
               enrollmentHistory={detail.enrollmentHistory}
-              tuitionProfile={tuitionProfile}
+              tuitionProfile={visibleTuitionProfile}
             />
           </TabPanel>
         </div>

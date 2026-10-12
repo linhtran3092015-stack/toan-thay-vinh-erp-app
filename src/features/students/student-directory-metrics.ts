@@ -10,6 +10,12 @@ import { isSessionAttendanceStatus } from "@/features/sessions/detail-read-model
 /** Attendance rate covers sessions dated within this many days, today included. */
 export const STUDENT_ATTENDANCE_WINDOW_DAYS = 30;
 
+/**
+ * A pending request older than this is overdue: the same rule as `payments_overdue`
+ * in the executive dashboard RPC (status = 'pending' and created over 14 days ago).
+ */
+export const PAYMENT_REQUEST_OVERDUE_DAYS = 14;
+
 export type StudentDirectoryMetricUnavailableReason = "forbidden" | "failed";
 
 export type StudentDirectoryMetricColumn<T> =
@@ -22,7 +28,13 @@ export interface StudentDirectoryMetrics {
   /** Ledger balance; a student without ledger entries is absent (balance 0). */
   balanceSessions: StudentDirectoryMetricColumn<number>;
   /** Expected minus paid over pending and partially paid requests; absent = no debt. */
-  outstandingVnd: StudentDirectoryMetricColumn<number>;
+  outstandingVnd: StudentDirectoryMetricColumn<DirectoryDebt>;
+}
+
+export interface DirectoryDebt {
+  amountVnd: number;
+  /** At least one open request is overdue (see PAYMENT_REQUEST_OVERDUE_DAYS). */
+  overdue: boolean;
 }
 
 export const unavailableStudentDirectoryMetrics: StudentDirectoryMetrics = {
@@ -64,6 +76,7 @@ export function summarizeDirectoryAttendance(rows: readonly DirectoryAttendanceR
 }
 
 export interface DirectoryPaymentRequestRow {
+  created_at: string;
   expected_amount_vnd: number | string;
   paid_amount_vnd: number | string;
   status: string;
@@ -71,9 +84,16 @@ export interface DirectoryPaymentRequestRow {
   student_id: string | null;
 }
 
-/** Open debt per student, matching `summarizePaymentRequests` on the profile. */
-export function summarizeDirectoryDebt(rows: readonly DirectoryPaymentRequestRow[]): Record<string, number> {
-  const debt: Record<string, number> = {};
+/**
+ * Open debt per student, matching `summarizePaymentRequests` on the profile, and
+ * whether any of it is overdue as of `now`.
+ */
+export function summarizeDirectoryDebt(
+  rows: readonly DirectoryPaymentRequestRow[],
+  now: Date = new Date(),
+): Record<string, DirectoryDebt> {
+  const overdueBefore = now.getTime() - PAYMENT_REQUEST_OVERDUE_DAYS * 24 * 60 * 60 * 1000;
+  const debt: Record<string, DirectoryDebt> = {};
 
   for (const row of rows) {
     if (!row.student_id || (row.status !== "pending" && row.status !== "partially_paid")) {
@@ -83,7 +103,10 @@ export function summarizeDirectoryDebt(rows: readonly DirectoryPaymentRequestRow
     const outstanding = Math.max(Number(row.expected_amount_vnd) - Number(row.paid_amount_vnd), 0);
 
     if (outstanding > 0) {
-      debt[row.student_id] = (debt[row.student_id] ?? 0) + outstanding;
+      const entry = debt[row.student_id] ?? { amountVnd: 0, overdue: false };
+      entry.amountVnd += outstanding;
+      entry.overdue ||= row.status === "pending" && Date.parse(row.created_at) < overdueBefore;
+      debt[row.student_id] = entry;
     }
   }
 
@@ -91,7 +114,7 @@ export function summarizeDirectoryDebt(rows: readonly DirectoryPaymentRequestRow
 }
 
 export type StudentDirectoryMetricCell =
-  | { kind: "value"; value: number }
+  | { kind: "value"; value: number; overdue?: boolean }
   | { kind: "empty"; reason: string }
   | { kind: "unavailable"; reason: string };
 
@@ -123,6 +146,10 @@ export function getStudentDirectoryMetricCell(
   }
 
   const value = column.byStudentId[studentId];
+
+  if (typeof value === "object") {
+    return { kind: "value", overdue: value.overdue, value: value.amountVnd };
+  }
 
   if (value !== undefined) {
     return { kind: "value", value };

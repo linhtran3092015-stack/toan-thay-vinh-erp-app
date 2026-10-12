@@ -385,7 +385,7 @@ function ParticipantTable({
                 <p className="font-semibold text-text-strong">
                   {canViewStudents
                     ? participant.studentName ?? "Chưa có tên học viên"
-                    : "Học viên ẩn"}
+                    : getParticipantDisplayName(participant, participants, canViewStudents)}
                 </p>
                 {canViewStudents && participant.studentCode ? (
                   <p className="text-caption tabular-nums text-text-muted">{participant.studentCode}</p>

@@ -78,6 +78,9 @@ describe("Student detail route permission gating", () => {
     expect(dependencies.getStudentPaymentRequests).not.toHaveBeenCalled();
     expect(dependencies.getCareDashboard).not.toHaveBeenCalled();
     expect(dependencies.getStudentLedgerSummary).not.toHaveBeenCalled();
+    // Without the payments-tab gate the tuition rate never reaches the client payload.
+    expect(dependencies.getStudentTuitionProfile).not.toHaveBeenCalled();
+    expect(props.tuitionProfile).toBeUndefined();
     expect(dependencies.getStudentAttendanceHistory).toHaveBeenCalledWith("student-1");
     expect(dependencies.getStudentUpcomingSession).toHaveBeenCalledWith("class-9a");
 
@@ -100,6 +103,7 @@ describe("Student detail route permission gating", () => {
     const props = await renderRoute({});
 
     expect(dependencies.getStudentPaymentRequests).toHaveBeenCalledWith("student-1");
+    expect(dependencies.getStudentTuitionProfile).toHaveBeenCalledWith("student-1");
     expect(dependencies.getCareDashboard).toHaveBeenCalledWith({ student_id: "student-1" });
     expect(dependencies.getStudentAttendanceHistory).not.toHaveBeenCalled();
     expect(props.payments).toBeNull();

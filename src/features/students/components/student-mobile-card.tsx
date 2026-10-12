@@ -5,6 +5,7 @@ import { getStudentDetailHref } from "@/features/students/detail/helpers";
 import type { StudentDirectoryItem } from "@/features/students/read-models";
 import {
   getStudentDirectoryMetricCell,
+  STUDENT_ATTENDANCE_WINDOW_DAYS,
   type StudentDirectoryMetrics,
 } from "@/features/students/student-directory-metrics";
 
@@ -32,13 +33,19 @@ export function StudentMobileCard({ directoryQuery, metrics, student }: StudentM
       metrics={
         <>
           <span className="basis-full truncate">
-            Lớp <strong className="font-semibold">{classInfo?.name ?? "Chưa xếp"}</strong>
+            Lớp{" "}
+            {classInfo?.name ? (
+              <strong className="font-semibold">{classInfo.name}</strong>
+            ) : (
+              <span className="text-text-muted">Chưa xếp lớp</span>
+            )}
           </span>
           <span>
-            Chuyên cần{" "}
+            Chuyên cần {STUDENT_ATTENDANCE_WINDOW_DAYS} ngày{" "}
             <StudentMetricValue
               cell={getStudentDirectoryMetricCell(metrics, "attendanceRate", student.id)}
               format="attendance"
+              strong
             />
           </span>
           <span>
@@ -46,6 +53,7 @@ export function StudentMobileCard({ directoryQuery, metrics, student }: StudentM
             <StudentMetricValue
               cell={getStudentDirectoryMetricCell(metrics, "balanceSessions", student.id)}
               format="sessions"
+              strong
             />
           </span>
           <span className="ml-auto">
@@ -66,7 +74,7 @@ function DebtLabel({ cell }: { cell: ReturnType<typeof getStudentDirectoryMetric
 
   return (
     <>
-      Nợ <StudentMetricValue cell={cell} format="vnd" />
+      Nợ <StudentMetricValue cell={cell} format="vnd" strong />
     </>
   );
 }

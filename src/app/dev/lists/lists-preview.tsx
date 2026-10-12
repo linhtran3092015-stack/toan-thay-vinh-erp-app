@@ -85,6 +85,8 @@ const students: StudentDirectoryItem[] = people.map(([fullName, guardian, phone,
 const attendanceRates = [96, 71, 100, 89, 93, null, 84, 62, 97, 90, 100, 78];
 const balances = [-1, 4, 7, 2, 5, 0, 9, 0, 3, 12, 6, 1];
 const debts = [2_400_000, 0, 0, 2_400_000, 0, 0, 1_200_000, 0, 0, 0, 0, 600_000];
+// Overdue = a pending request older than 14 days; the others are still within term.
+const overdueDebt = new Set([0, 3]);
 
 const studentMetrics: StudentDirectoryMetrics = {
   attendanceRate: {
@@ -98,7 +100,11 @@ const studentMetrics: StudentDirectoryMetrics = {
     status: "ready",
   },
   outstandingVnd: {
-    byStudentId: Object.fromEntries(debts.flatMap((value, index) => (value > 0 ? [[`student-${index}`, value]] : []))),
+    byStudentId: Object.fromEntries(
+      debts.flatMap((value, index) =>
+        value > 0 ? [[`student-${index}`, { amountVnd: value, overdue: overdueDebt.has(index) }]] : [],
+      ),
+    ),
     status: "ready",
   },
 };

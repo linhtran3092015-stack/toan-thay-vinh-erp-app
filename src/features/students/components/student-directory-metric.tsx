@@ -33,7 +33,7 @@ export function AttendanceRateBar({ cell }: { cell: StudentDirectoryMetricCell }
     <span className="flex items-center gap-2">
       <span aria-hidden="true" className="h-1.5 flex-1 overflow-hidden rounded-full bg-border-row">
         <span
-          className={cn("block h-full rounded-full", tone === "success" ? "bg-success" : "bg-warning")}
+          className={cn("progress-grow block h-full rounded-full", tone === "success" ? "bg-success" : "bg-warning")}
           style={{ width: `${cell.value}%` }}
         />
       </span>
@@ -48,9 +48,12 @@ export function AttendanceRateBar({ cell }: { cell: StudentDirectoryMetricCell }
 export function StudentMetricValue({
   cell,
   format,
+  strong = false,
 }: {
   cell: StudentDirectoryMetricCell;
   format: "attendance" | "sessions" | "vnd";
+  /** The mobile metric row bolds every value (design 06c); table cells stay regular. */
+  strong?: boolean;
 }) {
   if (cell.kind !== "value") {
     return <MetricBlank reason={cell.reason} />;
@@ -60,17 +63,44 @@ export function StudentMetricValue({
 
   if (format === "attendance") {
     return (
-      <span className={cn("tabular-nums", attendanceTone(value) === "warning" && "font-semibold text-warning")}>
+      <span className={cn("tabular-nums", strong && "font-semibold", attendanceTone(value) === "warning" && "font-semibold text-warning")}>
         {value}%
       </span>
     );
   }
 
-  const alarming = format === "sessions" ? value < 0 : value > 0;
+  if (format === "sessions") {
+    return (
+      <span className={cn("tabular-nums", strong && "font-semibold", value < 0 && "font-semibold text-danger")}>
+        {formatSignedSessions(value)}
+      </span>
+    );
+  }
+
+  // Design 06: overdue debt is danger, other open debt warning, zero muted so the
+  // rows that owe stand out. "Quá hạn" is spelled out so colour never carries it alone.
+  const overdue = value > 0 && cell.overdue === true;
 
   return (
-    <span className={cn("tabular-nums", alarming && "font-semibold text-danger")}>
-      {format === "sessions" ? formatSignedSessions(value) : formatVnd(value)}
+    <span
+      className={cn(
+        "tabular-nums",
+        strong && "font-semibold",
+        value === 0 && "text-text-subtle",
+        value > 0 && (overdue ? "font-semibold text-danger" : "font-semibold text-warning"),
+      )}
+    >
+      {formatVnd(value)}
+      {overdue ? (
+        strong ? (
+          <>
+            {" "}
+            <span className="font-normal">· quá hạn</span>
+          </>
+        ) : (
+          <span className="block text-caption font-normal leading-[14px]">Quá hạn</span>
+        )
+      ) : null}
     </span>
   );
 }

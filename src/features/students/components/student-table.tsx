@@ -32,7 +32,6 @@ interface StudentTableProps {
   footer?: ReactNode;
   status?: DataTableFrameStatus;
   empty?: ReactNode;
-  loading?: ReactNode;
   /** Header "select all" checkbox, e.g. to return focus after clearing a selection. */
   selectAllRef?: RefObject<HTMLInputElement | null>;
 }
@@ -51,7 +50,6 @@ export function StudentTable({
   footer,
   status = "ready",
   empty,
-  loading,
   selectAllRef,
 }: StudentTableProps) {
   const pageIds = students.map((student) => student.id);
@@ -92,7 +90,7 @@ export function StudentTable({
                 {student.nickname ? ` · ${student.nickname}` : ""}
               </span>
             </TableCell>
-            <TableCell className="w-[170px]">
+            <TableCell className="w-[150px]">
               {student.primaryGuardian ? (
                 <>
                   <span className="block truncate text-text-default">{student.primaryGuardian.fullName}</span>
@@ -102,34 +100,34 @@ export function StudentTable({
                 <span className="text-text-muted">Chưa liên kết</span>
               )}
             </TableCell>
-            <TableCell className="w-[170px]">
-              <span className="block truncate text-text-default">
+            <TableCell className="w-[150px] max-w-[150px]">
+              <span className="block truncate text-text-default" title={classInfo?.name}>
                 {classInfo?.name ?? <span className="text-text-muted">Chưa xếp lớp</span>}
               </span>
-              <span className="block text-caption leading-[14px] text-text-muted">
+              <span className="block truncate text-caption leading-[14px] text-text-muted">
                 Khối {student.currentGrade}{learningLevel ? ` · ${learningLevel}` : ""}
                 {registeredMode ? ` · ${formatLearningMode(registeredMode)}` : ""}
               </span>
             </TableCell>
-            <TableCell className="w-[140px]">
+            <TableCell className="w-[128px]">
               <AttendanceRateBar cell={getStudentDirectoryMetricCell(metrics, "attendanceRate", student.id)} />
             </TableCell>
-            <TableCell className="w-[96px]" numeric>
+            <TableCell className="w-[88px]" numeric>
               <StudentMetricValue
                 cell={getStudentDirectoryMetricCell(metrics, "balanceSessions", student.id)}
                 format="sessions"
               />
             </TableCell>
-            <TableCell className="w-[120px]" numeric>
+            <TableCell className="w-[116px]" numeric>
               <StudentMetricValue
                 cell={getStudentDirectoryMetricCell(metrics, "outstandingVnd", student.id)}
                 format="vnd"
               />
             </TableCell>
-            <TableCell className="w-[144px]">
+            <TableCell className="w-[136px]">
               <StudentStatusBadge status={student.lifecycleStatus} />
             </TableCell>
-            <TableCell className="w-[72px] text-right">
+            <TableCell className="w-[64px] text-right">
               <Link
                 aria-label={`Mở hồ sơ ${student.fullName}`}
                 className="inline-flex h-8 items-center rounded-md px-2 text-secondary font-semibold text-action-link hover:bg-interactive-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
@@ -165,8 +163,9 @@ export function StudentTable({
           <TableHeaderCell>Học sinh</TableHeaderCell>
           <TableHeaderCell>Phụ huynh</TableHeaderCell>
           <TableHeaderCell>Lớp</TableHeaderCell>
-          <TableHeaderCell title={`Có mặt trên buổi chính khóa trong ${STUDENT_ATTENDANCE_WINDOW_DAYS} ngày qua; không tính Học thêm`}>
-            Chuyên cần
+          <TableHeaderCell className="leading-4" title="Có mặt trên buổi chính khóa; không tính Học thêm">
+            Chuyên cần{" "}
+            <span className="block font-normal">{STUDENT_ATTENDANCE_WINDOW_DAYS} ngày</span>
           </TableHeaderCell>
           <TableHeaderCell numeric>Số dư buổi</TableHeaderCell>
           <TableHeaderCell numeric>Công nợ</TableHeaderCell>
@@ -174,9 +173,8 @@ export function StudentTable({
           <TableHeaderCell numeric>Thao tác</TableHeaderCell>
         </tr>
       }
-      loading={loading}
       status={status}
-      tableClassName="min-w-[1120px]"
+      tableClassName="min-w-[1030px]"
     />
   );
 }

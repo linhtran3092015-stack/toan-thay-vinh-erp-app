@@ -40,6 +40,8 @@ import {
   mergePendingClassDirectoryFilter,
   parseClassDirectoryViewState,
   resetClassDirectoryViewState,
+  serializeClassDirectoryViewState,
+  type ClassDirectoryViewState,
 } from "./class-directory-url-state";
 import type { ClassDirectoryItem } from "./read-models";
 import { formatLearningMode } from "@/lib/format";
@@ -62,14 +64,39 @@ export function ClassListPage({ canCreateClass, canImportClasses = false, classe
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
   const pendingFiltersRef = useRef<ClassDirectoryFiltersState | null>(null);
   const years = useMemo(() => Array.from(new Set(classes.map((item) => item.academicYear?.code).filter((value): value is string => Boolean(value)))).sort((a, b) => b.localeCompare(a, "vi")), [classes]);
-  const viewState = useMemo(() => parseClassDirectoryViewState(searchParams, years), [searchParams, years]);
-  // The History API updates search params synchronously, so the rendered filters (Back/Forward included) are the base for the next change.
+  // Inputs render local state, never search params: Next applies History API URLs inside
+  // startTransition, so a field fed from useSearchParams would lag (and fight IME composition).
+  const [viewState, setViewState] = useState<ClassDirectoryViewState>(() => parseClassDirectoryViewState(searchParams, years));
+  // Queries this page wrote that Next may not have applied yet, so their late arrival is not mistaken for Back/Forward.
+  const [localQueries, setLocalQueries] = useState<readonly string[]>([]);
+  const [syncedQuery, setSyncedQuery] = useState(() => searchParams.toString());
+  const urlQuery = searchParams.toString();
+  if (urlQuery !== syncedQuery) {
+    setSyncedQuery(urlQuery);
+    if (!localQueries.includes(urlQuery)) {
+      // Back/Forward or an outside navigation: the URL wins.
+      setViewState(parseClassDirectoryViewState(searchParams, years));
+      setLocalQueries([]);
+    } else if (localQueries.at(-1) === urlQuery) {
+      setLocalQueries([]);
+    }
+  }
+  // Event handlers merge onto the latest written filters, even before the page re-renders; Back/Forward re-bases it here.
   useEffect(() => { pendingFiltersRef.current = viewState.filters; }, [viewState.filters]);
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setViewState(parseClassDirectoryViewState(params, years));
+      setLocalQueries([params.toString()]);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [years]);
   const filteredClasses = useMemo(() => filterClasses(classes, viewState.filters), [classes, viewState.filters]);
   const pagination = useMemo(() => paginateClasses(filteredClasses, viewState.page), [filteredClasses, viewState.page]);
   const activeFilterCount = countActiveClassFilters(viewState.filters);
   const hasFilters = hasActiveClassFilters(viewState.filters);
-  const directoryQuery = getClassDirectoryQuery(searchParams);
+  const directoryQuery = getClassDirectoryQuery(serializeClassDirectoryViewState(searchParams, viewState));
 
   const statusCounts = useMemo(() => {
     const base = filterClasses(classes, { ...viewState.filters, status: "all" });
@@ -84,20 +111,27 @@ export function ClassListPage({ canCreateClass, canImportClasses = false, classe
   }));
   const summary = `${classes.filter((item) => item.status === "active").length} đang hoạt động · ${classes.filter((item) => item.status === "draft").length} nháp · ${classes.filter((item) => item.status === "closed" || item.status === "archived").length} đã kết thúc`;
 
+  // Filtering is client-side over the `classes` prop, so update the URL through the
+  // History API instead of a server round trip per keystroke. The state must be `null`:
+  // Next skips its own sync (and useSearchParams never updates) when it sees its internal state.
+  const writeUrl = (state: ClassDirectoryViewState, mode: "push" | "replace") => {
+    const href = getClassDirectoryHref(searchParams, state);
+    setViewState(state);
+    setLocalQueries((current) => [...current, href.split("?")[1] ?? ""]);
+    if (mode === "push") window.history.pushState(null, "", href);
+    else window.history.replaceState(null, "", href);
+  };
   const updateFilter = (key: keyof ClassDirectoryFiltersState, value: string) => {
     const filters = mergePendingClassDirectoryFilter(pendingFiltersRef.current, viewState.filters, key, value);
     pendingFiltersRef.current = filters;
-    // Filtering is client-side over the `classes` prop, so update the URL through the
-    // History API instead of a server round trip per keystroke. The state must be `null`:
-    // Next skips its own sync (and useSearchParams never updates) when it sees its internal state.
-    window.history.replaceState(null, "", getClassDirectoryHref(searchParams, { filters, page: 1 }));
+    writeUrl({ filters, page: 1 }, "replace");
   };
   const resetFilters = () => {
     const state = resetClassDirectoryViewState();
     pendingFiltersRef.current = state.filters;
-    window.history.replaceState(null, "", getClassDirectoryHref(searchParams, state));
+    writeUrl(state, "replace");
   };
-  const updatePage = (page: number) => window.history.pushState(null, "", getClassDirectoryHref(searchParams, { filters: viewState.filters, page }));
+  const updatePage = (page: number) => writeUrl({ filters: pendingFiltersRef.current ?? viewState.filters, page }, "push");
   const createHref = directoryQuery ? `/classes/new?${directoryQuery}` : "/classes/new";
   const isEmptyByFilter = filteredClasses.length === 0 && hasFilters;
   const emptyByFilterState = (
