@@ -234,14 +234,19 @@ export function SessionAttendanceManagement({
   const unmarkedParticipants = visibleParticipants.filter((participant) => !participant.attendanceId);
   const isRosterNarrowed = visibleParticipants.length !== participants.length;
 
-  /** Marks every unmarked student present, one existing action per student. */
+  /**
+   * Marks every unmarked student present, one existing action per student. A failed save does not
+   * stop the rest; failures are collected and reported together at the end.
+   */
   const markAllPresent = () => {
     if (!canEdit || isPending || unmarkedParticipants.length === 0) return;
     setActionState(null);
     startTransition(async () => {
       let saved = 0;
-      let failure: AttendanceActionState | null = null;
+      const failedNames: string[] = [];
+      let firstFailureMessage: string | null = null;
       for (const participant of unmarkedParticipants) {
+        let failureMessage: string | null = null;
         try {
           const result = await markSessionAttendanceAction({
             classSessionId: sessionId,
@@ -253,17 +258,26 @@ export function SessionAttendanceManagement({
           if (result.status === "success") {
             saved += 1;
           } else {
-            failure = result;
-            break;
+            failureMessage = result.message;
           }
         } catch {
-          failure = { status: "error", message: "Chưa lưu được điểm danh. Vui lòng thử lại." };
-          break;
+          failureMessage = "Chưa lưu được điểm danh. Vui lòng thử lại.";
+        }
+        if (failureMessage !== null) {
+          failedNames.push(
+            canViewStudents
+              ? participant.studentName ?? participant.studentCode ?? `Học viên ${participants.indexOf(participant) + 1}`
+              : `Học viên ${participants.indexOf(participant) + 1}`,
+          );
+          firstFailureMessage ??= failureMessage;
         }
       }
       setActionState(
-        failure
-          ? { ...failure, message: `Đã ghi có mặt ${saved}/${unmarkedParticipants.length}. ${failure.message}` }
+        failedNames.length > 0
+          ? {
+              status: "error",
+              message: `Đã ghi có mặt cho ${saved} học sinh; ${failedNames.length} học sinh chưa ghi được: ${failedNames.join(", ")}. ${firstFailureMessage}`,
+            }
           : { status: "success", message: `Đã ghi có mặt cho ${saved} học sinh chưa chọn.`, attendanceId: "", classSessionId: sessionId },
       );
       router.refresh();

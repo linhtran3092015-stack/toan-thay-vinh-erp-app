@@ -269,10 +269,11 @@ describe("Attendance status group and bulk marking (design 04)", () => {
     expect(attendanceActions.markSessionAttendanceAction).not.toHaveBeenCalled();
   });
 
-  it("marks every unmarked student present one action at a time and stops at the first failure with the partial count", async () => {
+  it("marks every unmarked student present one action at a time, keeps going past a failure, and reports every unsaved student", async () => {
     attendanceActions.markSessionAttendanceAction
       .mockResolvedValueOnce({ status: "success", message: "Đã ghi điểm danh.", attendanceId: "att-a", classSessionId: "session-1" })
-      .mockResolvedValueOnce({ status: "error", message: "Buổi học đã bị khóa." });
+      .mockResolvedValueOnce({ status: "error", message: "Học viên không thuộc roster." })
+      .mockResolvedValueOnce({ status: "success", message: "Đã ghi điểm danh.", attendanceId: "att-d", classSessionId: "session-1" });
     render(<SessionAttendanceManagement {...attendanceProps({ participants: [
       { ...participant, studentId: "a", studentName: "An", attendanceStatus: null },
       { ...participant, studentId: "b", studentName: "Bình", attendanceId: "att-b", attendanceStatus: "present" },
@@ -282,10 +283,12 @@ describe("Attendance status group and bulk marking (design 04)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Có mặt cho tất cả chưa chọn" }));
 
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Đã ghi có mặt 1/3. Buổi học đã bị khóa."));
-    expect(attendanceActions.markSessionAttendanceAction).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Đã ghi có mặt cho 2 học sinh; 1 học sinh chưa ghi được: Cúc. Học viên không thuộc roster."));
+    expect(attendanceActions.markSessionAttendanceAction).toHaveBeenCalledTimes(3);
     expect(attendanceActions.markSessionAttendanceAction).toHaveBeenNthCalledWith(1, expect.objectContaining({ studentId: "a", attendanceStatus: "present", actualLearningMode: "offline" }));
     expect(attendanceActions.markSessionAttendanceAction).toHaveBeenNthCalledWith(2, expect.objectContaining({ studentId: "c", attendanceStatus: "present", actualLearningMode: "online" }));
+    // The failure on Cúc does not stop the batch: Dũng is still saved.
+    expect(attendanceActions.markSessionAttendanceAction).toHaveBeenNthCalledWith(3, expect.objectContaining({ studentId: "d", attendanceStatus: "present", actualLearningMode: "offline" }));
     expect(attendanceActions.markSessionAttendanceAction).not.toHaveBeenCalledWith(expect.objectContaining({ studentId: "b" }));
   });
 

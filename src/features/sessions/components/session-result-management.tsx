@@ -438,13 +438,13 @@ function ResultTableRow({
       <TableCell className="w-[150px]">
         <AttendanceStatusBadge status={participant.attendanceStatus} />
       </TableCell>
-      <TableCell className={`w-[112px] font-semibold ${participant.testScore === null ? "text-text-subtle" : "text-text-strong"}`} numeric>
+      <TableCell className={`w-[112px] font-semibold ${participant.testScore === null ? "text-text-muted" : "text-text-strong"}`} numeric>
         {formatScore(participant.testScore, "Chưa nhập")}
       </TableCell>
       <TableCell className={`w-[150px] text-secondary ${eligible ? "text-text-default" : "text-text-subtle"}`}>
         {eligible ? formatNotebookStatus(participant.notebookStatus) : "—"}
       </TableCell>
-      <TableCell className={`w-[96px] ${participant.notebookScore === null ? "text-text-subtle" : "text-text-strong"}`} numeric>
+      <TableCell className={`w-[96px] ${participant.notebookScore === null ? "text-text-muted" : "text-text-strong"}`} numeric>
         {eligible ? formatScore(participant.notebookScore, "Chưa nhập") : "—"}
       </TableCell>
       <TableCell className="max-w-[300px] text-secondary text-text-muted">

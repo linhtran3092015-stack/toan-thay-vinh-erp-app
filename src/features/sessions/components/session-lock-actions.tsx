@@ -27,7 +27,7 @@ interface SessionLockActionsProps {
   canViewPayroll?: boolean;
   lockedAt: string | null;
   lockReason: string | null;
-  /** Participants with attendance; with `rosterCount` it drives the checklist. */
+  /** Roster students with a lock-counted status (present or either absence); with `rosterCount` it drives the checklist. */
   markedCount?: number;
   rosterCount?: number;
   sessionId: string;
@@ -182,7 +182,7 @@ export function SessionLockActions({
             `Điểm danh đủ ${markedCount}/${rosterCount} học sinh`
           ) : (
             <>
-              Điểm danh đủ roster — <strong>thiếu {rosterCount - markedCount}/{rosterCount}</strong>
+              Điểm danh đủ roster (có mặt hoặc vắng) — <strong>thiếu {rosterCount - markedCount}/{rosterCount}</strong>
             </>
           ),
           state: attendanceComplete ? "met" : "unmet",
@@ -226,7 +226,7 @@ export function SessionLockActions({
           <Button
             aria-haspopup="dialog"
             disabled={blockedByAttendance}
-            disabledReason={blockedByAttendance ? "Bật khi tất cả điều kiện bên trái đạt." : undefined}
+            disabledReason={blockedByAttendance ? "Bật khi tất cả điều kiện khóa đạt." : undefined}
             onClick={openConfirmation}
             ref={confirmationTriggerRef}
           >
@@ -244,7 +244,7 @@ export function SessionLockActions({
         conditions={conditions}
         consequence={
           <>
-            Khi khóa, điểm danh và kết quả của buổi này <strong>không thể sửa</strong>. Hệ thống trừ buổi khỏi số dư của học sinh có mặt theo loại buổi và ghi nhận công cho nhân sự. Khóa là vĩnh viễn, không thể mở lại; sai sót sau khóa chỉ sửa bằng yêu cầu điều chỉnh (số dư buổi / bảng lương) có duyệt và nhật ký.
+            Khi khóa, điểm danh và kết quả của buổi này <strong>không thể sửa</strong>. Hệ thống trừ 1 buổi cho mỗi học sinh có mặt hoặc vắng (có phép, không phép) nếu là buổi chính khóa hoặc buổi bù, và ghi nhận công cho nhân sự. Khóa là vĩnh viễn, không thể mở lại; sai sót sau khóa chỉ sửa bằng yêu cầu điều chỉnh (số dư buổi / bảng lương) có duyệt và nhật ký.
           </>
         }
         emphasized={isOpen}
@@ -285,7 +285,7 @@ export function SessionLockActions({
               className="mt-3 rounded-md border border-danger-border bg-danger-bg p-3 text-body text-danger-ink"
               id={dialogDescriptionId}
             >
-              <strong className="font-semibold">Hậu quả:</strong> điểm danh và kết quả bị đóng băng; số dư buổi của học sinh có mặt bị trừ theo loại buổi; công của nhân sự được ghi vào kỳ lương. Không thể mở khóa trở lại.
+              <strong className="font-semibold">Hậu quả:</strong> điểm danh và kết quả bị đóng băng; mỗi học sinh có mặt hoặc vắng (có phép, không phép) bị trừ 1 buổi nếu là buổi chính khóa hoặc buổi bù; công của nhân sự được ghi vào kỳ lương. Không thể mở khóa trở lại.
             </div>
           </div>
 

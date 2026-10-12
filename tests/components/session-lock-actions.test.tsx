@@ -291,7 +291,7 @@ describe("Session lock checklist (design 04b)", () => {
 
     const lock = screen.getByRole("button", { name: "Khóa buổi học" });
     expect(lock).toBeDisabled();
-    expect(lock).toHaveAccessibleDescription("Bật khi tất cả điều kiện bên trái đạt.");
+    expect(lock).toHaveAccessibleDescription("Bật khi tất cả điều kiện khóa đạt.");
     expect(screen.getByText("Chưa thể khóa")).toBeInTheDocument();
     expect(screen.getByText(/thiếu 1\/3/)).toBeInTheDocument();
     expect(screen.getByText("Buổi đã kết thúc")).toBeInTheDocument();
@@ -306,7 +306,7 @@ describe("Session lock checklist (design 04b)", () => {
     expect(screen.getByText("Đủ điều kiện")).toBeInTheDocument();
     expect(screen.getByText("Điểm danh đủ 3/3 học sinh")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Khóa buổi học" })).toBeEnabled();
-    expect(screen.queryByText("Bật khi tất cả điều kiện bên trái đạt.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Bật khi tất cả điều kiện khóa đạt.")).not.toBeInTheDocument();
   });
 
   it("leaves the server as authority when the roster is unknown or empty", () => {

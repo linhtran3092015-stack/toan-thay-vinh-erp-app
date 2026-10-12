@@ -52,6 +52,13 @@ interface SessionDetailPageProps {
   directoryQuery?: string;
 }
 
+/** Statuses lock_class_session_internal accepts as a recorded roster attendance. */
+const LOCK_COUNTED_ATTENDANCE_STATUSES: ReadonlySet<SessionAttendanceStatus> = new Set([
+  "present",
+  "excused_absence",
+  "unexcused_absence",
+]);
+
 /**
  * Session workbench (design 04): state → attendance → results → lock. The
  * read-model and server actions are unchanged; this page only arranges them.
@@ -70,8 +77,16 @@ export function SessionDetailPage({
   detail,
   directoryQuery = "",
 }: SessionDetailPageProps) {
-  const rosterCount = detail.participants.length;
-  const markedCount = detail.participants.filter((participant) => participant.attendanceStatus !== null).length;
+  // Display counts cover everyone on the page, walk-ins included.
+  const participantCount = detail.participants.length;
+  const participantMarkedCount = detail.participants.filter((participant) => participant.attendanceStatus !== null).length;
+  // Lock readiness mirrors lock_class_session_internal: every roster student (walk-ins have no
+  // enrollmentClassId) needs present or an absence; additional_study does not count.
+  const rosterParticipants = detail.participants.filter((participant) => participant.enrollmentClassId !== null);
+  const rosterCount = rosterParticipants.length;
+  const markedCount = rosterParticipants.filter(
+    (participant) => participant.attendanceStatus !== null && LOCK_COUNTED_ATTENDANCE_STATUSES.has(participant.attendanceStatus),
+  ).length;
   const eligible = detail.participants.filter(
     (participant) => participant.attendanceStatus === "present" || participant.attendanceStatus === "additional_study",
   );
@@ -106,7 +121,7 @@ export function SessionDetailPage({
           {formatDate(detail.sessionDate)} · {formatTime(detail.startTime)}–{formatTime(detail.endTime)}
           {detail.roomName ? ` · ${detail.roomName}` : ""} · {formatKind(detail.sessionKind)}
           {detail.componentCode ? ` · ${detail.componentCode}` : ""} · {formatMode(detail.learningMode)} · Khối {detail.grade} · Mức {detail.level}
-          {rosterCount > 0 ? ` · ${rosterCount} học sinh` : ""}
+          {participantCount > 0 ? ` · ${participantCount} học sinh` : ""}
         </p>
         <nav aria-label="Điều hướng buổi học" className="mt-2 text-secondary">
           <Link
@@ -119,14 +134,14 @@ export function SessionDetailPage({
         </nav>
       </PageHeader>
 
-      {rosterCount > 0 && (showsAttendance || showsResults || canLockSession) ? (
+      {participantCount > 0 && (showsAttendance || showsResults || canLockSession) ? (
         <div className="grid gap-3 sm:grid-cols-3">
           {showsAttendance ? (
             <WorkbenchTile
               label="Điểm danh"
-              tone={markedCount === rosterCount ? "success" : "warning"}
-              value={`${markedCount}/${rosterCount}`}
-              hint={markedCount === rosterCount ? "đủ roster" : `${rosterCount - markedCount} chưa điểm danh`}
+              tone={participantMarkedCount === participantCount ? "success" : "warning"}
+              value={`${participantMarkedCount}/${participantCount}`}
+              hint={participantMarkedCount === participantCount ? "đủ roster" : `${participantCount - participantMarkedCount} chưa điểm danh`}
             />
           ) : null}
           {showsResults ? (
@@ -187,7 +202,7 @@ export function SessionDetailPage({
             />
           ) : null
         }
-        attendancePending={detail.lockedAt ? 0 : rosterCount - markedCount}
+        attendancePending={detail.lockedAt ? 0 : participantCount - participantMarkedCount}
         results={
           showsResults ? (
             <SessionResultManagement

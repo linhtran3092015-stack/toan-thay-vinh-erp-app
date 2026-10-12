@@ -51,7 +51,7 @@ describe("Session workbench tiles and lock wiring (design 04)", () => {
         {...permissions}
         detail={buildDetail([
           { ...participant, attendanceId: "att-a", attendanceStatus: "present", resultId: "res-a", studentId: "a", studentName: "An", testScore: 8 },
-          { ...participant, attendanceId: "att-b", attendanceStatus: "additional_study", studentId: "b", studentName: "Bình" },
+          { ...participant, attendanceId: "att-b", attendanceStatus: "additional_study", enrollmentClassId: null, enrollmentId: null, studentId: "b", studentName: "Bình" },
           { ...participant, attendanceId: "att-c", attendanceStatus: "excused_absence", studentId: "c", studentName: "Cúc" },
           { ...participant, studentId: "d", studentName: "Dũng" },
         ])}
@@ -63,14 +63,15 @@ describe("Session workbench tiles and lock wiring (design 04)", () => {
     expectTile("1/2", "thiếu 1");
     expectTile("Bị chặn · thiếu 1 điểm danh");
     expect(screen.getByRole("button", { name: "Khóa buổi học" })).toBeDisabled();
-    expect(screen.getByText(/thiếu 1\/4/)).toBeInTheDocument();
+    // The walk-in (Bình) is not on the roster, so the lock checklist counts 3 roster students.
+    expect(screen.getByText(/thiếu 1\/3/)).toBeInTheDocument();
 
     view.rerender(
       <SessionDetailPage
         {...permissions}
         detail={buildDetail([
           { ...participant, attendanceId: "att-a", attendanceStatus: "present", resultId: "res-a", studentId: "a", studentName: "An", testScore: 8 },
-          { ...participant, attendanceId: "att-b", attendanceStatus: "additional_study", resultId: "res-b", studentId: "b", studentName: "Bình" },
+          { ...participant, attendanceId: "att-b", attendanceStatus: "additional_study", enrollmentClassId: null, enrollmentId: null, resultId: "res-b", studentId: "b", studentName: "Bình" },
           { ...participant, attendanceId: "att-c", attendanceStatus: "excused_absence", studentId: "c", studentName: "Cúc" },
           { ...participant, attendanceId: "att-d", attendanceStatus: "unexcused_absence", studentId: "d", studentName: "Dũng" },
         ])}
@@ -82,5 +83,30 @@ describe("Session workbench tiles and lock wiring (design 04)", () => {
     expectTile("Sẵn sàng");
     expect(screen.queryByText(/Bị chặn/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Khóa buổi học" })).toBeEnabled();
+    expect(screen.getByText("Điểm danh đủ 3/3 học sinh")).toBeInTheDocument();
+  });
+
+  // Value: protects=lock readiness mirrors lock_class_session_internal (roster students only; present/excused/unexcused only);
+  // fails_when=a roster student marked additional_study counts as ready, or a walk-in counts against readiness;
+  // why_new=review finding: the page counted any non-null status across all participants, so Khóa enabled and the server rejected;
+  // seam=none; no_claim=does not prove the server's enrollment-id join (attendance under a different enrollment)
+  it("keeps the lock blocked while a roster student is only marked additional_study", () => {
+    render(
+      <SessionDetailPage
+        {...permissions}
+        detail={buildDetail([
+          { ...participant, attendanceId: "att-a", attendanceStatus: "present", studentId: "a", studentName: "An" },
+          { ...participant, attendanceId: "att-b", attendanceStatus: "additional_study", studentId: "b", studentName: "Bình" },
+          { ...participant, attendanceId: "att-w", attendanceStatus: "additional_study", enrollmentClassId: null, enrollmentId: null, studentId: "w", studentName: "Vãng lai" },
+        ])}
+      />,
+    );
+
+    // Display tile still reports everyone on the page as marked…
+    expectTile("3/3", "đủ roster");
+    // …but the lock needs present or an absence for each roster student; the walk-in is not counted.
+    expectTile("Bị chặn · thiếu 1 điểm danh");
+    expect(screen.getByText(/thiếu 1\/2/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Khóa buổi học" })).toBeDisabled();
   });
 });
