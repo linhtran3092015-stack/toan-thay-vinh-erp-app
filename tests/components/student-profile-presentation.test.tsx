@@ -226,7 +226,10 @@ describe("Student profile presentation (design 05)", () => {
 
     const kpis = screen.getByRole("region", { name: "Chỉ số nhanh" });
     expect(within(kpis).getAllByText("Không có quyền")).toHaveLength(3);
-    expect(within(kpis).getByText("sessions.view")).toBeInTheDocument();
+    expect(within(kpis).getByText("không có quyền xem lịch buổi")).toBeInTheDocument();
+    expect(within(kpis).getByText("không có quyền xem thanh toán")).toBeInTheDocument();
+    expect(within(kpis).getByText("không có quyền xem số dư buổi")).toBeInTheDocument();
+    expect(within(kpis).queryByText(/\b(sessions|payments|session_ledger|attendance)\.view\b/)).not.toBeInTheDocument();
   });
 });
 
@@ -374,6 +377,108 @@ describe("Student profile review fixes", () => {
     expect(screen.getByText("YC-2610-0187")).toBeInTheDocument();
     expect(screen.queryByText("YC-2609-0142")).not.toBeInTheDocument();
     expect(screen.getByText("Hiển thị 1/2 yêu cầu")).toBeInTheDocument();
+    expect(screen.getByText("Chờ thanh toán")).toBeInTheDocument();
+  });
+});
+
+const tuitionProfile = {
+  currentRateVnd: 200_000,
+  rateHistory: [{ createdAt: "2026-09-01T00:00:00Z", effectiveFrom: "2026-09-01", reason: "Mức khởi điểm", unitPriceVnd: 200_000 }],
+  sourceHistory: [],
+  sourceName: "Giới thiệu",
+  sources: [{ id: "src-1", name: "Giới thiệu" }],
+};
+
+describe("Student profile feed states and permissions (review fixes)", () => {
+  // Value: protects=a failed payments feed never reads as "no debt"; fails_when=payments=null renders "0 ₫", a "Còn nợ" alert, or the empty-requests copy; why_new=only the attendance-null state was tested; seam=none; no_claim=does not prove the loader returns null on failure (student-activity-data.test)
+  it("shows a failed payments feed as unknown, never as zero debt", () => {
+    render(<StudentProfilePage {...ownerProps} detail={buildDetail()} enrollmentUiModel={buildModel()} initialTab="payments" payments={null} />);
+
+    const kpis = screen.getByRole("region", { name: "Chỉ số nhanh" });
+    const debtTile = within(kpis).getByText("Công nợ").parentElement as HTMLElement;
+    expect(within(debtTile).getByText("—")).toBeInTheDocument();
+    expect(within(debtTile).getByText("chưa tải được")).toBeInTheDocument();
+    expect(within(kpis).queryByText("0 ₫")).not.toBeInTheDocument();
+    expect(screen.getByText("Chưa tải được yêu cầu thanh toán; chưa thể kết luận học sinh có nợ hay không.")).toBeInTheDocument();
+    expect(screen.queryByText(/Còn nợ/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  // Value: protects=a failed upcoming-session feed is shown as unknown; fails_when=upcomingSessionFailed is ignored and the tile reads "Chưa xếp lịch"; why_new=the loader used to return null for both failure and none; seam=none; no_claim=does not prove the route maps the loader's null to upcomingSessionFailed (route test covers the call, not this mapping)
+  it("shows a failed upcoming-session feed as unknown instead of unscheduled", () => {
+    render(<StudentProfilePage {...ownerProps} detail={buildDetail()} enrollmentUiModel={buildModel()} upcomingSession={null} upcomingSessionFailed />);
+
+    const nextTile = within(screen.getByRole("region", { name: "Chỉ số nhanh" })).getByText("Buổi tới").parentElement as HTMLElement;
+    expect(within(nextTile).getByText("—")).toBeInTheDocument();
+    expect(within(nextTile).getByText("chưa tải được")).toBeInTheDocument();
+    expect(within(nextTile).queryByText("Chưa xếp lịch")).not.toBeInTheDocument();
+  });
+
+  // Value: protects=a role with students.manage_tuition_rates but no payments/ledger view keeps the tuition card entry point; fails_when=the payments tab is gated only on payments.view||session_ledger.view again; why_new=regression vs main where the card rendered for every profile viewer; seam=none; no_claim=does not prove the rate/source server actions succeed
+  it("keeps the tuition card reachable for a role that can manage rates without payment or ledger view", () => {
+    render(
+      <StudentProfilePage
+        canManageTuitionRates
+        canUpdateStudent={false}
+        canViewClasses
+        canViewGuardians={false}
+        detail={buildDetail()}
+        directoryHref="/students"
+        editHref="/students/student-1/edit"
+        enrollmentUiModel={buildModel({ end: hidden, reserve: hidden, transfer: hidden })}
+        initialTab="payments"
+        tuitionProfile={tuitionProfile}
+      />,
+    );
+
+    expect(within(screen.getByRole("tablist", { name: "Mục trong hồ sơ học sinh" })).getByRole("tab", { name: /Thanh toán/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Học phí & nguồn học viên")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Thêm mức phí" })).toBeInTheDocument();
+    expect(screen.getByText("Không có quyền xem yêu cầu thanh toán (payments.view).")).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Sổ cái số buổi học của học sinh" })).not.toBeInTheDocument();
+  });
+
+  // Value: protects=a read-only viewer without payments/ledger view still gets no payments tab; fails_when=the tuition exception opens the tab for everyone holding a tuition profile; why_new=pairs with the manage-rates case above; seam=none; no_claim=none
+  it("does not open the payments tab for a viewer who can only read the tuition profile", () => {
+    render(
+      <StudentProfilePage
+        canUpdateStudent={false}
+        canViewClasses
+        canViewGuardians={false}
+        detail={buildDetail()}
+        directoryHref="/students"
+        editHref="/students/student-1/edit"
+        enrollmentUiModel={buildModel({ end: hidden, reserve: hidden, transfer: hidden })}
+        tuitionProfile={tuitionProfile}
+      />,
+    );
+
+    expect(within(screen.getByRole("tablist", { name: "Mục trong hồ sơ học sinh" })).queryByRole("tab", { name: /Thanh toán/ })).not.toBeInTheDocument();
+  });
+
+  // Value: protects=totals computed over a capped feed say so; fails_when=truncated feeds render the same hints/footers as complete ones; why_new=the 200-row cap was silent; seam=none; no_claim=does not prove the loader sets truncated (student-activity-data.test)
+  it("notes when attendance and payment totals cover only the newest rows", () => {
+    const cappedAttendance = { ...attendance, truncated: true };
+    const cappedPayments = { ...payments, truncated: true };
+    render(<StudentProfilePage {...ownerProps} attendance={cappedAttendance} detail={buildDetail()} enrollmentUiModel={buildModel()} initialTab="attendance" payments={cappedPayments} />);
+
+    const kpis = screen.getByRole("region", { name: "Chỉ số nhanh" });
+    expect(within(kpis).getByText("tính trên 4 buổi gần nhất")).toBeInTheDocument();
+    expect(within(kpis).getByText("1 yêu cầu chờ · tính trên 2 yêu cầu gần nhất")).toBeInTheDocument();
+    expect(screen.getByText(/thống kê tính trên 4 buổi gần nhất/)).toBeInTheDocument();
+
+    fireEvent.click(within(screen.getByRole("tablist", { name: "Mục trong hồ sơ học sinh" })).getByRole("tab", { name: /Thanh toán/ }));
+    expect(screen.getByText("Tổng tính trên 2 yêu cầu gần nhất")).toBeInTheDocument();
+  });
+
+  // Value: protects=open payment requests are not announced as selected rows; fails_when=TableRow gets selected={isOpen} again (aria-selected on a non-selectable table); why_new=a11y review finding; seam=none; no_claim=does not check the badge colour
+  it("does not mark open payment requests as selected rows", () => {
+    render(<StudentPaymentsTab canCreatePaymentRequest={false} canViewPayments payments={payments} />);
+
+    const table = screen.getByRole("table", { name: "Yêu cầu thanh toán của học sinh" });
+    for (const row of within(table).getAllByRole("row")) {
+      expect(row).not.toHaveAttribute("aria-selected");
+    }
     expect(screen.getByText("Chờ thanh toán")).toBeInTheDocument();
   });
 });

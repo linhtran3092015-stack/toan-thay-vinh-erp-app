@@ -115,6 +115,7 @@ export function StudentAttendanceTab({ canViewAttendance, history, limit = 30 }:
             </TableCell>
             <TableCell>
               <Link
+                aria-label={`Mở buổi ${formatIsoDate(item.sessionDate)} · ${item.className}`}
                 className="text-secondary font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
                 href={`/sessions/${item.sessionId}`}
               >
@@ -132,6 +133,7 @@ export function StudentAttendanceTab({ canViewAttendance, history, limit = 30 }:
         footer={
           <span>
             Hiển thị {visible.length}/{filtered.length} buổi gần nhất
+            {history.truncated ? ` · thống kê tính trên ${history.total} buổi gần nhất` : ""}
             {history.items.some((item) => item.sessionLockedAt === null) ? " · buổi chưa khóa có thể còn thay đổi" : ""}
           </span>
         }

@@ -13,7 +13,7 @@ import {
   type StudentPaymentRequestItem,
   type StudentPaymentRequestStatus,
   type StudentPaymentSummary,
-  type StudentUpcomingSession,
+  type StudentUpcomingSessionFeed,
 } from "./student-activity-models";
 
 /**
@@ -23,7 +23,10 @@ import {
  * instead of pretending the student has no activity.
  */
 
-/** Max rows each activity feed loads; the tabs paginate on top of this. */
+/**
+ * Max rows each activity feed loads; counts and rates cover only this window
+ * and the summaries carry `truncated` so the page can say so.
+ */
 const ACTIVITY_FEED_LIMIT = 200;
 
 export async function getStudentAttendanceHistory(
@@ -66,11 +69,16 @@ export async function getStudentAttendanceHistory(
     const resultsById = new Map<string, { notebookStatus: string | null; testScore: number | null }>();
 
     if (sessionIds.length > 0) {
-      const { data: results } = await supabase
+      const { data: results, error: resultsError } = await supabase
         .from("session_results")
         .select("class_session_id, test_score, notebook_status")
         .eq("student_id", studentId)
         .in("class_session_id", sessionIds);
+
+      // Blank scores would read as "not graded"; report the feed as failed instead.
+      if (resultsError) {
+        return null;
+      }
 
       for (const result of results ?? []) {
         resultsById.set(result.class_session_id, {
@@ -124,7 +132,7 @@ export async function getStudentAttendanceHistory(
         : right.sessionDate.localeCompare(left.sessionDate),
     );
 
-    return summarizeAttendance(items);
+    return summarizeAttendance(items, { truncated: rows.length >= limit });
   } catch {
     return null;
   }
@@ -151,7 +159,8 @@ export async function getStudentPaymentRequests(
 
     // Unknown statuses are skipped rather than coerced: counting them as
     // "pending" would inflate the student's open debt.
-    const requests: StudentPaymentRequestItem[] = (data ?? [])
+    const rows = data ?? [];
+    const requests: StudentPaymentRequestItem[] = rows
       .filter((row): row is typeof row & { status: StudentPaymentRequestStatus } =>
         (paymentRequestStatuses as readonly string[]).includes(row.status),
       )
@@ -169,7 +178,7 @@ export async function getStudentPaymentRequests(
         topupType: row.topup_type === "renewal" ? "renewal" : "new",
       }));
 
-    return summarizePaymentRequests(requests);
+    return summarizePaymentRequests(requests, { truncated: rows.length >= limit });
   } catch {
     return null;
   }
@@ -178,16 +187,22 @@ export async function getStudentPaymentRequests(
 /**
  * Next scheduled or running session of the student's active class. Composite
  * classes hold their sessions on component classes, so those are included.
+ * `null` = the feed failed; `{ session: null }` = nothing scheduled.
  */
-export async function getStudentUpcomingSession(classId: string): Promise<StudentUpcomingSession | null> {
+export async function getStudentUpcomingSession(classId: string): Promise<StudentUpcomingSessionFeed | null> {
   try {
     const supabase = await createSupabaseServerClient();
     const today = getVietnamToday();
-    const { data: links } = await supabase
+    const { data: links, error: linksError } = await supabase
       .from("class_component_links")
       .select("component_class_id")
       .eq("parent_class_id", classId)
       .is("effective_to", null);
+
+    // Without the component classes a composite class would look unscheduled.
+    if (linksError) {
+      return null;
+    }
     const classIds = [classId, ...(links ?? []).map((link) => link.component_class_id)];
     const { data, error } = await supabase
       .from("class_sessions")
@@ -213,22 +228,28 @@ export async function getStudentUpcomingSession(classId: string): Promise<Studen
       .limit(1)
       .maybeSingle();
 
-    if (error || !data) {
+    if (error) {
       return null;
+    }
+
+    if (!data) {
+      return { session: null };
     }
 
     const klass = data.class as unknown as { code: string; name: string } | null;
 
     return {
-      classCode: klass?.code ?? "",
-      className: klass?.name ?? "Lớp không xác định",
-      endTime: data.end_time,
-      id: data.id,
-      learningMode: data.learning_mode,
-      roomName: data.room_name,
-      sessionDate: data.session_date,
-      startTime: data.start_time,
-      status: data.status,
+      session: {
+        classCode: klass?.code ?? "",
+        className: klass?.name ?? "Lớp không xác định",
+        endTime: data.end_time,
+        id: data.id,
+        learningMode: data.learning_mode,
+        roomName: data.room_name,
+        sessionDate: data.session_date,
+        startTime: data.start_time,
+        status: data.status,
+      },
     };
   } catch {
     return null;

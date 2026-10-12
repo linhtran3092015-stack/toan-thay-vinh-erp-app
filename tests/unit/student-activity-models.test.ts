@@ -88,7 +88,16 @@ describe("summarizePaymentRequests", () => {
       requests: [],
       totalExpectedVnd: 0,
       totalPaidVnd: 0,
+      truncated: false,
     });
+  });
+
+  // Value: protects=the summary carries the loader's truncation flag without changing the math; fails_when=the option is dropped or alters totals; why_new=the 200-row window was silent; seam=none; no_claim=does not prove the loader computes the flag (student-activity-data.test)
+  it("passes the truncation flag through and keeps totals over the given rows", () => {
+    const summary = summarizePaymentRequests([request({ id: "1", status: "pending" })], { truncated: true });
+
+    expect(summary.truncated).toBe(true);
+    expect(summary.outstandingVnd).toBe(1_000_000);
   });
 });
 
@@ -119,6 +128,19 @@ describe("summarizeAttendance / getAttendanceRate", () => {
 
     expect(history.classes).toEqual([]);
     expect(getAttendanceRate(history)).toBeNull();
+    expect(history.truncated).toBe(false);
+  });
+
+  // Value: protects=a truncated attendance window is flagged while the rate stays computed over the loaded rows; fails_when=the option is dropped or alters counts; why_new=the 200-row window was silent; seam=none; no_claim=does not prove the loader computes the flag (student-activity-data.test)
+  it("passes the truncation flag through without changing counts or the rate", () => {
+    const history = summarizeAttendance(
+      [attendanceItem({ id: "1", status: "present" }), attendanceItem({ id: "2", status: "unexcused_absence" })],
+      { truncated: true },
+    );
+
+    expect(history.truncated).toBe(true);
+    expect(history.total).toBe(2);
+    expect(getAttendanceRate(history)).toBe(50);
   });
 });
 

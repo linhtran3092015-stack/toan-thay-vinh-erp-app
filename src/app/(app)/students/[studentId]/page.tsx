@@ -101,14 +101,15 @@ export default async function StudentDetailRoute({
   const detail = detailResult.detail;
   const activeClassId = detail.activeEnrollment?.classInfo?.id ?? null;
 
-  const [enrollmentUiModel, ledgerSummary, tuitionProfile, attendance, payments, upcomingSession, careDashboard] =
+  const [enrollmentUiModel, ledgerSummary, tuitionProfile, attendance, payments, upcoming, careDashboard] =
     await Promise.all([
       getStudentEnrollmentUiModel(detail, permissions),
       canViewLedger ? getStudentLedgerSummary(studentId) : Promise.resolve(null),
       getStudentTuitionProfile(studentId),
       canViewAttendance ? getStudentAttendanceHistory(studentId) : Promise.resolve(undefined),
       canViewPayments ? getStudentPaymentRequests(studentId) : Promise.resolve(undefined),
-      canViewSessions && activeClassId ? getStudentUpcomingSession(activeClassId) : Promise.resolve(null),
+      // `null` = the feed failed; a student without a class has nothing scheduled.
+      canViewSessions && activeClassId ? getStudentUpcomingSession(activeClassId) : Promise.resolve({ session: null }),
       canViewCare ? getCareDashboard({ student_id: studentId }) : Promise.resolve(null),
     ]);
 
@@ -142,7 +143,8 @@ export default async function StudentDetailRoute({
       ledgerSummary={ledgerSummary}
       payments={payments}
       tuitionProfile={tuitionProfile}
-      upcomingSession={upcomingSession}
+      upcomingSession={upcoming?.session ?? null}
+      upcomingSessionFailed={upcoming === null}
       zaloGroupCard={<StudentZaloGroupCard canUpdate={canUpdateStudent} studentId={detail.id} studentName={detail.fullName} />}
     />
   );

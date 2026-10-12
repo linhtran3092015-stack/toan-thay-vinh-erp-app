@@ -71,7 +71,10 @@ export interface StudentProfilePageProps {
   ledgerSummary?: StudentLedgerReadModel | null;
   payments?: StudentPaymentSummary | null;
   tuitionProfile?: StudentTuitionProfile;
+  /** `null` = nothing scheduled (or no class); see `upcomingSessionFailed`. */
   upcomingSession?: StudentUpcomingSession | null;
+  /** The upcoming-session feed failed; the tile shows "—" instead of "Chưa xếp lịch". */
+  upcomingSessionFailed?: boolean;
   zaloGroupCard?: ReactNode;
 }
 
@@ -111,6 +114,7 @@ export function StudentProfilePage({
   payments,
   tuitionProfile,
   upcomingSession = null,
+  upcomingSessionFailed = false,
   zaloGroupCard,
 }: StudentProfilePageProps) {
   const tabsId = useId();
@@ -121,6 +125,10 @@ export function StudentProfilePage({
   });
 
   const tabItems: TabItem[] = [];
+  // The tuition card (rates, acquisition source) lives in the payments tab; a
+  // role that can edit it keeps the tab even without payments/ledger view.
+  const canEditTuition = Boolean(tuitionProfile) && (canManageTuitionRates || canCorrectAcquisitionSource);
+  const showPaymentsTab = canViewPayments || canViewLedger || canEditTuition;
 
   if (canViewClasses) {
     tabItems.push({ count: detail.activeEnrollment ? 1 : 0, label: "Lớp", value: "classes" });
@@ -128,7 +136,7 @@ export function StudentProfilePage({
   if (canViewAttendance) {
     tabItems.push({ count: attendance?.total, label: "Điểm danh", value: "attendance" });
   }
-  if (canViewPayments || canViewLedger) {
+  if (showPaymentsTab) {
     const pending = (payments?.openCount ?? 0) + ((ledgerSummary?.balanceSessions ?? 1) <= 0 ? 1 : 0);
     tabItems.push({ label: "Thanh toán & số dư buổi", pending: pending > 0 ? pending : undefined, value: "payments" });
   }
@@ -257,16 +265,20 @@ export function StudentProfilePage({
 
       <section
         aria-label="Chỉ số nhanh"
-        className="grid grid-cols-2 divide-border-row rounded-lg border border-border-subtle bg-surface-base shadow-[var(--panel-shadow)] max-md:divide-y md:grid-cols-4 md:divide-x"
+        className="grid grid-cols-2 divide-border-row rounded-lg border border-border-subtle bg-surface-base shadow-[var(--panel-shadow)] md:grid-cols-4 md:divide-x"
       >
+        {/* Below md the 2×2 grid draws its own dividers: column after tiles 1/3, row above tiles 3/4. */}
         <KpiTile
+          className="max-md:border-r"
           hint={
             !canViewAttendance
-              ? "attendance.view"
+              ? "không có quyền xem điểm danh"
               : attendance === null
                 ? "chưa tải được"
                 : attendance && attendance.total > 0
-                  ? `${attendance.counts.present + attendance.counts.additional_study}/${attendance.total} buổi · ${attendance.classes.length} lớp`
+                  ? attendance.truncated
+                    ? `tính trên ${attendance.total} buổi gần nhất`
+                    : `${attendance.counts.present + attendance.counts.additional_study}/${attendance.total} buổi · ${attendance.classes.length} lớp`
                   : "chưa có buổi được điểm danh"
           }
           label="Chuyên cần"
@@ -275,7 +287,7 @@ export function StudentProfilePage({
         <KpiTile
           hint={
             !canViewLedger
-              ? "session_ledger.view"
+              ? "không có quyền xem số dư buổi"
               : ledgerSummary
                 ? `+${ledgerSummary.totalCreditSessions} · −${ledgerSummary.totalDebitSessions} buổi`
                 : "chưa tải được sổ buổi"
@@ -293,38 +305,46 @@ export function StudentProfilePage({
           }
         />
         <KpiTile
+          className="max-md:border-r max-md:border-t"
           hint={
             !canViewPayments
-              ? "payments.view"
+              ? "không có quyền xem thanh toán"
               : payments === null
                 ? "chưa tải được"
-                : payments && payments.openCount > 0
-                  ? `${payments.openCount} yêu cầu chờ thanh toán`
-                  : "không có yêu cầu chờ"
+                : payments?.truncated
+                  ? `${payments.openCount} yêu cầu chờ · tính trên ${payments.requests.length} yêu cầu gần nhất`
+                  : payments && payments.openCount > 0
+                    ? `${payments.openCount} yêu cầu chờ thanh toán`
+                    : "không có yêu cầu chờ"
           }
           label="Công nợ"
           tone={payments && payments.outstandingVnd > 0 ? "danger" : "default"}
           value={!canViewPayments ? "Không có quyền" : payments ? formatVnd(payments.outstandingVnd) : "—"}
         />
         <KpiTile
+          className="max-md:border-t"
           hint={
             !canViewSessions
-              ? "sessions.view"
-              : upcomingSession
-                ? `${upcomingSession.className}${upcomingSession.roomName ? ` · ${upcomingSession.roomName}` : ""}`
-                : activeClass
-                  ? "lớp chưa có buổi sắp tới"
-                  : "học sinh chưa có lớp"
+              ? "không có quyền xem lịch buổi"
+              : upcomingSessionFailed
+                ? "chưa tải được"
+                : upcomingSession
+                  ? `${upcomingSession.className}${upcomingSession.roomName ? ` · ${upcomingSession.roomName}` : ""}`
+                  : activeClass
+                    ? "lớp chưa có buổi sắp tới"
+                    : "học sinh chưa có lớp"
           }
           label="Buổi tới"
           value={
             !canViewSessions
               ? "Không có quyền"
-              : upcomingSession
-                ? `${formatWeekdayDate(upcomingSession.sessionDate, { year: false })} · ${formatTime(upcomingSession.startTime)}`
-                : activeClass
-                  ? "Chưa xếp lịch"
-                  : "Chưa có lớp"
+              : upcomingSessionFailed
+                ? "—"
+                : upcomingSession
+                  ? `${formatWeekdayDate(upcomingSession.sessionDate, { year: false })} · ${formatTime(upcomingSession.startTime)}`
+                  : activeClass
+                    ? "Chưa xếp lịch"
+                    : "Chưa có lớp"
           }
         />
       </section>
@@ -426,7 +446,7 @@ export function StudentProfilePage({
             </TabPanel>
           ) : null}
 
-          {canViewPayments || canViewLedger ? (
+          {showPaymentsTab ? (
             <TabPanel activeValue={activeTab} tabsId={tabsId} value="payments">
               <StudentPaymentsTab
                 canCreatePaymentRequest={canCreatePaymentRequest}
@@ -469,18 +489,20 @@ export function StudentProfilePage({
 }
 
 function KpiTile({
+  className,
   hint,
   label,
   tone = "default",
   value,
 }: {
+  className?: string;
   hint?: string;
   label: string;
   tone?: "default" | "danger";
   value: string;
 }) {
   return (
-    <div className="min-w-0 px-4 py-3">
+    <div className={cn("min-w-0 border-border-row px-4 py-3", className)}>
       <p className="text-secondary text-text-muted">{label}</p>
       <p
         className={cn(

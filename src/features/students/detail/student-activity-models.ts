@@ -35,10 +35,18 @@ export interface StudentAttendanceHistory {
   counts: Record<SessionAttendanceStatus, number>;
   items: StudentAttendanceHistoryItem[];
   total: number;
+  /** The feed hit its row limit: counts and the rate cover only the newest rows. */
+  truncated: boolean;
+}
+
+/** Options for the summaries; `truncated` comes from the loader (raw rows === limit). */
+export interface ActivitySummaryOptions {
+  truncated?: boolean;
 }
 
 export function summarizeAttendance(
   items: StudentAttendanceHistoryItem[],
+  { truncated = false }: ActivitySummaryOptions = {},
 ): StudentAttendanceHistory {
   const counts: Record<SessionAttendanceStatus, number> = {
     additional_study: 0,
@@ -64,6 +72,7 @@ export function summarizeAttendance(
     counts,
     items,
     total: items.length,
+    truncated,
   };
 }
 
@@ -115,10 +124,13 @@ export interface StudentPaymentSummary {
   requests: StudentPaymentRequestItem[];
   totalExpectedVnd: number;
   totalPaidVnd: number;
+  /** The feed hit its row limit: totals and debt cover only the newest requests. */
+  truncated: boolean;
 }
 
 export function summarizePaymentRequests(
   requests: StudentPaymentRequestItem[],
+  { truncated = false }: ActivitySummaryOptions = {},
 ): StudentPaymentSummary {
   let openCount = 0;
   let outstandingVnd = 0;
@@ -139,7 +151,7 @@ export function summarizePaymentRequests(
     }
   }
 
-  return { openCount, outstandingVnd, requests, totalExpectedVnd, totalPaidVnd };
+  return { openCount, outstandingVnd, requests, totalExpectedVnd, totalPaidVnd, truncated };
 }
 
 export interface StudentUpcomingSession {
@@ -152,4 +164,12 @@ export interface StudentUpcomingSession {
   sessionDate: string;
   startTime: string;
   status: string;
+}
+
+/**
+ * Upcoming-session feed. The loader returns `null` when the query fails (like
+ * the other activity loaders); `{ session: null }` means nothing is scheduled.
+ */
+export interface StudentUpcomingSessionFeed {
+  session: StudentUpcomingSession | null;
 }

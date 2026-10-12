@@ -1,6 +1,6 @@
 import type { StudentEnrollmentReadModel } from "@/features/students/read-models";
 import type { StudentTuitionProfile } from "@/features/students/tuition-profile-data";
-import { formatIsoDate } from "@/lib/datetime";
+import { formatIsoDate, toVietnamDate } from "@/lib/datetime";
 import { formatVnd } from "@/lib/format";
 
 import { formatMode, formatTransitionKind, PanelNotice } from "./student-profile-shared";
@@ -58,7 +58,8 @@ export function buildStudentHistory({
 
   for (const [index, source] of (tuitionProfile?.sourceHistory ?? []).entries()) {
     events.push({
-      date: source.assignedAt,
+      // A timestamp; convert so it shows and sorts as a Vietnam business date like the other events.
+      date: toVietnamDate(source.assignedAt),
       detail: source.reason,
       id: `source-${index}-${source.assignedAt}-${source.reason}`,
       title: "Hiệu chỉnh nguồn học viên",

@@ -11,7 +11,7 @@ import { SessionBalanceBadge } from "@/features/students/components/session-bala
 import { formatDeltaSessions } from "@/features/students/detail/helpers";
 import { formatLedgerEntryType } from "@/features/students/ledger-labels";
 import type { StudentLedgerReadModel } from "@/features/students/ledger-data";
-import { formatIsoDate } from "@/lib/datetime";
+import { formatIsoDate, toVietnamDate } from "@/lib/datetime";
 
 interface StudentSessionLedgerCardProps {
   summary: StudentLedgerReadModel | null;
@@ -76,7 +76,7 @@ export function StudentSessionLedgerCard({ limit = 30, summary }: StudentSession
               {entry.balanceAfter}
             </TableCell>
             <TableCell className="whitespace-nowrap text-text-muted">{entry.referenceCode ?? "—"}</TableCell>
-            <TableCell className="max-w-[240px] truncate text-text-muted">{entry.note}</TableCell>
+            <TableCell className="max-w-[240px] truncate text-text-muted" title={entry.note ?? undefined}>{entry.note}</TableCell>
           </TableRow>
         ))}
         caption="Sổ cái số buổi học của học sinh"
@@ -86,7 +86,7 @@ export function StudentSessionLedgerCard({ limit = 30, summary }: StudentSession
           summary && summary.entries.length > 0 ? (
             <span>
               Hiển thị {visible.length}/{summary.ledgerEntryCount} phát sinh
-              {summary.latestEntryAt ? ` · mới nhất ${formatIsoDate(summary.latestEntryAt)}` : ""}
+              {summary.latestEntryAt ? ` · mới nhất ${formatIsoDate(toVietnamDate(summary.latestEntryAt))}` : ""}
             </span>
           ) : undefined
         }

@@ -15,7 +15,7 @@ import type {
   StudentPaymentRequestItem,
   StudentPaymentSummary,
 } from "@/features/students/detail/student-activity-models";
-import { formatIsoDate } from "@/lib/datetime";
+import { formatIsoDate, toVietnamDate } from "@/lib/datetime";
 import { formatVnd } from "@/lib/format";
 
 interface StudentPaymentsTabProps {
@@ -90,29 +90,26 @@ export function StudentPaymentsTab({
   } else {
     requestsBlock = (
       <DataTableFrame
-        body={payments.requests.slice(0, limit).map((request) => {
-          const isOpen = request.status === "pending" || request.status === "partially_paid";
-
-          return (
-            <TableRow key={request.id} selected={isOpen}>
-              <TableCell className="whitespace-nowrap text-text-muted">{formatIsoDate(request.createdAt)}</TableCell>
-              <TableCell>
-                <span className="block font-medium text-text-strong">{request.notes ?? describeRequest(request)}</span>
-                {request.notes ? <span className="block text-caption text-text-muted">{describeRequest(request)}</span> : null}
-              </TableCell>
-              <TableCell className="whitespace-nowrap text-text-muted">{request.publicCode}</TableCell>
-              <TableCell className="whitespace-nowrap" numeric>
-                {formatVnd(request.expectedAmountVnd)}
-              </TableCell>
-              <TableCell className={request.paidAmountVnd === 0 ? "whitespace-nowrap text-text-subtle" : "whitespace-nowrap"} numeric>
-                {formatVnd(request.paidAmountVnd)}
-              </TableCell>
-              <TableCell className="whitespace-nowrap">
-                <PaymentRequestStatusBadge status={request.status} />
-              </TableCell>
-            </TableRow>
-          );
-        })}
+        // Open requests are flagged by the status badge; `selected` would announce them as selected rows.
+        body={payments.requests.slice(0, limit).map((request) => (
+          <TableRow key={request.id}>
+            <TableCell className="whitespace-nowrap text-text-muted">{formatIsoDate(toVietnamDate(request.createdAt))}</TableCell>
+            <TableCell>
+              <span className="block font-medium text-text-strong">{request.notes ?? describeRequest(request)}</span>
+              {request.notes ? <span className="block text-caption text-text-muted">{describeRequest(request)}</span> : null}
+            </TableCell>
+            <TableCell className="whitespace-nowrap text-text-muted">{request.publicCode}</TableCell>
+            <TableCell className="whitespace-nowrap" numeric>
+              {formatVnd(request.expectedAmountVnd)}
+            </TableCell>
+            <TableCell className={request.paidAmountVnd === 0 ? "whitespace-nowrap text-text-subtle" : "whitespace-nowrap"} numeric>
+              {formatVnd(request.paidAmountVnd)}
+            </TableCell>
+            <TableCell className="whitespace-nowrap">
+              <PaymentRequestStatusBadge status={request.status} />
+            </TableCell>
+          </TableRow>
+        ))}
         caption="Yêu cầu thanh toán của học sinh"
         empty={<TableState>Chưa có yêu cầu thanh toán nào.</TableState>}
         footer={
@@ -129,6 +126,9 @@ export function StudentPaymentsTab({
                 <span className="text-text-muted">
                   Hiển thị {limit}/{payments.requests.length} yêu cầu
                 </span>
+              ) : null}
+              {payments.truncated ? (
+                <span className="text-text-muted">Tổng tính trên {payments.requests.length} yêu cầu gần nhất</span>
               ) : null}
             </>
           ) : undefined

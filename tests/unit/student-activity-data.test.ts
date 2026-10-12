@@ -14,6 +14,7 @@ vi.mock("@/lib/supabase/server", () => ({
 import {
   getStudentAttendanceHistory,
   getStudentPaymentRequests,
+  getStudentUpcomingSession,
 } from "@/features/students/detail/student-activity-data";
 
 /** Chainable PostgREST stand-in: every filter returns itself; awaiting it yields `result`. */
@@ -127,5 +128,98 @@ describe("getStudentAttendanceHistory", () => {
 
     tables({ session_attendance: { data: null, error: { message: "timeout" } } });
     await expect(getStudentAttendanceHistory("student-1")).resolves.toBeNull();
+  });
+
+  // Value: protects=a failed session_results read never renders every session as "no score"; fails_when=the results error is dropped again; why_new=only the first query's failure was covered; seam=none; no_claim=does not prove RLS on session_results
+  it("returns null instead of blank scores when the results query fails", async () => {
+    tables({
+      session_attendance: { data: [row("a-1", "present", session("s-1", "2026-10-01", "19:30:00", nineA), "s-1")], error: null },
+      session_results: { data: null, error: { message: "permission denied" } },
+    });
+
+    await expect(getStudentAttendanceHistory("student-1")).resolves.toBeNull();
+  });
+});
+
+describe("getStudentUpcomingSession", () => {
+  // Value: protects=a composite class whose component links fail to load is reported as a failed feed, not as unscheduled; fails_when=the links error is dropped and only the parent class is searched; why_new=the upcoming loader had no test; seam=none; no_claim=UI rendering of the failed state (covered in student-profile-presentation)
+  it("returns null without querying sessions when the component links query fails", async () => {
+    tables({ class_component_links: { data: null, error: { message: "timeout" } } });
+
+    await expect(getStudentUpcomingSession("class-1")).resolves.toBeNull();
+    expect(supabase.from).not.toHaveBeenCalledWith("class_sessions");
+  });
+
+  // Value: protects=sessions held on component classes count as the student's next session; fails_when=component ids stop reaching the class_id filter; why_new=untested; seam=none; no_claim=does not assert the end_time cutoff string
+  it("searches the parent class and its component classes", async () => {
+    const sessions = query({
+      data: { class: { code: "9A", name: "Toán 9A" }, end_time: "21:30:00", id: "s-1", learning_mode: "offline", room_name: null, session_date: "2026-10-14", start_time: "19:30:00", status: "scheduled" },
+      error: null,
+    });
+    supabase.from.mockImplementation((table: string) =>
+      table === "class_component_links" ? query({ data: [{ component_class_id: "comp-1" }], error: null }) : sessions,
+    );
+
+    await expect(getStudentUpcomingSession("class-1")).resolves.toMatchObject({ session: { id: "s-1", className: "Toán 9A" } });
+    expect(sessions.in).toHaveBeenCalledWith("class_id", ["class-1", "comp-1"]);
+  });
+
+  // Value: protects=the loader keeps "nothing scheduled" ({ session: null }) distinct from "query failed" (null); fails_when=a sessions error collapses into the empty result so the tile reads "Chưa xếp lịch"; why_new=both outcomes used to return null; seam=none; no_claim=does not prove the PostgREST filters
+  it("returns { session: null } when nothing is scheduled and null when the sessions query fails", async () => {
+    supabase.from.mockImplementation((table: string) =>
+      table === "class_component_links" ? query({ data: [], error: null }) : query({ data: null, error: null }),
+    );
+    await expect(getStudentUpcomingSession("class-1")).resolves.toEqual({ session: null });
+
+    supabase.from.mockImplementation((table: string) =>
+      table === "class_component_links" ? query({ data: [], error: null }) : query({ data: null, error: { message: "timeout" } }),
+    );
+    await expect(getStudentUpcomingSession("class-1")).resolves.toBeNull();
+  });
+});
+
+// Value: protects=feeds that hit their row limit say so (truncated) based on raw rows, even when some rows are dropped; fails_when=truncated is computed from mapped items (dropped rows hide the cap) or never set; why_new=the 200-row cap was silent; seam=none; no_claim=does not prove the UI note (covered in student-profile-presentation)
+describe("activity feed truncation", () => {
+  it("flags the payment feed as truncated when the raw rows reach the limit, even if a row is skipped", async () => {
+    const row = { bonus_sessions: 0, created_at: "2026-09-27T02:00:00Z", expected_amount_vnd: 1, notes: null, paid_amount_vnd: 0, paid_at: null, public_code: "YC", purchased_sessions: 1, topup_type: "new" };
+    tables({
+      student_payment_requests: {
+        data: [
+          { ...row, id: "pr-1", status: "pending" },
+          { ...row, id: "pr-2", status: "refund_pending" },
+        ],
+        error: null,
+      },
+    });
+
+    const capped = await getStudentPaymentRequests("student-1", 2);
+    expect(capped?.requests).toHaveLength(1);
+    expect(capped?.truncated).toBe(true);
+
+    await expect(getStudentPaymentRequests("student-1", 3)).resolves.toMatchObject({ truncated: false });
+  });
+
+  it("flags the attendance feed as truncated when the raw rows reach the limit", async () => {
+    tables({
+      session_attendance: {
+        data: [
+          {
+            actual_learning_mode: "offline",
+            attendance_status: "present",
+            class_session_id: "s-1",
+            id: "a-1",
+            is_late_update: false,
+            marked_at: "2026-10-05T12:00:00Z",
+            notes: null,
+            session: { class: null, component_code: null, id: "s-1", locked_at: null, session_date: "2026-10-01", start_time: "19:30:00" },
+          },
+        ],
+        error: null,
+      },
+      session_results: { data: [], error: null },
+    });
+
+    await expect(getStudentAttendanceHistory("student-1", 1)).resolves.toMatchObject({ total: 1, truncated: true });
+    await expect(getStudentAttendanceHistory("student-1", 2)).resolves.toMatchObject({ total: 1, truncated: false });
   });
 });
