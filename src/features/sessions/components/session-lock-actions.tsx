@@ -31,7 +31,7 @@ interface SessionLockActionsProps {
   lockReason: string | null;
   /** Roster students with a lock-counted status (present or either absence); with `rosterCount` it drives the checklist. */
   markedCount?: number;
-  /** Everyone on the page, walk-ins included; with `rosterCount === 0` it means walk-ins only (no roster to lock). */
+  /** Everyone on the page, walk-ins included; with `rosterCount === 0` the roster is known empty (walk-ins only, or nobody) and lock is blocked. */
   participantCount?: number;
   rosterCount?: number;
   sessionId: string;
@@ -76,8 +76,9 @@ export function SessionLockActions({
 
   const isCompleted = sessionStatus === "completed";
   const isLockable = isCompleted && lockedAt === null;
-  // The lock RPC raises SESSION_HAS_NO_ELIGIBLE_ROSTER when only walk-ins are on the session.
-  const hasNoRoster = rosterCount === 0 && participantCount !== undefined && participantCount > 0;
+  // The lock RPC raises SESSION_HAS_NO_ELIGIBLE_ROSTER whenever the roster is empty: walk-ins only, or nobody at all.
+  const hasNoRoster = rosterCount === 0 && participantCount !== undefined;
+  const hasWalkInsOnly = hasNoRoster && participantCount > 0;
   const attendanceKnown = markedCount !== undefined && rosterCount !== undefined && rosterCount > 0;
   const attendanceComplete = attendanceKnown ? markedCount >= rosterCount : undefined;
   const reasonError =
@@ -181,7 +182,9 @@ export function SessionLockActions({
 
   const attendanceCondition: GuardedCondition = hasNoRoster
     ? {
-        label: "Buổi không có học sinh trong roster — chỉ có học sinh học thêm nên chưa thể khóa",
+        label: hasWalkInsOnly
+          ? "Buổi không có học sinh trong roster — chỉ có học sinh học thêm nên chưa thể khóa"
+          : "Buổi không có học sinh trong roster nên chưa thể khóa.",
         state: "unmet",
       }
     : attendanceKnown

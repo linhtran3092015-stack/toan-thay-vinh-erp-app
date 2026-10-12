@@ -417,4 +417,24 @@ describe("Attendance and result copy match lock readiness", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Đã ghi có mặt cho 0 học sinh; dừng, không ghi tiếp 3 học sinh còn lại vì: Buổi học đã khóa nên không thể thay đổi điểm danh."));
     expect(attendanceActions.markSessionAttendanceAction).toHaveBeenCalledTimes(1);
   });
+
+  // The stopping student counts in "không ghi tiếp" (refused by the session-wide error), not as a per-student failure.
+  it("keeps earlier per-student failures in the stop message and counts only the stopped students as not attempted", async () => {
+    attendanceActions.markSessionAttendanceAction
+      .mockResolvedValueOnce({ status: "error", code: "MAIN_ATTENDANCE_REQUIRES_EFFECTIVE_ENROLLMENT", message: "Học viên không có đăng ký lớp còn hiệu lực tại ngày diễn ra buổi học." })
+      .mockResolvedValueOnce({ status: "error", code: "CLASS_SESSION_IS_LOCKED", message: "Buổi học đã khóa nên không thể thay đổi điểm danh." });
+    render(<SessionAttendanceManagement {...attendanceProps({ participants: [
+      { ...participant, studentId: "a", studentName: "An", attendanceStatus: null },
+      { ...participant, studentId: "b", studentName: "Bình", attendanceStatus: null },
+      { ...participant, studentId: "c", studentName: "Cúc", attendanceStatus: null },
+    ] })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Có mặt cho tất cả chưa chọn" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(
+      "Đã ghi có mặt cho 0 học sinh; 1 học sinh chưa ghi được: An. Học viên không có đăng ký lớp còn hiệu lực tại ngày diễn ra buổi học. Dừng, không ghi tiếp 2 học sinh còn lại vì: Buổi học đã khóa nên không thể thay đổi điểm danh.",
+    ));
+    expect(attendanceActions.markSessionAttendanceAction).toHaveBeenCalledTimes(2);
+    expect(attendanceActions.markSessionAttendanceAction).not.toHaveBeenCalledWith(expect.objectContaining({ studentId: "c" }));
+  });
 });

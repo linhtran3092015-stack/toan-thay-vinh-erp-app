@@ -264,10 +264,16 @@ export function SessionAttendanceManagement({
           if (result.status === "success") {
             saved += 1;
           } else if (result.code !== undefined && ATTENDANCE_SESSION_WIDE_ERROR_CODES.has(result.code)) {
+            // Not recorded because of the stop: this student (refused by the session-wide error) plus everyone after it.
+            const stoppedCount = unmarkedParticipants.length - saved - failedNames.length;
+            const stopNotice = `không ghi tiếp ${stoppedCount} học sinh còn lại vì: ${result.message}`;
             setActionState({
               code: result.code,
               status: "error",
-              message: `Đã ghi có mặt cho ${saved} học sinh; dừng, không ghi tiếp ${unmarkedParticipants.length - saved} học sinh còn lại vì: ${result.message}`,
+              message:
+                failedNames.length > 0
+                  ? `Đã ghi có mặt cho ${saved} học sinh; ${failedNames.length} học sinh chưa ghi được: ${failedNames.join(", ")}. ${firstFailureMessage} Dừng, ${stopNotice}`
+                  : `Đã ghi có mặt cho ${saved} học sinh; dừng, ${stopNotice}`,
             });
             router.refresh();
             return;

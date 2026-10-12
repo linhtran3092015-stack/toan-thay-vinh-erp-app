@@ -320,6 +320,19 @@ describe("Session lock checklist (design 04b)", () => {
     expect(screen.getByRole("button", { name: "Khóa buổi học" })).toBeEnabled();
   });
 
+  // The lock RPC raises SESSION_HAS_NO_ELIGIBLE_ROSTER on an empty roster, so a known-empty session must not look lockable.
+  it("blocks the lock when the session has no participants at all", () => {
+    render(<SessionLockActions {...lockProps({ markedCount: 0, participantCount: 0, rosterCount: 0 })} />);
+
+    const lock = screen.getByRole("button", { name: "Khóa buổi học" });
+    expect(lock).toBeDisabled();
+    expect(lock).toHaveAccessibleDescription("Buổi không có học sinh trong roster nên chưa thể khóa.");
+    expect(screen.getByText("Chưa thể khóa")).toBeInTheDocument();
+    expect(screen.queryByText("Đủ điều kiện")).not.toBeInTheDocument();
+    expect(screen.queryByText(/chỉ có học sinh học thêm/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/hệ thống kiểm tra khi xác nhận/)).not.toBeInTheDocument();
+  });
+
   it("offers post-lock remediation links only with the matching permissions", () => {
     const locked = lockProps({ lockedAt: "2026-08-10T12:15:00Z", lockReason: null });
 
