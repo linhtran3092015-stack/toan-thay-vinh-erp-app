@@ -35,7 +35,13 @@ export async function getStudentAttendanceHistory(
 ): Promise<StudentAttendanceHistory | null> {
   try {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
+    // Results are read by student alone, in parallel: an id list of up to `limit`
+    // sessions in the query string would approach URL length limits.
+    const resultsQuery = supabase
+      .from("session_results")
+      .select("class_session_id, test_score, notebook_status")
+      .eq("student_id", studentId);
+    const attendanceQuery = supabase
       .from("session_attendance")
       .select(
         `
@@ -59,33 +65,24 @@ export async function getStudentAttendanceHistory(
       .eq("student_id", studentId)
       .order("marked_at", { ascending: false })
       .limit(limit);
+    const [{ data, error }, { data: results, error: resultsError }] = await Promise.all([
+      attendanceQuery,
+      resultsQuery,
+    ]);
 
-    if (error) {
+    // Blank scores would read as "not graded"; report the feed as failed instead.
+    if (error || resultsError) {
       return null;
     }
 
     const rows = data ?? [];
-    const sessionIds = rows.map((row) => row.class_session_id);
     const resultsById = new Map<string, { notebookStatus: string | null; testScore: number | null }>();
 
-    if (sessionIds.length > 0) {
-      const { data: results, error: resultsError } = await supabase
-        .from("session_results")
-        .select("class_session_id, test_score, notebook_status")
-        .eq("student_id", studentId)
-        .in("class_session_id", sessionIds);
-
-      // Blank scores would read as "not graded"; report the feed as failed instead.
-      if (resultsError) {
-        return null;
-      }
-
-      for (const result of results ?? []) {
-        resultsById.set(result.class_session_id, {
-          notebookStatus: result.notebook_status,
-          testScore: result.test_score === null ? null : Number(result.test_score),
-        });
-      }
+    for (const result of results ?? []) {
+      resultsById.set(result.class_session_id, {
+        notebookStatus: result.notebook_status,
+        testScore: result.test_score === null ? null : Number(result.test_score),
+      });
     }
 
     const items: StudentAttendanceHistoryItem[] = [];
@@ -197,7 +194,9 @@ export async function getStudentUpcomingSession(classId: string): Promise<Studen
       .from("class_component_links")
       .select("component_class_id")
       .eq("parent_class_id", classId)
-      .is("effective_to", null);
+      // Active today: a link ended with a future date still holds sessions until then.
+      .lte("effective_from", today)
+      .or(`effective_to.is.null,effective_to.gte.${today}`);
 
     // Without the component classes a composite class would look unscheduled.
     if (linksError) {

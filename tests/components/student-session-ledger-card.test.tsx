@@ -86,4 +86,11 @@ describe("StudentSessionLedgerCard states (design 05a)", () => {
     expect(rows[1]).toHaveTextContent("B14");
     expect(within(card()).getByText("Hiển thị 1/2 phát sinh · mới nhất 12/10/2026")).toBeInTheDocument();
   });
+
+  // Value: protects=the "mới nhất" footer date is the Vietnam date of the latest entry timestamp; fails_when=latestEntryAt is formatted raw so a 01:00 Vietnam entry (18:00Z the day before) shows the previous day; why_new=the fixture timestamp (14:52Z) falls on the same date in UTC and Vietnam, so the conversion was unobservable; seam=none; no_claim=does not prove how ledger-data stamps latestEntryAt
+  it("shows the Vietnam date of the latest entry across the UTC day boundary", () => {
+    render(<StudentSessionLedgerCard summary={buildSummary({ latestEntryAt: "2026-10-12T18:00:00Z" })} />);
+
+    expect(within(card()).getByText("Hiển thị 2/2 phát sinh · mới nhất 13/10/2026")).toBeInTheDocument();
+  });
 });

@@ -20,7 +20,7 @@ import {
 /** Chainable PostgREST stand-in: every filter returns itself; awaiting it yields `result`. */
 function query(result: { data: unknown; error: unknown }) {
   const builder: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "in", "is", "or", "gte", "order", "limit"]) {
+  for (const method of ["select", "eq", "in", "is", "or", "gte", "lte", "order", "limit"]) {
     builder[method] = vi.fn(() => builder);
   }
   builder.maybeSingle = vi.fn(async () => result);
@@ -126,8 +126,21 @@ describe("getStudentAttendanceHistory", () => {
     expect(history?.items.find((item) => item.id === "a-2")).toMatchObject({ notebookStatus: null, testScore: null });
     expect(history?.items.find((item) => item.id === "a-5")?.className).toBe("Lớp không xác định");
 
-    tables({ session_attendance: { data: null, error: { message: "timeout" } } });
+    tables({ session_attendance: { data: null, error: { message: "timeout" } }, session_results: { data: [], error: null } });
     await expect(getStudentAttendanceHistory("student-1")).resolves.toBeNull();
+  });
+
+  // Value: protects=results are read by student without a session id list in the URL; fails_when=an .in() of up to 200 ids comes back and long histories hit URL limits (now failing the whole feed); why_new=review pass B; seam=none; no_claim=does not prove the result set size stays small
+  it("reads results by student without listing session ids", async () => {
+    const results = query({ data: [], error: null });
+    supabase.from.mockImplementation((table: string) =>
+      table === "session_results" ? results : query({ data: [], error: null }),
+    );
+
+    await getStudentAttendanceHistory("student-1");
+
+    expect(results.eq).toHaveBeenCalledWith("student_id", "student-1");
+    expect(results.in).not.toHaveBeenCalled();
   });
 
   // Value: protects=a failed session_results read never renders every session as "no score"; fails_when=the results error is dropped again; why_new=only the first query's failure was covered; seam=none; no_claim=does not prove RLS on session_results
@@ -148,6 +161,26 @@ describe("getStudentUpcomingSession", () => {
 
     await expect(getStudentUpcomingSession("class-1")).resolves.toBeNull();
     expect(supabase.from).not.toHaveBeenCalledWith("class_sessions");
+  });
+
+  // Value: protects=a component link ended with a future date still feeds the next session; fails_when=links are filtered by effective_to IS NULL only, dropping still-active links; why_new=review pass B; seam=none; no_claim=does not prove PostgREST parses the or() string
+  it("keeps component links that are active today, including ones ending later", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-12T05:00:00Z"));
+    try {
+      const links = query({ data: [], error: null });
+      supabase.from.mockImplementation((table: string) =>
+        table === "class_component_links" ? links : query({ data: null, error: null }),
+      );
+
+      await getStudentUpcomingSession("class-1");
+
+      expect(links.lte).toHaveBeenCalledWith("effective_from", "2026-10-12");
+      expect(links.or).toHaveBeenCalledWith("effective_to.is.null,effective_to.gte.2026-10-12");
+      expect(links.is).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // Value: protects=sessions held on component classes count as the student's next session; fails_when=component ids stop reaching the class_id filter; why_new=untested; seam=none; no_claim=does not assert the end_time cutoff string

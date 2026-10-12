@@ -38,7 +38,7 @@ const cardActions: ReadonlyArray<{ label: string; operation: StudentEnrollmentOp
 /** Tab "Lớp" (design 05b): current enrollment with its schedule, then ended ones. */
 export function StudentClassesTab({ canViewClasses, detail, model, onOperation }: StudentClassesTabProps) {
   if (!canViewClasses) {
-    return <PanelNotice tone="warning">Không có quyền xem lớp học (classes.view).</PanelNotice>;
+    return <PanelNotice tone="warning">Không có quyền xem lớp học.</PanelNotice>;
   }
 
   const active = detail.activeEnrollment;

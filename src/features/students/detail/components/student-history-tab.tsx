@@ -78,7 +78,7 @@ export function StudentHistoryTab(props: StudentHistoryTabProps) {
       <PanelNotice>
         {props.canViewClasses
           ? "Chưa có sự kiện nào được ghi nhận cho học sinh này."
-          : "Không có quyền xem lịch sử xếp lớp (classes.view)."}
+          : "Không có quyền xem lịch sử xếp lớp."}
       </PanelNotice>
     );
   }

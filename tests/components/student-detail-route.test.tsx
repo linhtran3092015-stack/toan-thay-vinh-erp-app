@@ -119,4 +119,16 @@ describe("Student detail route permission gating", () => {
     expect(none.upcomingSession).toBeNull();
     expect(none.upcomingSessionFailed).toBe(false);
   });
+
+  // Value: protects=a student without an active enrollment never queries upcoming sessions and is shown as "nothing scheduled", not as a failed feed; fails_when=getStudentUpcomingSession is called with an undefined class id, or the skipped load maps to upcomingSessionFailed; why_new=existing cases always give the student an active class; seam=loaders mocked at module boundaries; no_claim=does not prove the loader's own query
+  it("skips the upcoming-session load for a student without an active class and does not flag it as failed", async () => {
+    arrange(["students.view", "sessions.view"]);
+    dependencies.getStudentDetail.mockResolvedValue({ detail: { ...detail, activeEnrollment: null }, ok: true });
+
+    const props = await renderRoute({});
+
+    expect(dependencies.getStudentUpcomingSession).not.toHaveBeenCalled();
+    expect(props.upcomingSessionFailed).toBe(false);
+    expect(props.upcomingSession).toBeNull();
+  });
 });

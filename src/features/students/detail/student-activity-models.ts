@@ -76,15 +76,24 @@ export function summarizeAttendance(
   };
 }
 
-/** Attendance rate in percent over marked sessions; `null` when nothing is marked. */
+/** Main (roster) sessions: present or either absence; additional study is extra, not part of the rate. */
+export function getMainSessionCount(history: StudentAttendanceHistory): number {
+  return history.counts.present + history.counts.excused_absence + history.counts.unexcused_absence;
+}
+
+/**
+ * Attendance rate in percent over main sessions (present / present + absences);
+ * `null` when no main session is marked. Additional study is reported separately
+ * so extra sessions never hide absences.
+ */
 export function getAttendanceRate(history: StudentAttendanceHistory): number | null {
-  if (history.total === 0) {
+  const mainSessions = getMainSessionCount(history);
+
+  if (mainSessions === 0) {
     return null;
   }
 
-  const attended = history.counts.present + history.counts.additional_study;
-
-  return Math.round((attended / history.total) * 100);
+  return Math.round((history.counts.present / mainSessions) * 100);
 }
 
 export type StudentPaymentRequestStatus =

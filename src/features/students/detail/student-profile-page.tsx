@@ -27,6 +27,7 @@ import { StudentTuitionProfileCard } from "@/features/students/detail/components
 import { getInitials } from "@/features/students/detail/helpers";
 import {
   getAttendanceRate,
+  getMainSessionCount,
   type StudentAttendanceHistory,
   type StudentPaymentSummary,
   type StudentUpcomingSession,
@@ -278,7 +279,7 @@ export function StudentProfilePage({
                 : attendance && attendance.total > 0
                   ? attendance.truncated
                     ? `tính trên ${attendance.total} buổi gần nhất`
-                    : `${attendance.counts.present + attendance.counts.additional_study}/${attendance.total} buổi · ${attendance.classes.length} lớp`
+                    : `${attendance.counts.present}/${getMainSessionCount(attendance)} buổi chính${attendance.counts.additional_study > 0 ? ` · ${attendance.counts.additional_study} học thêm` : ""} · ${attendance.classes.length} lớp`
                   : "chưa có buổi được điểm danh"
           }
           label="Chuyên cần"
@@ -353,7 +354,7 @@ export function StudentProfilePage({
         <aside className="grid content-start gap-4">
           <ProfilePanel title="Phụ huynh" titleId="student-guardians-title">
             {!canViewGuardians ? (
-              <PanelNotice tone="warning">Không có quyền xem phụ huynh (guardians.view).</PanelNotice>
+              <PanelNotice tone="warning">Không có quyền xem phụ huynh.</PanelNotice>
             ) : detail.guardians.length === 0 ? (
               <PanelNotice>Học sinh chưa được liên kết phụ huynh.</PanelNotice>
             ) : (
@@ -512,7 +513,7 @@ function KpiTile({
       >
         {value}
       </p>
-      {hint ? <p className="mt-0.5 break-words text-caption text-text-muted md:truncate">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 break-words text-caption text-text-muted md:truncate" title={hint}>{hint}</p> : null}
     </div>
   );
 }

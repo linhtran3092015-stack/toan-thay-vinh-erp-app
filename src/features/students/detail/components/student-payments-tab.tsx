@@ -50,6 +50,7 @@ export function StudentPaymentsTab({
   payments,
   tuitionCard,
 }: StudentPaymentsTabProps) {
+  const tuitionOnly = !canViewPayments && !ledgerCard && Boolean(tuitionCard);
   const header = (
     <tr>
       <TableHeaderCell className="w-[100px]">Ngày</TableHeaderCell>
@@ -72,7 +73,7 @@ export function StudentPaymentsTab({
       <DataTableFrame
         body={null}
         caption="Yêu cầu thanh toán của học sinh"
-        forbidden={<TableState>Không có quyền xem yêu cầu thanh toán (payments.view).</TableState>}
+        forbidden={<TableState>Không có quyền xem yêu cầu thanh toán.</TableState>}
         header={header}
         status="forbidden"
       />
@@ -152,6 +153,9 @@ export function StudentPaymentsTab({
         />
       ) : null}
 
+      {/* A role that can only edit tuition sees its one actionable card first. */}
+      {tuitionOnly ? tuitionCard : null}
+
       <section aria-labelledby="student-payments-title" className="grid gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-body font-semibold text-text-strong" id="student-payments-title">
@@ -167,7 +171,7 @@ export function StudentPaymentsTab({
       </section>
 
       {ledgerCard}
-      {tuitionCard}
+      {tuitionOnly ? null : tuitionCard}
     </div>
   );
 }

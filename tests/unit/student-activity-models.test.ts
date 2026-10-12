@@ -10,6 +10,7 @@ import { formatVnd } from "@/lib/format";
 import { buildStudentHistory } from "@/features/students/detail/components/student-history-tab";
 import {
   getAttendanceRate,
+  getMainSessionCount,
   summarizeAttendance,
   summarizePaymentRequests,
   type StudentAttendanceHistoryItem,
@@ -102,7 +103,7 @@ describe("summarizePaymentRequests", () => {
 });
 
 describe("summarizeAttendance / getAttendanceRate", () => {
-  it("counts additional study as attended, rounds the rate, and orders classes by session count", () => {
+  it("rates main sessions only, rounds the rate, and orders classes by session count", () => {
     const history = summarizeAttendance([
       attendanceItem({ id: "1", status: "present" }),
       attendanceItem({ id: "2", status: "additional_study", classId: "class-8b", className: "Toán 8B" }),
@@ -119,8 +120,22 @@ describe("summarizeAttendance / getAttendanceRate", () => {
       ["class-9a", 4],
       ["class-8b", 3],
     ]);
-    // 4 attended of 7 = 57.14… → 57, not truncated to 0.57 or inflated by absences.
-    expect(getAttendanceRate(history)).toBe(57);
+    // 3 present of 6 main sessions = 50%; the additional-study session is extra and neither helps nor hurts.
+    expect(getMainSessionCount(history)).toBe(6);
+    expect(getAttendanceRate(history)).toBe(50);
+  });
+
+  // Value: protects=extra (additional study) sessions never mask absences in the Chuyên cần rate; fails_when=additional_study re-enters the numerator or denominator; why_new=review pass B (owner decision D6: rate covers main sessions only); seam=none; no_claim=does not prove the KPI hint copy
+  it("does not let additional study hide missed main sessions", () => {
+    const history = summarizeAttendance([
+      attendanceItem({ id: "1", status: "unexcused_absence" }),
+      attendanceItem({ id: "2", status: "excused_absence" }),
+      attendanceItem({ id: "3", status: "additional_study" }),
+      attendanceItem({ id: "4", status: "additional_study" }),
+    ]);
+
+    expect(getAttendanceRate(history)).toBe(0);
+    expect(getAttendanceRate(summarizeAttendance([attendanceItem({ id: "5", status: "additional_study" })]))).toBeNull();
   });
 
   it("reports no rate (not 0%) when nothing has been marked", () => {
@@ -178,6 +193,24 @@ describe("buildStudentHistory", () => {
     expect(events.map((event) => event.title)).toEqual([
       `Mức phí ${formatVnd(200_000)}/buổi có hiệu lực`,
       "Hiệu chỉnh nguồn học viên",
+    ]);
+  });
+
+  // Value: protects=a source correction stored as a UTC timestamp shows and sorts as its Vietnam business date; fails_when=assignedAt is used raw (date stays 2026-10-12 and the event sorts below a same-day rate); why_new=the fixture only uses a date-only assignedAt, which toVietnamDate cannot distinguish from a raw copy; seam=none; no_claim=does not prove the loader returns assignedAt as a timestamp
+  it("converts a late-evening UTC source timestamp to the next Vietnam business date", () => {
+    const events = buildStudentHistory({
+      canViewClasses: false,
+      enrollmentHistory: [],
+      tuitionProfile: {
+        ...tuitionProfile,
+        rateHistory: [{ createdAt: "2026-10-12T01:00:00Z", effectiveFrom: "2026-10-12", reason: "Tăng giá", unitPriceVnd: 220_000 }],
+        sourceHistory: [{ assignedAt: "2026-10-12T18:30:00Z", reason: "Sửa nguồn" }],
+      },
+    });
+
+    expect(events.map((event) => [event.date, event.title])).toEqual([
+      ["2026-10-13", "Hiệu chỉnh nguồn học viên"],
+      ["2026-10-12", `Mức phí ${formatVnd(220_000)}/buổi có hiệu lực`],
     ]);
   });
 

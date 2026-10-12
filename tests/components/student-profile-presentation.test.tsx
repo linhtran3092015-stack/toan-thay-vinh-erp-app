@@ -219,7 +219,7 @@ describe("Student profile presentation (design 05)", () => {
     const tablist = screen.getByRole("tablist", { name: "Mục trong hồ sơ học sinh" });
     expect(within(tablist).queryByRole("tab", { name: /Thanh toán/ })).not.toBeInTheDocument();
     expect(within(tablist).queryByRole("tab", { name: /Chăm sóc/ })).not.toBeInTheDocument();
-    expect(screen.getByText("Không có quyền xem phụ huynh (guardians.view).")).toBeInTheDocument();
+    expect(screen.getByText("Không có quyền xem phụ huynh.")).toBeInTheDocument();
     expect(screen.queryByText(/0912 345 678/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Thêm hành động" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Sửa hồ sơ" })).not.toBeInTheDocument();
@@ -434,7 +434,7 @@ describe("Student profile feed states and permissions (review fixes)", () => {
     expect(within(screen.getByRole("tablist", { name: "Mục trong hồ sơ học sinh" })).getByRole("tab", { name: /Thanh toán/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Học phí & nguồn học viên")).toBeVisible();
     expect(screen.getByRole("button", { name: "Thêm mức phí" })).toBeInTheDocument();
-    expect(screen.getByText("Không có quyền xem yêu cầu thanh toán (payments.view).")).toBeInTheDocument();
+    expect(screen.getByText("Không có quyền xem yêu cầu thanh toán.")).toBeInTheDocument();
     expect(screen.queryByRole("table", { name: "Sổ cái số buổi học của học sinh" })).not.toBeInTheDocument();
   });
 
@@ -469,6 +469,45 @@ describe("Student profile feed states and permissions (review fixes)", () => {
 
     fireEvent.click(within(screen.getByRole("tablist", { name: "Mục trong hồ sơ học sinh" })).getByRole("tab", { name: /Thanh toán/ }));
     expect(screen.getByText("Tổng tính trên 2 yêu cầu gần nhất")).toBeInTheDocument();
+  });
+
+  // Value: protects=the payment request date column shows the Vietnam date of createdAt; fails_when=createdAt is formatted raw so a request created at 01:00 Vietnam time (18:00Z the day before) shows the previous day; why_new=fixture timestamps sit mid-day where UTC and Vietnam dates agree; seam=none; no_claim=does not prove how the loader stamps createdAt
+  it("shows the Vietnam date of a payment request created across the UTC day boundary", () => {
+    const lateRequest = summarizePaymentRequests([
+      { bonusSessions: 0, createdAt: "2026-10-12T18:00:00Z", expectedAmountVnd: 2_400_000, id: "pr-late", notes: null, paidAmountVnd: 0, paidAt: null, publicCode: "YC-2610-0999", purchasedSessions: 12, status: "pending", topupType: "renewal" },
+    ]);
+    render(<StudentPaymentsTab canCreatePaymentRequest={false} canViewPayments payments={lateRequest} />);
+
+    const row = screen.getByText("YC-2610-0999").closest("tr") as HTMLElement;
+    expect(row).toHaveTextContent("13/10/2026");
+    expect(row).not.toHaveTextContent("12/10/2026");
+  });
+
+  // Value: protects=a role holding only canCorrectAcquisitionSource (no payments/ledger view, no rate management) still gets the payments tab and the tuition card; fails_when=canEditTuition ignores canCorrectAcquisitionSource so the tab disappears and the source form is unreachable; why_new=the existing cases cover manage-rates and read-only, not the source-correction-only role; seam=none; no_claim=does not prove the correct-source server action authorises this role
+  it("keeps the payments tab and tuition card for a role that can only correct the acquisition source", () => {
+    render(
+      <StudentProfilePage
+        canCorrectAcquisitionSource
+        canUpdateStudent={false}
+        canViewClasses
+        canViewGuardians={false}
+        detail={buildDetail()}
+        directoryHref="/students"
+        editHref="/students/student-1/edit"
+        enrollmentUiModel={buildModel({ end: hidden, reserve: hidden, transfer: hidden })}
+        initialTab="payments"
+        tuitionProfile={tuitionProfile}
+      />,
+    );
+
+    expect(within(screen.getByRole("tablist", { name: "Mục trong hồ sơ học sinh" })).getByRole("tab", { name: /Thanh toán/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Học phí & nguồn học viên")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Lưu nguồn" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Thêm mức phí" })).not.toBeInTheDocument();
+    // Its one actionable card comes before the forbidden payment requests frame.
+    const tuitionHeading = screen.getByText("Học phí & nguồn học viên");
+    const requestsHeading = screen.getByRole("heading", { name: "Yêu cầu thanh toán" });
+    expect(tuitionHeading.compareDocumentPosition(requestsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   // Value: protects=open payment requests are not announced as selected rows; fails_when=TableRow gets selected={isOpen} again (aria-selected on a non-selectable table); why_new=a11y review finding; seam=none; no_claim=does not check the badge colour

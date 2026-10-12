@@ -56,7 +56,7 @@ export function StudentAttendanceTab({ canViewAttendance, history, limit = 30 }:
     return (
       <DataTableFrame
         caption="Điểm danh của học sinh"
-        forbidden={<TableState>Không có quyền xem điểm danh (attendance.view).</TableState>}
+        forbidden={<TableState>Không có quyền xem điểm danh.</TableState>}
         header={header}
         body={null}
         status="forbidden"
