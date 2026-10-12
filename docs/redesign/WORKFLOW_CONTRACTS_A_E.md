@@ -99,7 +99,7 @@ stateDiagram-v2
 - Locking requires `sessions.lock` and calls `lock_class_session` through `lockClassSessionAction`. The server-side lock contract is the readiness source of truth.
 - A session may be locked only when the authoritative server-side requirements permit it: the user has `sessions.lock`; the session is completed and not already locked; the lock reason satisfies existing validation; an eligible active roster exists where the RPC requires one; and attendance completeness satisfies the lock RPC.
 - Results and test scores are not lock prerequisites. Missing results or optional test scores must not block Lock, and the redesign must not create fake/default results to satisfy Lock.
-- Client UI must not independently recreate lock-readiness policy. It may present authoritative supplied state and server-returned failures only.
+- Client UI must not invent its own lock-readiness policy. It may mirror the server rule exactly (`src/features/sessions/lock-readiness.ts` mirrors `lock_class_session_internal`: non-empty roster, every roster student present or absent, `additional_study` and walk-ins not counted, results not a condition) to show the condition checklist and to disable Lock with a stated reason while a mirrored condition is unmet. The lock RPC stays authoritative: it re-checks every condition, and its failures are shown as returned. A change to the RPC's rule must update the mirror and its tests in the same change. Owner-approved for the Stumana redesign (v0.7.0.0).
 - `lockedAt` remains the immutable lock marker. Preserve explicit feature-owned confirmation/reason meaning, existing revalidation and audit behavior, and the absence of unlock, reset, reopen, or reversal UI. Neither attendance nor results may be made editable by redesign presentation after lock.
 
 ### Ledger consequences
@@ -112,7 +112,7 @@ stateDiagram-v2
 
 - Permission-denied UI changes no underlying query/action exposure.
 - Attendance and results follow the existing session roster and lifecycle constraints.
-- Lock presentation reflects only authoritative server-supplied readiness and returned failures. It must not block on missing results or test scores.
+- Lock presentation reflects only authoritative server-supplied readiness, the exact client mirror of the lock RPC's attendance rule permitted under Lock above, and returned failures. It must not block on missing results or test scores.
 - Lock confirmation remains explicit and descriptive; the feature owns wording and Server Action binding.
 - After a lock, the same read model continues to show locked/immutable state after refresh and navigation.
 - Ledger consequences remain server/RPC-owned; presentation does not calculate session quantities or introduce fractional values.

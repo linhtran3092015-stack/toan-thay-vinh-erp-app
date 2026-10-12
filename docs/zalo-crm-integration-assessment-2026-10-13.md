@@ -77,7 +77,7 @@ Quyết định: gửi từ nick trung tâm; hai loại tin đầu là vắng kh
 2. **Vercel** → Environment Variables: `ZALOCRM_BASE_URL=https://crm.vanlinhtran.id.vn`, `ZALOCRM_API_KEY=<key>` → redeploy.
 3. **ERP** → Cài đặt → Chung → mục "Tin nhắn phụ huynh (Zalo)": bấm "Tải danh sách nick", chọn nick trung tâm, lưu. Kiểm tra mẫu tin.
 4. **Hồ sơ học sinh** → thẻ "Nhóm Zalo sổ liên lạc" → Liên kết nhóm (tìm theo tên nhóm / tên phụ huynh, đối chiếu thành viên) — làm cho từng học sinh; chưa liên kết thì không tạo tin.
-5. **Trợ giảng**: menu Học vụ → "Tin nhắn phụ huynh" → xem tin chờ, sửa nếu cần, bấm "Gửi vào nhóm Zalo".
+5. **Trợ giảng**: menu Vận hành → Chăm sóc & Tuyển sinh → "Tin nhắn phụ huynh" (trước v0.7.0.0 nằm trong Học vụ) → xem tin chờ, sửa nếu cần, bấm "Gửi vào nhóm Zalo".
 
 ## 7. Quyết định cần chủ trung tâm (các bước sau)
 

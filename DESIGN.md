@@ -108,7 +108,7 @@ Menus, drawers, and dialogs keep the 150–200ms guidance from the older Motion 
 
 ### Implementation guardrails (dev preview routes)
 
-Development-only preview routes render redesigned components with fixture data inside the real shell. They answer 404 when `NODE_ENV === "production"`; `src/proxy.ts` treats `/dev/*` as public only outside production.
+Development-only preview routes render redesigned components with fixture data inside the real shell. They answer 404 when `NODE_ENV === "production"`; `src/proxy.ts` lets only GET/HEAD requests to `/dev/*` skip sign-in, and only outside production; a POST to `/dev/*` still requires a session because it can carry any server action id.
 
 | Route | Shows |
 | --- | --- |
@@ -329,7 +329,7 @@ Primary-domain navigation is persistent shell navigation. Contextual module navi
 
 ### Contextual module strip
 
-- Render the strip as a semantic `<nav>` with an accessible label that identifies its domain, for example `Mô-đun trong Học vụ`.
+- Render the strip as a semantic `<nav>` with an accessible label that identifies its domain, for example `Mô-đun trong Tài chính`.
 - Render only existing, permission-visible route links from the active domain. It has no synthetic module, action, or route.
 - The current link uses `aria-current="page"`. Nested routes retain their owning module’s active state without changing route meaning: `/classes/academic-years` remains under the Classes module; `/settings/users` and `/settings/permissions` remain under the Settings module.
 - The strip is route navigation, never a `tablist` and never visually competes with feature-owned page tabs.
@@ -341,7 +341,7 @@ Primary-domain navigation is persistent shell navigation. Contextual module navi
 ### Mobile module selector
 
 - The selector exposes the real permission-visible module routes for the active domain; it is not a fake or non-functional select.
-- Its accessible name identifies the domain, for example `Chuyển mô-đun trong Học vụ`.
+- Its accessible name identifies the domain, for example `Chuyển mô-đun trong Tài chính`.
 - It supports ordinary keyboard navigation, Escape dismissal, and focus restoration to its trigger when closed.
 - Selecting a module follows its existing route. It does not manufacture cross-module filtering, global context, or new state.
 
@@ -370,14 +370,14 @@ A `PageHeader` is a compact structural region, not a hero.
 
 - Left: title, optional one-line route-owned context, then concise descriptive/support text only when it helps the next decision.
 - Right: one primary action maximum, then secondary actions. Action visibility is supplied by the feature.
-- Detail/edit routes may show a breadcrumb when it explains real ancestry. A breadcrumb never substitutes for a page title.
+- The top bar shows the real-route breadcrumb (domain when it has a module strip, then the current module) on every route in the navigation; detail/edit pages may add the record level. A breadcrumb never substitutes for a page title.
 - Put record status adjacent to the title, not detached in a metric strip.
 - On narrow screens, title/context comes first and action controls wrap below in source order.
 
 ### PageActionBar
 
 - Use directly below the header or immediately above the work area only when a persistent set of existing actions requires it.
-- Primary action: solid navy, labelled, optionally paired with a 18px Lucide icon.
+- Primary action: solid `--action-primary` (moss since the 2026-10-12 update), labelled, optionally paired with a 18px Lucide icon.
 - Secondary action: outlined or quiet. Tertiary action: text/ghost.
 - Never use a danger fill as the page primary action. Consequential actions remain in their feature-owned panel or dialog.
 - Buttons may be disabled only with a nearby explanation supplied by the feature when users need to understand why.
@@ -392,7 +392,7 @@ A `PageHeader` is a compact structural region, not a hero.
 
 ### DataTableFrame
 
-- Table wrapper: `--surface-base`, 1px `--border-subtle`, 8px radius, no default shadow.
+- Table wrapper: `--surface-base`, 1px `--border-subtle`, `--radius-lg` (12px since the 2026-10-12 update), `--panel-shadow`.
 - Header: 36–40px, `--table-header`, 12px/600. It is visually quieter than data rows but never too faint to scan.
 - Rows: 48px default; 56px only for a useful secondary line. Use a single bottom border. Hover uses `--table-row-hover`; selected uses `--table-row-selected`.
 - The primary identifying field is left-aligned and visually strongest. Codes, dates, and financial/session values use tabular figures; financial and numeric columns align right.
@@ -416,7 +416,7 @@ A `PageHeader` is a compact structural region, not a hero.
 
 - Forms use an 8- or 12-column grid on desktop and one column on mobile. Common fields are two columns at tablet/desktop only when label and error copy have room.
 - Group existing fields into `FormSection`s with a section title and a brief feature-owned explanation where needed. Do not invent fields or rearrange a workflow in a way that changes validation expectations.
-- Standard control is 40px high on desktop with a 6px radius. Textareas have a defined minimum height and resize behavior appropriate to the existing feature.
+- Standard control is 40px high on desktop with `--radius-md` (10px since the 2026-10-12 update). Textareas have a defined minimum height and resize behavior appropriate to the existing feature.
 - Labels remain visible. Required, help, error, pending, disabled, and stale/conflict states must be communicated with text as well as color/border treatment.
 - Form actions follow the existing feature’s binding and confirmation semantics. On long forms, use a sticky action area only if the current workflow benefits and it does not hide validation feedback.
 - Mobile form save/cancel actions may become a safe-area-aware bottom action bar. They must preserve keyboard visibility and existing unsaved-change behavior.
@@ -513,7 +513,7 @@ Responsive behavior changes layout, not data availability, permissions, route ac
 - This document directs Wave 1+ presentation work only. It authorizes no route, permission, action, RPC, schema, RLS, RBAC, audit, state-machine, server filtering, or pagination change.
 - `components/ui` implements domain-agnostic tokens/primitives; `components/shared` presents generic loading/empty/error/permission/result/pending states; `components/patterns` composes reusable page and operational presentation. Features keep all domain behavior.
 - New pattern primitives require two real workflow uses or an approved contractual need.
-- Dev preview routes (`/dev/ui`, `/dev/shell`, `/dev/lists`, `/dev/session`, `/dev/student`) are public only outside production and use fixture data; see the 2026-10-12 update at the top.
+- Dev preview routes (`/dev/ui`, `/dev/shell`, `/dev/lists`, `/dev/session`, `/dev/student`) skip sign-in for GET/HEAD only, and only outside production, and use fixture data; see the 2026-10-12 update at the top.
 - Preserve non-A–E visual debt until its feature enters a later approved wave, except for the smallest compatibility fix required by the global typography foundation.
 
 ## Decisions log
