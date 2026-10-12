@@ -24,6 +24,7 @@ import { SessionResultManagement } from "@/features/sessions/components/session-
 import { SessionLockActions } from "@/features/sessions/components/session-lock-actions";
 import { SessionLifecycleActions } from "@/features/sessions/components/session-lifecycle-actions";
 import { SessionRescheduleDialog } from "@/features/sessions/components/session-reschedule-dialog";
+import { getParticipantDisplayName, getSessionLockReadiness } from "@/features/sessions/lock-readiness";
 import type {
   SessionAttendanceStatus,
   SessionDetailReadModel,
@@ -52,13 +53,6 @@ interface SessionDetailPageProps {
   directoryQuery?: string;
 }
 
-/** Statuses lock_class_session_internal accepts as a recorded roster attendance. */
-const LOCK_COUNTED_ATTENDANCE_STATUSES: ReadonlySet<SessionAttendanceStatus> = new Set([
-  "present",
-  "excused_absence",
-  "unexcused_absence",
-]);
-
 /**
  * Session workbench (design 04): state → attendance → results → lock. The
  * read-model and server actions are unchanged; this page only arranges them.
@@ -82,11 +76,16 @@ export function SessionDetailPage({
   const participantMarkedCount = detail.participants.filter((participant) => participant.attendanceStatus !== null).length;
   // Lock readiness mirrors lock_class_session_internal: every roster student (walk-ins have no
   // enrollmentClassId) needs present or an absence; additional_study does not count.
-  const rosterParticipants = detail.participants.filter((participant) => participant.enrollmentClassId !== null);
-  const rosterCount = rosterParticipants.length;
-  const markedCount = rosterParticipants.filter(
-    (participant) => participant.attendanceStatus !== null && LOCK_COUNTED_ATTENDANCE_STATUSES.has(participant.attendanceStatus),
-  ).length;
+  const { markedCount, rosterAdditionalStudy, rosterCount } = getSessionLockReadiness(detail.participants);
+  const allParticipantsMarked = participantMarkedCount === participantCount;
+  const attendanceTile =
+    !allParticipantsMarked
+      ? { hint: `${participantCount - participantMarkedCount} chưa điểm danh`, tone: "warning" as const }
+      : rosterCount === 0
+        ? { hint: "không có học sinh trong roster", tone: "neutral" as const }
+        : rosterAdditionalStudy.length > 0
+          ? { hint: `${rosterAdditionalStudy.length} học sinh roster đang là Học thêm`, tone: "warning" as const }
+          : { hint: "đủ roster", tone: "success" as const };
   const eligible = detail.participants.filter(
     (participant) => participant.attendanceStatus === "present" || participant.attendanceStatus === "additional_study",
   );
@@ -97,9 +96,11 @@ export function SessionDetailPage({
     ? { tone: "neutral" as const, value: "Đã khóa vĩnh viễn" }
     : detail.status !== "completed"
       ? { tone: "neutral" as const, value: "Chưa thể khóa" }
-      : markedCount < rosterCount
-        ? { tone: "warning" as const, value: `Bị chặn · thiếu ${rosterCount - markedCount} điểm danh` }
-        : { tone: "success" as const, value: "Sẵn sàng" };
+      : rosterCount === 0
+        ? { tone: "warning" as const, value: "Chưa thể khóa · không có học sinh trong roster" }
+        : markedCount < rosterCount
+          ? { tone: "warning" as const, value: `Bị chặn · thiếu ${rosterCount - markedCount} điểm danh` }
+          : { tone: "success" as const, value: "Sẵn sàng" };
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
@@ -139,9 +140,9 @@ export function SessionDetailPage({
           {showsAttendance ? (
             <WorkbenchTile
               label="Điểm danh"
-              tone={participantMarkedCount === participantCount ? "success" : "warning"}
+              tone={attendanceTile.tone}
               value={`${participantMarkedCount}/${participantCount}`}
-              hint={participantMarkedCount === participantCount ? "đủ roster" : `${participantCount - participantMarkedCount} chưa điểm danh`}
+              hint={attendanceTile.hint}
             />
           ) : null}
           {showsResults ? (
@@ -202,7 +203,7 @@ export function SessionDetailPage({
             />
           ) : null
         }
-        attendancePending={detail.lockedAt ? 0 : participantCount - participantMarkedCount}
+        attendancePending={detail.lockedAt ? 0 : participantCount - participantMarkedCount + rosterAdditionalStudy.length}
         results={
           showsResults ? (
             <SessionResultManagement
@@ -224,7 +225,11 @@ export function SessionDetailPage({
           canViewPayroll={canViewPayroll}
           lockedAt={detail.lockedAt}
           lockReason={detail.lockReason}
+          additionalStudyRosterNames={rosterAdditionalStudy.map((participant) =>
+            getParticipantDisplayName(participant, detail.participants, canViewStudents),
+          )}
           markedCount={markedCount}
+          participantCount={participantCount}
           rosterCount={rosterCount}
           sessionId={detail.id}
           sessionStatus={detail.status}

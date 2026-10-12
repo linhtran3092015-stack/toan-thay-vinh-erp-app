@@ -21,6 +21,8 @@ import type { SessionLockActionState } from "@/features/sessions/forms/result-ac
 import type { SessionStatus } from "@/features/sessions/read-models";
 
 interface SessionLockActionsProps {
+  /** Roster students marked only additional_study (already masked by the caller); named in the checklist. */
+  additionalStudyRosterNames?: string[];
   /** Shows the "Hoàn buổi" path after lock (permission session_ledger.reverse). */
   canReverseLedger?: boolean;
   /** Shows the payroll correction path after lock (permission payroll.view). */
@@ -29,6 +31,8 @@ interface SessionLockActionsProps {
   lockReason: string | null;
   /** Roster students with a lock-counted status (present or either absence); with `rosterCount` it drives the checklist. */
   markedCount?: number;
+  /** Everyone on the page, walk-ins included; with `rosterCount === 0` it means walk-ins only (no roster to lock). */
+  participantCount?: number;
   rosterCount?: number;
   sessionId: string;
   sessionStatus: SessionStatus;
@@ -40,11 +44,13 @@ interface SessionLockActionsProps {
  * known client-side. Results are not a lock condition in this system.
  */
 export function SessionLockActions({
+  additionalStudyRosterNames = [],
   canReverseLedger = false,
   canViewPayroll = false,
   lockedAt,
   lockReason,
   markedCount,
+  participantCount,
   rosterCount,
   sessionId,
   sessionStatus,
@@ -70,6 +76,8 @@ export function SessionLockActions({
 
   const isCompleted = sessionStatus === "completed";
   const isLockable = isCompleted && lockedAt === null;
+  // The lock RPC raises SESSION_HAS_NO_ELIGIBLE_ROSTER when only walk-ins are on the session.
+  const hasNoRoster = rosterCount === 0 && participantCount !== undefined && participantCount > 0;
   const attendanceKnown = markedCount !== undefined && rosterCount !== undefined && rosterCount > 0;
   const attendanceComplete = attendanceKnown ? markedCount >= rosterCount : undefined;
   const reasonError =
@@ -171,18 +179,21 @@ export function SessionLockActions({
     );
   }
 
-  const conditions: GuardedCondition[] = [
-    {
-      label: isCompleted ? "Buổi đã kết thúc" : "Buổi chưa kết thúc — cần hoàn thành buổi trước khi khóa",
-      state: isCompleted ? "met" : "unmet",
-    },
-    attendanceKnown
+  const attendanceCondition: GuardedCondition = hasNoRoster
+    ? {
+        label: "Buổi không có học sinh trong roster — chỉ có học sinh học thêm nên chưa thể khóa",
+        state: "unmet",
+      }
+    : attendanceKnown
       ? {
           label: attendanceComplete ? (
             `Điểm danh đủ ${markedCount}/${rosterCount} học sinh`
           ) : (
             <>
               Điểm danh đủ roster (có mặt hoặc vắng) — <strong>thiếu {rosterCount - markedCount}/{rosterCount}</strong>
+              {additionalStudyRosterNames.length > 0
+                ? `. ${formatNames(additionalStudyRosterNames)} đang là Học thêm — đổi sang Có mặt hoặc Vắng để khóa`
+                : null}
             </>
           ),
           state: attendanceComplete ? "met" : "unmet",
@@ -190,7 +201,14 @@ export function SessionLockActions({
       : {
           label: "Điểm danh đủ roster của buổi học (hệ thống kiểm tra khi xác nhận)",
           state: "unknown",
-        },
+        };
+
+  const conditions: GuardedCondition[] = [
+    {
+      label: isCompleted ? "Buổi đã kết thúc" : "Buổi chưa kết thúc — cần hoàn thành buổi trước khi khóa",
+      state: isCompleted ? "met" : "unmet",
+    },
+    attendanceCondition,
   ];
 
   if (!isLockable) {
@@ -218,6 +236,7 @@ export function SessionLockActions({
   }
 
   const blockedByAttendance = attendanceComplete === false;
+  const isBlocked = hasNoRoster || blockedByAttendance;
 
   return (
     <>
@@ -225,8 +244,14 @@ export function SessionLockActions({
         action={
           <Button
             aria-haspopup="dialog"
-            disabled={blockedByAttendance}
-            disabledReason={blockedByAttendance ? "Bật khi tất cả điều kiện khóa đạt." : undefined}
+            disabled={isBlocked}
+            disabledReason={
+              hasNoRoster
+                ? "Buổi không có học sinh trong roster nên chưa thể khóa."
+                : blockedByAttendance
+                  ? "Bật khi tất cả điều kiện khóa đạt."
+                  : undefined
+            }
             onClick={openConfirmation}
             ref={confirmationTriggerRef}
           >
@@ -235,7 +260,7 @@ export function SessionLockActions({
           </Button>
         }
         badge={
-          blockedByAttendance ? (
+          isBlocked ? (
             <Badge tone="neutral">Chưa thể khóa</Badge>
           ) : (
             <Badge tone="success">Đủ điều kiện</Badge>
@@ -256,7 +281,8 @@ export function SessionLockActions({
             </div>
           ) : (
             <p className="text-secondary text-text-muted">
-              Hãy hoàn tất điểm danh theo yêu cầu trước khi khóa. Kết quả và điểm kiểm tra không phải là điều kiện khóa.
+              {blockedByAttendance ? "Hãy hoàn tất điểm danh theo yêu cầu trước khi khóa. " : null}
+              Kết quả và điểm kiểm tra không phải là điều kiện khóa.
             </p>
           )
         }
@@ -385,4 +411,9 @@ function formatSessionStatus(status: SessionStatus): string {
   };
 
   return labels[status];
+}
+
+/** Names at most three students, then counts the rest. */
+function formatNames(names: string[]): string {
+  return names.length <= 3 ? names.join(", ") : `${names.slice(0, 3).join(", ")} và ${names.length - 3} học sinh khác`;
 }

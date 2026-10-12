@@ -16,11 +16,18 @@ import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { permissionDeniedMessage } from "@/lib/permissions/labels";
+interface AttendanceError {
+  code?: string;
+  message: string;
+}
+
 function createErrorState(
   message: string,
   fieldErrors?: AttendanceActionFieldErrors,
+  code?: string,
 ): AttendanceActionState {
   return {
+    ...(code ? { code } : {}),
     fieldErrors,
     message,
     status: "error",
@@ -28,12 +35,16 @@ function createErrorState(
 }
 
 async function getAttendancePermissionError():
-  Promise<string | null> {
+  Promise<AttendanceError | null> {
   const permissionResult =
     await getDatabasePermissions();
 
   if (!permissionResult.ok) {
-    return "Không thể xác minh quyền điểm danh. Vui lòng đăng nhập lại hoặc thử lại.";
+    return {
+      code: "ATTENDANCE_PERMISSION_CHECK_FAILED",
+      message:
+        "Không thể xác minh quyền điểm danh. Vui lòng đăng nhập lại hoặc thử lại.",
+    };
   }
 
   if (
@@ -41,7 +52,10 @@ async function getAttendancePermissionError():
       "attendance.mark",
     )
   ) {
-    return permissionDeniedMessage("attendance.mark");
+    return {
+      code: "ATTENDANCE_MARK_PERMISSION_DENIED",
+      message: permissionDeniedMessage("attendance.mark"),
+    };
   }
 
   return null;
@@ -65,9 +79,9 @@ function revalidateAttendanceRoutes(
   );
 }
 
-function getAttendanceRpcErrorMessage(
+function getAttendanceRpcError(
   message: string,
-): string {
+): AttendanceError {
   const knownMessages: Record<string, string> = {
     ATTENDANCE_LEARNING_MODE_INVALID:
       "Hình thức học thực tế không hợp lệ.",
@@ -132,11 +146,17 @@ function getAttendanceRpcErrorMessage(
     of Object.entries(knownMessages)
   ) {
     if (message.includes(databaseMessage)) {
-      return userMessage;
+      return {
+        code: databaseMessage,
+        message: userMessage,
+      };
     }
   }
 
-  return "Không thể cập nhật điểm danh. Dữ liệu chưa được thay đổi.";
+  return {
+    message:
+      "Không thể cập nhật điểm danh. Dữ liệu chưa được thay đổi.",
+  };
 }
 
 export async function markSessionAttendanceAction(
@@ -147,7 +167,9 @@ export async function markSessionAttendanceAction(
 
   if (permissionError) {
     return createErrorState(
-      permissionError,
+      permissionError.message,
+      undefined,
+      permissionError.code,
     );
   }
 
@@ -184,10 +206,13 @@ export async function markSessionAttendanceAction(
       );
 
     if (error) {
+      const rpcError =
+        getAttendanceRpcError(error.message);
+
       return createErrorState(
-        getAttendanceRpcErrorMessage(
-          error.message,
-        ),
+        rpcError.message,
+        undefined,
+        rpcError.code,
       );
     }
 
@@ -226,7 +251,9 @@ export async function updateSessionAttendanceAction(
 
   if (permissionError) {
     return createErrorState(
-      permissionError,
+      permissionError.message,
+      undefined,
+      permissionError.code,
     );
   }
 
@@ -263,10 +290,13 @@ export async function updateSessionAttendanceAction(
       );
 
     if (error) {
+      const rpcError =
+        getAttendanceRpcError(error.message);
+
       return createErrorState(
-        getAttendanceRpcErrorMessage(
-          error.message,
-        ),
+        rpcError.message,
+        undefined,
+        rpcError.code,
       );
     }
 

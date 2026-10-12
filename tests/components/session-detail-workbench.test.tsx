@@ -102,11 +102,57 @@ describe("Session workbench tiles and lock wiring (design 04)", () => {
       />,
     );
 
-    // Display tile still reports everyone on the page as marked…
-    expectTile("3/3", "đủ roster");
-    // …but the lock needs present or an absence for each roster student; the walk-in is not counted.
+    // Everyone on the page has a status, but the tile does not claim "đủ roster": Bình (roster) is only Học thêm.
+    // Changed from expectTile("3/3", "đủ roster") — review finding (a): the tile contradicted the blocked lock.
+    expectTile("3/3", "1 học sinh roster đang là Học thêm");
+    expect(screen.queryByText("· đủ roster")).not.toBeInTheDocument();
+    // The attendance tab keeps its pending marker for that student.
+    expect(screen.getByRole("tab", { name: /Đầu giờ · Điểm danh\s*1\s*việc tồn/ })).toBeInTheDocument();
+    // The lock needs present or an absence for each roster student; the walk-in is not counted.
     expectTile("Bị chặn · thiếu 1 điểm danh");
     expect(screen.getByText(/thiếu 1\/2/)).toBeInTheDocument();
+    expect(screen.getByText(/Bình đang là Học thêm — đổi sang Có mặt hoặc Vắng để khóa/)).toBeInTheDocument();
+    expect(screen.queryByText(/Vãng lai đang là Học thêm/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Khóa buổi học" })).toBeDisabled();
+  });
+
+  // Value: protects=the checklist names a roster student stuck on Học thêm without leaking identity to a role without students.view;
+  // fails_when=the page passes studentName regardless of canViewStudents; why_new=review finding (a) added names to the checklist;
+  // seam=none; no_claim=does not prove the attendance editor's own masking
+  it("masks the Học thêm roster student's name in the lock checklist without students.view", () => {
+    render(
+      <SessionDetailPage
+        {...permissions}
+        canViewStudents={false}
+        detail={buildDetail([
+          { ...participant, attendanceId: "att-a", attendanceStatus: "present", studentId: "a", studentName: "An" },
+          { ...participant, attendanceId: "att-b", attendanceStatus: "additional_study", studentId: "b", studentName: "Bình" },
+        ])}
+      />,
+    );
+
+    expect(screen.getByText(/Học viên 2 đang là Học thêm/)).toBeInTheDocument();
+    expect(screen.queryByText(/Bình/)).not.toBeInTheDocument();
+  });
+
+  // Value: protects=a session with only walk-ins (empty roster) is shown as not lockable, matching SESSION_HAS_NO_ELIGIBLE_ROSTER;
+  // fails_when=rosterCount 0 falls through to "Sẵn sàng" or the button stays enabled; why_new=review finding (b);
+  // seam=none; no_claim=does not prove the server's roster resolution (resolve_class_session_rosters)
+  it("blocks the lock when only walk-ins are on the session", () => {
+    render(
+      <SessionDetailPage
+        {...permissions}
+        detail={buildDetail([
+          { ...participant, attendanceId: "att-w", attendanceStatus: "additional_study", enrollmentClassId: null, enrollmentId: null, studentId: "w", studentName: "Vãng lai" },
+        ])}
+      />,
+    );
+
+    expectTile("1/1", "không có học sinh trong roster");
+    expectTile("Chưa thể khóa · không có học sinh trong roster");
+    expect(screen.queryByText("Sẵn sàng")).not.toBeInTheDocument();
+    expect(screen.getByText("Buổi không có học sinh trong roster — chỉ có học sinh học thêm nên chưa thể khóa")).toBeInTheDocument();
+    expect(screen.getByText("Buổi không có học sinh trong roster nên chưa thể khóa.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Khóa buổi học" })).toBeDisabled();
   });
 });

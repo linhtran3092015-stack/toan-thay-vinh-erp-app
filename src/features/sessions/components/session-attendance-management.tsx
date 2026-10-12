@@ -40,10 +40,12 @@ import type {
   SessionAttendanceStatus,
   SessionParticipantReadModel,
 } from "@/features/sessions/detail-read-models";
-import type {
-  AttendanceActionState,
-  AttendanceLearningMode,
+import {
+  ATTENDANCE_SESSION_WIDE_ERROR_CODES,
+  type AttendanceActionState,
+  type AttendanceLearningMode,
 } from "@/features/sessions/forms/attendance-action-types";
+import { getParticipantDisplayName, getSessionLockReadiness } from "@/features/sessions/lock-readiness";
 import type {
   SessionLearningMode,
   SessionStatus,
@@ -234,9 +236,13 @@ export function SessionAttendanceManagement({
   const unmarkedParticipants = visibleParticipants.filter((participant) => !participant.attendanceId);
   const isRosterNarrowed = visibleParticipants.length !== participants.length;
 
+  /** Roster students marked only Học thêm: attendance looks complete, but the lock still refuses them. */
+  const rosterAdditionalStudyCount = getSessionLockReadiness(participants).rosterAdditionalStudy.length;
+
   /**
-   * Marks every unmarked student present, one existing action per student. A failed save does not
-   * stop the rest; failures are collected and reported together at the end.
+   * Marks every unmarked student present, one existing action per student. A per-student failure does
+   * not stop the rest; failures are collected and reported together at the end. A session-wide failure
+   * (locked, cancelled, signed out, no permission…) would fail every remaining student, so it stops the batch.
    */
   const markAllPresent = () => {
     if (!canEdit || isPending || unmarkedParticipants.length === 0) return;
@@ -257,6 +263,14 @@ export function SessionAttendanceManagement({
           });
           if (result.status === "success") {
             saved += 1;
+          } else if (result.code !== undefined && ATTENDANCE_SESSION_WIDE_ERROR_CODES.has(result.code)) {
+            setActionState({
+              code: result.code,
+              status: "error",
+              message: `Đã ghi có mặt cho ${saved} học sinh; dừng, không ghi tiếp ${unmarkedParticipants.length - saved} học sinh còn lại vì: ${result.message}`,
+            });
+            router.refresh();
+            return;
           } else {
             failureMessage = result.message;
           }
@@ -264,11 +278,7 @@ export function SessionAttendanceManagement({
           failureMessage = "Chưa lưu được điểm danh. Vui lòng thử lại.";
         }
         if (failureMessage !== null) {
-          failedNames.push(
-            canViewStudents
-              ? participant.studentName ?? participant.studentCode ?? `Học viên ${participants.indexOf(participant) + 1}`
-              : `Học viên ${participants.indexOf(participant) + 1}`,
-          );
+          failedNames.push(getParticipantDisplayName(participant, participants, canViewStudents));
           firstFailureMessage ??= failureMessage;
         }
       }
@@ -475,6 +485,10 @@ export function SessionAttendanceManagement({
               </Button>
             ) : attendanceSummary.unmarked > 0 ? (
               <p className="mt-2 text-secondary text-text-muted">Còn {attendanceSummary.unmarked} chưa điểm danh ngoài bộ lọc.</p>
+            ) : rosterAdditionalStudyCount > 0 ? (
+              <p className="mt-2 text-secondary text-warning">
+                {rosterAdditionalStudyCount} học sinh roster đang là Học thêm — đổi sang Có mặt hoặc Vắng để khóa buổi.
+              </p>
             ) : (
               <p className="mt-2 text-secondary text-text-muted">Đã điểm danh đủ. Chuyển sang Kết quả.</p>
             )}

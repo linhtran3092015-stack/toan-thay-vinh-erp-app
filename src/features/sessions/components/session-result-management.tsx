@@ -451,7 +451,7 @@ function ResultTableRow({
         {!eligible ? (
           <span className="text-text-muted">Không nhập cho học sinh vắng</span>
         ) : missing ? (
-          <span className="font-medium text-danger">Bắt buộc: học sinh có mặt phải có kết quả</span>
+          <span className="font-medium text-warning">Chưa nhập kết quả</span>
         ) : (
           participant.resultComment ?? <span className="text-text-subtle">—</span>
         )}
@@ -515,7 +515,7 @@ function ResultRecord({
         <span>Điểm vở <strong className="font-semibold tabular-nums">{eligible ? formatScore(participant.notebookScore, "Chưa nhập") : "—"}</strong></span>
       </div>
       <div className="mt-1.5 text-secondary text-text-muted">
-        {!eligible ? <p>Không được nhập kết quả</p> : eligible && participant.resultId === null ? <p className="font-medium text-danger">Bắt buộc: học sinh có mặt phải có kết quả</p> : <p>{participant.resultComment ?? "Chưa có nhận xét"}</p>}
+        {!eligible ? <p>Không được nhập kết quả</p> : eligible && participant.resultId === null ? <p className="font-medium text-warning">Chưa nhập kết quả</p> : <p>{participant.resultComment ?? "Chưa có nhận xét"}</p>}
       </div>
       <div className="mt-2"><ResultAction canEdit={canEdit} eligible={eligible} fullWidth isPending={isPending} onEdit={onEdit} participant={participant} /></div>
     </article>

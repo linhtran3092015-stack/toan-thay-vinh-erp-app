@@ -6,7 +6,7 @@ import { TabPanel, Tabs, type TabItem } from "@/components/ui/tabs";
 
 interface SessionWorkspaceProps {
   attendance: ReactNode;
-  /** Students still without attendance; shown as a pending dot on the tab. */
+  /** Students still needing attendance (unmarked, or roster students only marked Học thêm); shown as a pending dot on the tab. */
   attendancePending?: number;
   results: ReactNode;
   /** Eligible students still without a result. */
