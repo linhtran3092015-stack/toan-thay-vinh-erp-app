@@ -2,6 +2,11 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.6.22.1] - 2026-10-13
+
+### Fixed
+- Danh sách học sinh (`/students`) và hồ sơ của học sinh đã nghỉ không còn báo lỗi dữ liệu. Trước đây, chỉ cần một học sinh được kết thúc ghi danh bằng "Nghỉ học" (trạng thái `withdrawn`, có từ 0.6.16.0) là toàn bộ danh sách học sinh báo lỗi với mọi nhân viên.
+
 ## [0.6.22.0] - 2026-10-13
 
 Sửa lỗi chặn vận hành buổi học, trợ giảng được bắt đầu/kết thúc buổi.
