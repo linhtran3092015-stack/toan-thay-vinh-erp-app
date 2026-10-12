@@ -22,6 +22,11 @@ const PUBLIC_PATHS = new Set([
 ]);
 
 function isPublicPath(pathname: string): boolean {
+  // Component preview routes exist only outside production builds.
+  if (process.env.NODE_ENV !== "production" && pathname.startsWith("/dev/")) {
+    return true;
+  }
+
   return PUBLIC_PATHS.has(pathname) || pathname.startsWith("/coaching/form/") || pathname === "/site" || /^\/site\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(pathname);
 }
 

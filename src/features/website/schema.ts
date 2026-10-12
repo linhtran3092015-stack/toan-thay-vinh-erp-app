@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const palettePresets = { terracotta: "#B83C30", navy: "#24348B", mint: "#16794C", ocean: "#215FC7", plum: "#795096" } as const;
+export const palettePresets = { moss: "#4F6B5A", terracotta: "#B83C30", navy: "#24348B", mint: "#16794C", ocean: "#215FC7", plum: "#795096" } as const;
 export type Palette = keyof typeof palettePresets;
 const webUrl = z.string().trim().max(2000).refine((value) => {
   if (!value) return true;
@@ -12,7 +12,7 @@ export const brandingSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Mã màu gồm # và 6 ký tự hex."),
   logo: imageSource,
   favicon: imageSource,
-  appPalette: z.enum(["terracotta", "navy", "mint", "ocean", "plum"]),
+  appPalette: z.enum(["moss", "terracotta", "navy", "mint", "ocean", "plum"]),
   rounded: z.boolean(),
 }).strict();
 export const blockSchema = z.object({
@@ -53,7 +53,7 @@ export type Website = z.infer<typeof websiteSchema>;
 export type Branding = z.infer<typeof brandingSchema>;
 export type SitePage = z.infer<typeof pageSchema>;
 export type SiteBlock = z.infer<typeof blockSchema>;
-export const defaultBranding: Branding = { description: "", color: "#B83C30", logo: "", favicon: "", appPalette: "terracotta", rounded: true };
+export const defaultBranding: Branding = { description: "", color: "#B83C30", logo: "", favicon: "", appPalette: "moss", rounded: true };
 export function createPage(id = "home", slug = "trang-chu"): SitePage {
   return { id, slug, title: "Trang chủ", inMenu: true, blocks: [{ id: `${id}-hero`, type: "hero", title: "Cùng con học Toán vững vàng", body: "Giới thiệu phương pháp giảng dạy và thông tin trung tâm của bạn.", image: "", linkLabel: "", linkUrl: "" }] };
 }

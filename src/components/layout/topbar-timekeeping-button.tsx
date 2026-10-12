@@ -14,7 +14,7 @@ interface TopbarTimekeepingButtonProps {
 }
 
 const pillClassName =
-  "inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-action-primary px-2.5 text-xs font-semibold text-white transition-colors hover:bg-action-primary-hover hover:text-white focus:text-white focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring sm:px-3 sm:text-sm";
+  "inline-flex h-10 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-action-primary px-3 text-control font-medium text-white shadow-[var(--action-primary-shadow)] hover:bg-action-primary-hover hover:text-white focus:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus sm:px-[14px]";
 
 export function TopbarTimekeepingButton({
   attendancePolicy,
@@ -29,7 +29,7 @@ export function TopbarTimekeepingButton({
   const content = (
     <>
       <Clock aria-hidden="true" className="h-4 w-4 shrink-0 text-white" strokeWidth={2} />
-      <span className="text-white font-semibold">{label}</span>
+      <span className="sr-only font-semibold text-white sm:not-sr-only">{label}</span>
       {hasOpenEntry ? (
         <span
           aria-hidden="true"

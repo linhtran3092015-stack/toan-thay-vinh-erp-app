@@ -27,7 +27,7 @@ export function PageHeader({
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-page-title font-bold text-text-strong">{title}</h1>
+          <h1 className="text-page-title font-semibold tracking-[-0.01em] text-text-strong">{title}</h1>
           {context}
         </div>
         {children}

@@ -6,7 +6,8 @@ import type { ReactNode } from "react";
 
 import {
   getActiveNavigationDomain,
-  getVisibleNavigationDomains,
+  getNavigationBreadcrumb,
+  getVisibleNavigationGroups,
 } from "@/config/navigation";
 import { ModuleNavigation } from "@/components/layout/module-navigation";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -27,9 +28,15 @@ interface AppShellProps {
   openOfflineEntryId?: string | null;
   openTimekeepingEntryId?: string | null;
   permissions: readonly PermissionCode[];
+  /** Dev previews only: pretend the shell is on this route. */
+  previewPathname?: string;
   unreadNotificationCount: number;
 }
 
+/**
+ * Shell (design 01): 240px grouped sidebar from xl, 72px rail on tablet,
+ * drawer on mobile; 64px topbar; module strip only for multi-module domains.
+ */
 export function AppShell({
   authUser,
   attendancePolicy,
@@ -39,14 +46,18 @@ export function AppShell({
   hasOpenTimekeepingEntry = false,
   openTimekeepingEntryId = null,
   permissions,
+  previewPathname,
   unreadNotificationCount,
 }: AppShellProps) {
-  const pathname = usePathname();
+  const routePathname = usePathname();
+  const pathname = previewPathname ?? routePathname;
   const [mobileNavPath, setMobileNavPath] = useState<string | null>(null);
   const isMobileNavOpen = mobileNavPath === pathname;
   const mobileMenuTriggerRef = useRef<HTMLButtonElement>(null);
-  const visibleDomains = getVisibleNavigationDomains(permissions);
+  const visibleGroups = getVisibleNavigationGroups(permissions);
+  const visibleDomains = visibleGroups.flatMap((group) => group.domains);
   const activeDomain = getActiveNavigationDomain(pathname, visibleDomains);
+  const breadcrumb = getNavigationBreadcrumb(pathname, visibleDomains);
 
   if (mobileNavPath !== null && mobileNavPath !== pathname) {
     // Forget the old open menu so browser Back cannot reopen it later.
@@ -66,14 +77,16 @@ export function AppShell({
       <Sidebar
         activeDomainKey={activeDomain?.key}
         centerDisplayName={centerDisplayName}
-        domains={visibleDomains}
+        groups={visibleGroups}
         isMobileOpen={isMobileNavOpen}
         onClose={closeMobileNavigation}
+        pathname={pathname}
       />
 
-      <div className="min-h-screen md:pl-[72px] xl:pl-[var(--sidebar-width)]">
+      <div className="min-h-screen md:pl-[var(--rail-w)] xl:pl-[var(--sidebar-w)]">
         <Topbar
           attendancePolicy={attendancePolicy}
+          breadcrumb={breadcrumb}
           canCheckTimekeeping={canCheckTimekeeping}
           hasOpenTimekeepingEntry={hasOpenTimekeepingEntry}
           openTimekeepingEntryId={openTimekeepingEntryId}
@@ -82,9 +95,9 @@ export function AppShell({
           unreadNotificationCount={unreadNotificationCount}
           user={authUser}
         />
-        <ModuleNavigation domain={activeDomain} />
+        <ModuleNavigation domain={activeDomain} pathname={pathname} />
 
-        <main className="mx-auto max-w-[1600px] px-4 py-4 sm:px-5 lg:px-6">
+        <main className="mx-auto max-w-[1600px] px-4 py-4 md:px-5 md:py-5 lg:p-6">
           {children}
         </main>
       </div>

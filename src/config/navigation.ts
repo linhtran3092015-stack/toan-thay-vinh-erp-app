@@ -1,10 +1,15 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  BookOpen,
   BriefcaseBusiness,
+  CalendarDays,
+  ChartColumn,
+  ClipboardCheck,
+  FileInput,
   GraduationCap,
-  LayoutDashboard,
+  HeartHandshake,
+  House,
   Settings,
-  UsersRound,
   WalletCards,
 } from "lucide-react";
 
@@ -26,245 +31,335 @@ export interface NavigationDomain {
   label: string;
 }
 
+export type NavigationGroupPlacement = "main" | "footer";
+
+export interface NavigationGroup {
+  domains: readonly NavigationDomain[];
+  key: string;
+  /** Group title shown in the sidebar (12/600 subtle). Footer groups have no title. */
+  label: string;
+  placement: NavigationGroupPlacement;
+}
+
+const financeDomain: NavigationDomain = {
+  icon: WalletCards,
+  items: [
+    {
+      available: true,
+      href: "/finance",
+      label: "Học phí & Công nợ",
+      permission: "finance.view",
+    },
+    {
+      available: true,
+      href: "/finance/payment-requests",
+      label: "Yêu cầu thanh toán",
+      permission: "payments.view",
+    },
+    {
+      available: true,
+      href: "/finance/sepay",
+      label: "Giao dịch SePay",
+      permission: "sepay.view",
+    },
+    {
+      available: true,
+      href: "/finance/orders",
+      label: "Đơn hàng",
+      permission: "finance.view",
+    },
+    {
+      available: true,
+      href: "/finance/session-ledger",
+      label: "Sổ cái số buổi",
+      permission: "session_ledger.view",
+    },
+    {
+      available: true,
+      href: "/finance/tuition-periods",
+      label: "Kỳ thu học phí",
+      permission: "tuition_periods.view",
+    },
+    {
+      available: true,
+      href: "/finance/receiving-accounts",
+      label: "Tài khoản nhận SePay",
+      permission: "settings.sepay_receiving_accounts.manage",
+    },
+  ],
+  key: "finance",
+  label: "Tài chính",
+};
+
+const peopleDomain: NavigationDomain = {
+  icon: BriefcaseBusiness,
+  items: [
+    {
+      available: true,
+      href: "/staff",
+      label: "Nhân sự",
+      permission: "staff.view",
+    },
+    {
+      available: true,
+      href: "/timekeeping",
+      label: "Chấm công",
+      permission: "timekeeping.view",
+    },
+    {
+      available: true,
+      href: "/payroll/dashboard",
+      label: "Tổng quan lương",
+      permission: "payroll.dashboard.view",
+    },
+    {
+      available: true,
+      href: "/payroll",
+      label: "Bảng lương",
+      permission: "payroll.view",
+    },
+    {
+      available: true,
+      href: "/advances",
+      label: "Tạm ứng lương",
+      permission: "advances.view",
+    },
+    {
+      available: true,
+      href: "/grading-credits",
+      label: "Tín chỉ chấm bài",
+      permission: "grading_credits.view",
+    },
+    {
+      available: true,
+      href: "/commissions",
+      label: "Hoa hồng",
+      permission: "commissions.view",
+    },
+  ],
+  key: "people",
+  label: "Nhân sự",
+};
+
+const careDomain: NavigationDomain = {
+  icon: HeartHandshake,
+  items: [
+    {
+      available: true,
+      href: "/crm",
+      label: "CRM",
+      permission: "crm.view",
+    },
+    {
+      available: true,
+      href: "/student-care",
+      label: "Chăm sóc học sinh",
+      permission: "student_care.view",
+    },
+    {
+      available: true,
+      href: "/coaching",
+      label: "Coaching",
+      permission: "coaching.view",
+    },
+    {
+      available: true,
+      href: "/parent-messages",
+      label: "Tin nhắn phụ huynh",
+      permission: "attendance.view",
+    },
+  ],
+  key: "care",
+  label: "Chăm sóc & Tuyển sinh",
+};
+
 /**
- * This configuration remains the shell's route order and visibility source.
- * Domains only group existing routes; they do not grant access or introduce
- * parent landing pages.
+ * Sidebar structure from the 12/10/2026 handoff (section 1b): daily entities
+ * sit flat under "Việc chính", office work is grouped under "Vận hành", and
+ * imports/settings sit in the sidebar footer. Routes and permission codes are
+ * unchanged; only the grouping moved. Domains never grant access or introduce
+ * parent landing pages. A domain with one module renders no module strip.
  */
-export const navigationDomains: readonly NavigationDomain[] = [
+export const navigationGroups: readonly NavigationGroup[] = [
   {
-    icon: LayoutDashboard,
-    items: [
+    key: "primary",
+    label: "Việc chính",
+    placement: "main",
+    domains: [
       {
-        available: true,
-        href: "/",
-        label: "Tổng quan",
-        permission: "dashboard.view",
-      },
-    ],
-    key: "dashboard",
-    label: "Tổng quan",
-  },
-  {
-    icon: GraduationCap,
-    items: [
-      {
-        available: true,
-        href: "/students",
-        label: "Học viên",
-        permission: "students.view",
+        icon: House,
+        items: [
+          {
+            available: true,
+            href: "/",
+            label: "Hôm nay",
+            permission: "dashboard.view",
+          },
+        ],
+        key: "today",
+        label: "Hôm nay",
       },
       {
-        available: true,
-        href: "/classes",
+        icon: GraduationCap,
+        items: [
+          {
+            available: true,
+            href: "/students",
+            label: "Học sinh",
+            permission: "students.view",
+          },
+        ],
+        key: "students",
+        label: "Học sinh",
+      },
+      {
+        icon: BookOpen,
+        items: [
+          {
+            available: true,
+            href: "/classes",
+            label: "Lớp học",
+            permission: "classes.view",
+          },
+        ],
+        key: "classes",
         label: "Lớp học",
-        permission: "classes.view",
       },
       {
-        available: true,
-        href: "/sessions",
+        icon: CalendarDays,
+        items: [
+          {
+            available: true,
+            href: "/sessions",
+            label: "Buổi học",
+            permission: "sessions.view",
+          },
+        ],
+        key: "sessions",
         label: "Buổi học",
-        permission: "sessions.view",
       },
       {
-        available: true,
-        href: "/parent-messages",
-        label: "Tin nhắn phụ huynh",
-        permission: "attendance.view",
-      },
-      {
-        available: true,
-        href: "/learning-results",
+        icon: ClipboardCheck,
+        items: [
+          {
+            available: true,
+            href: "/learning-results",
+            label: "Kết quả học tập",
+            permission: "results.view",
+          },
+        ],
+        key: "results",
         label: "Kết quả học tập",
-        permission: "results.view",
-      },
-      {
-        available: true,
-        href: "/coaching",
-        label: "Coaching",
-        permission: "coaching.view",
-      },
-      {
-        available: true,
-        href: "/student-care",
-        label: "Chăm sóc học viên",
-        permission: "student_care.view",
       },
     ],
-    key: "academics",
-    label: "Học vụ",
   },
   {
-    icon: UsersRound,
-    items: [
+    key: "operations",
+    label: "Vận hành",
+    placement: "main",
+    domains: [
+      financeDomain,
+      peopleDomain,
+      careDomain,
       {
-        available: true,
-        href: "/crm",
-        label: "CRM",
-        permission: "crm.view",
+        icon: ChartColumn,
+        items: [
+          {
+            available: true,
+            href: "/reports",
+            label: "Báo cáo & Xuất dữ liệu",
+            permission: "reports.view",
+          },
+        ],
+        key: "reports",
+        label: "Báo cáo",
       },
     ],
-    key: "admissions",
-    label: "Tuyển sinh",
   },
   {
-    icon: WalletCards,
-    items: [
+    key: "footer",
+    label: "",
+    placement: "footer",
+    domains: [
       {
-        available: true,
-        href: "/finance",
-        label: "Học phí & Công nợ",
-        permission: "finance.view",
+        icon: FileInput,
+        items: [
+          {
+            available: true,
+            href: "/imports/students",
+            label: "Import học sinh",
+            permission: "imports.students",
+          },
+          {
+            available: true,
+            href: "/imports/session-balances",
+            label: "Import số dư buổi",
+            permission: "imports.session_balances",
+          },
+          {
+            available: true,
+            href: "/imports/classes",
+            label: "Import lớp & lịch học",
+            permission: "imports.classes",
+          },
+          {
+            available: true,
+            href: "/imports/enrollments",
+            label: "Import ghi danh",
+            permission: "imports.enrollments",
+          },
+        ],
+        key: "imports",
+        label: "Nhập dữ liệu",
       },
       {
-        available: true,
-        href: "/finance/payment-requests",
-        label: "Yêu cầu thanh toán",
-        permission: "payments.view",
-      },
-      {
-        available: true,
-        href: "/finance/sepay",
-        label: "Giao dịch SePay",
-        permission: "sepay.view",
-      },
-      {
-        available: true,
-        href: "/finance/orders",
-        label: "Đơn hàng",
-        permission: "finance.view",
-      },
-      {
-        available: true,
-        href: "/finance/session-ledger",
-        label: "Sổ cái số buổi",
-        permission: "session_ledger.view",
-      },
-      {
-        available: true,
-        href: "/finance/tuition-periods",
-        label: "Kỳ thu học phí",
-        permission: "tuition_periods.view",
-      },
-      {
-        available: true,
-        href: "/finance/receiving-accounts",
-        label: "Tài khoản nhận SePay",
-        permission: "settings.sepay_receiving_accounts.manage",
-      },
-    ],
-    key: "finance",
-    label: "Tài chính",
-  },
-  {
-    icon: BriefcaseBusiness,
-    items: [
-      {
-        available: true,
-        href: "/staff",
-        label: "Nhân sự",
-        permission: "staff.view",
-      },
-      {
-        available: true,
-        href: "/timekeeping",
-        label: "Chấm công",
-        permission: "timekeeping.view",
-      },
-      {
-        available: true,
-        href: "/payroll/dashboard",
-        label: "Tổng quan lương",
-        permission: "payroll.dashboard.view",
-      },
-      {
-        available: true,
-        href: "/payroll",
-        label: "Bảng lương",
-        permission: "payroll.view",
-      },
-      {
-        available: true,
-        href: "/advances",
-        label: "Tạm ứng lương",
-        permission: "advances.view",
-      },
-      {
-        available: true,
-        href: "/grading-credits",
-        label: "Tín chỉ chấm bài",
-        permission: "grading_credits.view",
-      },
-      {
-        available: true,
-        href: "/commissions",
-        label: "Hoa hồng",
-        permission: "commissions.view",
+        icon: Settings,
+        items: [
+          {
+            available: true,
+            href: "/settings",
+            label: "Cài đặt hệ thống",
+            permission: "staff.roles.view",
+          },
+          {
+            available: true,
+            href: "/notifications",
+            label: "Thông báo",
+            permission: "notifications.view",
+          },
+          {
+            activeMatchPaths: ["/settings/audit-logs"],
+            available: true,
+            href: "/audit",
+            label: "Nhật ký hệ thống",
+            permission: "audit.view",
+          },
+        ],
+        key: "settings",
+        label: "Cài đặt",
       },
     ],
-    key: "people",
-    label: "Nhân sự",
-  },
-  {
-    icon: Settings,
-    items: [
-      {
-        available: true,
-        href: "/imports/students",
-        label: "Import học viên",
-        permission: "imports.students",
-      },
-      {
-        available: true,
-        href: "/imports/session-balances",
-        label: "Import số dư buổi",
-        permission: "imports.session_balances",
-      },
-      {
-        available: true,
-        href: "/imports/classes",
-        label: "Import lớp & lịch học",
-        permission: "imports.classes",
-      },
-      {
-        available: true,
-        href: "/imports/enrollments",
-        label: "Import ghi danh",
-        permission: "imports.enrollments",
-      },
-      {
-        available: true,
-        href: "/reports",
-        label: "Báo cáo & Xuất dữ liệu",
-        permission: "reports.view",
-      },
-      {
-        available: true,
-        href: "/settings",
-        label: "Cài đặt hệ thống",
-        permission: "staff.roles.view",
-      },
-      {
-        activeMatchPaths: ["/settings/audit-logs"],
-        available: true,
-        href: "/audit",
-        label: "Nhật ký hệ thống",
-        permission: "audit.view",
-      },
-    ],
-    key: "administration",
-    label: "Quản trị",
   },
 ];
+
+/** Flat domain list in sidebar order; kept for callers that predate groups. */
+export const navigationDomains: readonly NavigationDomain[] = navigationGroups.flatMap(
+  (group) => group.domains,
+);
 
 export interface VisibleNavigationDomain extends Omit<NavigationDomain, "items"> {
   items: readonly NavigationItem[];
 }
 
-export function getVisibleNavigationDomains(
+export interface VisibleNavigationGroup extends Omit<NavigationGroup, "domains"> {
+  domains: readonly VisibleNavigationDomain[];
+}
+
+function filterDomains(
+  domains: readonly NavigationDomain[],
   permissions: readonly PermissionCode[],
 ): readonly VisibleNavigationDomain[] {
-  return navigationDomains.flatMap((domain) => {
+  return domains.flatMap((domain) => {
     const items = domain.items.filter(
       (item) =>
         item.available &&
@@ -272,6 +367,23 @@ export function getVisibleNavigationDomains(
     );
 
     return items.length > 0 ? [{ ...domain, items }] : [];
+  });
+}
+
+export function getVisibleNavigationDomains(
+  permissions: readonly PermissionCode[],
+): readonly VisibleNavigationDomain[] {
+  return filterDomains(navigationDomains, permissions);
+}
+
+/** Groups with no permission-visible domain disappear together with their title. */
+export function getVisibleNavigationGroups(
+  permissions: readonly PermissionCode[],
+): readonly VisibleNavigationGroup[] {
+  return navigationGroups.flatMap((group) => {
+    const domains = filterDomains(group.domains, permissions);
+
+    return domains.length > 0 ? [{ ...group, domains }] : [];
   });
 }
 
@@ -322,4 +434,32 @@ export function getActiveNavigationItem(
     .map((item) => ({ item, matchLength: getNavigationItemMatchLength(item, pathname) }))
     .filter((match) => match.matchLength > 0)
     .sort((left, right) => right.matchLength - left.matchLength)[0]?.item;
+}
+
+export interface NavigationBreadcrumb {
+  /** Present only when the domain holds several modules (a module strip exists). */
+  domain?: { href: string; label: string };
+  item?: { href: string; label: string };
+}
+
+/** Real-route breadcrumb for the topbar: domain / module. Records are added by pages. */
+export function getNavigationBreadcrumb(
+  pathname: string,
+  domains: readonly VisibleNavigationDomain[],
+): NavigationBreadcrumb {
+  const domain = getActiveNavigationDomain(pathname, domains);
+
+  if (!domain) {
+    return {};
+  }
+
+  const item = getActiveNavigationItem(domain.items, pathname);
+
+  return {
+    domain:
+      domain.items.length > 1
+        ? { href: domain.items[0].href, label: domain.label }
+        : undefined,
+    item: item ? { href: item.href, label: item.label } : undefined,
+  };
 }

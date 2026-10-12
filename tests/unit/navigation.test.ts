@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   getActiveNavigationDomain,
   getActiveNavigationItem,
+  getNavigationBreadcrumb,
   getVisibleNavigationDomains,
+  getVisibleNavigationGroups,
 } from "@/config/navigation";
 
 describe("redesigned shell navigation", () => {
@@ -19,6 +21,7 @@ describe("redesigned shell navigation", () => {
     "payments.view",
     "sepay.view",
     "session_ledger.view",
+    "tuition_periods.view",
     "staff.view",
     "timekeeping.view",
     "payroll.view",
@@ -37,26 +40,62 @@ describe("redesigned shell navigation", () => {
   it("hides domains without a permission-visible child route", () => {
     const domains = getVisibleNavigationDomains(["sessions.view"]);
 
-    expect(domains.map((domain) => domain.key)).toEqual(["academics"]);
+    expect(domains.map((domain) => domain.key)).toEqual(["sessions"]);
     expect(domains[0]?.items.map((item) => item.href)).toEqual(["/sessions"]);
   });
 
   it("uses the first visible existing module when earlier modules are unavailable", () => {
-    const domains = getVisibleNavigationDomains(["sessions.view"]);
-    const academics = domains.find((domain) => domain.key === "academics");
+    const domains = getVisibleNavigationDomains(["sepay.view"]);
+    const finance = domains.find((domain) => domain.key === "finance");
 
-    expect(academics?.items[0]?.href).toBe("/sessions");
+    expect(finance?.items[0]?.href).toBe("/finance/sepay");
+  });
+
+  it("groups daily entities flat under Việc chính and office work under Vận hành", () => {
+    const groups = getVisibleNavigationGroups(ownerPermissions);
+
+    expect(groups.map((group) => group.key)).toEqual(["primary", "operations", "footer"]);
+    expect(groups[0]?.domains.map((domain) => domain.items.map((item) => item.href))).toEqual([
+      ["/"],
+      ["/students"],
+      ["/classes"],
+      ["/sessions"],
+      ["/learning-results"],
+    ]);
+    expect(groups[1]?.domains.map((domain) => domain.key)).toEqual(["finance", "people", "care", "reports"]);
+    expect(groups[2]?.domains.map((domain) => domain.key)).toEqual(["imports", "settings"]);
+  });
+
+  it("hides a whole group, title included, when no domain in it is visible", () => {
+    const groups = getVisibleNavigationGroups(["sessions.view", "timekeeping.view"]);
+
+    expect(groups.map((group) => group.key)).toEqual(["primary", "operations"]);
+    expect(groups[1]?.domains.map((domain) => domain.key)).toEqual(["people"]);
+  });
+
+  it("builds a real-route breadcrumb: domain only when a module strip exists", () => {
+    const domains = getVisibleNavigationDomains(ownerPermissions);
+
+    expect(getNavigationBreadcrumb("/finance/tuition-periods/abc", domains)).toEqual({
+      domain: { href: "/finance", label: "Tài chính" },
+      item: { href: "/finance/tuition-periods", label: "Kỳ thu học phí" },
+    });
+    expect(getNavigationBreadcrumb("/classes/123", domains)).toEqual({
+      domain: undefined,
+      item: { href: "/classes", label: "Lớp học" },
+    });
+    expect(getNavigationBreadcrumb("/unknown", domains)).toEqual({});
   });
 
   it("keeps nested operational routes in their owning module", () => {
     const domains = getVisibleNavigationDomains(ownerPermissions);
-    const academics = getActiveNavigationDomain("/classes/academic-years", domains);
+    const classes = getActiveNavigationDomain("/classes/academic-years", domains);
     const classesModule = getActiveNavigationItem(
-      academics?.items ?? [],
+      classes?.items ?? [],
       "/classes/academic-years",
     );
 
-    expect(academics?.key).toBe("academics");
+    expect(classes?.key).toBe("classes");
     expect(classesModule?.href).toBe("/classes");
   });
 
@@ -83,21 +122,21 @@ describe("redesigned shell navigation", () => {
 
   it("maps the existing settings audit-log route to the audit module", () => {
     const domains = getVisibleNavigationDomains(ownerPermissions);
-    const administration = getActiveNavigationDomain("/settings/audit-logs", domains);
+    const settings = getActiveNavigationDomain("/settings/audit-logs", domains);
     const auditModule = getActiveNavigationItem(
-      administration?.items ?? [],
+      settings?.items ?? [],
       "/settings/audit-logs",
     );
 
-    expect(administration?.key).toBe("administration");
+    expect(settings?.key).toBe("settings");
     expect(auditModule?.href).toBe("/audit");
   });
 
   it("keeps settings child routes and trailing-slash module routes active", () => {
     const domains = getVisibleNavigationDomains(ownerPermissions);
-    const administration = getActiveNavigationDomain("/settings/users", domains);
+    const settings = getActiveNavigationDomain("/settings/users", domains);
     const settingsModule = getActiveNavigationItem(
-      administration?.items ?? [],
+      settings?.items ?? [],
       "/settings/users",
     );
     const finance = getActiveNavigationDomain(

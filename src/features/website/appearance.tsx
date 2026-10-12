@@ -30,7 +30,7 @@ export function PersonalAppearance() {
     try { localStorage.setItem(storageKey, key); window.dispatchEvent(new Event("erp-appearance-change")); setMessage("Đã áp dụng trên trình duyệt này."); } catch { setMessage("Trình duyệt không cho lưu tùy chọn."); }
   }}><span aria-hidden="true" style={{ background: color }} className="inline-block h-5 w-5 rounded-full" />{paletteLabels[key as Palette]}</button>)}<button className="brand-choice" type="button" onClick={() => { try { localStorage.removeItem(storageKey); window.dispatchEvent(new Event("erp-appearance-change")); setMessage("Đã dùng giao diện mặc định của trung tâm."); } catch { setMessage("Không thể lưu tùy chọn."); } }}>Theo trung tâm</button></div><p role="status" className="mt-3 text-sm">{message}</p></section>;
 }
-export const paletteLabels: Record<Palette, string> = { terracotta: "Đỏ ấm", navy: "Xanh navy", mint: "Bạc hà", ocean: "Trời xanh", plum: "Tím mận" };
+export const paletteLabels: Record<Palette, string> = { moss: "Xanh rêu", terracotta: "Đất nung", navy: "Xanh navy", mint: "Bạc hà", ocean: "Trời xanh", plum: "Tím mận" };
 
 const BrandingContext = createContext<Branding | null>(null);
 export function BrandingProvider({ branding, children }: { branding: Branding; children: ReactNode }) { return <BrandingContext.Provider value={branding}><AppAppearance branding={branding} />{children}</BrandingContext.Provider>; }

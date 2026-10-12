@@ -24,7 +24,7 @@ body::before {
   left: 0;
   right: 0;
   height: var(--safe-area-top);
-  background: var(--erp-accent, #B83C30);
+  background: var(--erp-accent, #4F6B5A);
   z-index: 100;
   pointer-events: none;
 }
@@ -133,48 +133,59 @@ body::before {
 
   --radius-pill: 999px;
 
-  /* Wave 1 semantic source of truth. Legacy aliases above stay available to
-     untouched features until their approved redesign wave. */
-  --surface-canvas: #F6F8FC;
+  /* Semantic source of truth: handoff 12/10/2026 (Stumana-style warm light
+     canvas, moss accent). Legacy aliases above stay available to untouched
+     features until their redesign step. */
+  --surface-canvas: #FAF9F6;
   --surface-base: #FFFFFF;
-  --surface-raised: #FCFCFE;
-  --surface-sunken: #F1F3F7;
-  --surface-selected: #EEF1FF;
-  --text-strong: #17203A;
-  --text-default: #334155;
-  --text-muted: #667085;
+  --surface-raised: #FCFBF9;
+  --surface-sunken: #F3F1EC;
+  --surface-selected: #EDF2EE;
+  --surface-hover: #F8F6F2;
+  --text-strong: #2B3444;
+  --text-default: #4A5566;
+  --text-muted: #647083;
   --text-subtle: #98A2B3;
   --text-disabled: #A9B2C1;
   --text-on-primary: #FFFFFF;
   --text-on-danger: #FFFFFF;
-  --border-subtle: #E6EAF2;
-  --border-strong: #CBD5E1;
+  --border-subtle: #ECE8E1;
+  --border-strong: #E1DCD3;
+  --border-strong-hover: #C9C3B8;
+  --border-row: #F1EEE8;
   --border-focus: #315FCC;
   --focus-ring: rgba(49, 95, 204, 0.28);
   --disabled-bg: #F1F3F7;
   --disabled-border: #E1E6EE;
-  --action-primary: #24348B;
-  --action-primary-hover: #1D2A73;
-  --action-primary-soft: #EEF1FF;
-  --action-link: #315FCC;
-  --interactive-hover: #F8FAFD;
-  --interactive-pressed: #E9EDF9;
+  --action-primary: #4F6B5A;
+  --action-primary-hover: #3F5749;
+  --action-primary-soft: #EDF2EE;
+  --action-primary-soft-border: #C9D8CE;
+  --action-primary-shadow: 0 1px 2px rgba(63, 87, 73, 0.18);
+  --action-link: #4F6B5A;
+  --interactive-hover: #F6F3EE;
+  --interactive-pressed: #EDE9E2;
 
   --status-success: #16794C;
   --status-success-soft: #EAF8F1;
   --status-success-border: #B7E9D0;
+  --status-success-ink: #0F5A38;
   --status-warning: #A85B09;
   --status-warning-soft: #FFF5E5;
   --status-warning-border: #F3D3A6;
-  --status-danger: #C33752;
-  --status-danger-soft: #FFF0F3;
-  --status-danger-border: #F4C4CF;
+  --status-warning-ink: #7A4306;
+  --status-danger: #BE123C;
+  --status-danger-soft: #FFF1F2;
+  --status-danger-border: #FECDD3;
+  --status-danger-ink: #881337;
   --status-info: #215FC7;
   --status-info-soft: #EDF4FF;
   --status-info-border: #BED4FB;
+  --status-info-ink: #1A4B9E;
   --status-neutral: #536174;
   --status-neutral-soft: #F1F3F6;
   --status-neutral-border: #D5DCE6;
+  --status-neutral-ink: #3F4C5E;
 
   /* Payroll dashboard data visualization. These stay stable across every
      payroll chart so a position keeps the same color within the page. */
@@ -188,32 +199,53 @@ body::before {
   --payroll-chart-8: #826B18;
   --payroll-chart-area: rgba(49, 95, 204, 0.10);
 
-  --nav-sidebar-bg: #24348B;
-  --nav-sidebar-fg: #FFFFFF;
-  --nav-sidebar-muted: rgba(255, 255, 255, 0.64);
-  --nav-sidebar-hover: rgba(255, 255, 255, 0.10);
-  --nav-sidebar-active: rgba(255, 255, 255, 0.18);
-  --nav-sidebar-active-indicator: #AFC0FF;
-  --nav-sidebar-border: rgba(255, 255, 255, 0.12);
+  /* Light sidebar (handoff 1b): soft active item + 3px left indicator. */
+  --nav-sidebar-bg: #FFFFFF;
+  --nav-sidebar-fg: #3B465A;
+  --nav-sidebar-muted: #647083;
+  --nav-sidebar-hover: #F6F3EE;
+  --nav-sidebar-active-bg: #EDF2EE;
+  --nav-sidebar-active-fg: #4F6B5A;
+  --nav-sidebar-indicator: #4F6B5A;
+  --nav-sidebar-border: #E7E3DC;
+  /* Pre-handoff names kept as aliases. */
+  --nav-sidebar-active: var(--nav-sidebar-active-bg);
+  --nav-sidebar-active-indicator: var(--nav-sidebar-indicator);
 
-  --elevation-1: 0 1px 2px rgba(23, 32, 58, 0.06);
-  --elevation-2: 0 8px 24px rgba(23, 32, 58, 0.12), 0 2px 8px rgba(23, 32, 58, 0.06);
-  --elevation-3: 0 20px 56px rgba(23, 32, 58, 0.20), 0 4px 16px rgba(23, 32, 58, 0.10);
-  --overlay-scrim: rgba(23, 32, 58, 0.44);
-  --table-header: #F1F3F7;
-  --table-row-hover: #F8FAFD;
-  --table-row-selected: #EEF1FF;
+  --panel-shadow: 0 1px 2px rgba(32, 43, 64, 0.04);
+  --elevation-1: 0 1px 2px rgba(32, 43, 64, 0.06);
+  --elevation-2: 0 8px 24px rgba(32, 43, 64, 0.12), 0 2px 8px rgba(32, 43, 64, 0.06);
+  --elevation-3: 0 20px 56px rgba(32, 43, 64, 0.20), 0 4px 16px rgba(32, 43, 64, 0.10);
+  --overlay-scrim: rgba(32, 43, 64, 0.44);
+  --toast-bg: #202B40;
+  --table-header: #F7F5F1;
+  --table-row-hover: #F8F6F2;
+  --table-row-selected: #EDF2EE;
   --field-bg: #FFFFFF;
   --field-placeholder: #98A2B3;
   --field-error: var(--status-danger);
   --field-error-soft: var(--status-danger-soft);
   --field-error-border: var(--status-danger-border);
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  /* 12/10: one step softer corners, still no pill controls. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
+
+  /* Control and layout metrics. */
+  --control-h: 40px;
+  --control-h-touch: 44px;
+  --control-h-compact: 32px;
+  --row-h: 48px;
+  --row-h-2: 56px;
+  --sidebar-w: 240px;
+  --rail-w: 72px;
+  --topbar-h: 64px;
+  --module-strip-h: 48px;
+  --sidebar-width: var(--sidebar-w);
+  --topbar-height: var(--topbar-h);
   --space-0: 0;
   --space-1: 4px;
   --space-2: 8px;
@@ -930,7 +962,25 @@ body::before {
   --nav-sidebar-hover: rgba(245, 247, 255, 0.10);
   --nav-sidebar-active: rgba(175, 192, 255, 0.20);
   --nav-sidebar-active-indicator: #AFC0FF;
+  --nav-sidebar-active-bg: var(--nav-sidebar-active);
+  --nav-sidebar-active-fg: var(--nav-sidebar-fg);
+  --nav-sidebar-indicator: var(--nav-sidebar-active-indicator);
   --nav-sidebar-border: rgba(245, 247, 255, 0.12);
+  --surface-hover: #2A3449;
+  --border-row: #2C3850;
+  --border-strong-hover: #5B6B86;
+  --action-primary-soft-border: #3E4F8A;
+  --action-primary-shadow: none;
+  --status-success-ink: #9BE4BC;
+  --status-warning-ink: #F6CD8E;
+  --status-danger-ink: #F7B3C2;
+  --status-info-ink: #B4CFFF;
+  --status-neutral-ink: #CAD2DF;
+  --panel-shadow: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --toast-bg: #0F1526;
+  --table-header: #1A2233;
+  --table-row-hover: #2A3449;
+  --table-row-selected: #2B396B;
   --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.30);
   --elevation-2: 0 8px 24px rgba(0, 0, 0, 0.40), 0 2px 8px rgba(0, 0, 0, 0.25);
   --elevation-3: 0 20px 56px rgba(0, 0, 0, 0.58), 0 4px 16px rgba(0, 0, 0, 0.35);
@@ -998,6 +1048,19 @@ body::before {
   --color-action-link: var(--action-link);
   --color-interactive-hover: var(--interactive-hover);
   --color-interactive-pressed: var(--interactive-pressed);
+  --color-surface-hover: var(--surface-hover);
+  --color-border-row: var(--border-row);
+  --color-border-strong-hover: var(--border-strong-hover);
+  --color-action-primary-soft-border: var(--action-primary-soft-border);
+  --color-success-ink: var(--status-success-ink);
+  --color-warning-ink: var(--status-warning-ink);
+  --color-danger-ink: var(--status-danger-ink);
+  --color-info-ink: var(--status-info-ink);
+  --color-neutral-ink: var(--status-neutral-ink);
+  --color-table-header: var(--table-header);
+  --color-table-row-hover: var(--table-row-hover);
+  --color-table-row-selected: var(--table-row-selected);
+  --color-toast-bg: var(--toast-bg);
 
   --font-display: var(--font-erp);
   --font-sans: var(--font-erp);
@@ -1054,6 +1117,69 @@ h1, h2, h3, h4, h5, h6, .font-display {
   font-family: var(--font-display);
 }
 
+/* Handoff 1a: titles sit a touch tighter; every table number lines up. */
+h1, h2, h3 {
+  letter-spacing: -0.01em;
+}
+
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Handoff 1c: 150ms ease-out state changes on controls; panels rise once on
+   entry; progress bars grow once. Everything stops under reduced motion. */
+button,
+a,
+input,
+select,
+textarea,
+[role="tab"] {
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes grow {
+  from {
+    width: 0;
+  }
+}
+
+/* Popovers/panels rise only from tablet up: on phone-sized viewports a
+   finished entry animation left popovers painting under page content, so
+   touch layouts open menus without motion. `backwards` keeps no end state. */
+@media (min-width: 768px) {
+  .panel-rise {
+    animation: rise 240ms ease-out backwards;
+  }
+}
+
+.progress-grow {
+  animation: grow 800ms ease-out backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 button,
 input,
 select,
@@ -1104,29 +1230,37 @@ a {
   .fee-notice { break-after: page; page-break-after: always; }
 }
 
-/* Warm, configurable ERP appearance. Domain navigation and business state colors remain semantic. */
-:root { --erp-accent: #B83C30; --radius-md: 8px; --radius-lg: 16px; --radius-xl: 20px; }
+/* Configurable ERP accent (Settings → Thương hiệu). The default is the
+   Stumana-style moss green from the 12/10/2026 handoff; terracotta and the
+   other presets stay selectable. Business state colors stay semantic. */
+:root {
+  --erp-accent: #4F6B5A;
+  --erp-accent-hover: #3F5749;
+  --erp-accent-soft: #EDF2EE;
+  --erp-accent-soft-border: #C9D8CE;
+}
+:root[data-erp-palette="terracotta"] { --erp-accent: #B83C30; }
 :root[data-erp-palette="navy"] { --erp-accent: #24348B; }
 :root[data-erp-palette="mint"] { --erp-accent: #16794C; }
 :root[data-erp-palette="ocean"] { --erp-accent: #215FC7; }
 :root[data-erp-palette="plum"] { --erp-accent: #795096; }
+:root[data-erp-palette]:not([data-erp-palette="moss"]) {
+  --erp-accent-hover: color-mix(in srgb, var(--erp-accent) 85%, black);
+  --erp-accent-soft: color-mix(in srgb, var(--erp-accent) 8%, white);
+  --erp-accent-soft-border: color-mix(in srgb, var(--erp-accent) 24%, white);
+}
 :root:not(.dark):not([data-theme="dark"]) {
-  --surface-canvas: #FAF9F6;
-  --surface-selected: color-mix(in srgb, var(--erp-accent) 8%, white);
+  --surface-selected: var(--erp-accent-soft);
   --action-primary: var(--erp-accent);
-  --action-primary-hover: color-mix(in srgb, var(--erp-accent) 85%, black);
-  --action-primary-soft: var(--surface-selected);
+  --action-primary-hover: var(--erp-accent-hover);
+  --action-primary-soft: var(--erp-accent-soft);
+  --action-primary-soft-border: var(--erp-accent-soft-border);
+  --action-primary-shadow: 0 1px 2px color-mix(in srgb, var(--erp-accent) 18%, transparent);
   --action-link: var(--erp-accent);
-  --border-focus: var(--erp-accent);
-  --focus-ring: color-mix(in srgb, var(--erp-accent) 28%, transparent);
-  --nav-sidebar-bg: #FFFCFA;
-  --nav-sidebar-fg: #28303F;
-  --nav-sidebar-muted: #6B6870;
-  --nav-sidebar-hover: color-mix(in srgb, var(--erp-accent) 5%, white);
-  --nav-sidebar-active: var(--surface-selected);
-  --nav-sidebar-active-indicator: var(--erp-accent);
-  --nav-sidebar-border: #EBE5E1;
-  --table-row-selected: var(--surface-selected);
+  --nav-sidebar-active-bg: var(--erp-accent-soft);
+  --nav-sidebar-active-fg: var(--erp-accent);
+  --nav-sidebar-indicator: var(--erp-accent);
+  --table-row-selected: var(--erp-accent-soft);
 }
 :root.dark, :root[data-theme="dark"] {
   --action-primary: var(--erp-accent);
@@ -1135,9 +1269,12 @@ a {
   --action-primary-hover: color-mix(in srgb, var(--erp-accent) 85%, black);
   --action-link: color-mix(in srgb, var(--erp-accent) 35%, white);
   --action-primary-soft: color-mix(in srgb, var(--erp-accent) 25%, #1E2430);
+  --action-primary-soft-border: color-mix(in srgb, var(--erp-accent) 45%, #1E2430);
   --nav-sidebar-active-indicator: var(--action-link);
+  --nav-sidebar-indicator: var(--action-link);
 }
-:root[data-erp-rounded="false"] { --radius-md: 6px; --radius-lg: 8px; --radius-xl: 12px; }
+/* "Bo góc" off: the tight DESIGN.md radius scale. */
+:root[data-erp-rounded="false"] { --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 12px; }
 .brand-panel { min-width: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px; background: var(--surface-base); }
 .brand-panel h2,.brand-panel h3 { font-size: 18px; font-weight: 600; }
 .brand-field { display: grid; gap: 6px; margin-top: 16px; font-size: 13px; font-weight: 500; }

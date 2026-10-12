@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { TopbarTimekeepingButton } from "@/components/layout/topbar-timekeeping-button";
@@ -27,7 +27,7 @@ describe("TopbarTimekeepingButton", () => {
     expect(link.className).toContain("text-white");
   });
 
-  it("renders Topbar with button placed left of ThemeToggle when user has timekeeping permission", () => {
+  it("renders Topbar with the attendance button next to the bell and user menu when user has timekeeping permission", () => {
     render(
       <Topbar
         canCheckTimekeeping
@@ -40,7 +40,10 @@ describe("TopbarTimekeepingButton", () => {
     );
 
     expect(screen.getByRole("link", { name: "Chấm công ngay" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Giao diện/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Thông báo" })).toHaveAttribute("href", "/notifications");
+    fireEvent.click(screen.getByRole("button", { name: "Tài khoản: Test Assistant" }));
+    expect(screen.getByRole("menuitem", { name: /Giao diện/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Đăng xuất" })).toBeInTheDocument();
   });
 
   it("hides attendance button when user lacks timekeeping permission", () => {
@@ -55,6 +58,6 @@ describe("TopbarTimekeepingButton", () => {
     );
 
     expect(screen.queryByRole("link", { name: /Chấm công/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Giao diện/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tài khoản: Unauthorized Staff" })).toBeInTheDocument();
   });
 });
