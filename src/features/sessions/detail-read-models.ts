@@ -10,6 +10,18 @@ export type SessionAttendanceStatus =
   | "unexcused_absence"
   | "additional_study";
 
+/** Canonical display order; plain data so client and server modules can share it. */
+export const SESSION_ATTENDANCE_STATUSES: readonly SessionAttendanceStatus[] = [
+  "present",
+  "additional_study",
+  "excused_absence",
+  "unexcused_absence",
+];
+
+export function isSessionAttendanceStatus(value: string): value is SessionAttendanceStatus {
+  return (SESSION_ATTENDANCE_STATUSES as readonly string[]).includes(value);
+}
+
 export type SessionNotebookStatus =
   | "submitted"
   | "not_submitted"

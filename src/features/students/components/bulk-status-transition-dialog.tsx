@@ -36,8 +36,13 @@ export function BulkStatusTransitionDialog({
   onSuccess,
   selectedStudentIds = [],
 }: BulkStatusTransitionDialogProps) {
-  const defaultSource: StudentLifecycleStatus =
-    initialSourceStatus !== "all" ? initialSourceStatus : "interested";
+  // Only pre-enrollment statuses can be a bulk source; a chip such as "Đang học"
+  // would leave the select showing one status while the dialog submits another.
+  const defaultSource: StudentLifecycleStatus = (
+    bulkTransitionStatuses as readonly string[]
+  ).includes(initialSourceStatus)
+    ? (initialSourceStatus as StudentLifecycleStatus)
+    : "interested";
 
   const [sourceStatus, setSourceStatus] =
     useState<StudentLifecycleStatus>(defaultSource);

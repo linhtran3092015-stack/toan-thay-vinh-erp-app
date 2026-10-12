@@ -1,11 +1,12 @@
 "use client";
 
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import {
   getActiveNavigationItem,
+  type NavigationItem,
   type VisibleNavigationDomain,
 } from "@/config/navigation";
 import { cn } from "@/lib/utils";
@@ -13,18 +14,32 @@ import { NavigationLink } from "@/components/layout/navigation-link";
 
 interface ModuleNavigationProps {
   domain?: VisibleNavigationDomain;
+  /** Defaults to the current route; the shell passes its own (preview-aware) value. */
+  pathname?: string;
 }
 
-export function ModuleNavigation({ domain }: ModuleNavigationProps) {
+/**
+ * Module strip (design 01, tier 2): a `nav`, not a tablist. 48px row of
+ * 32px chips under the topbar; hidden when the domain has a single module.
+ * Mobile replaces it with a 44px selector that lists the same modules.
+ */
+export function ModuleNavigation({ domain, pathname }: ModuleNavigationProps) {
   if (!domain || domain.items.length <= 1) {
     return null;
   }
 
-  return <ModuleNavigationContent domain={domain} />;
+  return <ModuleNavigationContent domain={domain} pathname={pathname} />;
 }
 
-function ModuleNavigationContent({ domain }: { domain: VisibleNavigationDomain }) {
-  const pathname = usePathname();
+function ModuleNavigationContent({
+  domain,
+  pathname: pathnameOverride,
+}: {
+  domain: VisibleNavigationDomain;
+  pathname?: string;
+}) {
+  const routePathname = usePathname();
+  const pathname = pathnameOverride ?? routePathname;
   const navigationLabel = `Mô-đun trong ${domain.label}`;
 
   return (
@@ -48,11 +63,26 @@ function ModuleNavigationContent({ domain }: { domain: VisibleNavigationDomain }
   );
 }
 
+function ModuleBadge({ item }: { item: NavigationItem }) {
+  if (!item.badge) {
+    return null;
+  }
+
+  return (
+    <span className="grid h-[18px] min-w-[18px] place-items-center rounded-sm bg-action-primary-soft px-[5px] text-[11px] font-semibold tabular-nums text-action-primary">
+      {item.badge}
+    </span>
+  );
+}
+
 interface NavigationContentProps {
   domain: VisibleNavigationDomain;
   navigationLabel: string;
   pathname: string;
 }
+
+const scrollButtonClassName =
+  "flex h-8 w-8 flex-none items-center justify-center rounded-md border border-border-subtle bg-surface-base text-text-muted hover:bg-interactive-hover disabled:cursor-not-allowed disabled:text-text-disabled focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus";
 
 function DesktopModuleNavigation({
   domain,
@@ -118,12 +148,12 @@ function DesktopModuleNavigation({
   return (
     <nav
       aria-label={navigationLabel}
-      className="mx-auto flex h-12 max-w-[1600px] items-center gap-2 px-5 lg:px-6"
+      className="mx-auto flex h-[var(--module-strip-h)] max-w-[1600px] items-center gap-2 px-5 lg:px-6"
     >
       {hasOverflow ? (
         <button
           aria-label={`Xem mô-đun trước trong ${domain.label}`}
-          className="flex h-8 w-8 flex-none items-center justify-center rounded-md border border-border-subtle bg-surface-base text-text-muted transition-colors hover:bg-interactive-hover disabled:cursor-not-allowed disabled:text-text-disabled focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+          className={scrollButtonClassName}
           disabled={!canScrollBack}
           onClick={() => scrollByPage(-1)}
           title={`Xem mô-đun trước trong ${domain.label}`}
@@ -145,15 +175,16 @@ function DesktopModuleNavigation({
               <NavigationLink
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "flex h-9 items-center rounded-md px-3 text-control font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring",
+                  "flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-control font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus",
                   isActive
-                    ? "bg-action-primary-soft text-action-primary"
-                    : "text-text-muted hover:bg-interactive-hover hover:text-text-strong",
+                    ? "bg-action-primary-soft font-semibold text-action-primary"
+                    : "text-text-default hover:bg-interactive-hover hover:text-text-strong",
                 )}
                 href={item.href}
                 key={item.href}
               >
                 {item.label}
+                <ModuleBadge item={item} />
               </NavigationLink>
             );
           })}
@@ -163,7 +194,7 @@ function DesktopModuleNavigation({
       {hasOverflow ? (
         <button
           aria-label={`Xem mô-đun tiếp theo trong ${domain.label}`}
-          className="flex h-8 w-8 flex-none items-center justify-center rounded-md border border-border-subtle bg-surface-base text-text-muted transition-colors hover:bg-interactive-hover disabled:cursor-not-allowed disabled:text-text-disabled focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+          className={scrollButtonClassName}
           disabled={!canScrollForward}
           onClick={() => scrollByPage(1)}
           title={`Xem mô-đun tiếp theo trong ${domain.label}`}
@@ -199,8 +230,10 @@ function MobileModuleSelector({
       return;
     }
 
-    const firstLink = menuRef.current?.querySelector<HTMLAnchorElement>("a");
-    firstLink?.focus();
+    const activeLink =
+      menuRef.current?.querySelector<HTMLAnchorElement>('a[aria-current="page"]') ??
+      menuRef.current?.querySelector<HTMLAnchorElement>("a");
+    activeLink?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -245,19 +278,23 @@ function MobileModuleSelector({
         aria-expanded={isOpen}
         aria-haspopup="true"
         aria-label={`Chuyển mô-đun trong ${domain.label}`}
-        className="flex h-11 w-full items-center justify-between rounded-md border border-border-subtle bg-surface-base px-3 text-left text-control font-semibold text-text-strong focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+        className="flex h-11 w-full items-center justify-between rounded-md border border-border-strong bg-surface-base px-3 text-left text-control font-semibold text-text-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
         onClick={() => setIsOpen((open) => !open)}
         ref={triggerRef}
         type="button"
       >
-        <span className="truncate">{activeItem?.label ?? domain.label}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-caption font-medium text-text-muted">{domain.label}</span>
+          <span aria-hidden="true" className="text-caption text-border-strong-hover">/</span>
+          <span className="truncate">{activeItem?.label ?? domain.label}</span>
+        </span>
         <ChevronDown aria-hidden="true" className="ml-3 flex-none text-text-muted" size={18} strokeWidth={1.8} />
       </button>
 
       {isOpen ? (
         <div
           aria-label={`Chuyển mô-đun trong ${domain.label}`}
-          className="absolute inset-x-0 top-[calc(100%+8px)] z-40 max-h-[min(360px,calc(100vh-180px))] overflow-y-auto rounded-lg border border-border-subtle bg-surface-raised p-2 shadow-[var(--elevation-2)]"
+          className="panel-rise absolute inset-x-0 top-[calc(100%+8px)] z-40 max-h-[min(360px,calc(100vh-180px))] overflow-y-auto rounded-lg border border-border-subtle bg-surface-raised p-1.5 shadow-[var(--elevation-2)]"
           id={menuId}
           ref={menuRef}
         >
@@ -268,9 +305,9 @@ function MobileModuleSelector({
               <NavigationLink
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "flex min-h-11 items-center rounded-md px-3 text-control font-medium focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring",
+                  "flex min-h-11 items-center justify-between gap-2 rounded-md px-2.5 text-control font-medium focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus",
                   isActive
-                    ? "bg-action-primary-soft text-action-primary"
+                    ? "bg-action-primary-soft font-semibold text-action-primary"
                     : "text-text-default hover:bg-interactive-hover",
                 )}
                 href={item.href}
@@ -279,7 +316,11 @@ function MobileModuleSelector({
                   if (item.href === pathname) close(false);
                 }}
               >
-                {item.label}
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">{item.label}</span>
+                  <ModuleBadge item={item} />
+                </span>
+                {isActive ? <Check aria-hidden="true" size={16} strokeWidth={2.2} /> : null}
               </NavigationLink>
             );
           })}

@@ -2,6 +2,28 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.7.0.0] - 2026-10-13
+
+Giao diện mới theo phong cách Stumana: menu gọn theo nhóm, danh sách học sinh có số liệu chuyên cần, số dư buổi và công nợ, hồ sơ học sinh và trang buổi học được dựng lại.
+
+### Added
+- **Danh sách học sinh** (`/students`) có thêm 3 cột: chuyên cần 30 ngày (buổi chính khóa, không tính Học thêm), số dư buổi và công nợ. Công nợ có 2 mức: yêu cầu chờ thanh toán quá 14 ngày hiện đỏ kèm chữ "Quá hạn" (cùng quy tắc với bảng điều khiển), còn lại hiện vàng. Mỗi cột tải riêng; thiếu quyền hoặc lỗi tải thì hiện "—" kèm lý do, không bao giờ hiện 0.
+- `/students` và `/classes`: chip lọc nhanh theo trạng thái có đếm số, tóm tắt "đang học · bảo lưu · đã nghỉ", chọn nhiều dòng để chuyển trạng thái hàng loạt, bộ lọc dạng bảng trượt trên điện thoại, phân trang trong khung bảng.
+- **Hồ sơ học sinh** (`/students/[id]`): đầu trang với một thao tác chính (Ghi danh vào lớp / Quay lại học) và menu chuyển lớp, bảo lưu, kết thúc kèm lý do; 4 ô số liệu (chuyên cần, số dư buổi, công nợ, buổi tới); cột thông tin phụ huynh, ghi chú nội bộ, nhóm Zalo; 5 tab Lớp, Điểm danh, Thanh toán & số dư buổi, Chăm sóc, Lịch sử, chỉ hiện tab người xem có quyền. Mở thẳng tab bằng `?tab=`.
+- **Trang buổi học**: bấm một trạng thái trên dòng chưa điểm danh là lưu ngay; nút "Có mặt cho tất cả chưa chọn" kèm báo cáo chính xác em nào chưa ghi được; thanh tiến độ trên điện thoại; khung khóa buổi liệt kê điều kiện đã đạt hoặc chưa, giống đúng điều kiện của máy chủ.
+- Trang xem trước giao diện với dữ liệu mẫu cho người phát triển: `/dev/ui`, `/dev/shell`, `/dev/lists`, `/dev/student`, `/dev/session` (trả 404 trên production).
+
+### Changed
+- Menu trái nhóm lại thành "Việc chính" (Hôm nay, Học sinh, Lớp học, Buổi học, Kết quả học tập), "Vận hành" (tài chính, nhân sự, chăm sóc & tuyển sinh, báo cáo) và cuối menu (nhập dữ liệu, cài đặt; mục Thông báo nay cũng nằm trong Cài đặt). Đường dẫn và quyền giữ nguyên. Có chế độ thu gọn 72px và ngăn kéo trên điện thoại.
+- Thanh trên cùng có breadcrumb theo trang thật, chuông thông báo đếm số (tối đa 99+), menu tài khoản chứa đổi giao diện và đăng xuất.
+- Màu nhấn mặc định đổi sang xanh rêu; "Đất nung" vẫn chọn được trong cài đặt giao diện. Biểu tượng ứng dụng (PWA) đổi theo màu mới.
+- Nút, nhãn trạng thái, tab, bảng và banner kết quả dùng bộ thành phần mới; bảng vừa màn hình laptop 1366px.
+- Trợ giảng không còn thấy mức học phí và nguồn tuyển sinh trên hồ sơ (ô thông tin và tab Lịch sử); máy chủ cũng không tải các dữ liệu này khi thiếu quyền của tab Thanh toán.
+
+### Lưu ý triển khai
+- Màu xanh rêu là mặc định mới và không có migration dữ liệu. Nếu rollback về bản cũ sau khi ai đó đã lưu lựa chọn "moss", bản cũ không nhận ra giá trị này.
+- Việc ẩn mức học phí với trợ giảng mới làm ở giao diện và khâu tải dữ liệu. Chính sách RLS của `student_tuition_rate_versions` và `student_acquisition_source_assignments` vẫn cho đọc trực tiếp qua API; sẽ thu hẹp bằng migration riêng.
+
 ## [0.6.22.1] - 2026-10-13
 
 ### Fixed

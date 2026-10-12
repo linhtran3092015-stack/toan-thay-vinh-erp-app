@@ -4,6 +4,7 @@ import {
   useState,
   useRef,
   type FormEvent,
+  type ReactNode,
   type RefObject,
 } from "react";
 import { X } from "lucide-react";
@@ -11,12 +12,6 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   endStudentEnrollmentAction,
   enrollStudentInClassAction,
@@ -38,12 +33,6 @@ import {
   textAreaControlClass,
 } from "@/features/students/form/components/form-controls";
 
-interface StudentEnrollmentManagementProps {
-  model: StudentEnrollmentUiModel;
-  studentId: string;
-  studentName: string;
-}
-
 interface EnrollmentDialogValues {
   classId: string;
   effectiveDate: string;
@@ -51,15 +40,7 @@ interface EnrollmentDialogValues {
   registeredMode: StudentEnrollmentRegisteredMode;
 }
 
-const operationOrder: StudentEnrollmentOperation[] = [
-  "enroll",
-  "transfer",
-  "reserve",
-  "end",
-  "resume",
-];
-
-const operationLabels: Record<
+export const operationLabels: Record<
   StudentEnrollmentOperation,
   string
 > = {
@@ -86,11 +67,34 @@ const operationDescriptions: Record<
     "Kết thúc lớp hiện tại và chuyển sang lớp mới ngay hôm nay.",
 };
 
-export function StudentEnrollmentManagement({
+export interface StudentEnrollmentOperationsOptions {
+  model: StudentEnrollmentUiModel;
+  studentId: string;
+  studentName: string;
+}
+
+export interface StudentEnrollmentOperationsController {
+  /** The dialog element; render it once wherever the feature lives. */
+  dialog: ReactNode;
+  /** Opens the dialog for an enabled operation; ignores disabled ones. */
+  open: (
+    operation: StudentEnrollmentOperation,
+    trigger?: HTMLButtonElement | null,
+  ) => void;
+  successMessage: string | null;
+}
+
+/**
+ * Enrollment operations (enroll, transfer, reserve, end, resume) share one
+ * dialog and one success banner. The hook owns that state so a page can put
+ * the primary action in its header, the rest in an overflow menu, and still
+ * open the same dialog from an enrollment card.
+ */
+export function useStudentEnrollmentOperations({
   model,
   studentId,
   studentName,
-}: StudentEnrollmentManagementProps) {
+}: StudentEnrollmentOperationsOptions): StudentEnrollmentOperationsController {
   const router = useRouter();
 
   const [activeOperation, setActiveOperation] =
@@ -111,20 +115,11 @@ export function StudentEnrollmentManagement({
 
   const [successMessage, setSuccessMessage] =
     useState<string | null>(null);
-  const activeTriggerRef = useRef<HTMLButtonElement>(null);
+  const activeTriggerRef = useRef<HTMLButtonElement | null>(null);
 
-  const visibleOperations = operationOrder.filter(
-    (operation) =>
-      model.actions[operation].visible,
-  );
-
-  if (visibleOperations.length === 0) {
-    return null;
-  }
-
-  function openDialog(
+  function open(
     operation: StudentEnrollmentOperation,
-    trigger: HTMLButtonElement,
+    trigger?: HTMLButtonElement | null,
   ) {
     if (!model.actions[operation].enabled) {
       return;
@@ -135,7 +130,7 @@ export function StudentEnrollmentManagement({
     );
     setActionState(null);
     setSuccessMessage(null);
-    activeTriggerRef.current = trigger;
+    activeTriggerRef.current = trigger ?? null;
     setActiveOperation(operation);
   }
 
@@ -179,105 +174,22 @@ export function StudentEnrollmentManagement({
     }
   }
 
-  return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Nghiệp vụ xếp lớp</CardTitle>
-        </CardHeader>
+  const dialog = activeOperation ? (
+    <EnrollmentOperationDialog
+      actionState={actionState}
+      isPending={isPending}
+      model={model}
+      onClose={closeDialog}
+      onSubmit={handleSubmit}
+      operation={activeOperation}
+      setValues={setValues}
+      studentName={studentName}
+      returnFocusRef={activeTriggerRef}
+      values={values}
+    />
+  ) : null;
 
-        <CardContent className="grid gap-4">
-          {successMessage ? (
-            <div
-              className="rounded-lg border border-success-border bg-success-bg px-4 py-3 text-sm font-semibold leading-6 text-success"
-              role="status"
-            >
-              {successMessage}
-            </div>
-          ) : null}
-
-          <div className="grid gap-3 md:grid-cols-2">
-            {visibleOperations.map(
-              (operation) => {
-                const availability =
-                  model.actions[operation];
-
-                return (
-                  <div
-                    className="grid content-between gap-3 rounded-lg border border-hairline bg-canvas p-4"
-                    key={operation}
-                  >
-                    <div>
-                      <p className="font-semibold text-ink">
-                        {operationLabels[operation]}
-                      </p>
-
-                      <p className="mt-1 text-sm leading-6 text-ink-muted">
-                        {
-                          operationDescriptions[
-                            operation
-                          ]
-                        }
-                      </p>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Button
-                        className="min-h-10 justify-self-start"
-                        disabled={
-                          !availability.enabled
-                        }
-                        onClick={(event) =>
-                          openDialog(operation, event.currentTarget)
-                        }
-                        size="sm"
-                        type="button"
-                        variant={
-                          operation === "reserve"
-                            ? "outline"
-                            : "secondary"
-                        }
-                      >
-                        {operationLabels[operation]}
-                      </Button>
-
-                      {availability.reason ? (
-                        <p className="text-xs font-semibold leading-5 text-warning">
-                          {availability.reason}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              },
-            )}
-          </div>
-
-          <p className="text-xs leading-5 text-ink-muted">
-            Chuyển lớp và bảo lưu chỉ có hiệu lực
-            trong ngày thao tác. Mọi thay đổi đều
-            được lưu vào lịch sử xếp lớp và nhật ký
-            hệ thống.
-          </p>
-        </CardContent>
-      </Card>
-
-      {activeOperation ? (
-        <EnrollmentOperationDialog
-          actionState={actionState}
-          isPending={isPending}
-          model={model}
-          onClose={closeDialog}
-          onSubmit={handleSubmit}
-          operation={activeOperation}
-          setValues={setValues}
-          studentName={studentName}
-          returnFocusRef={activeTriggerRef}
-          values={values}
-        />
-      ) : null}
-    </>
-  );
+  return { dialog, open, successMessage };
 }
 
 interface EnrollmentOperationDialogProps {
@@ -486,10 +398,10 @@ function EnrollmentOperationDialog({
                 value={values.registeredMode}
               >
                 <option value="offline">
-                  Offline
+                  Tại lớp
                 </option>
                 <option value="online">
-                  Online
+                  Trực tuyến
                 </option>
               </select>
             </FieldShell>

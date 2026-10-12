@@ -1,6 +1,5 @@
 "use client";
 
-import { Moon, Sun } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 
 const subscribe = (callback: () => void) => {
@@ -8,16 +7,19 @@ const subscribe = (callback: () => void) => {
   return () => window.removeEventListener("storage", callback);
 };
 
-export function ThemeToggle() {
+export type ThemeName = "light" | "dark";
+
+/** Reads and toggles the html `dark` class/`data-theme` set by the root layout. */
+export function useTheme(): { isClient: boolean; theme: ThemeName; toggle: () => void } {
   const isClient = useSyncExternalStore(
     subscribe,
     () => true,
     () => false,
   );
 
-  const [themeState, setThemeState] = useState<"light" | "dark" | null>(null);
+  const [themeState, setThemeState] = useState<ThemeName | null>(null);
 
-  const currentTheme =
+  const theme: ThemeName =
     themeState ??
     (isClient &&
     (document.documentElement.classList.contains("dark") ||
@@ -25,8 +27,8 @@ export function ThemeToggle() {
       ? "dark"
       : "light");
 
-  const toggleTheme = () => {
-    const nextTheme = currentTheme === "light" ? "dark" : "light";
+  const toggle = () => {
+    const nextTheme: ThemeName = theme === "light" ? "dark" : "light";
     setThemeState(nextTheme);
     if (nextTheme === "dark") {
       document.documentElement.classList.add("dark");
@@ -39,40 +41,5 @@ export function ThemeToggle() {
     }
   };
 
-  if (!isClient) {
-    return (
-      <button
-        aria-label="Chuyển chế độ giao diện"
-        className="flex h-11 w-11 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
-        title="Chuyển chế độ giao diện"
-        type="button"
-      >
-        <Sun aria-hidden="true" size={20} strokeWidth={1.8} />
-      </button>
-    );
-  }
-
-  return (
-    <button
-      aria-label={
-        currentTheme === "dark"
-          ? "Chuyển sang Giao diện Sáng"
-          : "Chuyển sang Giao diện Tối"
-      }
-      className="flex h-11 w-11 items-center justify-center rounded-md text-text-strong transition-colors duration-150 hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
-      onClick={toggleTheme}
-      title={
-        currentTheme === "dark"
-          ? "Giao diện Tối (Bật)"
-          : "Giao diện Sáng (Bật)"
-      }
-      type="button"
-    >
-      {currentTheme === "dark" ? (
-        <Moon aria-hidden="true" size={20} strokeWidth={1.8} />
-      ) : (
-        <Sun aria-hidden="true" size={20} strokeWidth={1.8} />
-      )}
-    </button>
-  );
+  return { isClient, theme, toggle };
 }

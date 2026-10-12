@@ -1,162 +1,118 @@
+import {
+  DataTableFrame,
+  TableCell,
+  TableHeaderCell,
+  TableRow,
+  TableState,
+} from "@/components/patterns/data-table-frame";
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { SessionBalanceBadge } from "@/features/students/components/session-balance-badge";
-
 import { formatDeltaSessions } from "@/features/students/detail/helpers";
-import {
-  formatLedgerEntryType,
-  type StudentLedgerReadModel,
-} from "@/features/students/ledger-data";
+import { formatLedgerEntryType } from "@/features/students/ledger-labels";
+import type { StudentLedgerReadModel } from "@/features/students/ledger-data";
+import { formatIsoDate, toVietnamDate } from "@/lib/datetime";
 
 interface StudentSessionLedgerCardProps {
   summary: StudentLedgerReadModel | null;
+  /** Rows shown before the footer notes the rest. */
+  limit?: number;
 }
 
-export function StudentSessionLedgerCard({
-  summary,
-}: StudentSessionLedgerCardProps) {
-  if (!summary) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Sổ cái số buổi học</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-ink-muted">
-            Không tải được dữ liệu sổ cái số buổi.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+const header = (
+  <tr>
+    <TableHeaderCell className="w-[110px]">Ngày</TableHeaderCell>
+    <TableHeaderCell>Loại phát sinh</TableHeaderCell>
+    <TableHeaderCell className="w-[90px]" numeric>
+      Số buổi
+    </TableHeaderCell>
+    <TableHeaderCell className="w-[90px]" numeric>
+      Số dư sau
+    </TableHeaderCell>
+    <TableHeaderCell className="w-[140px]">Tham chiếu</TableHeaderCell>
+    <TableHeaderCell>Ghi chú</TableHeaderCell>
+  </tr>
+);
+
+/** Session ledger (design 05a): alerts, three totals, then the entries in a table frame. */
+export function StudentSessionLedgerCard({ limit = 30, summary }: StudentSessionLedgerCardProps) {
+  const visible = summary?.entries.slice(0, limit) ?? [];
 
   return (
-    <div className="grid gap-4">
-      {/* Alert Banners */}
-      {summary.alerts.map((alert, index) => (
-        <div
-          className={`flex items-start gap-3 rounded-lg border p-4 ${
-            alert.severity === "danger"
-              ? "border-danger/30 bg-danger/5 text-danger-dark"
-              : "border-warning/30 bg-warning/5 text-warning-dark"
-          }`}
-          key={index}
-        >
-          <Badge tone={alert.severity === "danger" ? "danger" : "warning"}>
-            {alert.title}
-          </Badge>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{alert.title}</p>
-            <p className="mt-0.5 text-xs opacity-90">{alert.description}</p>
-          </div>
-        </div>
+    <section aria-labelledby="student-ledger-title" className="grid gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-body font-semibold text-text-strong" id="student-ledger-title">
+          Sổ cái số buổi học
+        </h3>
+        {summary ? <SessionBalanceBadge balance={summary.balanceSessions} /> : null}
+      </div>
+
+      {summary?.alerts.map((alert, index) => (
+        <ResultBanner description={alert.description} key={`${alert.alertType}-${index}`} title={alert.title} tone={alert.severity} />
       ))}
 
-      {/* Main Ledger Card */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <CardTitle>Sổ cái số buổi học</CardTitle>
-          <SessionBalanceBadge balance={summary.balanceSessions} />
-        </CardHeader>
+      {summary ? (
+        <dl className="grid grid-cols-3 divide-x divide-border-row rounded-lg border border-border-subtle bg-surface-base shadow-[var(--panel-shadow)]">
+          <LedgerTotal label="Số dư hiện tại" value={`${summary.balanceSessions} buổi`} />
+          <LedgerTotal label="Tổng đã cộng" tone="success" value={`+${summary.totalCreditSessions} buổi`} />
+          <LedgerTotal label="Tổng đã trừ" tone="danger" value={`−${summary.totalDebitSessions} buổi`} />
+        </dl>
+      ) : null}
 
-        <CardContent className="grid gap-4">
-          {/* Summary Metrics */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="rounded-md border border-hairline bg-canvas p-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Số dư hiện tại
-              </p>
-              <p className="mt-1 text-lg font-bold text-ink">
-                {summary.balanceSessions} buổi
-              </p>
-            </div>
-
-            <div className="rounded-md border border-hairline bg-canvas p-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Tổng đã cộng
-              </p>
-              <p className="mt-1 text-lg font-bold text-success">
-                +{summary.totalCreditSessions} buổi
-              </p>
-            </div>
-
-            <div className="col-span-2 rounded-md border border-hairline bg-canvas p-3 sm:col-span-1">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Tổng đã trừ
-              </p>
-              <p className="mt-1 text-lg font-bold text-danger">
-                -{summary.totalDebitSessions} buổi
-              </p>
-            </div>
-          </div>
-
-          {/* Ledger Table */}
-          {summary.entries.length === 0 ? (
-            <div className="rounded-md border border-dashed border-hairline bg-canvas p-4 text-center text-sm text-ink-muted">
-              Học viên chưa có lịch sử phát sinh số buổi.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-hairline text-xs font-semibold uppercase text-ink-subtle">
-                    <th className="py-2.5 pr-3">Ngày</th>
-                    <th className="py-2.5 pr-3">Loại phát sinh</th>
-                    <th className="py-2.5 pr-3 text-right">Số buổi</th>
-                    <th className="py-2.5 pr-3 text-right">Số dư sau</th>
-                    <th className="py-2.5 pr-3">Tham chiếu</th>
-                    <th className="py-2.5">Ghi chú</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-hairline">
-                  {summary.entries.map((entry) => (
-                    <tr className="hover:bg-canvas/50" key={entry.id}>
-                      <td className="py-2.5 pr-3 font-medium whitespace-nowrap text-ink">
-                        {formatDate(entry.effectiveOn)}
-                      </td>
-                      <td className="py-2.5 pr-3 text-ink">
-                        <Badge tone="neutral">
-                          {formatLedgerEntryType(entry.entryType)}
-                        </Badge>
-                      </td>
-                      <td
-                        className={`py-2.5 pr-3 text-right font-bold whitespace-nowrap ${
-                          entry.deltaSessions > 0
-                            ? "text-success"
-                            : "text-danger"
-                        }`}
-                      >
-                        {formatDeltaSessions(entry.deltaSessions)}
-                      </td>
-                      <td className="py-2.5 pr-3 text-right font-semibold text-ink">
-                        {entry.balanceAfter}
-                      </td>
-                      <td className="py-2.5 pr-3 text-xs font-mono text-ink-muted">
-                        {entry.referenceCode ?? "—"}
-                      </td>
-                      <td className="py-2.5 text-xs text-ink-muted max-w-[200px] truncate">
-                        {entry.note}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+      <DataTableFrame
+        body={visible.map((entry) => (
+          <TableRow key={entry.id}>
+            <TableCell className="whitespace-nowrap text-text-muted">{formatIsoDate(entry.effectiveOn)}</TableCell>
+            <TableCell>
+              <Badge tone="neutral">{formatLedgerEntryType(entry.entryType)}</Badge>
+            </TableCell>
+            <TableCell
+              className={entry.deltaSessions > 0 ? "font-semibold text-success" : "font-semibold text-danger"}
+              numeric
+            >
+              {formatDeltaSessions(entry.deltaSessions)}
+            </TableCell>
+            <TableCell className="font-semibold text-text-strong" numeric>
+              {entry.balanceAfter}
+            </TableCell>
+            <TableCell className="whitespace-nowrap text-text-muted">{entry.referenceCode ?? "—"}</TableCell>
+            <TableCell className="max-w-[240px] truncate text-text-muted" title={entry.note ?? undefined}>{entry.note}</TableCell>
+          </TableRow>
+        ))}
+        caption="Sổ cái số buổi học của học sinh"
+        empty={<TableState>Học viên chưa có lịch sử phát sinh số buổi.</TableState>}
+        error={<TableState>Không tải được dữ liệu sổ cái số buổi.</TableState>}
+        footer={
+          summary && summary.entries.length > 0 ? (
+            <span>
+              Hiển thị {visible.length}/{summary.ledgerEntryCount} phát sinh
+              {summary.latestEntryAt ? ` · mới nhất ${formatIsoDate(toVietnamDate(summary.latestEntryAt))}` : ""}
+            </span>
+          ) : undefined
+        }
+        header={header}
+        status={!summary ? "error" : visible.length === 0 ? "empty" : "ready"}
+      />
+    </section>
   );
 }
 
-function formatDate(value: string): string {
-  if (!value) return "Chưa cập nhật";
-  const parts = value.split("-");
-  if (parts.length !== 3) return value;
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+function LedgerTotal({
+  label,
+  tone = "default",
+  value,
+}: {
+  label: string;
+  tone?: "default" | "success" | "danger";
+  value: string;
+}) {
+  const valueClassName =
+    tone === "success" ? "text-success" : tone === "danger" ? "text-danger" : "text-text-strong";
+
+  return (
+    <div className="min-w-0 px-4 py-3">
+      <dt className="text-secondary text-text-muted">{label}</dt>
+      <dd className={`mt-0.5 text-body font-semibold tabular-nums ${valueClassName}`}>{value}</dd>
+    </div>
+  );
 }

@@ -16,6 +16,6 @@ test.describe("Wave 1 authenticated shell smoke", () => {
     await page.goto("/students");
 
     await expect(page).not.toHaveURL(/\/login/);
-    await expect(page.getByRole("heading", { name: "Học viên" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Học sinh" })).toBeVisible();
   });
 });

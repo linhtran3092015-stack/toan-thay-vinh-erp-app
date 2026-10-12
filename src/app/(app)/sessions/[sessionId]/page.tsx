@@ -179,6 +179,12 @@ export default async function SessionDetailRoute({
       canMarkAttendance={
         canMarkAttendance
       }
+      canReverseLedger={permissionResult.permissions.includes(
+        "session_ledger.reverse",
+      )}
+      canViewPayroll={permissionResult.permissions.includes(
+        "payroll.view",
+      )}
       canViewAttendance={canViewAttendance}
       canViewResults={canViewResults}
       canViewStudents={canViewStudents}

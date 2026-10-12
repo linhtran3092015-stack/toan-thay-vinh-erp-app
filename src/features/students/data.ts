@@ -13,6 +13,16 @@ import type {
   StudentRegisteredMode,
   StudentScheduleReadModel,
 } from "@/features/students/read-models";
+import {
+  STUDENT_ATTENDANCE_WINDOW_DAYS,
+  summarizeDirectoryAttendance,
+  summarizeDirectoryDebt,
+  type DirectoryAttendanceRow,
+  type DirectoryPaymentRequestRow,
+  type StudentDirectoryMetricColumn,
+  type StudentDirectoryMetrics,
+} from "@/features/students/student-directory-metrics";
+import { addDays, getVietnamToday } from "@/lib/datetime";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.generated";
 import type { StudentLifecycleStatus } from "@/types/domain";
@@ -456,6 +466,111 @@ export async function getStudentDirectory(
     ok: true,
     students,
   };
+}
+
+interface StudentDirectoryMetricsOptions {
+  /** attendance.view and sessions.view: the window filters on the session date. */
+  includeAttendance: boolean;
+  /** session_ledger.view */
+  includeBalance: boolean;
+  /** payments.view */
+  includeDebt: boolean;
+}
+
+/**
+ * Offset pages can shift when rows are inserted mid-read (attendance is marked and
+ * payment requests change during class hours), so a row may come back twice.
+ */
+function uniqueById<Row extends { id: string }>(rows: Row[]): Row[] {
+  return [...new Map(rows.map((row) => [row.id, row])).values()];
+}
+
+async function loadMetricColumn<Row, T>(
+  enabled: boolean,
+  fetchRows: () => Promise<PageResult<Row>>,
+  summarize: (rows: Row[]) => Record<string, T>,
+): Promise<StudentDirectoryMetricColumn<T>> {
+  if (!enabled) {
+    return { reason: "forbidden", status: "unavailable" };
+  }
+
+  try {
+    const result = await fetchRows();
+
+    if (result.error) {
+      return { reason: "failed", status: "unavailable" };
+    }
+
+    return { byStudentId: summarize(result.data ?? []), status: "ready" };
+  } catch {
+    return { reason: "failed", status: "unavailable" };
+  }
+}
+
+/**
+ * Directory columns for every student at once, from existing read models only:
+ * the ledger balance view, open payment requests and recent attendance. Each
+ * column loads and fails on its own; the directory itself never waits on them
+ * to decide whether it can render.
+ */
+export async function getStudentDirectoryMetrics(
+  options: StudentDirectoryMetricsOptions,
+): Promise<StudentDirectoryMetrics> {
+  const supabase = await createSupabaseServerClient();
+  const today = getVietnamToday();
+  const windowStart = addDays(today, 1 - STUDENT_ATTENDANCE_WINDOW_DAYS);
+
+  const [attendanceRate, balanceSessions, outstandingVnd] = await Promise.all([
+    loadMetricColumn(
+      options.includeAttendance,
+      () =>
+        fetchAllPages<DirectoryAttendanceRow & { id: string }>((from, to) =>
+          supabase
+            .from("session_attendance")
+            .select("id, student_id, attendance_status, session:class_sessions!inner(session_date)")
+            .gte("session.session_date", windowStart)
+            .lte("session.session_date", today)
+            .order("id", { ascending: true })
+            .range(from, to),
+        ),
+      (rows) => summarizeDirectoryAttendance(uniqueById(rows)),
+    ),
+    loadMetricColumn(
+      options.includeBalance,
+      () =>
+        fetchAllPages<{ balance_sessions: number | null; student_id: string | null }>((from, to) =>
+          supabase
+            .from("student_session_balances")
+            .select("student_id, balance_sessions")
+            .order("student_id", { ascending: true })
+            .range(from, to),
+        ),
+      (rows) => {
+        const balances: Record<string, number> = {};
+
+        for (const row of rows) {
+          if (row.student_id) balances[row.student_id] = Number(row.balance_sessions ?? 0);
+        }
+
+        return balances;
+      },
+    ),
+    loadMetricColumn(
+      options.includeDebt,
+      () =>
+        fetchAllPages<DirectoryPaymentRequestRow & { id: string }>((from, to) =>
+          supabase
+            .from("student_payment_requests")
+            .select("id, student_id, expected_amount_vnd, paid_amount_vnd, status, created_at")
+            .in("status", ["pending", "partially_paid"])
+            .order("id", { ascending: true })
+            .range(from, to),
+        ),
+      (rows) => summarizeDirectoryDebt(uniqueById(rows)),
+    ),
+  ]);
+
+  return { attendanceRate, balanceSessions, outstandingVnd };
 }
 
 export async function getStudentDetail(

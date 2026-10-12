@@ -1,11 +1,11 @@
 import "server-only";
 
-import type {
-  SessionAttendanceStatus,
-  SessionDetailReadModel,
-  SessionDetailResult,
-  SessionNotebookStatus,
-  SessionParticipantReadModel,
+import {
+  isSessionAttendanceStatus,
+  type SessionDetailReadModel,
+  type SessionDetailResult,
+  type SessionNotebookStatus,
+  type SessionParticipantReadModel,
 } from "@/features/sessions/detail-read-models";
 import type {
   SessionKind,
@@ -128,17 +128,6 @@ function isSessionStatus(
     "in_progress",
     "completed",
     "cancelled",
-  ].includes(value);
-}
-
-function isAttendanceStatus(
-  value: string,
-): value is SessionAttendanceStatus {
-  return [
-    "present",
-    "excused_absence",
-    "unexcused_absence",
-    "additional_study",
   ].includes(value);
 }
 
@@ -440,7 +429,7 @@ export async function getSessionDetail(
 
         const attendanceStatus =
           attendance &&
-          isAttendanceStatus(
+          isSessionAttendanceStatus(
             attendance.attendance_status,
           )
             ? attendance.attendance_status

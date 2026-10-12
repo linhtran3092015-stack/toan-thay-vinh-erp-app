@@ -47,6 +47,14 @@ export function formatPercent(value: number): string {
   return `${decimalFormatter.format(value)}%`;
 }
 
+/** Learning mode copy shared by students, classes and sessions. */
+export function formatLearningMode(value: string | null | undefined): string {
+  if (value === "offline") return "Tại lớp";
+  if (value === "online") return "Trực tuyến";
+  if (value === "hybrid") return "Kết hợp";
+  return "Chưa xác định";
+}
+
 /** Session counts read naturally in Vietnamese ("12 buổi"). */
 export function formatSessions(count: number): string {
   return `${integerFormatter.format(count)} buổi`;

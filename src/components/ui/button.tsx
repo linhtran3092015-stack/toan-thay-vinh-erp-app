@@ -1,35 +1,156 @@
-import { forwardRef, type ButtonHTMLAttributes } from "react";
+import {
+  forwardRef,
+  useId,
+  type ButtonHTMLAttributes,
+} from "react";
 
 import { cn } from "@/lib/utils";
 
-type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger";
-type ButtonSize = "sm" | "md" | "lg";
+/**
+ * Design-file variants (10-thu-vien-component): primary, secondary, ghost,
+ * danger-outline, danger-solid (dialog confirm only). `outline` and `danger`
+ * are the pre-handoff names still used by features and map onto the new
+ * presentation; they stay supported on purpose.
+ */
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "danger-outline"
+  | "danger-solid"
+  | "outline"
+  | "danger";
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+/** 32px (table row, desktop, always labelled) · 40px desktop · 44px touch. */
+export type ButtonSize = "sm" | "md" | "lg";
+
+export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  /** Keeps the label, adds a 16px spinner, disables the control. */
   isLoading?: boolean;
+  /**
+   * Plain-language reason rendered under a disabled button and linked through
+   * `aria-describedby`. Features own the wording; the button only shows it.
+   */
+  disabledReason?: string;
+  /** Square control holding one icon. Callers must pass `aria-label`. */
+  iconOnly?: boolean;
 };
 
-const variantClasses: Record<ButtonVariant, string> = {
-  primary:
-    "border-action-primary bg-action-primary text-text-on-primary hover:bg-action-primary-hover disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
-  secondary:
-    "border-border-strong bg-surface-base text-text-strong hover:bg-interactive-hover disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
-  outline:
-    "border-border-subtle bg-surface-base text-text-strong hover:border-border-strong hover:bg-interactive-hover disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
-  ghost:
-    "border-transparent bg-transparent text-text-muted hover:bg-interactive-hover hover:text-text-strong disabled:text-text-disabled",
-  // Outlined so it never reads as the (also red) primary accent; fills on hover.
-  danger:
-    "border-danger bg-danger-bg text-danger hover:bg-danger hover:text-text-on-danger disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
+type VariantPresentation = {
+  base: string;
+  padding: string;
+  disabled: string;
+  pending: string;
+  spinner: string;
 };
 
-const sizeClasses: Record<ButtonSize, string> = {
-  sm: "h-8 rounded-md px-3 text-control",
-  md: "h-10 rounded-md px-4 text-control",
-  lg: "h-11 rounded-md px-5 text-control",
+const variants: Record<ButtonVariant, VariantPresentation> = {
+  primary: {
+    base:
+      "border-transparent bg-action-primary font-medium text-text-on-primary shadow-[var(--action-primary-shadow)] hover:bg-action-primary-hover active:translate-y-px",
+    padding: "px-[18px]",
+    disabled:
+      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled disabled:shadow-none",
+    pending: "opacity-80",
+    spinner: "border-current/40 border-t-current",
+  },
+  secondary: {
+    base:
+      "border-border-strong bg-surface-base font-medium text-text-strong hover:border-border-strong-hover hover:bg-interactive-hover",
+    padding: "px-[18px]",
+    disabled:
+      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
+    pending: "text-text-muted",
+    spinner: "border-border-subtle border-t-current",
+  },
+  outline: {
+    base:
+      "border-border-subtle bg-surface-base font-medium text-text-strong hover:border-border-strong-hover hover:bg-interactive-hover",
+    padding: "px-4",
+    disabled:
+      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
+    pending: "text-text-muted",
+    spinner: "border-border-subtle border-t-current",
+  },
+  ghost: {
+    base:
+      "border-transparent bg-transparent font-semibold text-text-default hover:bg-interactive-hover hover:text-text-strong",
+    padding: "px-3",
+    disabled: "disabled:bg-transparent disabled:text-text-disabled",
+    pending: "text-text-muted",
+    spinner: "border-border-subtle border-t-current",
+  },
+  "danger-outline": {
+    base:
+      "border-danger bg-surface-base font-semibold text-danger hover:bg-danger-bg",
+    padding: "px-4",
+    disabled:
+      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
+    pending: "opacity-80",
+    spinner: "border-current/40 border-t-current",
+  },
+  danger: {
+    base:
+      "border-danger bg-surface-base font-semibold text-danger hover:bg-danger-bg",
+    padding: "px-4",
+    disabled:
+      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
+    pending: "opacity-80",
+    spinner: "border-current/40 border-t-current",
+  },
+  "danger-solid": {
+    base:
+      "border-transparent bg-danger font-semibold text-text-on-danger hover:bg-[color-mix(in_srgb,var(--status-danger)_88%,black)] active:translate-y-px",
+    padding: "px-4",
+    disabled:
+      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
+    pending: "opacity-80",
+    spinner: "border-current/40 border-t-current",
+  },
 };
+
+const sizes: Record<ButtonSize, { base: string; iconOnly: string; padding?: string }> = {
+  sm: {
+    base: "h-8 rounded-[calc(var(--radius-md)-2px)] text-[13px]/[18px]",
+    iconOnly: "w-8",
+    padding: "px-3",
+  },
+  md: { base: "h-10 rounded-md text-control", iconOnly: "w-10" },
+  lg: { base: "h-11 rounded-md text-control", iconOnly: "w-11" },
+};
+
+const baseClassName =
+  "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus focus-visible:shadow-[0_0_0_5px_var(--focus-ring)] disabled:pointer-events-none";
+
+/**
+ * Button presentation for non-button elements (e.g. a `Link` that must look
+ * like the page's primary action). Keeps one source of truth for the styles.
+ */
+export function getButtonClassName({
+  className,
+  iconOnly = false,
+  size = "md",
+  variant = "primary",
+}: {
+  className?: string;
+  iconOnly?: boolean;
+  size?: ButtonSize;
+  variant?: ButtonVariant;
+} = {}): string {
+  const presentation = variants[variant];
+  const sizing = sizes[size];
+
+  return cn(
+    baseClassName,
+    presentation.base,
+    presentation.disabled,
+    sizing.base,
+    iconOnly ? cn("px-0", sizing.iconOnly) : (sizing.padding ?? presentation.padding),
+    className,
+  );
+}
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
   className,
@@ -38,30 +159,62 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   variant = "primary",
   isLoading = false,
   disabled,
+  disabledReason,
+  iconOnly = false,
   children,
+  "aria-describedby": ariaDescribedBy,
   ...props
 }, ref) {
-  return (
+  const reasonId = useId();
+  const presentation = variants[variant];
+  const sizing = sizes[size];
+  const isDisabled = Boolean(disabled) || isLoading;
+  const showReason = Boolean(disabledReason) && Boolean(disabled) && !isLoading;
+
+  const button = (
     <button
+      aria-busy={isLoading || undefined}
+      aria-describedby={
+        showReason
+          ? [ariaDescribedBy, reasonId].filter(Boolean).join(" ")
+          : ariaDescribedBy
+      }
       className={cn(
-        "inline-flex cursor-pointer items-center justify-center gap-2 border font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:pointer-events-none",
-        variantClasses[variant],
-        sizeClasses[size],
+        baseClassName,
+        presentation.base,
+        isLoading ? presentation.pending : presentation.disabled,
+        sizing.base,
+        iconOnly ? cn("px-0", sizing.iconOnly) : (sizing.padding ?? presentation.padding),
         className,
       )}
-      disabled={disabled || isLoading}
+      disabled={isDisabled}
       ref={ref}
       type={type}
-      aria-busy={isLoading || undefined}
       {...props}
     >
       {isLoading ? (
         <span
           aria-hidden="true"
-          className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+          className={cn(
+            "h-4 w-4 shrink-0 animate-spin rounded-full border-2",
+            presentation.spinner,
+          )}
         />
       ) : null}
       {children}
     </button>
+  );
+
+  if (!showReason) {
+    return button;
+  }
+
+  return (
+    <span className="inline-flex flex-col items-start gap-1">
+      {button}
+      <span className="text-caption text-text-muted" id={reasonId}>
+        {disabledReason}
+      </span>
+    </span>
   );
 });

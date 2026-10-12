@@ -140,7 +140,7 @@ The following patterns are proven by the completed Foundation through Wave 6 ref
 | Sessions | URL-backed directory state, lifecycle presentation, session-detail composition, and separate lifecycle versus `lockedAt` presentation. |
 | Attendance | Dense editable operational data presentation, container-width record-list fallback, permission-safe identity presentation, and editable/readonly state treatment. |
 | Results | DataTableFrame/record-list reuse, eligibility/editability presentation, validation feedback, and feature-owned result semantics. |
-| Lock | Server-authoritative readiness, irreversible-action presentation, pending-safe confirmation, separate immutable `lockedAt`, and no client ledger/readiness engine. |
+| Lock | Server-authoritative readiness (the client may only mirror the lock RPC's attendance rule for the checklist and disabled reason, per WORKFLOW_CONTRACTS_A_E.md), irreversible-action presentation, pending-safe confirmation, separate immutable `lockedAt`, and no client ledger engine. |
 
 ## Cross-wave rule
 

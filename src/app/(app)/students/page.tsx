@@ -1,6 +1,6 @@
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
-import { getStudentDirectory } from "@/features/students/data";
+import { getStudentDirectory, getStudentDirectoryMetrics } from "@/features/students/data";
 import { StudentListPage } from "@/features/students/student-list-page";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -31,16 +31,18 @@ export default async function StudentsRoute() {
     );
   }
 
-  const directoryResult = await getStudentDirectory({
-    includeClasses:
-      permissionResult.permissions.includes(
-        "classes.view",
-      ),
-    includeGuardians:
-      permissionResult.permissions.includes(
-        "guardians.view",
-      ),
-  });
+  const permissions = permissionResult.permissions;
+  const [directoryResult, metrics] = await Promise.all([
+    getStudentDirectory({
+      includeClasses: permissions.includes("classes.view"),
+      includeGuardians: permissions.includes("guardians.view"),
+    }),
+    getStudentDirectoryMetrics({
+      includeAttendance: permissions.includes("attendance.view") && permissions.includes("sessions.view"),
+      includeBalance: permissions.includes("session_ledger.view"),
+      includeDebt: permissions.includes("payments.view"),
+    }),
+  ]);
 
   if (!directoryResult.ok) {
     return (
@@ -56,9 +58,13 @@ export default async function StudentsRoute() {
       canCreateStudent={permissionResult.permissions.includes(
         "students.create",
       )}
+      canImportStudents={permissionResult.permissions.includes(
+        "imports.students",
+      )}
       canManageStatus={permissionResult.permissions.includes(
         "students.manage_status",
       )}
+      metrics={metrics}
       students={directoryResult.students}
     />
   );
