@@ -114,7 +114,7 @@ describe("Classes directory quick chips and empty-by-filter (design 06b)", () =>
     expect(dataRows()).toHaveLength(3);
 
     fireEvent.click(within(chips).getByRole("button", { name: chip("Nháp", 1) }));
-    expect(historySpies.replace).toHaveBeenLastCalledWith(window.history.state, "", "/classes?status=draft");
+    expect(historySpies.replace).toHaveBeenLastCalledWith(null, "", "/classes?status=draft");
     view.rerender(<ClassListPage canCreateClass={false} classes={classes} />);
 
     expect(screen.getByRole("button", { name: chip("Nháp", 1) })).toHaveAttribute("aria-pressed", "true");
@@ -138,7 +138,7 @@ describe("Classes directory quick chips and empty-by-filter (design 06b)", () =>
     expect(within(frame).getByText("Nới rộng điều kiện hoặc xóa bộ lọc để xem lại danh sách.")).toBeInTheDocument();
 
     fireEvent.click(within(frame).getByRole("button", { name: "Xóa lọc" }));
-    expect(historySpies.replace).toHaveBeenLastCalledWith(window.history.state, "", "/classes");
+    expect(historySpies.replace).toHaveBeenLastCalledWith(null, "", "/classes");
     rerender();
 
     expect(dataRows()).toHaveLength(3);
@@ -165,7 +165,42 @@ describe("Classes directory pagination history", () => {
     fireEvent.click(within(pager).getByRole("button", { name: "Sau" }));
 
     expect(historySpies.push).toHaveBeenCalledTimes(1);
-    expect(historySpies.push).toHaveBeenLastCalledWith(window.history.state, "", "/classes?status=active&page=2");
+    expect(historySpies.push).toHaveBeenLastCalledWith(null, "", "/classes?status=active&page=2");
     expect(historySpies.replace).not.toHaveBeenCalled();
+  });
+
+  // Value: protects=URL writes hand Next a null state so its patched History API syncs useSearchParams; fails_when=the page passes window.history.state, which carries Next's __NA marker and makes Next skip the sync (filters, chips and paging stop working in the real app); why_new=ship review pass C CRITICAL — the spies above would not notice because jsdom's state is null; seam=none; no_claim=does not run Next's patched history
+  it("never forwards Next's internal history state when writing the URL", () => {
+    const stateGetter = vi.spyOn(window.history, "state", "get").mockReturnValue({ __NA: true });
+    try {
+      navigation.state.params = new URLSearchParams("status=active");
+      render(<ClassListPage canCreateClass={false} classes={manyClasses} />);
+
+      fireEvent.click(within(screen.getByRole("navigation", { name: "Phân trang lớp học" })).getByRole("button", { name: "Sau" }));
+      fireEvent.click(within(screen.getByRole("group", { name: "Lọc nhanh theo trạng thái" })).getByRole("button", { name: /^Tất cả/ }));
+
+      for (const [data] of [...historySpies.push.mock.calls, ...historySpies.replace.mock.calls]) {
+        expect(data).toBeNull();
+      }
+      expect(historySpies.push.mock.calls.length + historySpies.replace.mock.calls.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      stateGetter.mockRestore();
+    }
+  });
+
+  // Value: protects=after Back/Forward the next filter change builds on the URL's filters, not a stale buffer; fails_when=the pending buffer only re-syncs when equal to the rendered filters (pre-3806799), so a later change revives the abandoned filter; why_new=ship review pass C; seam=none; no_claim=does not dispatch a real popstate
+  it("builds the next filter change on the URL after Back, not on a stale buffer", () => {
+    navigation.state.params = new URLSearchParams("status=active");
+    const view = render(<ClassListPage canCreateClass={false} classes={manyClasses} />);
+
+    // A change the harness does not feed back yet leaves the buffer at status=active.
+    fireEvent.change(screen.getByTestId("desktop-class-search"), { target: { value: "Toán" } });
+    // Back: the URL now says status=closed without going through the page.
+    navigation.state.params = new URLSearchParams("status=closed");
+    view.rerender(<ClassListPage canCreateClass={false} classes={manyClasses} />);
+    fireEvent.change(screen.getByTestId("desktop-class-search"), { target: { value: "7-1" } });
+
+    expect(historySpies.replace).toHaveBeenLastCalledWith(null, "", expect.stringContaining("status=closed"));
+    expect(historySpies.replace).toHaveBeenLastCalledWith(null, "", expect.not.stringContaining("status=active"));
   });
 });

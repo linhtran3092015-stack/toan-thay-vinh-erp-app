@@ -201,6 +201,19 @@ describe("Student profile presentation (design 05)", () => {
     expect(screen.getByText("Chưa ghi danh lớp nào")).toBeInTheDocument();
   });
 
+  // Value: protects=a reserved or previously enrolled student is not told they never enrolled; fails_when=the empty class state ignores enrollment history; why_new=ship review pass C; seam=none; no_claim=does not check the resume action wiring
+  it("words the empty class state for a student who has been enrolled before", () => {
+    const base = buildDetail();
+    const detail = buildDetail({ activeEnrollment: null, activeSchedules: [], lifecycleStatus: "reserved" });
+    expect(base.enrollmentHistory.length).toBeGreaterThan(0);
+    const model = { ...buildModel({ end: hidden, reserve: hidden, resume: allowed, transfer: hidden }), activeEnrollment: null };
+
+    render(<StudentProfilePage {...ownerProps} detail={{ ...detail, enrollmentHistory: base.enrollmentHistory }} enrollmentUiModel={model} initialTab="classes" />);
+
+    expect(screen.getByText("Không có lớp đang học")).toBeInTheDocument();
+    expect(screen.queryByText("Chưa ghi danh lớp nào")).not.toBeInTheDocument();
+  });
+
   it("hides money and guardian details from a teaching assistant", () => {
     render(
       <StudentProfilePage

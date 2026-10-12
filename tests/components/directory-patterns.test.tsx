@@ -86,6 +86,25 @@ describe("BulkActionBar", () => {
     fireEvent.click(within(bar).getByRole("button", { name: "Bỏ chọn" }));
     expect(onClear).toHaveBeenCalledTimes(1);
   });
+
+  // Value: protects=clearing a selection hands focus to the first focus target the current layout renders; fails_when=focus goes to a CSS-hidden control (desktop hides the mobile filter trigger) and drops to <body>; why_new=ship review pass C; seam=none; no_claim=does not prove which controls a real breakpoint hides (checkVisibility stubbed)
+  it("returns focus to the first rendered candidate after Bỏ chọn", () => {
+    const hidden = document.createElement("button");
+    const visible = document.createElement("button");
+    hidden.checkVisibility = () => false;
+    visible.checkVisibility = () => true;
+    document.body.append(hidden, visible);
+    try {
+      render(
+        <BulkActionBar onClear={() => {}} returnFocusRefs={[{ current: hidden }, { current: visible }]} selectedCount={2} subject="học sinh" />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Bỏ chọn" }));
+      expect(document.activeElement).toBe(visible);
+    } finally {
+      hidden.remove();
+      visible.remove();
+    }
+  });
 });
 
 describe("FilterBar", () => {

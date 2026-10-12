@@ -88,15 +88,16 @@ export function ClassListPage({ canCreateClass, canImportClasses = false, classe
     const filters = mergePendingClassDirectoryFilter(pendingFiltersRef.current, viewState.filters, key, value);
     pendingFiltersRef.current = filters;
     // Filtering is client-side over the `classes` prop, so update the URL through the
-    // History API (synced with useSearchParams) instead of a server round trip per keystroke.
-    window.history.replaceState(window.history.state, "", getClassDirectoryHref(searchParams, { filters, page: 1 }));
+    // History API instead of a server round trip per keystroke. The state must be `null`:
+    // Next skips its own sync (and useSearchParams never updates) when it sees its internal state.
+    window.history.replaceState(null, "", getClassDirectoryHref(searchParams, { filters, page: 1 }));
   };
   const resetFilters = () => {
     const state = resetClassDirectoryViewState();
     pendingFiltersRef.current = state.filters;
-    window.history.replaceState(window.history.state, "", getClassDirectoryHref(searchParams, state));
+    window.history.replaceState(null, "", getClassDirectoryHref(searchParams, state));
   };
-  const updatePage = (page: number) => window.history.pushState(window.history.state, "", getClassDirectoryHref(searchParams, { filters: viewState.filters, page }));
+  const updatePage = (page: number) => window.history.pushState(null, "", getClassDirectoryHref(searchParams, { filters: viewState.filters, page }));
   const createHref = directoryQuery ? `/classes/new?${directoryQuery}` : "/classes/new";
   const isEmptyByFilter = filteredClasses.length === 0 && hasFilters;
   const emptyByFilterState = (

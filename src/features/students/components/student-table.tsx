@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 
 import {
   DataTableFrame,
@@ -25,6 +25,8 @@ interface StudentTableProps {
   status?: DataTableFrameStatus;
   empty?: ReactNode;
   loading?: ReactNode;
+  /** Header "select all" checkbox, e.g. to return focus after clearing a selection. */
+  selectAllRef?: RefObject<HTMLInputElement | null>;
 }
 
 const checkboxClassName =
@@ -41,6 +43,7 @@ export function StudentTable({
   status = "ready",
   empty,
   loading,
+  selectAllRef,
 }: StudentTableProps) {
   const pageIds = students.map((student) => student.id);
   const selectedOnPage = pageIds.filter((id) => selectedIds?.has(id)).length;
@@ -127,6 +130,7 @@ export function StudentTable({
                 onChange={(event) => onToggleAll?.(pageIds, event.target.checked)}
                 ref={(node) => {
                   if (node) node.indeterminate = selectedOnPage > 0 && !allSelected;
+                  if (selectAllRef) selectAllRef.current = node;
                 }}
                 type="checkbox"
               />

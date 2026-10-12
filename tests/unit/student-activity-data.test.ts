@@ -163,8 +163,8 @@ describe("getStudentUpcomingSession", () => {
     expect(supabase.from).not.toHaveBeenCalledWith("class_sessions");
   });
 
-  // Value: protects=a component link ended with a future date still feeds the next session; fails_when=links are filtered by effective_to IS NULL only, dropping still-active links; why_new=review pass B; seam=none; no_claim=does not prove PostgREST parses the or() string
-  it("keeps component links that are active today, including ones ending later", async () => {
+  // Value: protects=component links that have not ended (ending later, or starting later) still feed the next session; fails_when=links are filtered by effective_to IS NULL only, or by effective_from <= today which hides a composite class starting next week; why_new=review passes B and C; seam=none; no_claim=does not prove PostgREST parses the or() string
+  it("keeps component links that have not ended, including ones starting or ending later", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-12T05:00:00Z"));
     try {
@@ -175,7 +175,7 @@ describe("getStudentUpcomingSession", () => {
 
       await getStudentUpcomingSession("class-1");
 
-      expect(links.lte).toHaveBeenCalledWith("effective_from", "2026-10-12");
+      expect(links.lte).not.toHaveBeenCalled();
       expect(links.or).toHaveBeenCalledWith("effective_to.is.null,effective_to.gte.2026-10-12");
       expect(links.is).not.toHaveBeenCalled();
     } finally {

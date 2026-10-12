@@ -60,6 +60,7 @@ export function StudentListPage({
   const [isBulkTransitionOpen, setIsBulkTransitionOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   const classNames = useMemo(
     () =>
@@ -103,7 +104,7 @@ export function StudentListPage({
         filters: nextFilters,
         page: nextPage,
       });
-      window.history.replaceState(window.history.state, "", nextHref);
+      window.history.replaceState(null, "", nextHref);
     };
 
     if (immediate) {
@@ -219,7 +220,7 @@ export function StudentListPage({
         filters,
         page: newPage,
       });
-      window.history.pushState(window.history.state, "", nextHref);
+      window.history.pushState(null, "", nextHref);
     }
   };
 
@@ -330,7 +331,7 @@ export function StudentListPage({
       />
 
       {canManageStatus ? (
-        <BulkActionBar onClear={clearSelection} returnFocusRef={filterTriggerRef} selectedCount={selectedIds.size} subject="học sinh">
+        <BulkActionBar onClear={clearSelection} returnFocusRefs={[selectAllRef, filterTriggerRef]} selectedCount={selectedIds.size} subject="học sinh">
           <Button onClick={() => setIsBulkTransitionOpen(true)} size="sm" variant="secondary">
             Chuyển trạng thái…
           </Button>
@@ -346,6 +347,7 @@ export function StudentListPage({
           </p>
           <StudentTable
             directoryQuery={directoryQuery}
+            selectAllRef={selectAllRef}
             empty={emptyByFilterState}
             footer={
               <Pagination

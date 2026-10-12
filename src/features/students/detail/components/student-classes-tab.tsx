@@ -58,10 +58,21 @@ export function StudentClassesTab({ canViewClasses, detail, model, onOperation }
         />
       ) : (
         <div className="rounded-lg border border-dashed border-border-strong bg-surface-base px-5 py-8 text-center">
-          <p className="text-body font-semibold text-text-strong">Chưa ghi danh lớp nào</p>
-          <p className="mt-1 text-secondary text-text-muted">
-            Học sinh chưa có lớp đang hoạt động, nên chưa có lịch học và chưa bị trừ buổi.
-          </p>
+          {ended.length > 0 ? (
+            <>
+              <p className="text-body font-semibold text-text-strong">Không có lớp đang học</p>
+              <p className="mt-1 text-secondary text-text-muted">
+                Học sinh hiện không có lớp đang hoạt động, nên không có lịch học và không bị trừ buổi mới.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-body font-semibold text-text-strong">Chưa ghi danh lớp nào</p>
+              <p className="mt-1 text-secondary text-text-muted">
+                Học sinh chưa có lớp đang hoạt động, nên chưa có lịch học và chưa bị trừ buổi.
+              </p>
+            </>
+          )}
           {enrollAction ? (
             <Button
               className="mt-4"

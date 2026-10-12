@@ -25,13 +25,6 @@ export function mergePendingClassDirectoryFilter(
   return { ...(pending ?? rendered), [key]: value };
 }
 
-export function areClassDirectoryFiltersEqual(
-  left: ClassDirectoryFiltersState,
-  right: ClassDirectoryFiltersState,
-): boolean {
-  return left.search === right.search && left.year === right.year && left.grade === right.grade && left.level === right.level && left.mode === right.mode && left.status === right.status;
-}
-
 export function parseClassDirectoryViewState(
   params: SearchParamsLike,
   years: readonly string[],

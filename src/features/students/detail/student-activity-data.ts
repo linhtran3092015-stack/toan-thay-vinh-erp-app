@@ -194,8 +194,7 @@ export async function getStudentUpcomingSession(classId: string): Promise<Studen
       .from("class_component_links")
       .select("component_class_id")
       .eq("parent_class_id", classId)
-      // Active today: a link ended with a future date still holds sessions until then.
-      .lte("effective_from", today)
+      // Not ended yet: a link ending later (or starting later) can still hold the next session.
       .or(`effective_to.is.null,effective_to.gte.${today}`);
 
     // Without the component classes a composite class would look unscheduled.

@@ -12,8 +12,11 @@ interface BulkActionBarProps {
   children?: ReactNode;
   className?: string;
   onClear: () => void;
-  /** Receives focus when "Bỏ chọn" removes the bar, so keyboard users keep their place. */
-  returnFocusRef?: RefObject<HTMLElement | null>;
+  /**
+   * Candidates for focus when "Bỏ chọn" removes the bar, so keyboard users keep their place.
+   * The first one that is rendered wins (layouts hide some controls with CSS).
+   */
+  returnFocusRefs?: ReadonlyArray<RefObject<HTMLElement | null>>;
 }
 
 /**
@@ -24,7 +27,7 @@ export function BulkActionBar({
   children,
   className,
   onClear,
-  returnFocusRef,
+  returnFocusRefs,
   selectedCount,
   subject,
 }: BulkActionBarProps) {
@@ -49,7 +52,10 @@ export function BulkActionBar({
         {children}
         <Button
           onClick={() => {
-            returnFocusRef?.current?.focus();
+            returnFocusRefs
+              ?.map((ref) => ref.current)
+              .find((element) => element !== null && element.isConnected && (element.checkVisibility?.() ?? true))
+              ?.focus();
             onClear();
           }}
           size="sm"
