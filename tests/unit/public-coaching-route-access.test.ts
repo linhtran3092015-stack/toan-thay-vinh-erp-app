@@ -62,4 +62,21 @@ describe("component preview route access (/dev/)", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/login");
   });
+
+  // Value: protects=src/app/dev/layout.tsx 404s every /dev/* preview in production, so a signed-in staff member never reaches fixture pages; fails_when=the NODE_ENV check is dropped/inverted or the layout stops calling notFound(); why_new=the proxy cases only cover signed-out requests, nothing exercised the layout gate; seam=none; no_claim=does not prove next build omits the routes or that each preview page has its own check
+  it("404s every /dev/ preview through the layout in production, signed in or not", async () => {
+    const { default: DevLayout } = await import("@/app/dev/layout");
+
+    expect(DevLayout({ children: "preview" })).toBe("preview");
+
+    vi.stubEnv("NODE_ENV", "production");
+    let thrown: unknown;
+    try {
+      DevLayout({ children: "preview" });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect((thrown as { digest?: string } | undefined)?.digest).toMatch(/404/);
+  });
 });
