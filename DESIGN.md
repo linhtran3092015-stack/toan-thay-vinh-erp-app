@@ -118,6 +118,7 @@ Development-only preview routes render redesigned components with fixture data i
 | `/dev/session` | Session workbench with fixture data: attendance group, results, guarded lock panel. Buttons call real server actions, so look only. |
 | `/dev/student` | Student profile with fixture data. Enrollment dialogs open but their server actions fail on fixture ids. |
 | `/dev/class` | Class detail with fixture data: header, Tổng quan, Buổi học, Học sinh, Kết quả and Học phí tabs, enrol, transfer and reserve dialogs. Query params `state` (`active`, `unscheduled`, `draft`, `closed`, `composite`), `role` (`owner`, `ta`), `tab` (`overview`, `sessions`, `students`, `results`, `fees`) and `period` (`locked` by default, `draft`) for the Học phí tab. Dialogs open but their server actions fail on fixture ids, as does switching the tuition period. |
+| `/dev/dashboard` | Home dashboard (design 02) with fixture data: centre layout (2a) and personal layout (2b) chosen by permission codes, with the "Phân tích" section below. Query params `role` (`owner`, `accountant`, `ta`) and `state` (`normal`, `empty`, `errors`). Links point at real routes and the timekeeping dialog calls a real server action, so look only; the live payroll estimate card is left out. |
 
 ---
 
@@ -515,7 +516,7 @@ Responsive behavior changes layout, not data availability, permissions, route ac
 - This document directs Wave 1+ presentation work only. It authorizes no route, permission, action, RPC, schema, RLS, RBAC, audit, state-machine, server filtering, or pagination change. Changes the owner approved separately are recorded in `docs/redesign/WORKFLOW_CONTRACTS_A_E.md` (for example v0.8.0.0: class-page bulk cancel and enrolment search).
 - `components/ui` implements domain-agnostic tokens/primitives; `components/shared` presents generic loading/empty/error/permission/result/pending states; `components/patterns` composes reusable page and operational presentation. Features keep all domain behavior.
 - New pattern primitives require two real workflow uses or an approved contractual need.
-- Dev preview routes (`/dev/ui`, `/dev/shell`, `/dev/lists`, `/dev/session`, `/dev/student`, `/dev/class`) skip sign-in for GET/HEAD only, and only outside production, and use fixture data; see the 2026-10-12 update at the top.
+- Dev preview routes (`/dev/ui`, `/dev/shell`, `/dev/lists`, `/dev/session`, `/dev/student`, `/dev/class`, `/dev/dashboard`) skip sign-in for GET/HEAD only, and only outside production, and use fixture data; see the 2026-10-12 update at the top.
 - Preserve non-A–E visual debt until its feature enters a later approved wave, except for the smallest compatibility fix required by the global typography foundation.
 
 ## Decisions log

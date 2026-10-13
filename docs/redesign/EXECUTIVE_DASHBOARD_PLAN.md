@@ -80,6 +80,8 @@ Each database function:
 
 Desktop uses a 12-column grid. Tablet uses two columns. Mobile uses one column without horizontal page scrolling. Charts keep readable labels and expose equivalent text/accessible names.
 
+Since v0.10.0.0, `/` opens on the home dashboard (design 02, `src/features/dashboard/components/home/dashboard-home.tsx`) and this executive dashboard renders below it as the "Phân tích" section. Its header has the section title, data timestamp, real month selector and the print export, with no greeting. The attention queue (item 6) is no longer rendered here; its items feed the home's "Cần bạn xử lý" / "Việc của bạn" list. A failed executive read shows an error in place of the section while the home blocks above still render. Owner-approved for the Stumana redesign step 6 (v0.10.0.0).
+
 ## Permission model
 
 | Data | Required permission |
