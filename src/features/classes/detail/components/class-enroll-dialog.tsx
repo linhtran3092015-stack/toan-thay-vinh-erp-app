@@ -27,8 +27,6 @@ const VISIBLE_MATCHES = 40;
 
 const ENROLL_SEARCH_DEBOUNCE_MS = 300;
 
-/** Shown when the search call itself fails; a returned error carries its own message. */
-
 type RemoteSearch =
   | { status: "idle" }
   | { status: "loading" }

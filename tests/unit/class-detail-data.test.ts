@@ -203,25 +203,37 @@ describe("getClassDetailWorkspace", () => {
     expect(workspace.absenceStreaks).toMatchObject({ status: "ready", value: [{ count: 2, student: { id: "a" } }] });
   });
 
-  it("fails attendance on its own when the roster RPC fails, keeping sessions", async () => {
+  // Value: protects=a roster RPC that fails or throws for one session leaves only that session unresolved; the others keep their tallies and the attendance feed stays ready (owner decision D18);
+  // fails_when=one failed or rejected resolve_class_session_roster call marks the whole attendance feed failed, or the failed session shows a 0/0 tally instead of an unknown one;
+  // why_new=the loader used to drop every roster on the first failed call (ship adversarial review);
+  // seam=none; no_claim=does not prove which errors the RPC raises for a deleted session
+  it("leaves only the session whose roster RPC failed unresolved, keeping the feed", async () => {
     tables({
       class_component_links: { data: [], error: null },
-      class_sessions: { data: [sessionRow("s1", "2026-10-12", "completed")], error: null },
-      session_attendance: { data: [], error: null },
+      class_sessions: {
+        data: [sessionRow("s1", "2026-10-12", "completed"), sessionRow("s2", "2026-10-09", "completed"), sessionRow("s3", "2026-10-07", "completed")],
+        error: null,
+      },
+      session_attendance: { data: [{ attendance_status: "present", class_session_id: "s2", student_id: "a" }], error: null },
       session_results: { data: [], error: null },
       student_enrollments: { data: [], error: null },
     });
-    supabase.rpc.mockResolvedValue({ data: null, error: { message: "boom" } });
+    supabase.rpc.mockImplementation(async (_name: string, args: { p_class_session_id: string }) => {
+      if (args.p_class_session_id === "s1") return { data: null, error: { message: "CLASS_SESSION_NOT_FOUND" } };
+      if (args.p_class_session_id === "s3") throw new Error("network down");
+      return { data: [{ enrollment_class_id: "class-1", student_id: "a" }], error: null };
+    });
 
     const workspace = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
 
     expect(workspace.sessions.status).toBe("ready");
-    expect(workspace.attendance).toEqual({ reason: "failed", status: "unavailable" });
-    // Streaks read attendance rows directly, so they survive a roster failure.
+    expect(workspace.attendance).toEqual({ status: "ready", value: true });
     expect(workspace.absenceStreaks).toEqual({ status: "ready", value: [] });
-    if (workspace.sessions.status === "ready") {
-      expect(workspace.sessions.value.rows[0]).toMatchObject({ attendance: null, rosterCount: null });
-    }
+    if (workspace.sessions.status !== "ready") return;
+    const byId = Object.fromEntries(workspace.sessions.value.rows.map((row) => [row.id, row]));
+    expect(byId.s1).toMatchObject({ attendance: null, rosterCount: null });
+    expect(byId.s3).toMatchObject({ attendance: null, rosterCount: null });
+    expect(byId.s2).toMatchObject({ attendance: { absent: 0, additional: 0, present: 1, unmarked: 0 }, rosterCount: 1 });
   });
 
   // Value: protects=a TA without payments.view never gets a debt feed marked "failed" (which renders tuition tiles) when the client or the enrolment read fails;
@@ -328,12 +340,15 @@ describe("getClassDetailWorkspace", () => {
         class_component_links: { data: [], error: null },
         class_sessions: { data: [sessionRow("s1", "2026-10-12", "completed")], error: null },
         session_attendance: { data: [], error: null },
-        session_results: { data: [], error: null },
+        // A loader that throws (not a returned error): the results read rejects.
+        session_results: () => {
+          throw new Error("network down");
+        },
         student_enrollments: { data: [{ student: { full_name: "An", id: "a", public_code: "HS1" }, student_id: "a" }], error: null },
         student_payment_requests: { data: [], error: null },
       });
     load();
-    supabase.rpc.mockRejectedValue(new Error("network down"));
+    supabase.rpc.mockResolvedValue({ data: [], error: null });
 
     const owner = await getClassDetailWorkspace("class-1", allowed);
 

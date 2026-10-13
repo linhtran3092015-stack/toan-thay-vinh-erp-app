@@ -15,7 +15,10 @@ export const ENROLLMENT_SEARCH_MIN_LENGTH = 2;
 /** Longer enroll-dialog search input is cut; nobody types a name or code this long. */
 export const ENROLLMENT_SEARCH_MAX_LENGTH = 100;
 
-/** Shown by the enroll dialog and returned by the search action when a search fails. */
+/**
+ * Shown by the enroll dialog when the search call itself fails, and returned by the
+ * search action when the query fails; other returned errors carry their own message.
+ */
 export const ENROLLMENT_SEARCH_FAILED_MESSAGE = "Chưa tìm được học sinh, thử lại.";
 
 /** A feed the viewer may not read, or whose query failed, carries no value at all. */

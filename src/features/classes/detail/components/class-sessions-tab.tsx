@@ -227,7 +227,12 @@ export function ClassSessionsTab({
   }
 
   const hasBulkCancellable = eligibleIds.size > 0;
-  const selectableOnPage = pageRows.filter((row) => eligibleIds.has(row.id)).map((row) => row.id);
+  // Select-all takes only upcoming sessions: an overdue one may have been taught
+  // without being started in the app, and a cancel cannot be undone, so it must be
+  // ticked on its own (owner decision D17).
+  const selectableOnPage = pageRows
+    .filter((row) => eligibleIds.has(row.id) && getClassSessionStage(row, today, nowTime) !== "overdue")
+    .map((row) => row.id);
   const selectedOnPage = selectableOnPage.filter((id) => selectedIds.has(id)).length;
   const allOnPageSelected = selectableOnPage.length > 0 && selectedOnPage === selectableOnPage.length;
 
@@ -300,7 +305,7 @@ export function ClassSessionsTab({
       {hasBulkCancellable ? (
         <BulkActionBar
           // Same 864px container switch as the table/list (.class-sessions in globals.css).
-          actionSizeClassName="@max-[863px]:[&>button]:h-11 @min-[864px]:[&>button]:h-8"
+          actionSizeClassName="@max-[864px]:[&>button]:h-11 @min-[864px]:[&>button]:h-8"
           onClear={() => setSelectedIds(new Set())}
           returnFocusRefs={clearFocusRefs}
           selectedCount={selectedCount}
@@ -385,7 +390,7 @@ export function ClassSessionsTab({
                 <TableHeaderCell className="w-12">
                   {selectableOnPage.length > 0 ? (
                     <input
-                      aria-label="Chọn mọi buổi chưa bắt đầu trên trang"
+                      aria-label="Chọn mọi buổi sắp tới trên trang"
                       checked={allOnPageSelected}
                       className={checkboxClassName}
                       onChange={(event) => toggleAllOnPage(event.target.checked)}
@@ -483,6 +488,7 @@ export function ClassSessionsTab({
       {isCancelOpen ? (
         <BulkCancelDialog
           classId={classId}
+          isOverdue={(row) => getClassSessionStage(row, today, nowTime) === "overdue"}
           onClose={() => setIsCancelOpen(false)}
           onDone={(outcome) => {
             setIsCancelOpen(false);
@@ -691,12 +697,15 @@ interface BulkCancelOutcome {
 
 function BulkCancelDialog({
   classId,
+  isOverdue,
   onClose,
   onDone,
   returnFocusRef,
   rows: liveRows,
 }: {
   classId: string;
+  /** Past its date but never started: named in the warning so the owner checks it was not taught. */
+  isOverdue: (row: ClassSessionRow) => boolean;
   onClose: () => void;
   onDone: (outcome: BulkCancelOutcome) => void;
   returnFocusRef: RefObject<HTMLButtonElement | null>;
@@ -713,6 +722,7 @@ function BulkCancelDialog({
   const isReasonTooShort = trimmed.length < CANCEL_REASON_MIN_LENGTH;
   const isTooMany = rows.length > BULK_CANCEL_MAX_SESSIONS;
   const isEmpty = rows.length === 0;
+  const overdueCount = rows.filter(isOverdue).length;
   const reasonError = trimmed.length > 0 && isReasonTooShort ? `Lý do hủy phải có ít nhất ${CANCEL_REASON_MIN_LENGTH} ký tự.` : null;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -772,8 +782,17 @@ function BulkCancelDialog({
           </h2>
           <div className="mt-3 grid gap-1.5" id="class-bulk-cancel-description">
             <p className="rounded-md border border-danger-border bg-danger-bg px-3 py-2.5 text-secondary font-semibold text-danger-ink">
-              Các buổi sau sẽ bị hủy và không mở lại được: {rows.map((row) => `${formatSessionOrdinal(row.ordinal)} (${formatWeekdayDate(row.sessionDate, { year: false })})`).join(", ")}.
+              Các buổi sau sẽ bị hủy và không mở lại được:{" "}
+              {rows
+                .map((row) => `${formatSessionOrdinal(row.ordinal)} (${formatWeekdayDate(row.sessionDate, { year: false })}${isOverdue(row) ? ", đã qua ngày" : ""})`)
+                .join(", ")}
+              .
             </p>
+            {overdueCount > 0 ? (
+              <p className="text-secondary font-semibold text-warning-ink">
+                {overdueCount} buổi đã qua ngày mà chưa bắt đầu trên hệ thống. Kiểm tra chắc chắn buổi đó chưa dạy trước khi hủy.
+              </p>
+            ) : null}
             <p className="text-secondary text-text-muted">
               Buổi hủy không trừ buổi của học sinh. Cần dạy bù thì tạo buổi bù ở mục Tạo buổi học và chọn buổi đã hủy làm buổi gốc.
             </p>

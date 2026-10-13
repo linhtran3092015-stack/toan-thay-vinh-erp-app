@@ -270,27 +270,40 @@ const ROSTER_CONCURRENCY = 8;
  * RPC (the batch variant is internal-only). Locked sessions need no call: the
  * lock requires every roster student to be present or absent, and only roster
  * students may hold those statuses, so their roster is read off the attendance.
+ * A call that fails (a session deleted since the read, a transient error) only
+ * leaves that session unresolved: it lands in `failedIds`, the rest still count
+ * (owner decision D18).
  */
 async function loadOpenRosters(
   supabase: SupabaseClient,
   sessionIds: readonly string[],
-): Promise<Array<RosterEntry & { enrollment_class_id: string }> | null> {
+): Promise<{ entries: Array<RosterEntry & { enrollment_class_id: string }>; failedIds: Set<string> }> {
   const entries: Array<RosterEntry & { enrollment_class_id: string }> = [];
+  const failedIds = new Set<string>();
 
   for (const ids of chunk(sessionIds, ROSTER_CONCURRENCY)) {
     const results = await Promise.all(
-      ids.map(async (id) => ({ id, result: await supabase.rpc("resolve_class_session_roster", { p_class_session_id: id }) })),
+      ids.map(async (id) => {
+        try {
+          return { id, result: await supabase.rpc("resolve_class_session_roster", { p_class_session_id: id }) };
+        } catch {
+          return { id, result: null };
+        }
+      }),
     );
 
     for (const { id, result } of results) {
-      if (result.error) return null;
+      if (!result || result.error) {
+        failedIds.add(id);
+        continue;
+      }
       entries.push(
         ...(result.data ?? []).map((row) => ({ class_session_id: id, enrollment_class_id: row.enrollment_class_id, student_id: row.student_id })),
       );
     }
   }
 
-  return entries;
+  return { entries, failedIds };
 }
 
 /** Roster of a locked session = its students marked present or absent. */
@@ -440,7 +453,7 @@ async function fillSessionFeeds(
   const rosters =
     openRosters && attendance && classEnrollmentIds
       ? [
-          ...openRosters
+          ...openRosters.entries
             .filter((entry) => ownSessionIds.has(entry.class_session_id) || entry.enrollment_class_id === classId)
             .map(({ class_session_id, student_id }) => ({ class_session_id, student_id })),
           ...getLockedSessionRosters(
@@ -456,7 +469,7 @@ async function fillSessionFeeds(
   const rosterCounts = new Map<string, number>();
   for (const entry of rosters ?? []) rosterCounts.set(entry.class_session_id, (rosterCounts.get(entry.class_session_id) ?? 0) + 1);
   const tallies = rosters && attendance ? tallyClassSessionAttendance(rosters, attendance) : null;
-  const resolved = new Set([...lockedIds, ...openIds]);
+  const resolved = new Set([...lockedIds, ...openIds.filter((id) => !openRosters?.failedIds.has(id))]);
   const started = new Set(startedIds);
   // Once a session's roster is resolved, its results count only the students
   // its tally counts (roster plus additional_study walk-ins), so a withdrawn
@@ -499,7 +512,7 @@ async function fillSessionFeeds(
   }
 
   if (permissions.canViewAttendance && permissions.canViewStudents) {
-    // Without rosters (RPC failed) streaks fall back to the marks alone.
+    // Without rosters (no attendance read) streaks fall back to the marks alone.
     workspace.absenceStreaks =
       attendance && workspace.students.status === "ready"
         ? {

@@ -805,7 +805,7 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     ]);
     renderPage({ initialTab: "sessions", workspace: workspace({ sessions: { status: "ready", value: { rows, truncated: false } } }) });
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Chọn mọi buổi chưa bắt đầu trên trang" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Chọn mọi buổi sắp tới trên trang" }));
     expect(screen.getByRole("region", { name: "Đã chọn 5 buổi · B1, B2, B3 +2" })).toBeInTheDocument();
 
     const list = screen.getByRole("list", { name: "Buổi học của lớp" });
@@ -815,13 +815,38 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     expect(within(list).getAllByText("Đã hủy")).toHaveLength(1);
   });
 
+  // Value: protects=select-all takes only upcoming sessions; an overdue one (past its date, never started) is ticked on its own and the dialog warns that it may have been taught (owner decision D17);
+  // fails_when=select-all also selects overdue sessions, an overdue session cannot be selected at all, or the dialog does not mark it "đã qua ngày" with the warning;
+  // why_new=ship adversarial review: select-all could cancel past sessions that were taught but never started in the app;
+  // seam=none; no_claim=does not prove the server refuses nothing else for overdue sessions
+  it("keeps overdue sessions out of select-all and warns when one is ticked", () => {
+    const rows = orderClassSessions([
+      row({ id: "s-overdue", sessionDate: "2026-10-09" }),
+      row({ id: "s-soon", sessionDate: "2026-10-14" }),
+      row({ id: "s-later", sessionDate: "2026-10-16" }),
+    ]);
+    renderPage({ initialTab: "sessions", workspace: withRows(rows) });
+    const table = screen.getByRole("table", { name: "Buổi học của lớp" });
+
+    fireEvent.click(within(table).getByRole("checkbox", { name: "Chọn mọi buổi sắp tới trên trang" }));
+    expect(screen.getByRole("region", { name: /^Đã chọn 2 / })).toBeInTheDocument();
+    const overdueBox = within(table).getByRole("checkbox", { name: /Chọn buổi B1 / });
+    expect(overdueBox).not.toBeChecked();
+
+    fireEvent.click(overdueBox);
+    fireEvent.click(screen.getByRole("button", { name: "Hủy buổi…" }));
+    const dialog = screen.getByRole("dialog", { name: "Hủy 3 buổi học" });
+    expect(dialog).toHaveTextContent(/B1 \([^)]*, đã qua ngày\)/);
+    expect(within(dialog).getByText(/1 buổi đã qua ngày mà chưa bắt đầu trên hệ thống/)).toBeInTheDocument();
+  });
+
   // Value: protects=on mobile, where select-all is hidden, "Bỏ chọn" moves focus to the first row checkbox instead of the body;
   // fails_when=returnFocusRefs only holds the desktop select-all, so a hidden select-all leaves keyboard focus nowhere;
   // why_new=design/red-team review: select-all is desktop-only;
   // seam=checkVisibility is stubbed on the select-all to stand in for the md:hidden layout; no_claim=does not prove CSS visibility
   it("returns focus to the first mobile checkbox when select-all is hidden", () => {
     renderPage({ initialTab: "sessions" });
-    const selectAll = screen.getByRole("checkbox", { name: "Chọn mọi buổi chưa bắt đầu trên trang" });
+    const selectAll = screen.getByRole("checkbox", { name: "Chọn mọi buổi sắp tới trên trang" });
     Object.defineProperty(selectAll, "checkVisibility", { value: () => false });
     const list = screen.getByRole("list", { name: "Buổi học của lớp" });
     fireEvent.click(within(list).getByRole("checkbox", { name: /Chọn buổi B4 / }));
@@ -838,7 +863,7 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
   // seam=none (select-all's focus is stubbed as a no-op to stand in for display:none); no_claim=does not prove CSS hides select-all
   it("skips a select-all that cannot take focus when checkVisibility is missing", () => {
     renderPage({ initialTab: "sessions" });
-    const selectAll = screen.getByRole("checkbox", { name: "Chọn mọi buổi chưa bắt đầu trên trang" });
+    const selectAll = screen.getByRole("checkbox", { name: "Chọn mọi buổi sắp tới trên trang" });
     Object.defineProperty(selectAll, "focus", { value: () => undefined });
     const list = screen.getByRole("list", { name: "Buổi học của lớp" });
     fireEvent.click(within(list).getByRole("checkbox", { name: /Chọn buổi B4 / }));
