@@ -2,6 +2,28 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.8.0.0] - 2026-10-13
+
+Trang chi tiết lớp dựng lại theo phong cách Stumana (bước 5b, đợt 1): tab Tổng quan cho biết lớp đang cần xử lý gì, tab Buổi học có hủy buổi hàng loạt và ghi danh học sinh ngay trên trang lớp.
+
+### Added
+- **Trang chi tiết lớp** (`/classes/[id]`): đầu trang có trạng thái, thông tin lớp, nút Sửa lớp, Ghi danh học sinh và menu "…" để kích hoạt, đóng hoặc lưu trữ lớp. Menu nói rõ vì sao chưa đóng được (còn lịch cố định, còn học sinh đang học, còn buổi đang diễn ra) và hộp xác nhận đóng lớp nêu số buổi đã lên lịch sẽ bị hủy. Mở thẳng tab bằng `?tab=`.
+- **Tab Tổng quan**: buổi tiếp theo của lớp, tiến độ số buổi, khung "Lớp này cần bạn xử lý" (buổi chờ khóa kèm tình trạng điểm danh, buổi đã qua mà chưa bắt đầu, học sinh còn công nợ, học sinh vắng liên tiếp theo đúng quy tắc chăm sóc), biểu đồ chuyên cần 12 buổi gần nhất, ô sức khỏe lớp, lịch hằng tuần và lịch cố định. Phần nào thiếu quyền hoặc tải lỗi thì ghi rõ lý do, không hiện số 0 giả.
+- **Tab Buổi học**: lọc theo trạng thái (Sắp tới, Chờ khóa, Đã khóa, Đã hủy) có đếm số, mở đúng trang chứa buổi kế tiếp, cột điểm danh và kết quả. Nút trên mỗi dòng đổi theo tình trạng (Điểm danh, Khóa buổi, Mở buổi). Ô trống luôn kèm lời giải thích, kể cả trên điện thoại. Máy tính bảng và điện thoại dùng danh sách thẻ với ô chọn 44px.
+- **Hủy buổi hàng loạt** (chỉ chủ trung tâm): chọn tối đa 40 buổi chưa bắt đầu, nhập lý do, xem kết quả từng buổi. Buổi hủy không được mà vẫn còn hủy được thì giữ trong lựa chọn để thử lại. "Chọn tất cả" chỉ lấy buổi sắp tới; buổi đã qua ngày mà chưa bắt đầu phải tích riêng và hộp xác nhận cảnh báo kiểm tra buổi đó chưa dạy. Máy chủ kiểm tra lại từng buổi ngay trước khi hủy và không hủy buổi vừa được bắt đầu.
+- **Ghi danh từ trang lớp**: tìm học sinh theo tên hoặc mã trong toàn bộ học sinh chưa ghi danh, gõ không dấu vẫn ra kết quả; ngày bắt đầu mặc định theo giờ Việt Nam.
+- **Lớp ghép**: trang lớp cha liệt kê các lớp thành phần (kể cả liên kết bắt đầu sau), không hiện nút tạo lịch hay tạo buổi hàng loạt. Buổi của lớp thành phần chỉ hiện trong thời gian liên kết còn hiệu lực. Sĩ số, chuyên cần và số kết quả chỉ tính học sinh của chính lớp đang xem.
+- Menu "…" dùng chung cho trang lớp và hồ sơ học sinh, dùng được hoàn toàn bằng bàn phím.
+- Trang xem trước `/dev/class` với dữ liệu mẫu (trả 404 trên production).
+
+### Changed
+- Lỗi "lớp ghép không có lịch hoặc buổi riêng" có cùng một câu trên mọi màn hình (tạo lịch, tạo buổi, tạo buổi hàng loạt). Lỗi hủy buổi đã khóa hoặc không còn hủy được có câu báo riêng.
+- Biểu tượng trên trang lớp theo đúng nét 1.8 của hệ thiết kế.
+
+### Lưu ý triển khai
+- Không có migration.
+- Quy tắc "chỉ chủ trung tâm hủy hàng loạt" và việc không hủy buổi đang diễn ra mới được kiểm ở server action; RPC `cancel_class_session` vẫn nhận buổi `in_progress`. Cần chặn thêm ở database bằng migration riêng.
+
 ## [0.7.0.0] - 2026-10-13
 
 Giao diện mới theo phong cách Stumana: menu gọn theo nhóm, danh sách học sinh có số liệu chuyên cần, số dư buổi và công nợ, hồ sơ học sinh và trang buổi học được dựng lại.
