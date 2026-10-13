@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { compositeParentRpcMessages } from "@/features/classes/composite-parent-messages";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -21,8 +22,7 @@ const batchRpcErrorMessages: Record<string, string> = {
   CLASS_SESSION_SCHEDULE_CLASS_MISMATCH: "Khung lịch không thuộc lớp này.",
   CLASS_SESSION_SCHEDULE_NOT_EFFECTIVE: "Có buổi nằm ngoài thời gian hiệu lực của khung lịch.",
   CLASS_SESSION_WEEKDAY_MISMATCH: "Có buổi không đúng thứ trong tuần của khung lịch.",
-  COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION: "Lớp ghép không tạo buổi trực tiếp; hãy tạo ở lớp thành phần.",
-  COMPOSITE_PARENT_CANNOT_HAVE_SCHEDULE_TEMPLATE: "Lớp ghép không có lịch cố định riêng; lịch học nằm ở các lớp thành phần.",
+  ...compositeParentRpcMessages,
   INVALID_SESSION_TIME: "Giờ bắt đầu phải trước giờ kết thúc.",
   INVALID_COMPONENT_CODE: "Mã thành phần không hợp lệ.",
 };

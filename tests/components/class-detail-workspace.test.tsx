@@ -201,7 +201,44 @@ describe("ClassDetailPage header and tabs", () => {
 
     expect(await screen.findByText("Đã kích hoạt lớp.")).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Kích hoạt lớp học" })).not.toBeInTheDocument();
-    expect(mocks.refresh).toHaveBeenCalledTimes(1);
+    // changeClassStatusAction revalidates the class page itself; a client refresh would render it twice.
+    expect(mocks.refresh).not.toHaveBeenCalled();
+  });
+
+  // Value: protects=a reason rejected by changeClassStatusAction is shown under the textarea, linked via aria-describedby/aria-invalid, and cleared when the dialog is reopened;
+  // fails_when=fieldErrors.reason is ignored (only the generic alert shows), the error is not referenced by the textarea, or a stale reason error survives closing and reopening the dialog;
+  // why_new=the existing status-dialog test returns only a message; the reason field-error branch of useClassStatusOperations was never rendered;
+  // seam=changeClassStatusAction is mocked; no_claim=does not prove which reasons the server schema rejects
+  it("shows and links a rejected reason in the status dialog, and clears it on reopen", async () => {
+    mocks.changeClassStatusAction.mockResolvedValueOnce({
+      fieldErrors: { reason: ["Lý do thao tác quá dài."] },
+      message: "Vui lòng kiểm tra lại thông tin đổi trạng thái lớp.",
+      status: "error",
+    });
+    renderPage({ detail: buildDetail({ status: "draft" }) });
+    const trigger = screen.getByRole("button", { name: "Thêm hành động cho lớp" });
+
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: /Kích hoạt lớp/ }));
+    let dialog = screen.getByRole("dialog", { name: "Kích hoạt lớp học" });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /Lý do đổi trạng thái/ }), { target: { value: "Đủ học sinh" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận kích hoạt" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Vui lòng kiểm tra lại thông tin đổi trạng thái lớp.");
+    const textarea = within(dialog).getByRole("textbox", { name: /Lý do đổi trạng thái/ });
+    expect(textarea).toHaveAttribute("aria-invalid", "true");
+    expect(textarea).toHaveAccessibleDescription("Lý do thao tác quá dài.");
+
+    // The transition settles after the error renders; close once the dialog is interactive again.
+    await within(dialog).findByRole("button", { name: "Xác nhận kích hoạt" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Hủy" }));
+    expect(screen.queryByRole("dialog", { name: "Kích hoạt lớp học" })).not.toBeInTheDocument();
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: /Kích hoạt lớp/ }));
+    dialog = screen.getByRole("dialog", { name: "Kích hoạt lớp học" });
+    expect(within(dialog).getByRole("textbox", { name: /Lý do đổi trạng thái/ })).not.toHaveAttribute("aria-invalid");
+    expect(within(dialog).queryByText("Lý do thao tác quá dài.")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
   });
 
   // Value: protects=a consecutive-absence streak links to the care queue filtered on that student, or to the profile for roles without student_care.view;
@@ -303,6 +340,8 @@ describe("ClassDetailPage enroll dialog", () => {
       }),
     );
     expect(await screen.findByText("Đã ghi danh Hoàng Bảo Ngọc vào lớp L-9A26.")).toBeInTheDocument();
+    // enrollStudentInClassAction revalidates the class page itself; a client refresh would render it twice.
+    expect(mocks.refresh).not.toHaveBeenCalled();
   });
 
   // Value: protects=a rejected enrolment keeps the dialog open with the RPC message and no success banner; a failed candidate read disables enrolment with a reason;
@@ -456,6 +495,22 @@ describe("ClassDetailPage close blockers and composite classes", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Việc tiếp theo của lớp" })).toHaveClass("text-body", "text-text-strong");
   });
 
+  // Value: protects=when the lowest bar is an older session, the legend dates it (not "gần nhất") and keeps a separate "Buổi gần nhất" entry for the latest bar;
+  // fails_when=latestIsLow stops comparing bar ids (any low bar is called "gần nhất" and the latest-bar entry disappears), or the low entry loses its date;
+  // why_new=only the merged branch (latest bar is also the lowest) was rendered in a test;
+  // seam=none; no_claim=does not prove the bar colours at real sizes
+  it("dates an older lowest bar and keeps the latest-bar legend entry", () => {
+    const rows = orderClassSessions([
+      row({ attendance: { absent: 12, additional: 0, present: 10, unmarked: 0 }, id: "s-1", lockedAt: "2026-10-09T15:00:00Z", resultCount: 10, rosterCount: 22, sessionDate: "2026-10-09", status: "completed" }),
+      row({ attendance: { absent: 1, additional: 0, present: 21, unmarked: 0 }, id: "s-2", resultCount: 21, rosterCount: 22, sessionDate: "2026-10-12", status: "completed" }),
+    ]);
+    renderPage({ workspace: withRows(rows) });
+
+    expect(screen.getByText(/B1 \(Thứ 6 09\/10\) có mặt\s+10\/22 · thấp nhất/)).toBeInTheDocument();
+    expect(screen.queryByText(/\(gần nhất\)/)).not.toBeInTheDocument();
+    expect(screen.getByText("Buổi gần nhất")).toBeInTheDocument();
+  });
+
   // Value: protects=an owner whose debt feed failed sees an unknown amount, never a reassuring 0 ₫;
   // fails_when=a failed debt feed renders "0 ₫" or hides the tile from an owner;
   // why_new=only the forbidden (TA) branch of the debt tiles was tested;
@@ -480,6 +535,49 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     expect(screen.getByRole("tab", { name: /Buổi học/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Chưa tải được buổi học của lớp")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  // Value: protects=when the sessions feed failed, the overview's needs-action panel says sessions were not checked instead of giving an all-clear;
+  // fails_when=NeedsActionPanel ignores a failed sessions feed and shows only "Không có việc tồn trong phần bạn được xem.";
+  // why_new=the only failed-sessions test rendered the Sessions tab; the debt and absence notes had their own branches;
+  // seam=none; no_claim=does not prove the loader reports a failed read as failed
+  it("does not give an all-clear on the overview when the sessions feed failed", () => {
+    renderPage({
+      workspace: workspace({
+        absenceStreaks: { reason: "forbidden", status: "unavailable" },
+        debt: { reason: "forbidden", status: "unavailable" },
+        sessions: { reason: "failed", status: "unavailable" },
+      }),
+    });
+    const panel = screen.getByRole("region", { name: "Lớp này cần bạn xử lý" });
+    expect(within(panel).getByText(/Chưa tải được buổi học nên chưa kiểm tra buổi chờ khóa/)).toBeInTheDocument();
+  });
+
+  // Value: protects=the attendance and result columns say why a value is missing: no permission, a failed load, or results needing attendance;
+  // fails_when=a failed attendance or results read is reported as "Không có quyền", or the results dash has no reason for assistive tech;
+  // why_new=the cells took a boolean, so a failed read and a missing permission rendered the same "no permission" text, and the results reason branch was unreachable;
+  // seam=none; no_claim=does not prove the loader nulls attendance tallies when attendance fails
+  it("explains missing attendance and result values by permission or failed load", () => {
+    renderPage({
+      initialTab: "sessions",
+      workspace: workspace({ attendance: { reason: "failed", status: "unavailable" }, results: { reason: "forbidden", status: "unavailable" } }),
+    });
+    expect(screen.getAllByText("Chưa tải được điểm danh").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Không có quyền xem điểm danh")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Không có quyền xem kết quả").length).toBeGreaterThan(0);
+
+    cleanup();
+    const noAttendanceRows = sessionRows.map((sessionRow) => ({ ...sessionRow, attendance: null }));
+    renderPage({
+      initialTab: "sessions",
+      workspace: workspace({
+        attendance: { reason: "forbidden", status: "unavailable" },
+        results: { status: "ready", value: true },
+        sessions: { status: "ready", value: { rows: noAttendanceRows, truncated: false } },
+      }),
+    });
+    expect(screen.getAllByText("Không có quyền xem điểm danh").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Cần quyền xem điểm danh để tính kết quả").length).toBeGreaterThan(0);
   });
 
   // Value: protects=the truncation notice says honestly that only the newest 400 sessions are shown;

@@ -2,7 +2,6 @@
 
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 
 import { ActionMenu } from "@/components/patterns/action-menu";
@@ -11,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, getButtonClassName } from "@/components/ui/button";
 import { TabPanel, Tabs, type TabItem } from "@/components/ui/tabs";
 import type { ClassDetailWorkspace, ClassEnrollmentCandidate } from "@/features/classes/detail/class-detail-data";
-import { summarizeClassSessions } from "@/features/classes/detail/class-detail-models";
+import { forbiddenClassDetailWorkspace, getClassDetailFeedState, summarizeClassSessions } from "@/features/classes/detail/class-detail-models";
 import { ClassEnrollDialog } from "@/features/classes/detail/components/class-enroll-dialog";
 import { ClassOverviewTab } from "@/features/classes/detail/components/class-overview-tab";
 import { ClassScheduleSection, sortSchedules } from "@/features/classes/detail/components/class-schedule-section";
@@ -29,15 +28,6 @@ const classDetailTabs: readonly ClassDetailTab[] = ["overview", "sessions"];
 function isClassDetailTab(value: unknown): value is ClassDetailTab {
   return typeof value === "string" && (classDetailTabs as readonly string[]).includes(value);
 }
-
-const unavailableWorkspace: ClassDetailWorkspace = {
-  absenceStreaks: { reason: "forbidden", status: "unavailable" },
-  attendance: { reason: "forbidden", status: "unavailable" },
-  debt: { reason: "forbidden", status: "unavailable" },
-  results: { reason: "forbidden", status: "unavailable" },
-  sessions: { reason: "forbidden", status: "unavailable" },
-  students: { reason: "forbidden", status: "unavailable" },
-};
 
 interface ClassDetailPageProps {
   /**
@@ -86,9 +76,8 @@ export function ClassDetailPage({
   initialTab,
   nowTime,
   today,
-  workspace = unavailableWorkspace,
+  workspace = forbiddenClassDetailWorkspace,
 }: ClassDetailPageProps) {
-  const router = useRouter();
   const tabsId = useId();
   const resolvedToday = today ?? getVietnamToday();
   const resolvedNow = nowTime ?? getVietnamTime();
@@ -287,12 +276,12 @@ export function ClassDetailPage({
           <TabPanel activeValue={activeTab} tabsId={tabsId} value="sessions">
             {sessionRows && workspace.sessions.status === "ready" ? (
               <ClassSessionsTab
-                attendanceAvailable={workspace.attendance.status === "ready"}
+                attendanceFeed={getClassDetailFeedState(workspace.attendance)}
                 batchHref={batchHref}
                 canBulkCancelSessions={canBulkCancelSessions}
                 canLockSessions={canLockSessions}
                 classId={detail.id}
-                resultsAvailable={workspace.results.status === "ready"}
+                resultsFeed={getClassDetailFeedState(workspace.results)}
                 nowTime={resolvedNow}
                 rows={sessionRows}
                 today={resolvedToday}
@@ -320,7 +309,8 @@ export function ClassDetailPage({
           onSuccess={(message) => {
             setIsEnrollOpen(false);
             setEnrollMessage(message);
-            router.refresh();
+            // No router.refresh(): the action's revalidatePath(`/classes/${classId}`)
+            // already re-renders this page in the same response.
           }}
           returnFocusRef={enrollTriggerRef}
         />

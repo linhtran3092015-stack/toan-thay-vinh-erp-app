@@ -62,7 +62,8 @@ describe("composite parent rejections", () => {
   });
 
   it.each([
-    ["COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION", "Lớp ghép không có buổi học riêng. Hãy tạo buổi trên lớp thành phần (ví dụ 7A hoặc 7B)."],
+    // One wording on every screen (compositeParentRpcMessages).
+    ["COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION", "Lớp ghép không có buổi học riêng. Hãy tạo buổi trên lớp thành phần."],
     ["COMPOSITE_PARENT_CANNOT_HAVE_SCHEDULE_TEMPLATE", scheduleTemplateMessage],
   ])("createSessionAction explains %s", async (databaseMessage, userMessage) => {
     const client = rejectRpcWith(databaseMessage);

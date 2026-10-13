@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { compositeParentRpcMessages } from "@/features/classes/composite-parent-messages";
+
 import type {
   CancelClassSessionsActionInput,
   CancelClassSessionsActionState,
@@ -208,10 +210,7 @@ function getLifecycleRpcErrorMessage(
       "Chưa đến giờ bắt đầu buổi học. Hãy bấm Bắt đầu khi tới giờ học theo lịch.",
     CLASS_SESSION_START_STATUS_INVALID:
       "Buổi học không ở trạng thái có thể bắt đầu.",
-    COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION:
-      "Lớp ghép không có buổi học riêng. Hãy tạo buổi trên lớp thành phần (ví dụ 7A hoặc 7B).",
-    COMPOSITE_PARENT_CANNOT_HAVE_SCHEDULE_TEMPLATE:
-      "Lớp ghép không có lịch cố định riêng; lịch học nằm ở các lớp thành phần.",
+    ...compositeParentRpcMessages,
   };
 
   for (
@@ -619,6 +618,39 @@ export async function cancelClassSessionsAction(
     }
 
     try {
+      // Re-read just before the RPC: cancel_class_session also cancels an
+      // in_progress session, so one started since the lookup above must not be
+      // cancelled here. This narrows the window to this round trip; closing it
+      // needs a status guard inside the RPC (TODOS).
+      const { data: current, error: currentError } =
+        await supabase
+          .from("class_sessions")
+          .select("id, status, locked_at")
+          .eq("class_id", classId)
+          .in("id", [sessionId]);
+      const currentRow = current?.[0];
+
+      if (currentError || !currentRow) {
+        failed.push({
+          message:
+            "Không thể kiểm tra lại buổi học nên chưa hủy.",
+          sessionId,
+        });
+        continue;
+      }
+
+      if (
+        currentRow.status !== "scheduled" ||
+        currentRow.locked_at !== null
+      ) {
+        failed.push({
+          message:
+            "Buổi học vừa được bắt đầu, khóa hoặc hủy nên không hủy hàng loạt.",
+          sessionId,
+        });
+        continue;
+      }
+
       const { data, error } =
         await supabase.rpc(
           "cancel_class_session",
@@ -659,10 +691,8 @@ export async function cancelClassSessionsAction(
   // refresh just the class page so its selection drops them.
   if (cancelled > 0) {
     revalidateSessionRoutes();
-    revalidatePath(`/classes/${classId}`);
-  } else if (failed.length > 0) {
-    revalidatePath(`/classes/${classId}`);
   }
+  revalidatePath(`/classes/${classId}`);
 
   return {
     cancelled,

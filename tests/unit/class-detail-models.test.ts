@@ -105,13 +105,11 @@ describe("summarizeClassSessions and countClassSessionFilters", () => {
 
   it("counts non-cancelled sessions by stage", () => {
     expect(summarizeClassSessions(rows, TODAY)).toEqual({
-      cancelled: 1,
       completed: 2,
       locked: 1,
       overdue: 1,
       pendingLock: 1,
       total: 5,
-      upcoming: 2,
     });
   });
 
@@ -126,8 +124,8 @@ describe("summarizeClassSessions and countClassSessionFilters", () => {
   it("counts a session that ended earlier today as overdue when given the time", () => {
     const withEnded = [...rows, session({ endTime: "09:00:00", id: "7", sessionDate: TODAY, startTime: "07:30:00" })];
 
-    expect(summarizeClassSessions(withEnded, TODAY, "10:00:00")).toMatchObject({ overdue: 2, upcoming: 2 });
-    expect(summarizeClassSessions(withEnded, TODAY)).toMatchObject({ overdue: 1, upcoming: 3 });
+    expect(summarizeClassSessions(withEnded, TODAY, "10:00:00")).toMatchObject({ overdue: 2 });
+    expect(summarizeClassSessions(withEnded, TODAY)).toMatchObject({ overdue: 1 });
     expect(countClassSessionFilters(withEnded, TODAY, "10:00:00")).toMatchObject({ all: 7, upcoming: 2 });
     expect(countClassSessionFilters(withEnded, TODAY)).toMatchObject({ upcoming: 3 });
   });

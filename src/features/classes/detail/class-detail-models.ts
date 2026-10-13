@@ -1,4 +1,5 @@
 import { isSessionAttendanceStatus } from "@/features/sessions/detail-read-models";
+import type { ClassDetailWorkspace } from "@/features/classes/detail/class-detail-data";
 import type { SessionKind, SessionStatus } from "@/features/sessions/read-models";
 
 /**
@@ -18,6 +19,23 @@ export const ENROLLMENT_SEARCH_MAX_LENGTH = 100;
 export type ClassDetailFeed<T> =
   | { status: "ready"; value: T }
   | { status: "unavailable"; reason: "forbidden" | "failed" };
+
+/** A feed's readiness without its value: "ready", or why it is unavailable. */
+export type ClassDetailFeedState = "ready" | "forbidden" | "failed";
+
+/** Every feed forbidden: the page's default and the loader's starting point. */
+export const forbiddenClassDetailWorkspace: Readonly<ClassDetailWorkspace> = {
+  absenceStreaks: { reason: "forbidden", status: "unavailable" },
+  attendance: { reason: "forbidden", status: "unavailable" },
+  debt: { reason: "forbidden", status: "unavailable" },
+  results: { reason: "forbidden", status: "unavailable" },
+  sessions: { reason: "forbidden", status: "unavailable" },
+  students: { reason: "forbidden", status: "unavailable" },
+};
+
+export function getClassDetailFeedState(feed: ClassDetailFeed<unknown>): ClassDetailFeedState {
+  return feed.status === "ready" ? "ready" : feed.reason;
+}
 
 export interface ClassSessionAttendanceTally {
   /** Roster students marked present. */
@@ -119,7 +137,8 @@ export function matchesClassSessionFilter(stage: ClassSessionStage, filter: Clas
   }
 }
 
-function compareSessions(a: Pick<ClassSessionRow, "sessionDate" | "startTime">, b: Pick<ClassSessionRow, "sessionDate" | "startTime">): number {
+/** Ascending by date, then start time. */
+export function compareSessions(a: Pick<ClassSessionRow, "sessionDate" | "startTime">, b: Pick<ClassSessionRow, "sessionDate" | "startTime">): number {
   return a.sessionDate === b.sessionDate ? a.startTime.localeCompare(b.startTime) : a.sessionDate.localeCompare(b.sessionDate);
 }
 
@@ -144,28 +163,21 @@ export interface ClassSessionSummary {
   completed: number;
   locked: number;
   pendingLock: number;
-  /** Scheduled from today on, plus sessions in progress. */
-  upcoming: number;
   overdue: number;
-  cancelled: number;
 }
 
 export function summarizeClassSessions(rows: readonly ClassSessionRow[], today: string, nowTime?: string): ClassSessionSummary {
-  const summary: ClassSessionSummary = { cancelled: 0, completed: 0, locked: 0, overdue: 0, pendingLock: 0, total: 0, upcoming: 0 };
+  const summary: ClassSessionSummary = { completed: 0, locked: 0, overdue: 0, pendingLock: 0, total: 0 };
 
   for (const row of rows) {
     const stage = getClassSessionStage(row, today, nowTime);
 
-    if (stage === "cancelled") {
-      summary.cancelled += 1;
-      continue;
-    }
+    if (stage === "cancelled") continue;
 
     summary.total += 1;
     if (row.status === "completed") summary.completed += 1;
     if (stage === "locked") summary.locked += 1;
     if (stage === "pending_lock") summary.pendingLock += 1;
-    if (stage === "upcoming" || stage === "live") summary.upcoming += 1;
     if (stage === "overdue") summary.overdue += 1;
   }
 
@@ -353,13 +365,13 @@ export interface AttendanceChartBar {
   sessionDate: string;
   /** Present share of the roster, 0–100. */
   rate: number;
-  /** Lowest bar in the window and clearly below the rest (shown in warning colour). */
+  /** The unique lowest bar in the window, when its rate is below LOW_ATTENDANCE_RATE (shown in warning colour). */
   low: boolean;
   /** Most recent completed session. */
   latest: boolean;
 }
 
-/** A session this far below the window's typical attendance is called out. */
+/** Attendance rate (%) below which a session or the class is flagged; an absolute cutoff, not relative to the window. */
 export const LOW_ATTENDANCE_RATE = 85;
 
 /** Last `limit` completed sessions with a roster, oldest first. */

@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { compositeParentRpcMessages } from "@/features/classes/composite-parent-messages";
+
 import type {
   ClassManagementActionState,
   CreateClassScheduleActionInput,
@@ -130,11 +132,7 @@ function getRpcErrorMessage(
       "Chỉ có thể quản lý lịch của lớp đang hoạt động.",
 
     // A linked composite parent ("lớp ghép"), including a link that starts later.
-    COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION:
-      "Lớp ghép không có buổi học riêng. Hãy tạo buổi trên lớp thành phần.",
-
-    COMPOSITE_PARENT_CANNOT_HAVE_SCHEDULE_TEMPLATE:
-      "Lớp ghép không có lịch cố định riêng; lịch học nằm ở các lớp thành phần.",
+    ...compositeParentRpcMessages,
 
     ENDED_CLASS_SCHEDULE_IS_IMMUTABLE:
       "Lịch đã kết thúc nên không thể thay đổi.",

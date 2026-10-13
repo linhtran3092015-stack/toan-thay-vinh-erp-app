@@ -72,8 +72,10 @@ interface ClassScheduleSectionProps {
 
 /**
  * Schedule templates of the class: active ones with replace/end actions, the
- * create form while slots remain, and the history. Moved unchanged in behaviour
- * from the old detail page; the overview's "Sửa lịch" link jumps here.
+ * create form while slots remain, and the history in a collapsed section. On a
+ * linked composite parent the create form is replaced by the list of component
+ * classes, since the database rejects its own templates. The overview's
+ * "Sửa lịch" link jumps here.
  */
 export function ClassScheduleSection({ canManageSchedule, detail, today }: ClassScheduleSectionProps) {
   const activeSchedules = sortSchedules(detail.schedules.filter((schedule) => schedule.isActive));

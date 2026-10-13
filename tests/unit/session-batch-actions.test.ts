@@ -173,7 +173,8 @@ describe("createBatchSessionsAction", () => {
   // why_new=componentClasses now includes links that start later, and a link added after the page loaded still makes the trigger raise;
   // seam=none; no_claim=does not prove create_batch_class_sessions raises these codes
   it.each([
-    ["COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION", "Lớp ghép không tạo buổi trực tiếp; hãy tạo ở lớp thành phần."],
+    // One wording on every screen (compositeParentRpcMessages).
+    ["COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION", "Lớp ghép không có buổi học riêng. Hãy tạo buổi trên lớp thành phần."],
     ["COMPOSITE_PARENT_CANNOT_HAVE_SCHEDULE_TEMPLATE", "Lớp ghép không có lịch cố định riêng; lịch học nằm ở các lớp thành phần."],
   ])("explains the composite-parent rejection %s", async (databaseMessage, userMessage) => {
     mocks.server.mockResolvedValue(createMockServerClient({ rpcResult: { data: null, error: { message: databaseMessage } } }));

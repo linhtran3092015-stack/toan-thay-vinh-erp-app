@@ -298,6 +298,8 @@ function NeedsActionPanel({
     if (overdue.length > NEEDS_ACTION_ROWS) {
       notes.push(`Còn ${overdue.length - NEEDS_ACTION_ROWS} buổi đã qua chưa bắt đầu.`);
     }
+  } else if (workspace.sessions.status === "unavailable" && workspace.sessions.reason === "failed") {
+    notes.push("Chưa tải được buổi học nên chưa kiểm tra buổi chờ khóa hoặc đã qua chưa bắt đầu.");
   }
 
   if (workspace.debt.status === "ready" && workspace.debt.value.studentCount > 0) {

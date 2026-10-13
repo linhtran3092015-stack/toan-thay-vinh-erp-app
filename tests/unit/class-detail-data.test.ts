@@ -740,6 +740,29 @@ describe("getClassDetailWorkspace", () => {
     expect(rejected.sessions).toEqual({ reason: "failed", status: "unavailable" });
   });
 
+  // Value: protects=a link date or class id that is not plain ISO date / id text never reaches the PostgREST or() filter: the sessions feed fails and no session query is sent;
+  // fails_when=the date check in buildSessionWindowFilter is dropped or only checks effective_from, so "2026-09-30),class_id.neq.x" splits the filter and widens the session read;
+  // why_new=only an unsafe component id was tested; malformed effective_from/effective_to and an unsafe page class id were not;
+  // seam=none (driven through getClassDetailWorkspace); no_claim=does not prove the database can store such dates
+  it.each([
+    ["a malformed effective_from", "class-1", { effective_from: "2026-09-01),class_id.neq.x", effective_to: null }],
+    ["a malformed effective_to", "class-1", { effective_from: "2026-09-01", effective_to: "2026-09-30),class_id.neq.x" }],
+    ["a timestamp effective_to", "class-1", { effective_from: "2026-09-01", effective_to: "2026-09-30T00:00:00" }],
+    ["an unsafe page class id", "class-1,class_id.neq.y", { effective_from: "2026-09-01", effective_to: null }],
+  ])("fails the sessions feed instead of sending a filter built from %s", async (_label, classId, window) => {
+    const calls = tables({
+      class_component_links: { data: [{ component_class_id: "class-1-t", ...window }], error: null },
+      class_sessions: { data: [], error: null },
+      student_enrollments: { data: [], error: null },
+    });
+
+    const workspace = await getClassDetailWorkspace(classId, { ...allowed, canViewPayments: false });
+
+    expect(calls.class_sessions).toBeUndefined();
+    expect(workspace.sessions).toEqual({ reason: "failed", status: "unavailable" });
+    expect(workspace.attendance).toEqual({ reason: "failed", status: "unavailable" });
+  });
+
   it("reports the sessions feed as failed when the session query errors", async () => {
     tables({
       class_component_links: { data: [], error: null },

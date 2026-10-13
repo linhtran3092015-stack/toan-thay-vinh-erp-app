@@ -2,8 +2,10 @@ import "server-only";
 
 import {
   CLASS_SESSION_LIMIT,
+  compareSessions,
   ENROLLMENT_SEARCH_MAX_LENGTH,
   findAbsenceStreaks,
+  forbiddenClassDetailWorkspace,
   getTalliedStudents,
   isLockCountedAttendanceStatus,
   orderClassSessions,
@@ -392,10 +394,6 @@ async function loadDebt(supabase: SupabaseClient, studentIds: readonly string[])
   return rows ? summarizeClassDebt(summarizeDirectoryDebt(rows)) : null;
 }
 
-function compareSessionsAscending(a: Pick<ClassSessionRow, "sessionDate" | "startTime">, b: Pick<ClassSessionRow, "sessionDate" | "startTime">): number {
-  return a.sessionDate.localeCompare(b.sessionDate) || a.startTime.localeCompare(b.startTime);
-}
-
 type SessionsResult = NonNullable<Awaited<ReturnType<typeof loadSessions>>>;
 
 /** Fills the session-based feeds (sessions, attendance, results, streaks) of `workspace`. */
@@ -418,8 +416,8 @@ async function fillSessionFeeds(
   // oldest of those.
   const unlockedRows = startedRows.filter((row) => !row.lockedAt);
   const openIds = [
-    ...unlockedRows.filter((row) => row.status === "in_progress").sort((a, b) => compareSessionsAscending(b, a)),
-    ...unlockedRows.filter((row) => row.status === "completed").sort(compareSessionsAscending),
+    ...unlockedRows.filter((row) => row.status === "in_progress").sort((a, b) => compareSessions(b, a)),
+    ...unlockedRows.filter((row) => row.status === "completed").sort(compareSessions),
   ]
     .slice(0, OPEN_ROSTER_LIMIT)
     .map((row) => row.id);
@@ -518,14 +516,7 @@ export async function getClassDetailWorkspace(
   classId: string,
   permissions: ClassDetailWorkspacePermissions,
 ): Promise<ClassDetailWorkspace> {
-  const workspace: ClassDetailWorkspace = {
-    absenceStreaks: forbidden,
-    attendance: forbidden,
-    debt: forbidden,
-    results: forbidden,
-    sessions: forbidden,
-    students: forbidden,
-  };
+  const workspace: ClassDetailWorkspace = { ...forbiddenClassDetailWorkspace };
 
   let supabase: SupabaseClient;
 

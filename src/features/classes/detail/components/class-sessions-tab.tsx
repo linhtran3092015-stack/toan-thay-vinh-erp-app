@@ -23,6 +23,7 @@ import {
   getRecordedCount,
   getSessionAttendanceReadiness,
   matchesClassSessionFilter,
+  type ClassDetailFeedState,
   type ClassSessionFilter,
   type ClassSessionRow,
   type ClassSessionStage,
@@ -56,8 +57,8 @@ const checkboxClassName =
   "h-4 w-4 cursor-pointer rounded border-border-strong accent-[var(--action-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus";
 
 interface ClassSessionsTabProps {
-  /** False when attendance is not readable or failed to load (column shows "—"). */
-  attendanceAvailable: boolean;
+  /** Attendance feed: when not "ready" the column shows "—" and says why (no permission, or failed to load). */
+  attendanceFeed: ClassDetailFeedState;
   batchHref: string | null;
   /** Bulk cancel is owner-only: sessions.manage and classes.manage_schedule (TAs hold only the first). */
   canBulkCancelSessions: boolean;
@@ -67,7 +68,8 @@ interface ClassSessionsTabProps {
   classId: string;
   /** HH:MM in Vietnam time: a session that ended earlier today without starting is overdue. */
   nowTime?: string;
-  resultsAvailable: boolean;
+  /** Results feed, explained the same way as attendanceFeed. */
+  resultsFeed: ClassDetailFeedState;
   rows: readonly ClassSessionRow[];
   today: string;
   truncated?: boolean;
@@ -119,13 +121,13 @@ function getInitialPage(rows: readonly ClassSessionRow[], today: string): number
  * Creating sessions stays in /sessions/batch; the tab only links there.
  */
 export function ClassSessionsTab({
-  attendanceAvailable,
+  attendanceFeed,
   batchHref,
   canBulkCancelSessions,
   canLockSessions = false,
   classId,
   nowTime,
-  resultsAvailable,
+  resultsFeed,
   rows,
   today,
   truncated = false,
@@ -353,10 +355,10 @@ export function ClassSessionsTab({
                   </span>
                 </TableCell>
                 <TableCell numeric>
-                  <AttendanceCell available={attendanceAvailable} classId={classId} row={row} />
+                  <AttendanceCell classId={classId} feed={attendanceFeed} row={row} />
                 </TableCell>
                 <TableCell numeric>
-                  <ResultCell available={resultsAvailable} row={row} />
+                  <ResultCell attendanceFeed={attendanceFeed} feed={resultsFeed} row={row} />
                 </TableCell>
                 <TableCell>
                   <Badge tone={classSessionStageMeta[stage].tone}>{classSessionStageMeta[stage].label}</Badge>
@@ -452,10 +454,10 @@ export function ClassSessionsTab({
                       row.attendance || row.resultCount !== null ? (
                         <span className="flex gap-4 text-secondary text-text-muted">
                           <span>
-                            Điểm danh <AttendanceCell available={attendanceAvailable} classId={classId} row={row} />
+                            Điểm danh <AttendanceCell classId={classId} feed={attendanceFeed} row={row} />
                           </span>
                           <span>
-                            Kết quả <ResultCell available={resultsAvailable} row={row} />
+                            Kết quả <ResultCell attendanceFeed={attendanceFeed} feed={resultsFeed} row={row} />
                           </span>
                         </span>
                       ) : undefined
@@ -477,7 +479,7 @@ export function ClassSessionsTab({
           onDone={(outcome) => {
             setIsCancelOpen(false);
             // Keep failed sessions selected for a retry only while they still look
-            // cancellable; the effect above drops the rest once fresh rows arrive.
+            // cancellable; the render-time prune above drops the rest once fresh rows arrive.
             const keptIds = outcome.failed.map((item) => item.row.id).filter((id) => eligibleIds.has(id));
             setSelectedIds(new Set(keptIds));
             focusResultRef.current = true;
@@ -514,13 +516,13 @@ function ExplainedDash({ reason }: { reason: string }) {
   );
 }
 
-function AttendanceCell({ available, classId, row }: { available: boolean; classId: string; row: ClassSessionRow }) {
+function AttendanceCell({ classId, feed, row }: { classId: string; feed: ClassDetailFeedState; row: ClassSessionRow }) {
   if (row.status === "cancelled") {
     return <span className="text-text-muted">—</span>;
   }
 
-  if (!available) {
-    return <ExplainedDash reason="Không có quyền xem điểm danh" />;
+  if (feed !== "ready") {
+    return <ExplainedDash reason={feed === "forbidden" ? "Không có quyền xem điểm danh" : "Chưa tải được điểm danh"} />;
   }
 
   const readiness = getSessionAttendanceReadiness(row, classId);
@@ -562,16 +564,34 @@ function AttendanceCell({ available, classId, row }: { available: boolean; class
   );
 }
 
-function ResultCell({ available, row }: { available: boolean; row: ClassSessionRow }) {
-  if (row.status === "cancelled" || row.resultCount === null || !row.attendance) {
+function ResultCell({
+  attendanceFeed,
+  feed,
+  row,
+}: {
+  attendanceFeed: ClassDetailFeedState;
+  feed: ClassDetailFeedState;
+  row: ClassSessionRow;
+}) {
+  if (row.status === "cancelled") {
     return <span className="text-text-muted">—</span>;
   }
 
-  if (!available) {
+  if (feed !== "ready") {
+    return <ExplainedDash reason={feed === "forbidden" ? "Không có quyền xem kết quả" : "Chưa tải được kết quả"} />;
+  }
+
+  // Not started yet: no results to count.
+  if (row.resultCount === null) {
+    return <span className="text-text-muted">—</span>;
+  }
+
+  // The denominator is the students marked present, which needs attendance.
+  if (!row.attendance) {
     return (
-      <span className="text-text-muted" title="Không có quyền xem kết quả">
-        —
-      </span>
+      <ExplainedDash
+        reason={attendanceFeed === "forbidden" ? "Cần quyền xem điểm danh để tính kết quả" : "Chưa tải được điểm danh để tính kết quả"}
+      />
     );
   }
 

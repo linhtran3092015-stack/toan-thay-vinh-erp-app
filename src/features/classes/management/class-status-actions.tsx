@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import type { FormEvent, ReactNode, RefObject } from "react";
 import {
   useEffect,
@@ -132,7 +131,6 @@ export function useClassStatusOperations({
   operations: ClassStatusOperation[];
   successMessage: string | null;
 } {
-  const router = useRouter();
   const operations = getClassStatusOperations(status, scheduledSessionCount);
   const [selectedOperation, setSelectedOperation] = useState<ClassStatusOperation | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -195,8 +193,9 @@ export function useClassStatusOperations({
         focusSuccessRef.current = getClassStatusOperations(selectedOperation.targetStatus).length === 0;
         setSelectedOperation(null);
         setReason("");
+        // changeClassStatusAction revalidates /classes/[classId], which re-renders
+        // this page in the same response; a router.refresh() would render it twice.
         setSuccessMessage(result.message || "Đã đổi trạng thái lớp.");
-        router.refresh();
       }
     });
   };
