@@ -4,7 +4,7 @@
 
 These workflow descriptions capture currently observed behavior. Presentation may change in later waves, but no workflow may gain, lose, or reinterpret a transition, permission check, RPC, validation rule, audit path, or error mapping.
 
-Owner-approved exceptions are recorded next to the workflow they change, each marked with its release: the client lock-readiness mirror (v0.7.0.0, Sessions), and class-page bulk cancel, class-page enrolment and server-side enrolment search (v0.8.0.0, Sessions and Students).
+Owner-approved exceptions are recorded next to the workflow they change, each marked with its release: the client lock-readiness mirror (v0.7.0.0, Sessions), and class-page bulk cancel, class-page enrolment and server-side enrolment search (v0.8.0.0, Sessions and Students), and class-page transfer and reserve with the expected-enrolment check (v0.9.0.0, Students).
 
 ## Students
 
@@ -28,6 +28,8 @@ Owner-approved exceptions are recorded next to the workflow they change, each ma
 The redesign does not define a new enrollment state graph. It must render the feature’s existing read model and action availability.
 
 Enrolment is also offered from the class page (`/classes/[classId]`, "Ghi danh học sinh"). It calls the same `enrollStudentInClassAction` / `enroll_student_in_class` with the class fixed; preconditions, conflicts and audit are unchanged. The page offers it to viewers with `students.view` and `students.manage_status`. Candidates are students without enrolment history; the dialog ships the first 500 and searches the rest through the Server Action `searchEnrollmentCandidatesAction` (same two permissions, 2–100 characters, read-only `students` query with escaped `ilike` on name and code). PostgREST `ilike` is accent-sensitive, so the dialog merges accentless local matches with the server results. Owner-approved for the Stumana redesign step 5b (v0.8.0.0).
+
+Transfer and reserve are also offered from the class page (`/classes/[classId]`, Học sinh tab, row menu "…") on active classes. They open the student profile's dialogs and call the same `transferStudentClassAction` / `transfer_student_class` and `reserveStudentEnrollmentAction` / `reserve_student_enrollment`; preconditions, conflicts and audit are unchanged. The page offers them to viewers with `students.view` plus `students.transfer_class` or `students.reserve`, on active enrolment rows only, and disables them with a reason when the enrolment starts today or later (the RPCs' date rule) or, for transfer, when no other active class loads. Both actions accept an optional `expectedEnrollmentId`: when given, the action re-reads the student's active enrolment before the RPC and refuses with a reload message if it is a different one. The class roster and the student profile both send it. The RPCs still act on the student's single active enrolment, so the check is action-level only (TODOS). Class-page transfer and reserve are owner-approved for the Stumana redesign step 5b (v0.9.0.0); the expected-enrolment check shipped in the same release.
 
 ## Classes
 

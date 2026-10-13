@@ -117,7 +117,7 @@ Development-only preview routes render redesigned components with fixture data i
 | `/dev/lists` | Student and class directory previews: DataTableFrame, FilterBar, quick filter chips, bulk bar, record list. |
 | `/dev/session` | Session workbench with fixture data: attendance group, results, guarded lock panel. Buttons call real server actions, so look only. |
 | `/dev/student` | Student profile with fixture data. Enrollment dialogs open but their server actions fail on fixture ids. |
-| `/dev/class` | Class detail with fixture data: header, Tổng quan and Buổi học tabs, enrol dialog. Query params `state` (`active`, `unscheduled`, `draft`, `closed`, `composite`), `role` (`owner`, `ta`) and `tab` (`overview`, `sessions`). Dialogs open but their server actions fail on fixture ids. |
+| `/dev/class` | Class detail with fixture data: header, Tổng quan, Buổi học, Học sinh, Kết quả and Học phí tabs, enrol, transfer and reserve dialogs. Query params `state` (`active`, `unscheduled`, `draft`, `closed`, `composite`), `role` (`owner`, `ta`), `tab` (`overview`, `sessions`, `students`, `results`, `fees`) and `period` (`locked` by default, `draft`) for the Học phí tab. Dialogs open but their server actions fail on fixture ids, as does switching the tuition period. |
 
 ---
 
@@ -410,6 +410,7 @@ A `PageHeader` is a compact structural region, not a hero.
 - A record is a compact bordered **record strip**, not a stack of heavily padded cards: identity and a visible textual status first, one or two essential metadata lines next, and one clear record action with appropriate tap targets.
 - Do not nest a rounded inner information card inside every record strip. Use dividers and aligned label/value pairs instead.
 - Keep actions at the bottom in source order. Use full-width controls only for a single primary record action on narrow screens.
+- Exception: a record strip may carry one row "…" menu beside it (`RecordListItem` `trailing`, outside the record link and after it in source order; `ActionMenu` `align="end"` keeps the panel on screen). The class roster uses it for Chuyển lớp / Bảo lưu, as in design 03. Owner-approved for the Stumana redesign step 5b (v0.9.0.0).
 
 ## Forms and detail pages
 

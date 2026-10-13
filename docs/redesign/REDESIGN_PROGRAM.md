@@ -8,7 +8,7 @@ Deliver a substantially clearer, faster, and more consistent ERP experience with
 
 - Improve usability, scanability, and speed for frequent staff work.
 - Establish a coherent visual language and lower cognitive load.
-- Preserve existing routes, business logic, database behavior, Supabase integrations, permissions, RLS/RBAC, audit behavior, Server Action/RPC boundaries, and financial/session state machines. Owner-approved additions are recorded in WORKFLOW_CONTRACTS_A_E.md (v0.8.0.0: class-page bulk cancel and enrolment search).
+- Preserve existing routes, business logic, database behavior, Supabase integrations, permissions, RLS/RBAC, audit behavior, Server Action/RPC boundaries, and financial/session state machines. Owner-approved additions are recorded in WORKFLOW_CONTRACTS_A_E.md (v0.8.0.0: class-page bulk cancel and enrolment search; v0.9.0.0: class-page transfer and reserve).
 - Build frontend primitives that remain maintainable without becoming a generic application framework.
 - Release in small, independently reversible waves.
 
