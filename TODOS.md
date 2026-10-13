@@ -672,6 +672,140 @@
 **Priority:** P2
 **Depends on:** None
 
+## Trang chủ
+
+### Kiểm tra quyền `classes.view` của trợ giảng trên production
+
+**What:** Xem trên production vai trò trợ giảng (và quản lý vận hành) có `classes.view` chưa; nếu chưa, cấp qua Cài đặt hoặc migration.
+
+**Why:** Dữ liệu khởi tạo chỉ cấp `classes.view` cho chủ trung tâm. RLS bảng `classes` cần quyền này, nên thiếu nó thì buổi học về không có lớp và các khối buổi học trên trang chủ (và trang Buổi học) báo "Chưa tải được".
+
+**Context:** `hasHiddenClass` trong `src/features/dashboard/home-data.ts` biến lớp bị ẩn thành lỗi có thể thấy. Đã thử chặn feed theo `classes.view` rồi bỏ vì có thể giấu cả lịch của trợ giảng.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** None
+
+### Gộp kiểm tra sĩ số của các buổi hôm nay
+
+**What:** Thay vòng gọi `resolve_class_session_roster` từng buổi (tối đa 40, 8 buổi một lúc) bằng một RPC tổng hợp sĩ số theo danh sách buổi.
+
+**Why:** Trang chủ là trang đầu tiên của mọi nhân sự; thời gian tải tăng theo số buổi trong ngày.
+
+**Context:** RPC lô `resolve_class_session_rosters` đang bị thu quyền với `authenticated`; cần migration. `fillRosters` ở `home-data.ts`.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### RPC đếm kết quả thiếu cho hàng đợi buổi chờ khóa
+
+**What:** Cho `get_unlocked_completed_sessions` (hoặc RPC anh em) trả thêm số học sinh có mặt mà chưa có kết quả.
+
+**Why:** `loadMissingResults` đang đọc toàn bộ điểm danh và kết quả của tối đa 200 buổi mỗi lần tải trang chủ của trợ giảng.
+
+**Context:** `src/features/dashboard/home-data.ts`.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Stream các khối nặng của trang chủ
+
+**What:** Tách các khối nặng (lịch hôm nay, kết quả thiếu, chuyên cần tuần, học phí) thành server component riêng trong `Suspense`, và cho phần Phân tích không làm chạy lại các khối khi đổi tháng.
+
+**Why:** Trang chủ chờ mọi nguồn xong mới hiển thị; đổi tháng ở Phân tích chạy lại toàn bộ.
+
+**Context:** `src/app/(app)/page.tsx`, `getDashboardHomeReadModel`.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Tổng hợp giao dịch SePay chưa khớp bằng một truy vấn
+
+**What:** Đếm, cộng tiền và lấy giao dịch cũ nhất trong database thay vì đọc 500 dòng.
+
+**Why:** Tổng hiện là cận dưới ("+") khi tồn hơn 500 giao dịch.
+
+**Context:** `loadSepayBacklog` trong `home-data.ts`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Link "buổi quá giờ chưa xong điểm danh" dẫn tới đúng tập buổi
+
+**What:** Thêm bộ lọc "cần điểm danh" phía server cho `/sessions` rồi trỏ link của mục tổng hợp vào đó.
+
+**Why:** Link hiện là `/sessions?lock=unlocked&to=<hôm nay>`, hiện rộng hơn tập được đếm và bị giới hạn 300 dòng phía client.
+
+**Context:** `buildNeedsAction` trong `src/features/dashboard/home-models.ts`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Kiểu chung cho mã việc chờ duyệt và link điều chỉnh công
+
+**What:** Xuất union type cho id của `AttentionItem` từ `src/features/dashboard/data.ts`, dùng cho `attentionRules`; sửa link `timekeeping-adj` trong `mapAttention` từ `/payroll` sang `/timekeeping`.
+
+**Why:** Đổi tên id ở một bên làm mục biến mất khỏi danh sách việc mà không lỗi biên dịch.
+
+**Context:** `attentionRules` ở `home-models.ts`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Phần Phân tích của trợ giảng hiện số 0
+
+**What:** Ẩn ô hoạt động nổi bật khi RPC trả null vì thiếu quyền, hoặc không hiện Phân tích ở bố cục trợ giảng.
+
+**Why:** `mapOperationalHighlights` đổi null thành 0 nên trợ giảng thấy số 0 như số thật (có từ trước bước 6).
+
+**Context:** `src/features/dashboard/data.ts`, `dashboard-page.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Không che lỗi đọc điểm danh và lỗi hàng đợi
+
+**What:** Khi người xem có `attendance.view` mà đọc điểm danh lỗi, báo khối lỗi thay vì hiện "—"; đưa thông điệp lỗi của hàng đợi chờ khóa vào log `DASHBOARD_FEED_FAILED`.
+
+**Why:** Lỗi thật hiện ra như thiếu quyền; log hàng đợi hiện chỉ có tên feed.
+
+**Context:** `fillRosters` và `getUnlockedSessionQueueResult(...).catch` trong `home-data.ts`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Dọn các class màu chết trên `<Link>`
+
+**What:** Luật toàn cục `a { color: inherit }` (không nằm trong layer) thắng mọi utility của Tailwind v4, nên khoảng 45 class `text-*` trên `<Link>` không có tác dụng. Rà từng chỗ: bỏ class hoặc thêm `!` nếu cần màu đó.
+
+**Why:** Đưa luật vào `@layer base` đã thử ở bước 6 và làm hỏng tương phản dark mode của chip module; cần rà tay.
+
+**Context:** `src/app/globals.css`; nút đã có `!` trong `src/components/ui/button.tsx`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Khoảng chờ trước khi buổi đang học bị coi là quá giờ
+
+**What:** Cân nhắc 15–30 phút sau giờ kết thúc trước khi buổi `in_progress` được tính là "chưa hoàn thành".
+
+**Why:** Buổi 19:30–21:30 thành việc tồn đúng 21:30, trước khi nhân sự kịp bấm hoàn thành.
+
+**Context:** `hasSessionEnded` dùng chung ở `class-detail-models.ts`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
 ## Completed
 
 ### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp
