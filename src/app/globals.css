@@ -362,26 +362,32 @@ body::before {
 }
 
 /* Class detail, Buổi học tab. */
-.class-sessions {
+/* .class-roster: the class page's students and tuition tabs share the switch. */
+.class-sessions,
+.class-roster {
   container-type: inline-size;
 }
 
-.class-sessions-table {
+.class-sessions-table,
+.class-roster-table {
   display: none;
 }
 
-.class-sessions-record-list {
+.class-sessions-record-list,
+.class-roster-record-list {
   display: grid;
 }
 
 /* 864px covers the class sessions table's 860px min width + the frame border:
    tablets beside the rail get the record list (44px targets), not a scrolling table. */
 @container (min-width: 864px) {
-  .class-sessions-table {
+  .class-sessions-table,
+  .class-roster-table {
     display: block;
   }
 
-  .class-sessions-record-list {
+  .class-sessions-record-list,
+  .class-roster-record-list {
     display: none;
   }
 }
