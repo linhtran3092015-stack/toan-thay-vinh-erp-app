@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { searchEnrollmentCandidatesAction } from "@/features/classes/actions/class-enrollment-search-actions";
 import type { ClassEnrollmentCandidate } from "@/features/classes/detail/class-detail-data";
+import { ENROLLMENT_SEARCH_MAX_LENGTH, ENROLLMENT_SEARCH_MIN_LENGTH } from "@/features/classes/detail/class-detail-models";
+import { normalizeRosterSearch } from "@/features/sessions/components/roster-search";
 import { enrollStudentInClassAction } from "@/features/students/enrollment/student-enrollment-actions";
 import type {
   StudentEnrollmentActionState,
@@ -19,14 +21,15 @@ import { cn } from "@/lib/utils";
 /** Matches shown at once; typing narrows the rest. */
 const VISIBLE_MATCHES = 40;
 
-/** From this many characters the dialog searches every candidate on the server. */
-const ENROLL_SEARCH_MIN_LENGTH = 2;
 const ENROLL_SEARCH_DEBOUNCE_MS = 300;
+
+/** Shown when the search call itself fails; a returned error carries its own message. */
+const SEARCH_FAILED_MESSAGE = "Chưa tìm được học sinh, thử lại.";
 
 type RemoteSearch =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "error" }
+  | { message: string; status: "error" }
   | { candidates: ClassEnrollmentCandidate[]; status: "ready"; truncated: boolean };
 
 interface ClassEnrollDialogProps {
@@ -40,10 +43,6 @@ interface ClassEnrollDialogProps {
   onClose: () => void;
   onSuccess: (message: string) => void;
   returnFocusRef?: RefObject<HTMLElement | null>;
-}
-
-function normalize(value: string): string {
-  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/đ/g, "d").replace(/Đ/g, "d").toLowerCase();
 }
 
 function getDefaultMode(candidate: ClassEnrollmentCandidate | undefined, classDefaultMode: string): StudentEnrollmentRegisteredMode {
@@ -90,15 +89,19 @@ export function ClassEnrollDialog({
   );
 
   const matches = useMemo(() => {
-    const needle = normalize(query.trim());
-    // While the server search is pending or failed, the preloaded list still narrows locally.
-    const source = remote.status === "ready" ? remote.candidates : candidates;
-    const filtered = needle && remote.status !== "ready"
-      ? source.filter((candidate) => normalize(`${candidate.fullName} ${candidate.publicCode}`).includes(needle))
-      : source;
+    const needle = normalizeRosterSearch(query);
+    // The preloaded list always narrows accent-insensitively ("hoang" finds "Hoàng"); the
+    // server's ILIKE is accent-sensitive, so its results only add students not preloaded.
+    const local = needle
+      ? candidates.filter((candidate) => normalizeRosterSearch(`${candidate.fullName} ${candidate.publicCode}`).includes(needle))
+      : candidates;
+    const localIds = new Set(local.map((candidate) => candidate.id));
+    const merged =
+      remote.status === "ready" ? [...local, ...remote.candidates.filter((candidate) => !localIds.has(candidate.id))] : local;
 
-    // Same-grade students first: they are the likely ones for this class.
-    return [...filtered].sort((a, b) => Number(b.grade === classGrade) - Number(a.grade === classGrade));
+    // Same-grade students first: they are the likely ones for this class. The sort is
+    // stable, so preloaded matches stay ahead of server-only ones within each group.
+    return [...merged].sort((a, b) => Number(b.grade === classGrade) - Number(a.grade === classGrade));
   }, [candidates, classGrade, query, remote]);
 
   const studentId = selected?.id ?? "";
@@ -116,7 +119,7 @@ export function ClassEnrollDialog({
     const sequence = ++searchSequenceRef.current;
     const needle = value.trim();
 
-    if (needle.length < ENROLL_SEARCH_MIN_LENGTH) {
+    if (needle.length < ENROLLMENT_SEARCH_MIN_LENGTH) {
       setRemote({ status: "idle" });
       return;
     }
@@ -129,9 +132,9 @@ export function ClassEnrollDialog({
         const result = await searchEnrollmentCandidatesAction(needle);
         next = result.status === "success"
           ? { candidates: result.candidates, status: "ready", truncated: result.truncated }
-          : { status: "error" };
+          : { message: result.message, status: "error" };
       } catch {
-        next = { status: "error" };
+        next = { message: SEARCH_FAILED_MESSAGE, status: "error" };
       }
 
       if (sequence === searchSequenceRef.current) {
@@ -206,6 +209,7 @@ export function ClassEnrollDialog({
             aria-label="Tìm học sinh theo tên hoặc mã"
             className={fieldControlClass()}
             disabled={isPending}
+            maxLength={ENROLLMENT_SEARCH_MAX_LENGTH}
             onChange={(event) => changeQuery(event.target.value)}
             placeholder="Tìm theo tên hoặc mã học sinh"
             ref={searchRef}
@@ -219,7 +223,7 @@ export function ClassEnrollDialog({
           ) : null}
           {remote.status === "error" ? (
             <p className="rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-secondary text-warning-ink" role="alert">
-              Chưa tìm được học sinh, thử lại.
+              {remote.message}
             </p>
           ) : null}
           {remote.status === "idle" && candidates.length === 0 && !candidatesTruncated ? (
@@ -343,7 +347,7 @@ function SearchHint({
   } else if (remote.status === "idle") {
     text =
       candidatesTruncated
-        ? `${shown}Danh sách ban đầu chỉ có một phần học sinh; gõ từ ${ENROLL_SEARCH_MIN_LENGTH} ký tự để tìm trong toàn bộ.`
+        ? `${shown}Danh sách ban đầu chỉ có một phần học sinh; gõ từ ${ENROLLMENT_SEARCH_MIN_LENGTH} ký tự để tìm trong toàn bộ.`
         : matchCount > VISIBLE_MATCHES
           ? `${shown}Gõ thêm tên hoặc mã để thu hẹp.`
           : null;

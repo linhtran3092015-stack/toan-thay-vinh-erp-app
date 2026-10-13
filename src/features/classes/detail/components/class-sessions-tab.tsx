@@ -3,7 +3,7 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useTransition, type FormEvent, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent, type RefObject } from "react";
 
 import { BulkActionBar } from "@/components/patterns/bulk-action-bar";
 import { DataTableFrame, TableCell, TableHeaderCell, TableRow, TableState } from "@/components/patterns/data-table-frame";
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import {
+  CLASS_SESSION_LIMIT,
   classSessionFilters,
   classSessionStageMeta,
   countClassSessionFilters,
@@ -26,8 +27,13 @@ import {
   type ClassSessionRow,
   type ClassSessionStage,
 } from "@/features/classes/detail/class-detail-models";
-import { cancelSessionAction } from "@/features/sessions/actions/session-lifecycle-actions";
-import { CANCEL_REASON_MAX_LENGTH, CANCEL_REASON_MIN_LENGTH } from "@/features/sessions/forms/session-lifecycle-form-schema";
+import { cancelClassSessionsAction } from "@/features/sessions/actions/session-lifecycle-actions";
+import type { CancelClassSessionsActionState } from "@/features/sessions/forms/session-action-types";
+import {
+  BULK_CANCEL_MAX_SESSIONS,
+  CANCEL_REASON_MAX_LENGTH,
+  CANCEL_REASON_MIN_LENGTH,
+} from "@/features/sessions/forms/session-lifecycle-form-schema";
 import { textAreaControlClass } from "@/features/students/form/components/form-controls";
 import { formatTime, formatWeekdayDate } from "@/lib/datetime";
 import { formatLearningMode } from "@/lib/format";
@@ -35,8 +41,8 @@ import { cn } from "@/lib/utils";
 
 export const CLASS_SESSIONS_PAGE_SIZE = 20;
 
-/** Mirrors CLASS_SESSION_LIMIT in class-detail-data (server-only, so not importable here). */
-const CLASS_SESSION_DISPLAY_LIMIT = 400;
+/** Ordinals named in the bulk bar before the rest collapse into "+n". */
+const BULK_SUBJECT_ORDINALS = 3;
 
 const filterLabels: Record<ClassSessionFilter, string> = {
   all: "Tất cả",
@@ -55,6 +61,8 @@ interface ClassSessionsTabProps {
   batchHref: string | null;
   /** Bulk cancel is owner-only: sessions.manage and classes.manage_schedule (TAs hold only the first). */
   canBulkCancelSessions: boolean;
+  /** The page's class: only its own sessions are bulk-cancelled, never a component class's. */
+  classId: string;
   /** HH:MM in Vietnam time: a session that ended earlier today without starting is overdue. */
   nowTime?: string;
   resultsAvailable: boolean;
@@ -63,9 +71,30 @@ interface ClassSessionsTabProps {
   truncated?: boolean;
 }
 
-/** Only sessions nobody has started can be cancelled in bulk; the RPC checks again. */
-function isBulkCancellable(row: ClassSessionRow, stage: ClassSessionStage): boolean {
-  return row.status === "scheduled" && !row.lockedAt && (stage === "upcoming" || stage === "overdue");
+/**
+ * Only this class's sessions nobody has started can be cancelled in bulk. A composite
+ * parent's feed also lists its components' sessions, which other classes share, so
+ * those are cancelled from the component's own page. The server checks both again.
+ */
+function isBulkCancellable(row: ClassSessionRow, stage: ClassSessionStage, classId: string): boolean {
+  return row.classId === classId && row.status === "scheduled" && !row.lockedAt && (stage === "upcoming" || stage === "overdue");
+}
+
+/** "B3 ngày T4, 14/10/2026", or "đã hủy ngày …" for a cancelled session (it has no ordinal). */
+function describeSession(row: ClassSessionRow): string {
+  return `${row.ordinal === null ? "đã hủy" : formatSessionOrdinal(row.ordinal)} ngày ${formatWeekdayDate(row.sessionDate)}`;
+}
+
+/** "B3 (T4 14/10, 19:30)": names a session in result messages without relying on the ordinal alone. */
+function identifySession(row: ClassSessionRow): string {
+  return `${formatSessionOrdinal(row.ordinal)} (${formatWeekdayDate(row.sessionDate, { year: false })}, ${formatTime(row.startTime)})`;
+}
+
+/** "buổi · B3, B4, B5 +2": at most a few ordinals, so the bar stays one line. */
+function formatBulkSubject(rows: readonly ClassSessionRow[]): string {
+  const named = rows.slice(0, BULK_SUBJECT_ORDINALS).map((row) => formatSessionOrdinal(row.ordinal)).join(", ");
+  const rest = rows.length - BULK_SUBJECT_ORDINALS;
+  return rows.length === 0 ? "buổi" : `buổi · ${named}${rest > 0 ? ` +${rest}` : ""}`;
 }
 
 /** First page that shows the next upcoming session, so the table opens on "now". */
@@ -83,6 +112,7 @@ export function ClassSessionsTab({
   attendanceAvailable,
   batchHref,
   canBulkCancelSessions,
+  classId,
   nowTime,
   resultsAvailable,
   rows,
@@ -96,7 +126,33 @@ export function ClassSessionsTab({
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [resultMessage, setResultMessage] = useState<{ tone: "success" | "warning"; title: string; description?: string } | null>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
+  const firstMobileCheckboxRef = useRef<HTMLInputElement>(null);
+  const chipsRef = useRef<HTMLDivElement>(null);
   const cancelTriggerRef = useRef<HTMLButtonElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  /** Set when a bulk cancel cleared the selection: its trigger is gone, so focus goes to the result. */
+  const focusResultRef = useRef(false);
+  // "Bỏ chọn" fallbacks: select-all is desktop-only, so mobile lands on the first row
+  // checkbox, or on the active filter chip when this page has nothing to select.
+  const clearFocusRefs = useMemo<ReadonlyArray<RefObject<HTMLElement | null>>>(
+    () => [
+      selectAllRef,
+      firstMobileCheckboxRef,
+      {
+        get current() {
+          return chipsRef.current?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]') ?? null;
+        },
+      },
+    ],
+    [],
+  );
+
+  useEffect(() => {
+    if (resultMessage && focusResultRef.current) {
+      focusResultRef.current = false;
+      resultRef.current?.focus();
+    }
+  }, [resultMessage]);
 
   const counts = useMemo(() => countClassSessionFilters(rows, today, nowTime), [nowTime, rows, today]);
   const filtered = useMemo(
@@ -124,9 +180,9 @@ export function ClassSessionsTab({
     });
   }
 
-  const hasBulkCancellable = canBulkCancelSessions && rows.some((row) => isBulkCancellable(row, getClassSessionStage(row, today, nowTime)));
+  const hasBulkCancellable = canBulkCancelSessions && rows.some((row) => isBulkCancellable(row, getClassSessionStage(row, today, nowTime), classId));
   const selectableOnPage = canBulkCancelSessions
-    ? pageRows.filter((row) => isBulkCancellable(row, getClassSessionStage(row, today, nowTime))).map((row) => row.id)
+    ? pageRows.filter((row) => isBulkCancellable(row, getClassSessionStage(row, today, nowTime), classId)).map((row) => row.id)
     : [];
   const selectedOnPage = selectableOnPage.filter((id) => selectedIds.has(id)).length;
   const allOnPageSelected = selectableOnPage.length > 0 && selectedOnPage === selectableOnPage.length;
@@ -161,7 +217,9 @@ export function ClassSessionsTab({
   return (
     <div className="grid min-w-0 gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <QuickFilterChips chips={chips} label="Lọc buổi học theo trạng thái" onChange={changeFilter} value={filter} />
+        <div ref={chipsRef}>
+          <QuickFilterChips chips={chips} label="Lọc buổi học theo trạng thái" onChange={changeFilter} value={filter} />
+        </div>
         {batchHref ? (
           <Link
             className="inline-flex min-h-11 items-center gap-1 text-secondary md:min-h-8 font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
@@ -175,20 +233,25 @@ export function ClassSessionsTab({
 
       {truncated ? (
         <ResultBanner
-          description={`Lớp có hơn ${CLASS_SESSION_DISPLAY_LIMIT} buổi. Bảng chỉ hiện ${CLASS_SESSION_DISPLAY_LIMIT} buổi mới nhất; các buổi cũ hơn không có trong bảng và không được tính vào số đếm ở trên.`}
-          title={`Chỉ hiện ${CLASS_SESSION_DISPLAY_LIMIT} buổi mới nhất`}
+          description={`Lớp có hơn ${CLASS_SESSION_LIMIT} buổi. Bảng chỉ hiện ${CLASS_SESSION_LIMIT} buổi mới nhất; các buổi cũ hơn không có trong bảng và không được tính vào số đếm ở trên.`}
+          title={`Chỉ hiện ${CLASS_SESSION_LIMIT} buổi mới nhất`}
           tone="info"
         />
       ) : null}
 
-      {resultMessage ? <ResultBanner description={resultMessage.description} title={resultMessage.title} tone={resultMessage.tone} /> : null}
+      {resultMessage ? (
+        // Focus target after a bulk cancel that cleared the selection (its trigger unmounted).
+        <div className="rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus" ref={resultRef} tabIndex={-1}>
+          <ResultBanner description={resultMessage.description} title={resultMessage.title} tone={resultMessage.tone} />
+        </div>
+      ) : null}
 
       {hasBulkCancellable ? (
         <BulkActionBar
           onClear={() => setSelectedIds(new Set())}
-          returnFocusRefs={[selectAllRef]}
+          returnFocusRefs={clearFocusRefs}
           selectedCount={selectedIds.size}
-          subject={`buổi · ${selectedRows.map((row) => formatSessionOrdinal(row.ordinal)).join(", ")}`}
+          subject={formatBulkSubject(selectedRows)}
         >
           <Button
             onClick={() => setIsCancelOpen(true)}
@@ -206,7 +269,7 @@ export function ClassSessionsTab({
         <DataTableFrame
           body={pageRows.map((row) => {
             const stage = getClassSessionStage(row, today, nowTime);
-            const selectable = canBulkCancelSessions && isBulkCancellable(row, stage);
+            const selectable = canBulkCancelSessions && isBulkCancellable(row, stage, classId);
             const isSelected = selectedIds.has(row.id);
 
             return (
@@ -215,7 +278,7 @@ export function ClassSessionsTab({
                   <TableCell className="w-12">
                     {selectable ? (
                       <input
-                        aria-label={`Chọn buổi ${formatSessionOrdinal(row.ordinal)} ngày ${formatWeekdayDate(row.sessionDate)}`}
+                        aria-label={`Chọn buổi ${describeSession(row)}`}
                         checked={isSelected}
                         className={checkboxClassName}
                         onChange={() => toggle(row.id)}
@@ -304,11 +367,13 @@ export function ClassSessionsTab({
             <ResponsiveRecordList label="Buổi học của lớp">
               {pageRows.map((row) => {
                 const stage = getClassSessionStage(row, today, nowTime);
-                const selectable = canBulkCancelSessions && isBulkCancellable(row, stage);
+                const selectable = canBulkCancelSessions && isBulkCancellable(row, stage, classId);
+                const isFirstSelectable = selectable && row.id === selectableOnPage[0];
+                const timeAndRoom = `${formatTime(row.startTime)}–${formatTime(row.endTime)}${row.roomName ? ` · ${row.roomName}` : ""}`;
 
                 return (
                   <RecordListItem
-                    ariaLabel={`Mở buổi ${formatSessionOrdinal(row.ordinal)} ngày ${formatWeekdayDate(row.sessionDate)}`}
+                    ariaLabel={`Mở buổi ${describeSession(row)}`}
                     badge={<Badge tone={classSessionStageMeta[stage].tone}>{classSessionStageMeta[stage].label}</Badge>}
                     href={`/sessions/${row.id}`}
                     key={row.id}
@@ -320,10 +385,11 @@ export function ClassSessionsTab({
                           {selectable ? (
                             <label className="flex h-11 w-11 cursor-pointer items-center justify-center">
                               <input
-                                aria-label={`Chọn buổi ${formatSessionOrdinal(row.ordinal)} ngày ${formatWeekdayDate(row.sessionDate)}`}
+                                aria-label={`Chọn buổi ${describeSession(row)}`}
                                 checked={selectedIds.has(row.id)}
                                 className={checkboxClassName}
                                 onChange={() => toggle(row.id)}
+                                ref={isFirstSelectable ? firstMobileCheckboxRef : undefined}
                                 type="checkbox"
                               />
                             </label>
@@ -331,7 +397,8 @@ export function ClassSessionsTab({
                         </span>
                       ) : undefined
                     }
-                    meta={`${formatWeekdayDate(row.sessionDate)} · ${formatTime(row.startTime)}–${formatTime(row.endTime)}${row.roomName ? ` · ${row.roomName}` : ""}`}
+                    // A cancelled session has no ordinal: its date is the title and the badge says "Đã hủy".
+                    meta={row.ordinal === null ? timeAndRoom : `${formatWeekdayDate(row.sessionDate)} · ${timeAndRoom}`}
                     metrics={
                       row.attendance || row.resultCount !== null ? (
                         <span className="flex gap-4 text-secondary text-text-muted">
@@ -344,7 +411,7 @@ export function ClassSessionsTab({
                         </span>
                       ) : undefined
                     }
-                    title={`Buổi ${row.ordinal ?? "đã hủy"}`}
+                    title={row.ordinal === null ? formatWeekdayDate(row.sessionDate) : formatSessionOrdinal(row.ordinal)}
                   />
                 );
               })}
@@ -356,16 +423,18 @@ export function ClassSessionsTab({
 
       {isCancelOpen ? (
         <BulkCancelDialog
+          classId={classId}
           onClose={() => setIsCancelOpen(false)}
           onDone={(outcome) => {
             setIsCancelOpen(false);
             setSelectedIds(new Set(outcome.failed.map((item) => item.row.id)));
+            focusResultRef.current = outcome.failed.length === 0;
             setResultMessage(
               outcome.failed.length === 0
                 ? { title: `Đã hủy ${outcome.cancelled} buổi.`, tone: "success" }
                 : {
                     description: outcome.failed
-                      .map((item) => `${formatSessionOrdinal(item.row.ordinal)}: ${item.message}`)
+                      .map((item) => `${identifySession(item.row)}: ${item.message}`)
                       .join(" · "),
                     title: `Đã hủy ${outcome.cancelled}/${outcome.cancelled + outcome.failed.length} buổi. Các buổi lỗi vẫn đang được chọn.`,
                     tone: "warning",
@@ -435,7 +504,7 @@ function SessionRowAction({ row, stage }: { row: ClassSessionRow; stage: ClassSe
 
   return (
     <Link
-      aria-label={`${label} buổi ${formatSessionOrdinal(row.ordinal)} ngày ${formatWeekdayDate(row.sessionDate)}`}
+      aria-label={`${label} buổi ${describeSession(row)}`}
       className="inline-flex h-8 items-center whitespace-nowrap rounded-md px-2 text-secondary font-semibold text-action-link hover:bg-interactive-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
       href={`/sessions/${row.id}`}
     >
@@ -450,46 +519,60 @@ interface BulkCancelOutcome {
 }
 
 function BulkCancelDialog({
+  classId,
   onClose,
   onDone,
   returnFocusRef,
   rows,
 }: {
+  classId: string;
   onClose: () => void;
   onDone: (outcome: BulkCancelOutcome) => void;
   returnFocusRef: RefObject<HTMLButtonElement | null>;
   rows: readonly ClassSessionRow[];
 }) {
   const [reason, setReason] = useState("");
-  const [progress, setProgress] = useState(0);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const trimmed = reason.trim();
   const isReasonTooShort = trimmed.length < CANCEL_REASON_MIN_LENGTH;
+  const isTooMany = rows.length > BULK_CANCEL_MAX_SESSIONS;
   const reasonError = trimmed.length > 0 && isReasonTooShort ? `Lý do hủy phải có ít nhất ${CANCEL_REASON_MIN_LENGTH} ký tự.` : null;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isReasonTooShort) {
+    if (isReasonTooShort || isTooMany) {
       return;
     }
 
+    setSubmitError(null);
     startTransition(async () => {
-      const outcome: BulkCancelOutcome = { cancelled: 0, failed: [] };
+      let result: CancelClassSessionsActionState;
 
-      // One RPC per session, in date order; a failure does not stop the others.
-      for (const row of rows) {
-        try {
-          const result = await cancelSessionAction({ reason: trimmed, sessionId: row.id });
-          if (result.status === "success") outcome.cancelled += 1;
-          else outcome.failed.push({ message: result.message, row });
-        } catch {
-          outcome.failed.push({ message: "Không kết nối được hệ thống.", row });
-        }
-        setProgress((value) => value + 1);
+      // One call: the server cancels the sessions one by one, in date order, and a
+      // failure does not stop the others.
+      try {
+        result = await cancelClassSessionsAction({ classId, reason: trimmed, sessionIds: rows.map((row) => row.id) });
+      } catch {
+        setSubmitError("Không kết nối được hệ thống. Tải lại trang để xem buổi nào đã hủy rồi thử lại.");
+        return;
       }
 
-      onDone(outcome);
+      if (result.status === "error") {
+        setSubmitError(result.message);
+        return;
+      }
+
+      const rowsById = new Map(rows.map((row) => [row.id, row]));
+
+      onDone({
+        cancelled: result.cancelled,
+        failed: result.failed.flatMap((item) => {
+          const row = rowsById.get(item.sessionId);
+          return row ? [{ message: item.message, row }] : [];
+        }),
+      });
     });
   }
 
@@ -543,9 +626,15 @@ function BulkCancelDialog({
           ) : null}
         </div>
 
+        {submitError ? (
+          <p className="rounded-md border border-danger-border bg-danger-bg px-3 py-2.5 text-secondary font-semibold text-danger-ink" role="alert">
+            {submitError}
+          </p>
+        ) : null}
+
         {isPending ? (
           <p aria-live="polite" className="text-secondary text-text-muted">
-            Đang hủy {progress}/{rows.length} buổi…
+            Đang hủy {rows.length} buổi…
           </p>
         ) : null}
 
@@ -554,8 +643,16 @@ function BulkCancelDialog({
             Không hủy
           </Button>
           <Button
-            disabled={isPending || isReasonTooShort}
-            disabledReason={isPending ? undefined : isReasonTooShort ? `Nhập lý do hủy (ít nhất ${CANCEL_REASON_MIN_LENGTH} ký tự)` : undefined}
+            disabled={isPending || isReasonTooShort || isTooMany}
+            disabledReason={
+              isPending
+                ? undefined
+                : isTooMany
+                  ? `Mỗi lần hủy tối đa ${BULK_CANCEL_MAX_SESSIONS} buổi; bỏ chọn bớt`
+                  : isReasonTooShort
+                    ? `Nhập lý do hủy (ít nhất ${CANCEL_REASON_MIN_LENGTH} ký tự)`
+                    : undefined
+            }
             type="submit"
             variant="danger-solid"
           >

@@ -3,17 +3,19 @@
 import { z } from "zod";
 
 import { searchClassEnrollmentCandidates, type ClassEnrollmentCandidate } from "@/features/classes/detail/class-detail-data";
+import { ENROLLMENT_SEARCH_MAX_LENGTH, ENROLLMENT_SEARCH_MIN_LENGTH } from "@/features/classes/detail/class-detail-models";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { permissionDeniedMessage } from "@/lib/permissions/labels";
-
-/** Shortest query the class enroll dialog sends to the server. */
-const MIN_QUERY_LENGTH = 2;
 
 export type EnrollmentCandidateSearchResult =
   | { candidates: ClassEnrollmentCandidate[]; status: "success"; truncated: boolean }
   | { message: string; status: "error" };
 
-const querySchema = z.string().trim().min(MIN_QUERY_LENGTH).max(100);
+const querySchema = z
+  .string({ message: "Từ khóa tìm kiếm không hợp lệ." })
+  .trim()
+  .min(ENROLLMENT_SEARCH_MIN_LENGTH, `Nhập ít nhất ${ENROLLMENT_SEARCH_MIN_LENGTH} ký tự để tìm học sinh.`)
+  .max(ENROLLMENT_SEARCH_MAX_LENGTH, `Từ khóa tìm kiếm tối đa ${ENROLLMENT_SEARCH_MAX_LENGTH} ký tự.`);
 
 /**
  * Server-side search for the class enroll dialog: the page only ships the first
@@ -25,7 +27,7 @@ export async function searchEnrollmentCandidatesAction(query: string): Promise<E
   const parsed = querySchema.safeParse(query);
 
   if (!parsed.success) {
-    return { message: `Nhập ít nhất ${MIN_QUERY_LENGTH} ký tự để tìm học sinh.`, status: "error" };
+    return { message: parsed.error.issues[0]?.message ?? "Từ khóa tìm kiếm không hợp lệ.", status: "error" };
   }
 
   const permissionResult = await getCachedDatabasePermissions();

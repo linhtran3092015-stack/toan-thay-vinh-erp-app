@@ -278,6 +278,7 @@ export function ClassDetailPage({
                 attendanceAvailable={workspace.attendance.status === "ready"}
                 batchHref={batchHref}
                 canBulkCancelSessions={canBulkCancelSessions}
+                classId={detail.id}
                 resultsAvailable={workspace.results.status === "ready"}
                 nowTime={resolvedNow}
                 rows={sessionRows}
@@ -317,7 +318,10 @@ export function ClassDetailPage({
 
 const shortWeekdays: Record<number, string> = { 0: "CN", 1: "2", 2: "3", 3: "4", 4: "5", 5: "6", 6: "7", 7: "CN" };
 
-/** "Thứ 2-4-6, 19:30–21:30" when all slots share a time, otherwise one entry per slot. */
+/**
+ * "Thứ 2-4-6, 19:30–21:30" when all slots share a time, otherwise one entry per slot.
+ * Sunday is never a "Thứ": "Thứ 2, Chủ nhật" or "Chủ nhật".
+ */
 export function formatScheduleSummary(schedules: readonly ClassScheduleReadModel[]): string | null {
   if (schedules.length === 0) {
     return null;
@@ -327,7 +331,12 @@ export function formatScheduleSummary(schedules: readonly ClassScheduleReadModel
   const times = new Set(sorted.map((schedule) => `${schedule.startTime.slice(0, 5)}–${schedule.endTime.slice(0, 5)}`));
   const days = sorted.map((schedule) => shortWeekdays[schedule.weekday] ?? String(schedule.weekday));
   const rooms = [...new Set(sorted.map((schedule) => schedule.roomName).filter((room): room is string => Boolean(room)))];
-  const dayLabel = (values: string[]) => (values.every((value) => value === "CN") ? "Chủ nhật" : `Thứ ${values.join("-")}`);
+  const dayLabel = (values: string[]) => {
+    const weekdays = values.filter((value) => value !== "CN");
+    return [weekdays.length > 0 ? `Thứ ${weekdays.join("-")}` : null, values.includes("CN") ? "Chủ nhật" : null]
+      .filter(Boolean)
+      .join(", ");
+  };
 
   const slots =
     times.size === 1

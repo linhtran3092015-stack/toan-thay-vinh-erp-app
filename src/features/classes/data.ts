@@ -377,6 +377,7 @@ export async function getClassDetail(
     };
   }
 
+  const today = getVietnamToday();
   const [academicYearResult, schedulesResult, componentLinksResult] =
     await Promise.all([
       supabase
@@ -391,13 +392,14 @@ export async function getClassDetail(
         .order("is_active", { ascending: false })
         .order("weekday", { ascending: true })
         .order("start_time", { ascending: true }),
-      // Links still in force today or starting later: a composite parent cannot
-      // hold its own sessions or schedule templates while one overlaps.
+      // Links not ended before today; those starting later are dropped below
+      // (a composite parent cannot hold its own sessions while a link covers
+      // the session date, so a future link does not make the class composite yet).
       supabase
         .from("class_component_links")
-        .select("component_order, component:classes!class_component_links_component_class_id_fkey(id, code, name)")
+        .select("component_order, effective_from, component:classes!class_component_links_component_class_id_fkey(id, code, name)")
         .eq("parent_class_id", classId)
-        .or(`effective_to.is.null,effective_to.gte.${getVietnamToday()}`)
+        .or(`effective_to.is.null,effective_to.gte.${today}`)
         .order("component_order", { ascending: true }),
     ]);
 
@@ -483,7 +485,9 @@ export async function getClassDetail(
       detail: {
         ...baseClass,
         classinUrl: classRow.classin_url,
-        componentClasses: mapComponentClasses(componentLinksResult.data ?? []),
+        componentClasses: mapComponentClasses(
+          (componentLinksResult.data ?? []).filter((link) => link.effective_from <= today),
+        ),
         schedules,
       },
     };

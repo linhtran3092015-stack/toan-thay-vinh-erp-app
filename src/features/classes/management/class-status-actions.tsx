@@ -16,6 +16,7 @@ import type {
   ClassTargetStatus,
 } from "@/features/classes/forms/class-action-types";
 import { initialClassManagementActionState } from "@/features/classes/forms/class-action-types";
+import { textAreaControlClass } from "@/features/students/form/components/form-controls";
 import type {
   ClassDetailReadModel,
 } from "@/features/classes/read-models";
@@ -42,9 +43,6 @@ export interface ClassStatusOperation {
   submitLabel: string;
   targetStatus: ClassTargetStatus;
 }
-
-const inputClassName =
-  "min-h-11 w-full rounded-md border border-hairline bg-surface-base px-3 text-sm font-normal text-ink outline-none transition focus:border-action-primary focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
 
 /** Transitions change_class_status allows from each status; unknown statuses get none. */
 export function getClassStatusOperations(
@@ -185,6 +183,8 @@ export function useClassStatusOperations({
     });
   };
 
+  const reasonError = actionState.fieldErrors?.reason?.[0];
+
   const dialog = (
     <Dialog
       ariaDescribedBy="class-status-action-description"
@@ -223,13 +223,18 @@ export function useClassStatusOperations({
             </div>
           </div>
 
-          <label className="grid gap-2 text-sm font-semibold text-ink">
-            <span>Lý do đổi trạng thái</span>
+          <div className="grid gap-1.5">
+            <label className="text-sm font-semibold text-ink-muted" htmlFor="class-status-action-reason">
+              Lý do đổi trạng thái<span className="ml-1 text-danger">*</span>
+            </label>
 
             <textarea
+              aria-describedby={reasonError ? "class-status-action-reason-error" : undefined}
+              aria-invalid={reasonError ? true : undefined}
               autoFocus
-              className={`${inputClassName} min-h-28 resize-y py-3`}
+              className={textAreaControlClass(reasonError, "min-h-28 resize-y")}
               disabled={isPending}
+              id="class-status-action-reason"
               maxLength={2000}
               onChange={(event) => setReason(event.target.value)}
               placeholder="Nhập lý do thực hiện"
@@ -237,13 +242,15 @@ export function useClassStatusOperations({
               value={reason}
             />
 
-            {actionState.fieldErrors?.reason?.[0] ? (
-              <span className="text-xs font-medium text-danger">{actionState.fieldErrors.reason[0]}</span>
+            {reasonError ? (
+              <p className="text-xs font-semibold leading-5 text-danger" id="class-status-action-reason-error">
+                {reasonError}
+              </p>
             ) : null}
-          </label>
+          </div>
 
           {actionState.status === "error" && actionState.message ? (
-            <div aria-live="polite" className="rounded-md border border-danger-border bg-danger-bg p-3 text-sm text-danger">
+            <div aria-live="polite" className="rounded-md border border-danger-border bg-danger-bg p-3 text-secondary font-semibold text-danger-ink">
               {actionState.message}
             </div>
           ) : null}
@@ -255,6 +262,7 @@ export function useClassStatusOperations({
 
             <Button
               disabled={isPending || reason.trim().length === 0}
+              disabledReason={isPending ? undefined : reason.trim().length === 0 ? "Nhập lý do đổi trạng thái" : undefined}
               type="submit"
               variant={selectedOperation.danger ? "danger-solid" : "primary"}
             >

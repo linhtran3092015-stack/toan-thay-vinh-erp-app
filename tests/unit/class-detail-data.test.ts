@@ -112,7 +112,7 @@ describe("getClassDetailWorkspace", () => {
         ],
         error: null,
       },
-      session_results: { data: [{ class_session_id: "s2" }], error: null },
+      session_results: { data: [{ class_session_id: "s2", student_id: "a" }], error: null },
       student_enrollments: {
         data: [
           { student: { full_name: "Bảo", id: "b", public_code: "HS2" }, student_id: "b" },
@@ -215,22 +215,28 @@ describe("getClassDetailWorkspace", () => {
     expect(owner.debt).toEqual({ reason: "failed", status: "unavailable" });
   });
 
-  // Value: protects=the per-session roster RPC fan-out stays capped at 40 newest unlocked sessions, 8 in flight at a time;
-  // fails_when=the OPEN_ROSTER_LIMIT slice or the chunked concurrency is removed, or the cap keeps the oldest sessions instead of the newest;
-  // why_new=existing loader tests use one or two sessions, so neither the cap nor the concurrency limit is exercised;
+  // Value: protects=the per-session roster RPC fan-out stays capped at 40, 8 in flight at a time, and spends the cap on pending-lock sessions oldest first, then live sessions newest first;
+  // fails_when=the OPEN_ROSTER_LIMIT slice or the chunked concurrency is removed, or the cap keeps the newest pending-lock sessions (the overview's needs-action list, which shows the oldest, then gets "—" rosters);
+  // why_new=red-team found the cap kept the 40 newest open sessions while needs-action lists the oldest pending-lock ones;
   // seam=none; no_claim=does not measure real RPC latency or prove the database tolerates 8 concurrent calls
-  it("resolves at most 40 open rosters, newest first, 8 at a time", async () => {
-    const rows = Array.from({ length: 41 }, (_, index) => {
-      const day = new Date(Date.UTC(2026, 8, 1 + index)).toISOString().slice(0, 10);
-      return sessionRow(`s${String(index).padStart(2, "0")}`, day, "completed");
-    }).reverse();
-    tables({
-      class_component_links: { data: [], error: null },
-      class_sessions: { data: rows, error: null },
-      session_attendance: { data: [], error: null },
-      session_results: { data: [], error: null },
-      student_enrollments: { data: [], error: null },
-    });
+  it("resolves at most 40 open rosters, oldest pending-lock first, 8 at a time", async () => {
+    const day = (offset: number) => new Date(Date.UTC(2026, 7, 1 + offset)).toISOString().slice(0, 10);
+    const arrange = (completed: number, live: number) => {
+      tables({
+        class_component_links: { data: [], error: null },
+        class_sessions: {
+          data: [
+            ...Array.from({ length: completed }, (_, index) => sessionRow(`s${String(index).padStart(2, "0")}`, day(index), "completed")),
+            ...Array.from({ length: live }, (_, index) => sessionRow(`live${index}`, day(60 + index), "in_progress")),
+          ].reverse(),
+          error: null,
+        },
+        session_attendance: { data: [], error: null },
+        session_results: { data: [], error: null },
+        student_enrollments: { data: [], error: null },
+      });
+    };
+    const resolvedIds = () => supabase.rpc.mock.calls.map(([, args]) => (args as { p_class_session_id: string }).p_class_session_id);
     let inFlight = 0;
     let maxInFlight = 0;
     supabase.rpc.mockImplementation(async () => {
@@ -241,17 +247,29 @@ describe("getClassDetailWorkspace", () => {
       return { data: [{ student_id: "a" }], error: null };
     });
 
+    arrange(41, 1);
     const workspace = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
 
     expect(supabase.rpc).toHaveBeenCalledTimes(40);
-    expect(supabase.rpc).not.toHaveBeenCalledWith("resolve_class_session_roster", { p_class_session_id: "s00" });
+    // The 40 oldest pending-lock sessions win over the newest one and the live one.
+    expect(new Set(resolvedIds())).toEqual(new Set(Array.from({ length: 40 }, (_, index) => `s${String(index).padStart(2, "0")}`)));
     expect(maxInFlight).toBe(8);
     expect(workspace.sessions.status).toBe("ready");
     if (workspace.sessions.status !== "ready") return;
     const byId = Object.fromEntries(workspace.sessions.value.rows.map((row) => [row.id, row]));
-    // The oldest open session falls outside the cap and shows "—" rather than 0/0.
-    expect(byId.s00).toMatchObject({ attendance: null, rosterCount: null });
-    expect(byId.s40).toMatchObject({ attendance: { absent: 0, additional: 0, present: 0, unmarked: 1 }, rosterCount: 1 });
+    // An open session outside the cap shows "—" rather than 0/0.
+    expect(byId.s40).toMatchObject({ attendance: null, rosterCount: null });
+    expect(byId.live0).toMatchObject({ attendance: null, rosterCount: null });
+    expect(byId.s00).toMatchObject({ attendance: { absent: 0, additional: 0, present: 0, unmarked: 1 }, rosterCount: 1 });
+
+    // Pending-lock sessions first, then live sessions newest first.
+    supabase.rpc.mockClear();
+    arrange(38, 3);
+    await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
+
+    expect(resolvedIds()).toHaveLength(40);
+    expect(resolvedIds().slice(0, 2)).toEqual(["s00", "s01"]);
+    expect(resolvedIds().slice(38)).toEqual(["live2", "live1"]);
   });
 
   // Value: protects=an exception thrown after the client exists (G1) marks every permitted feed that had not loaded as failed and keeps loaded ones;
@@ -288,7 +306,7 @@ describe("getClassDetailWorkspace", () => {
   // Value: protects=a composite parent shows a component's sessions only while a link covers the session date, and always its own sessions;
   // fails_when=effective_from/effective_to are ignored (sessions of a component's earlier or later parent appear) or an open-ended link (effective_to null) drops sessions;
   // why_new=api-contract review found getSessionClassIds ignored the link window that resolve_class_session_rosters applies;
-  // seam=none; no_claim=does not prove the window filter keeps the 400-session cap exact (out-of-window rows still count toward the limit)
+  // seam=none; no_claim=the mock ignores the query's or() window filter, so this checks the JS safety net only (the query filter is tested below)
   it("keeps component sessions only inside a link window", async () => {
     const calls = tables({
       class_component_links: {
@@ -518,6 +536,145 @@ describe("getClassDetailWorkspace", () => {
     expect(workspace.sessions.value.rows.some((row) => row.id === "s400")).toBe(false);
   });
 
+  // Value: protects=on a composite parent page, result counts of component sessions count only students the attendance tally counts (the parent's roster plus walk-ins), and stay "—" when that roster is unknown;
+  // fails_when=a result of a student enrolled only in the component class is counted, the walk-in rule differs from the tally, an unresolved component session shows an unfiltered count, or own sessions get filtered;
+  // why_new=red-team found loadResultCounts counted every session_results row while attendance was already restricted to the parent's roster;
+  // seam=none; no_claim=does not cover a student enrolled in both the parent and the component (the RPC then reports the component enrolment)
+  it("counts component-session results only for the page class's students", async () => {
+    const arrange = () =>
+      tables({
+        class_component_links: { data: [{ component_class_id: "class-1-t", effective_from: "2026-09-01", effective_to: null }], error: null },
+        class_sessions: {
+          data: [
+            sessionRow("open-component", "2026-10-12", "completed", "class-1-t"),
+            { ...sessionRow("locked-component", "2026-10-09", "completed", "class-1-t"), locked_at: "2026-10-10T00:00:00Z" },
+            { ...sessionRow("locked-own", "2026-10-08", "completed"), locked_at: "2026-10-09T00:00:00Z" },
+          ],
+          error: null,
+        },
+        session_attendance: {
+          data: [
+            { attendance_status: "present", class_session_id: "open-component", student_enrollment_id: "e-a", student_id: "a" },
+            { attendance_status: "present", class_session_id: "open-component", student_enrollment_id: "e-z", student_id: "z" },
+            { attendance_status: "additional_study", class_session_id: "open-component", student_enrollment_id: null, student_id: "w" },
+            { attendance_status: "present", class_session_id: "locked-component", student_enrollment_id: "e-a", student_id: "a" },
+            { attendance_status: "unexcused_absence", class_session_id: "locked-component", student_enrollment_id: "e-z", student_id: "z" },
+            { attendance_status: "present", class_session_id: "locked-own", student_enrollment_id: "e-a", student_id: "a" },
+          ],
+          error: null,
+        },
+        session_results: {
+          data: [
+            { class_session_id: "open-component", student_id: "a" },
+            { class_session_id: "open-component", student_id: "z" },
+            { class_session_id: "open-component", student_id: "w" },
+            { class_session_id: "locked-component", student_id: "a" },
+            { class_session_id: "locked-component", student_id: "z" },
+            { class_session_id: "locked-own", student_id: "a" },
+            { class_session_id: "locked-own", student_id: "q" },
+          ],
+          error: null,
+        },
+        student_enrollments: (own) =>
+          own.some(([method, args]) => method === "select" && args[0] === "id")
+            ? { data: [{ id: "e-a" }], error: null }
+            : { data: [{ student: { full_name: "An", id: "a", public_code: "HS1" }, student_id: "a" }], error: null },
+      });
+    const calls = arrange();
+    supabase.rpc.mockResolvedValue({
+      data: [
+        { enrollment_class_id: "class-1", student_id: "a" },
+        { enrollment_class_id: "class-1-t", student_id: "z" },
+      ],
+      error: null,
+    });
+
+    const workspace = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
+
+    expect(calls.session_results).toContainEqual(["select", ["class_session_id, student_id"]]);
+    expect(workspace.sessions.status).toBe("ready");
+    if (workspace.sessions.status !== "ready") return;
+    const byId = Object.fromEntries(workspace.sessions.value.rows.map((row) => [row.id, row]));
+    // z is enrolled only in the component class: not counted; the walk-in w is, as in the tally.
+    expect(byId["open-component"]).toMatchObject({ attendance: { additional: 1, present: 1 }, resultCount: 2 });
+    expect(byId["locked-component"]).toMatchObject({ resultCount: 1 });
+    // Own sessions keep every result.
+    expect(byId["locked-own"]).toMatchObject({ resultCount: 2 });
+
+    // Without attendance rights the component rosters are unknown: no count rather than an unfiltered one.
+    arrange();
+    const noAttendance = await getClassDetailWorkspace("class-1", { ...allowed, canViewAttendance: false, canViewPayments: false });
+
+    expect(noAttendance.results).toEqual({ status: "ready", value: true });
+    if (noAttendance.sessions.status !== "ready") throw new Error("sessions not ready");
+    const noAttendanceById = Object.fromEntries(noAttendance.sessions.value.rows.map((row) => [row.id, row]));
+    expect(noAttendanceById["open-component"]).toMatchObject({ resultCount: null });
+    expect(noAttendanceById["locked-component"]).toMatchObject({ resultCount: null });
+    expect(noAttendanceById["locked-own"]).toMatchObject({ resultCount: 2 });
+  });
+
+  // Value: protects=link windows filter component sessions in the query, before the 400 limit, so out-of-window rows neither take the budget nor make `truncated` true; malformed ids or dates never reach the filter string;
+  // fails_when=the or() window filter is dropped or mis-built (missing lte for a closed window, lte on an open one), the limit is applied before the window, or an id with , ( ) is interpolated;
+  // why_new=red-team found loadSessions limited first and dropped out-of-window rows afterwards, so a composite class could show fewer than 400 sessions with a false truncation flag;
+  // seam=none; no_claim=the mock applies the window itself when it sees the expected or() string; it does not prove PostgREST parses that string
+  it("filters component sessions by link window in the query, before the limit", async () => {
+    const windows = [
+      { component_class_id: "class-1-t", effective_from: "2026-09-01", effective_to: "2026-09-30" },
+      { component_class_id: "class-1-t", effective_from: "2026-10-10", effective_to: null },
+    ];
+    const expectedFilter =
+      "class_id.eq.class-1," +
+      "and(class_id.eq.class-1-t,session_date.gte.2026-09-01,session_date.lte.2026-09-30)," +
+      "and(class_id.eq.class-1-t,session_date.gte.2026-10-10)";
+    const day = (offset: number) => new Date(Date.UTC(2026, 7, 31) - offset * 86_400_000).toISOString().slice(0, 10);
+    // 400 own sessions up to 2026-08-31, plus newer component sessions between the two windows.
+    const own = Array.from({ length: 400 }, (_, index) => sessionRow(`own${index}`, day(index), "scheduled"));
+    const outside = Array.from({ length: 9 }, (_, index) => sessionRow(`out${index}`, `2026-10-0${index + 1}`, "scheduled", "class-1-t"));
+    const dataset = [...outside.reverse(), ...own];
+    const calls = tables({
+      class_component_links: { data: windows, error: null },
+      // Stand-in for the server: applies the window only when the query sends the expected filter.
+      class_sessions: (ownCalls) => {
+        const filtered = ownCalls.some(([method, args]) => method === "or" && args[0] === expectedFilter);
+        const limit = ownCalls.find(([method]) => method === "limit")?.[1][0] as number;
+        return { data: dataset.filter((row) => !filtered || row.class_id === "class-1").slice(0, limit), error: null };
+      },
+      session_attendance: { data: [], error: null },
+      session_results: { data: [], error: null },
+      student_enrollments: { data: [], error: null },
+    });
+
+    const workspace = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
+
+    expect(calls.class_sessions).toContainEqual(["or", [expectedFilter]]);
+    expect(calls.class_sessions).toContainEqual(["limit", [401]]);
+    expect(workspace.sessions.status).toBe("ready");
+    if (workspace.sessions.status !== "ready") return;
+    expect(workspace.sessions.value.truncated).toBe(false);
+    expect(workspace.sessions.value.rows).toHaveLength(400);
+
+    // A class without components sends no or() filter.
+    const plain = tables({
+      class_component_links: { data: [], error: null },
+      class_sessions: { data: [], error: null },
+      session_attendance: { data: [], error: null },
+      session_results: { data: [], error: null },
+      student_enrollments: { data: [], error: null },
+    });
+    await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
+    expect(plain.class_sessions.some(([method]) => method === "or")).toBe(false);
+
+    // An id that could split the filter fails the feed instead of reaching PostgREST.
+    const unsafe = tables({
+      class_component_links: { data: [{ component_class_id: "x,class_id.neq.y", effective_from: "2026-09-01", effective_to: null }], error: null },
+      class_sessions: { data: [], error: null },
+      student_enrollments: { data: [], error: null },
+    });
+    const rejected = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
+    expect(unsafe.class_sessions).toBeUndefined();
+    expect(rejected.sessions).toEqual({ reason: "failed", status: "unavailable" });
+  });
+
   it("reports the sessions feed as failed when the session query errors", async () => {
     tables({
       class_component_links: { data: [], error: null },
@@ -618,5 +775,87 @@ describe("searchClassEnrollmentCandidates", () => {
     const calls = tables({ students: { data: [], error: null } });
     await searchClassEnrollmentCandidates("x,y");
     expect(calls.students).toContainEqual(["or", ['full_name.ilike."%x,y%",public_code.ilike."%x,y%"']]);
+  });
+});
+
+describe("getClassDetailWorkspace partial failures", () => {
+  const loaded = (debt: TableResult) =>
+    tables({
+      class_component_links: { data: [], error: null },
+      class_sessions: { data: [sessionRow("s1", "2026-10-12", "completed")], error: null },
+      session_attendance: { data: [{ attendance_status: "present", class_session_id: "s1", student_id: "a" }], error: null },
+      session_results: { data: [], error: null },
+      student_enrollments: { data: [{ student: { full_name: "An", id: "a", public_code: "HS1" }, student_id: "a" }], error: null },
+      student_payment_requests: debt,
+    });
+
+  // Value: protects=a debt read that errors or throws fails only the debt feed; sessions, attendance and students still show and nothing rejects unhandled;
+  // fails_when=the debt .catch is removed: the throw settles while the roster RPC is still pending on a later macrotask, so the rejection is unhandled (and the late await hits the outer catch); or a debt error marks other feeds failed;
+  // why_new=testing review found every mock settled in microtasks, so the rejection was always awaited in time and the test passed without the .catch;
+  // seam=none; no_claim=does not cover a debt read failing in a later chunk or page (same null path)
+  it.each([
+    ["errors", { data: null, error: { message: "denied" } } as TableResult],
+    [
+      "throws",
+      (() => {
+        throw new Error("socket hang up");
+      }) as TableResult,
+    ],
+  ])("fails only debt when the debt read %s", async (_label, debt) => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      loaded(debt);
+      // The session side settles on a later macrotask, after the debt read has failed.
+      supabase.rpc.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ data: [{ enrollment_class_id: "class-1", student_id: "a" }], error: null }), 5)),
+      );
+
+      const workspace = await getClassDetailWorkspace("class-1", allowed);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(supabase.from).toHaveBeenCalledWith("student_payment_requests");
+      expect(workspace.debt).toEqual({ reason: "failed", status: "unavailable" });
+      expect(workspace.students).toEqual({ status: "ready", value: [{ fullName: "An", id: "a", publicCode: "HS1" }] });
+      expect(workspace.attendance).toEqual({ status: "ready", value: true });
+      expect(workspace.results).toEqual({ status: "ready", value: true });
+      expect(workspace.sessions.status).toBe("ready");
+      if (workspace.sessions.status !== "ready") return;
+      expect(workspace.sessions.value.rows[0]).toMatchObject({ attendance: { present: 1, unmarked: 0 }, rosterCount: 1 });
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
+  // Value: protects=on a parent with locked component sessions, a failed read of the parent's enrolment ids fails attendance instead of showing 0/0 tallies;
+  // fails_when=a null classEnrollmentIds is treated as an empty set (every component student filtered out) and attendance stays ready;
+  // why_new=the loadClassEnrollmentIds failure branch was never exercised; the existing component test only covers its success;
+  // seam=none; no_claim=does not cover a failure on a later page of the enrolment-id read (same null path)
+  it("fails attendance when the parent's enrolment-id read fails on locked component sessions", async () => {
+    tables({
+      class_component_links: { data: [{ component_class_id: "class-1-t", effective_from: "2026-09-01", effective_to: null }], error: null },
+      class_sessions: {
+        data: [{ ...sessionRow("locked-component", "2026-10-09", "completed", "class-1-t"), locked_at: "2026-10-10T00:00:00Z" }],
+        error: null,
+      },
+      session_attendance: {
+        data: [{ attendance_status: "present", class_session_id: "locked-component", student_enrollment_id: "e-a", student_id: "a" }],
+        error: null,
+      },
+      session_results: { data: [], error: null },
+      student_enrollments: (own) =>
+        own.some(([method, args]) => method === "select" && args[0] === "id")
+          ? { data: null, error: { message: "denied" } }
+          : { data: [{ student: { full_name: "An", id: "a", public_code: "HS1" }, student_id: "a" }], error: null },
+    });
+
+    const workspace = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
+
+    expect(workspace.attendance).toEqual({ reason: "failed", status: "unavailable" });
+    expect(workspace.sessions.status).toBe("ready");
+    if (workspace.sessions.status !== "ready") return;
+    expect(workspace.sessions.value.rows[0]).toMatchObject({ attendance: null, rosterCount: null });
   });
 });

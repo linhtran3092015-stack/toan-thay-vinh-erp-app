@@ -14,6 +14,7 @@ import {
   getAttendanceChart,
   getClassAttendanceRate,
   getClassSessionStage,
+  hasSessionEnded,
   isAbsenceStatus,
   isLockCountedAttendanceStatus,
   LOW_ATTENDANCE_RATE,
@@ -151,6 +152,26 @@ describe("findNextClassSession", () => {
 
     expect(findNextClassSession(rows, TODAY, "10:00:00")?.id).toBe("tonight");
     expect(findNextClassSession(rows, TODAY, "22:00")?.id).toBe("friday");
+  });
+
+  // Value: protects=the "next session" card never shows a session the sessions list already calls overdue, at the exact end minute and seconds after it;
+  // fails_when=findNextClassSession and getClassSessionStage use different end-time rules again (e.g. HH:MM slices with >=, which kept a session ending 21:30 as next until 21:31);
+  // why_new=review found findNextClassSession compared minutes with >= while the stage used full times with <=, so at 21:30–21:30:59 a row was both next and overdue;
+  // seam=none; no_claim=does not prove getVietnamTime returns seconds in production
+  it("agrees with the stage on when a session has ended", () => {
+    const rows = [session({ id: "tonight", sessionDate: TODAY }), session({ id: "friday", sessionDate: "2026-10-16" })];
+
+    for (const nowTime of ["21:29:59", "21:30", "21:30:00", "21:30:30"]) {
+      const next = findNextClassSession(rows, TODAY, nowTime);
+      expect(next && getClassSessionStage(next, TODAY, nowTime)).toBe("upcoming");
+      expect(hasSessionEnded(rows[0], TODAY, nowTime)).toBe(getClassSessionStage(rows[0], TODAY, nowTime) === "overdue");
+    }
+
+    expect(findNextClassSession(rows, TODAY, "21:29:59")?.id).toBe("tonight");
+    expect(findNextClassSession(rows, TODAY, "21:30")?.id).toBe("friday");
+    expect(findNextClassSession(rows, TODAY, "21:30:30")?.id).toBe("friday");
+    expect(hasSessionEnded({ sessionDate: "2026-10-12" }, TODAY)).toBe(true);
+    expect(hasSessionEnded({ endTime: "21:30:00", sessionDate: TODAY }, TODAY)).toBe(false);
   });
 });
 

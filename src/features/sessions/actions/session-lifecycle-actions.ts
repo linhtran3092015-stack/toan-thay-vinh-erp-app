@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import type {
+  CancelClassSessionsActionInput,
+  CancelClassSessionsActionState,
   CancelSessionActionInput,
   CreateSessionActionInput,
   RescheduleSessionActionInput,
@@ -11,12 +13,16 @@ import type {
   SessionLifecycleFieldErrors,
 } from "@/features/sessions/forms/session-action-types";
 import {
+  cancelClassSessionsSchema,
   cancelSessionSchema,
   createSessionSchema,
   rescheduleSessionSchema,
   sessionIdSchema,
 } from "@/features/sessions/forms/session-lifecycle-form-schema";
-import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
+import {
+  getCachedDatabasePermissions,
+  getDatabasePermissions,
+} from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { permissionDeniedMessage } from "@/lib/permissions/labels";
@@ -24,6 +30,17 @@ function createErrorState(
   message: string,
   fieldErrors?: SessionLifecycleFieldErrors,
 ): SessionLifecycleActionState {
+  return {
+    fieldErrors,
+    message,
+    status: "error",
+  };
+}
+
+function createBulkCancelErrorState(
+  message: string,
+  fieldErrors?: SessionLifecycleFieldErrors,
+): Extract<CancelClassSessionsActionState, { status: "error" }> {
   return {
     fieldErrors,
     message,
@@ -465,6 +482,152 @@ export async function cancelSessionAction(
       "Không thể kết nối tới hệ thống buổi học. Vui lòng thử lại.",
     );
   }
+}
+
+/**
+ * Bulk cancel from a class page (owner decision D6). Owner-only: needs both
+ * sessions.manage and classes.manage_schedule, which teaching assistants lack.
+ * Sessions must belong to `classId` (a composite parent's page also lists its
+ * components' sessions); each one goes through the same cancel_class_session
+ * RPC as a single cancel, one after another, and a failure does not stop the
+ * rest. Routes are revalidated once, after the loop.
+ */
+export async function cancelClassSessionsAction(
+  input: CancelClassSessionsActionInput,
+): Promise<CancelClassSessionsActionState> {
+  const permissionResult =
+    await getCachedDatabasePermissions();
+
+  if (!permissionResult.ok) {
+    return createBulkCancelErrorState(
+      "Không thể xác minh quyền quản lý buổi học. Vui lòng đăng nhập lại hoặc thử lại.",
+    );
+  }
+
+  for (const permission of [
+    "sessions.manage",
+    "classes.manage_schedule",
+  ] as const) {
+    if (
+      !permissionResult.permissions.includes(
+        permission,
+      )
+    ) {
+      return createBulkCancelErrorState(
+        permissionDeniedMessage(permission),
+      );
+    }
+  }
+
+  const parsed =
+    cancelClassSessionsSchema.safeParse(input);
+
+  if (!parsed.success) {
+    const fieldErrors =
+      parsed.error.flatten().fieldErrors;
+
+    return createBulkCancelErrorState(
+      fieldErrors.reason?.[0] ??
+        fieldErrors.sessionIds?.[0] ??
+        "Vui lòng kiểm tra lại các buổi cần hủy và lý do hủy.",
+      fieldErrors,
+    );
+  }
+
+  const { classId, reason, sessionIds } =
+    parsed.data;
+
+  let supabase: Awaited<
+    ReturnType<typeof createSupabaseServerClient>
+  >;
+  let ownSessionIds: Set<string>;
+
+  try {
+    supabase =
+      await createSupabaseServerClient();
+
+    const { data, error } = await supabase
+      .from("class_sessions")
+      .select("id")
+      .eq("class_id", classId)
+      .in("id", sessionIds);
+
+    if (error) {
+      return createBulkCancelErrorState(
+        "Không thể kiểm tra buổi học của lớp. Chưa hủy buổi nào.",
+      );
+    }
+
+    ownSessionIds = new Set(
+      (data ?? []).map((row) => row.id),
+    );
+  } catch {
+    return createBulkCancelErrorState(
+      "Không thể kết nối tới hệ thống buổi học. Chưa hủy buổi nào.",
+    );
+  }
+
+  let cancelled = 0;
+  const failed: Array<{
+    message: string;
+    sessionId: string;
+  }> = [];
+
+  for (const sessionId of sessionIds) {
+    if (!ownSessionIds.has(sessionId)) {
+      failed.push({
+        message:
+          "Buổi học không thuộc lớp này nên không hủy ở đây.",
+        sessionId,
+      });
+      continue;
+    }
+
+    try {
+      const { data, error } =
+        await supabase.rpc(
+          "cancel_class_session",
+          {
+            p_class_session_id: sessionId,
+            p_reason: reason,
+          },
+        );
+
+      if (error) {
+        failed.push({
+          message: getLifecycleRpcErrorMessage(
+            error.message,
+          ),
+          sessionId,
+        });
+      } else if (!data?.id) {
+        failed.push({
+          message:
+            "Database không trả về kết quả hủy buổi học.",
+          sessionId,
+        });
+      } else {
+        cancelled += 1;
+      }
+    } catch {
+      failed.push({
+        message:
+          "Không thể kết nối tới hệ thống buổi học.",
+        sessionId,
+      });
+    }
+  }
+
+  if (cancelled > 0) {
+    revalidateSessionRoutes();
+    revalidatePath(`/classes/${classId}`);
+  }
+
+  return {
+    cancelled,
+    failed,
+    status: "success",
+  };
 }
 
 export async function rescheduleSessionAction(

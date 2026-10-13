@@ -104,14 +104,6 @@ export function ClassOverviewTab({
   );
 }
 
-function SectionTitle({ children, id }: { children: ReactNode; id: string }) {
-  return (
-    <h2 className="text-caption font-semibold uppercase tracking-[0.02em] text-text-muted" id={id}>
-      {children}
-    </h2>
-  );
-}
-
 function NextSessionPanel({
   activeStudentCount,
   batchHref,
@@ -143,7 +135,9 @@ function NextSessionPanel({
   return (
     <section aria-labelledby="class-next-session-title" className="rounded-lg border border-border-subtle bg-surface-base shadow-[var(--panel-shadow)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-row px-4 py-3">
-        <SectionTitle id="class-next-session-title">Việc tiếp theo của lớp</SectionTitle>
+        <h2 className="text-body font-semibold text-text-strong" id="class-next-session-title">
+          Việc tiếp theo của lớp
+        </h2>
         {next ? <span className="text-secondary text-text-muted">{formatWeekdayDate(next.sessionDate)}</span> : null}
       </div>
 
@@ -248,7 +242,8 @@ interface NeedsActionItem {
   tone: "warning" | "danger" | "neutral";
 }
 
-const inlineLinkClassName = cn(getButtonClassName({ size: "sm", variant: "secondary" }), "shrink-0");
+/** 32px on desktop rows, 44px touch target below md. */
+const inlineLinkClassName = cn(getButtonClassName({ size: "sm", variant: "secondary" }), "shrink-0 max-md:h-11");
 
 function NeedsActionPanel({
   canLockSessions,
@@ -415,7 +410,10 @@ function NeedsActionPanel({
 function AttendanceChartPanel({ attendanceReady, rows }: { attendanceReady: boolean; rows: ClassSessionRow[] }) {
   const bars = attendanceReady ? getAttendanceChart(rows) : [];
   const lowBar = bars.find((bar) => bar.low);
-  const latestRoster = bars.at(-1)?.roster;
+  const latestBar = bars.at(-1);
+  const latestRoster = latestBar?.roster;
+  // A low bar is drawn in warning even when it is the latest one, so it gets one merged entry.
+  const latestIsLow = lowBar !== undefined && lowBar.id === latestBar?.id;
 
   return (
     <section aria-labelledby="class-attendance-chart-title" className="rounded-lg border border-border-subtle bg-surface-base p-4 shadow-[var(--panel-shadow)]">
@@ -479,13 +477,16 @@ function AttendanceChartPanel({ attendanceReady, rows }: { attendanceReady: bool
             {lowBar ? (
               <span className="inline-flex items-center gap-1.5">
                 <span aria-hidden="true" className="h-2 w-2 rounded-full bg-warning" />
-                {formatSessionOrdinal(lowBar.ordinal)} ({formatIsoDate(lowBar.sessionDate).slice(0, 5)}) có mặt {lowBar.present}/{lowBar.roster} · thấp nhất
+                {formatSessionOrdinal(lowBar.ordinal)} ({latestIsLow ? "gần nhất" : formatWeekdayDate(lowBar.sessionDate, { year: false })}) có mặt{" "}
+                {lowBar.present}/{lowBar.roster} · thấp nhất
               </span>
             ) : null}
-            <span className="inline-flex items-center gap-1.5">
-              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-action-primary" />
-              Buổi gần nhất
-            </span>
+            {latestIsLow ? null : (
+              <span className="inline-flex items-center gap-1.5">
+                <span aria-hidden="true" className="h-2 w-2 rounded-full bg-action-primary" />
+                Buổi gần nhất
+              </span>
+            )}
           </div>
         </>
       )}
@@ -525,7 +526,9 @@ function HealthPanel({
                 : "không có quyền"
               : rate === null
                 ? "chưa có buổi kết thúc"
-                : undefined
+                : rate < LOW_ATTENDANCE_RATE
+                  ? `dưới ${LOW_ATTENDANCE_RATE}%`
+                  : undefined
           }
           label="Chuyên cần"
           tone={rate !== null && rate < LOW_ATTENDANCE_RATE ? "warning" : "default"}

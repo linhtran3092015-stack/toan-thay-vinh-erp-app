@@ -6,13 +6,13 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ActionMenu } from "@/components/patterns/action-menu";
-import { ClassDetailPage } from "@/features/classes/class-detail-page";
+import { ClassDetailPage, formatScheduleSummary } from "@/features/classes/class-detail-page";
 import type { ClassDetailWorkspace } from "@/features/classes/detail/class-detail-data";
 import { orderClassSessions, type ClassSessionRow } from "@/features/classes/detail/class-detail-models";
-import type { ClassDetailReadModel } from "@/features/classes/read-models";
+import type { ClassDetailReadModel, ClassScheduleReadModel } from "@/features/classes/read-models";
 
 const mocks = vi.hoisted(() => ({
-  cancelSessionAction: vi.fn(),
+  cancelClassSessionsAction: vi.fn(),
   changeClassStatusAction: vi.fn(),
   enrollStudentInClassAction: vi.fn(),
   refresh: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: mocks.refresh, replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
-vi.mock("@/features/sessions/actions/session-lifecycle-actions", () => ({ cancelSessionAction: mocks.cancelSessionAction }));
+vi.mock("@/features/sessions/actions/session-lifecycle-actions", () => ({ cancelClassSessionsAction: mocks.cancelClassSessionsAction }));
 vi.mock("@/features/students/enrollment/student-enrollment-actions", () => ({
   enrollStudentInClassAction: mocks.enrollStudentInClassAction,
 }));
@@ -166,8 +166,8 @@ describe("ClassDetailPage header and tabs", () => {
   });
 
   // Value: protects=the "…" menu item opens the hook's shared dialog and submits classId, reason and target status; an RPC error keeps the dialog open with the message;
-  // fails_when=ActionMenu onSelect no longer reaches useClassStatusOperations.open, the dialog node is not rendered, the payload loses classId/targetStatus, or an error closes the dialog;
-  // why_new=the status flow moved from a component to a hook and no test ever submitted it (the action mock was never asserted);
+  // fails_when=ActionMenu onSelect no longer reaches useClassStatusOperations.open, the dialog node is not rendered, the confirm button loses its "Nhập lý do đổi trạng thái" reason or the textarea its label, the payload loses classId/targetStatus, or an error closes the dialog;
+  // why_new=the status flow moved from a component to a hook and no test ever submitted it (the action mock was never asserted); the reason field now uses the shared textarea control;
   // seam=none; no_claim=does not prove change_class_status accepts the transition
   it("changes the class status through the menu dialog and keeps it open on an error", async () => {
     mocks.changeClassStatusAction
@@ -179,7 +179,8 @@ describe("ClassDetailPage header and tabs", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /Kích hoạt lớp/ }));
     const dialog = screen.getByRole("dialog", { name: "Kích hoạt lớp học" });
     expect(within(dialog).getByRole("button", { name: "Xác nhận kích hoạt" })).toBeDisabled();
-    fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "Đủ học sinh để mở lớp" } });
+    expect(within(dialog).getByRole("button", { name: "Xác nhận kích hoạt" })).toHaveAccessibleDescription("Nhập lý do đổi trạng thái");
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /Lý do đổi trạng thái/ }), { target: { value: "Đủ học sinh để mở lớp" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận kích hoạt" }));
 
     expect(await within(dialog).findByText("Năm học của lớp chưa hoạt động.")).toBeInTheDocument();
@@ -225,10 +226,16 @@ describe("ClassDetailPage header and tabs", () => {
 });
 
 describe("ClassDetailPage sessions tab", () => {
+  // Value: protects=bulk cancel only offers sessions not started, sends them in one server call with this class, and keeps failed sessions selected, named by date and time;
+  // fails_when=a locked session gets a checkbox, the dialog calls the server per session or drops classId, a failure is counted as cancelled or cleared from the selection, or the failure names only the ordinal;
+  // why_new=bulk cancel moved from N client calls of cancelSessionAction to one cancelClassSessionsAction (owner decision D6);
+  // seam=cancelClassSessionsAction is mocked (its own unit test covers the server loop); no_claim=does not prove the RPC accepts these sessions
   it("offers bulk cancel only for sessions not started and keeps failures selected", async () => {
-    mocks.cancelSessionAction
-      .mockResolvedValueOnce({ message: "Đã hủy buổi học.", sessionId: "s-next", status: "success" })
-      .mockResolvedValueOnce({ message: "Buổi học đã bắt đầu.", status: "error" });
+    mocks.cancelClassSessionsAction.mockResolvedValueOnce({
+      cancelled: 1,
+      failed: [{ message: "Buổi học đã bắt đầu.", sessionId: "s-later" }],
+      status: "success",
+    });
 
     renderPage({ initialTab: "sessions" });
     // jsdom renders both the desktop table and the mobile list; act on the table.
@@ -247,11 +254,10 @@ describe("ClassDetailPage sessions tab", () => {
     // The enabled button drops the disabled-reason wrapper, so query it again.
     fireEvent.click(within(dialog).getByRole("button", { name: "Hủy 2 buổi" }));
 
-    await waitFor(() => expect(mocks.cancelSessionAction).toHaveBeenCalledTimes(2));
-    expect(mocks.cancelSessionAction).toHaveBeenNthCalledWith(1, { reason: "Trùng lịch thi", sessionId: "s-next" });
-    expect(mocks.cancelSessionAction).toHaveBeenNthCalledWith(2, { reason: "Trùng lịch thi", sessionId: "s-later" });
+    await waitFor(() => expect(mocks.cancelClassSessionsAction).toHaveBeenCalledTimes(1));
+    expect(mocks.cancelClassSessionsAction).toHaveBeenCalledWith({ classId: "class-1", reason: "Trùng lịch thi", sessionIds: ["s-next", "s-later"] });
     await waitFor(() => expect(screen.getByText(/Đã hủy 1\/2 buổi/)).toBeInTheDocument());
-    expect(screen.getByText("B4: Buổi học đã bắt đầu.")).toBeInTheDocument();
+    expect(screen.getByText("B4 (Thứ 6 16/10, 19:30): Buổi học đã bắt đầu.")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Đã chọn 1 buổi · B4" })).toBeInTheDocument();
     expect(mocks.refresh).toHaveBeenCalled();
   });
@@ -423,6 +429,23 @@ describe("ClassDetailPage close blockers and composite classes", () => {
     expect(screen.queryByText(/đã qua nhưng chưa bắt đầu/)).not.toBeInTheDocument();
   });
 
+  // Value: protects=when the latest session is also the lowest, the chart legend names it once in warning (no "Buổi gần nhất" moss dot for a bar drawn in warning), and a low rate says why it is flagged;
+  // fails_when=the legend shows a moss "Buổi gần nhất" entry for a warning bar, prints a sliced ISO date, or the low attendance tile has no hint;
+  // why_new=design review of the overview chart and health tiles;
+  // seam=none; no_claim=does not prove the bar colours at real sizes
+  it("merges the latest and lowest bar into one legend entry and explains a low attendance rate", () => {
+    const rows = orderClassSessions([
+      row({ attendance: { absent: 1, additional: 0, present: 21, unmarked: 0 }, id: "s-1", lockedAt: "2026-10-09T15:00:00Z", resultCount: 21, rosterCount: 22, sessionDate: "2026-10-09", status: "completed" }),
+      row({ attendance: { absent: 12, additional: 0, present: 10, unmarked: 0 }, id: "s-2", resultCount: 10, rosterCount: 22, sessionDate: "2026-10-12", status: "completed" }),
+    ]);
+    renderPage({ workspace: workspace({ sessions: { status: "ready", value: { rows, truncated: false } } }) });
+
+    expect(screen.getByText(/B2 \(gần nhất\) có mặt\s+10\/22 · thấp nhất/)).toBeInTheDocument();
+    expect(screen.queryByText("Buổi gần nhất")).not.toBeInTheDocument();
+    expect(screen.getByText("dưới 85%")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Việc tiếp theo của lớp" })).toHaveClass("text-body", "text-text-strong");
+  });
+
   // Value: protects=an owner whose debt feed failed sees an unknown amount, never a reassuring 0 ₫;
   // fails_when=a failed debt feed renders "0 ₫" or hides the tile from an owner;
   // why_new=only the forbidden (TA) branch of the debt tiles was tested;
@@ -486,14 +509,14 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     expect(within(screen.getByRole("table", { name: "Buổi học của lớp" })).getByRole("checkbox", { name: /Chọn buổi B3 / })).toBeChecked();
   });
 
-  // Value: protects=a cancel call that throws (network) is reported per session and the session stays selected for a retry;
-  // fails_when=the thrown call aborts the loop, is counted as cancelled, or clears the selection;
-  // why_new=only returned errors were tested, not a rejected promise;
-  // seam=cancelSessionAction is mocked; no_claim=none
-  it("reports a rejected cancel call and keeps that session selected", async () => {
-    mocks.cancelSessionAction
+  // Value: protects=a bulk cancel call that throws or returns an error keeps the dialog open with a message and the whole selection, so the owner can retry;
+  // fails_when=a rejected call or an error state closes the dialog, reports success, clears the selection, or refreshes the page;
+  // why_new=the dialog now makes one server call, so a thrown call or a permission error affects the whole batch;
+  // seam=cancelClassSessionsAction is mocked; no_claim=none
+  it("keeps the dialog and the selection when the bulk cancel call fails", async () => {
+    mocks.cancelClassSessionsAction
       .mockRejectedValueOnce(new Error("network down"))
-      .mockResolvedValueOnce({ message: "Đã hủy buổi học.", sessionId: "s-later", status: "success" });
+      .mockResolvedValueOnce({ message: "Tài khoản hiện tại không có quyền quản lý lịch học.", status: "error" });
     renderPage({ initialTab: "sessions" });
     const table = screen.getByRole("table", { name: "Buổi học của lớp" });
     fireEvent.click(within(table).getByRole("checkbox", { name: /Chọn buổi B3 / }));
@@ -503,10 +526,92 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     fireEvent.change(within(dialog).getByRole("textbox", { name: /Lý do hủy/ }), { target: { value: "Trùng lịch thi" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Hủy 2 buổi" }));
 
-    expect(await screen.findByText("B3: Không kết nối được hệ thống.")).toBeInTheDocument();
-    expect(mocks.cancelSessionAction).toHaveBeenCalledTimes(2);
-    expect(screen.getByText(/Đã hủy 1\/2 buổi/)).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Đã chọn 1 buổi · B3" })).toBeInTheDocument();
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Không kết nối được hệ thống.");
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Hủy 2 buổi" }));
+    await waitFor(() => expect(within(dialog).getByRole("alert")).toHaveTextContent("Tài khoản hiện tại không có quyền quản lý lịch học."));
+
+    expect(mocks.cancelClassSessionsAction).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("dialog", { name: "Hủy 2 buổi học" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Đã chọn 2 buổi · B3, B4" })).toBeInTheDocument();
+    expect(screen.queryByText(/Đã hủy \d/)).not.toBeInTheDocument();
+    expect(mocks.refresh).not.toHaveBeenCalled();
+  });
+
+  // Value: protects=after every selected session is cancelled, focus lands on the result banner instead of the unmounted bulk trigger;
+  // fails_when=focus falls to the document body (the trigger and its bar are gone) or the success banner is not focusable;
+  // why_new=design/red-team review: keyboard users lost their place after a fully successful bulk cancel;
+  // seam=cancelClassSessionsAction is mocked; no_claim=does not prove screen reader announcement order
+  it("moves focus to the result after a fully successful bulk cancel", async () => {
+    mocks.cancelClassSessionsAction.mockResolvedValueOnce({ cancelled: 2, failed: [], status: "success" });
+    renderPage({ initialTab: "sessions" });
+    const table = screen.getByRole("table", { name: "Buổi học của lớp" });
+    fireEvent.click(within(table).getByRole("checkbox", { name: /Chọn buổi B3 / }));
+    fireEvent.click(within(table).getByRole("checkbox", { name: /Chọn buổi B4 / }));
+    fireEvent.click(screen.getByRole("button", { name: "Hủy buổi…" }));
+    const dialog = screen.getByRole("dialog", { name: "Hủy 2 buổi học" });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /Lý do hủy/ }), { target: { value: "Trùng lịch thi" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Hủy 2 buổi" }));
+
+    const banner = await screen.findByText("Đã hủy 2 buổi.");
+    expect(screen.queryByRole("region", { name: /Đã chọn/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toContainElement(banner));
+    expect(mocks.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  // Value: protects=a composite parent page cannot bulk-cancel its component classes' sessions, which other classes share;
+  // fails_when=isBulkCancellable ignores row.classId and offers a checkbox (desktop or mobile) for a component session;
+  // why_new=red-team finding: the parent's feed includes component sessions and the bulk bar would cancel them;
+  // seam=none; no_claim=the server-side class check is covered in cancel-class-sessions-action.test
+  it("offers no bulk selection for a component class's sessions on the parent page", () => {
+    const rows = orderClassSessions([
+      row({ classId: "component-1", classCode: "L-9A26-T2", componentCode: "T2", id: "c-next", sessionDate: "2026-10-15" }),
+      row({ id: "own-next", sessionDate: "2026-10-16" }),
+    ]);
+    renderPage({ initialTab: "sessions", workspace: workspace({ sessions: { status: "ready", value: { rows, truncated: false } } }) });
+
+    const table = screen.getByRole("table", { name: "Buổi học của lớp" });
+    expect(within(table).queryByRole("checkbox", { name: /Chọn buổi B1 / })).not.toBeInTheDocument();
+    expect(within(table).getByRole("checkbox", { name: /Chọn buổi B2 / })).toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "Buổi học của lớp" });
+    expect(within(list).getAllByRole("checkbox")).toHaveLength(1);
+  });
+
+  // Value: protects=the bulk bar names at most three sessions, and mobile cards use the table's ordinal format with cancelled sessions titled by date;
+  // fails_when=a long selection lists every ordinal, the mobile title reads "Buổi 3"/"Buổi đã hủy", or a cancelled card repeats "Đã hủy" beside its badge;
+  // why_new=design review of the sessions tab;
+  // seam=none; no_claim=does not prove the one-line layout at real widths
+  it("caps the bulk subject at three ordinals and titles mobile cards like the table", () => {
+    const rows = orderClassSessions([
+      row({ id: "s-cancelled", sessionDate: "2026-10-13", status: "cancelled" }),
+      ...["2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17", "2026-10-18"].map((date, index) => row({ id: `s-${index}`, sessionDate: date })),
+    ]);
+    renderPage({ initialTab: "sessions", workspace: workspace({ sessions: { status: "ready", value: { rows, truncated: false } } }) });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Chọn mọi buổi chưa bắt đầu trên trang" }));
+    expect(screen.getByRole("region", { name: "Đã chọn 5 buổi · B1, B2, B3 +2" })).toBeInTheDocument();
+
+    const list = screen.getByRole("list", { name: "Buổi học của lớp" });
+    expect(within(list).getByText("B1")).toBeInTheDocument();
+    expect(within(list).getByText("Thứ 3, 13/10/2026")).toBeInTheDocument();
+    expect(within(list).queryByText(/Buổi đã hủy/)).not.toBeInTheDocument();
+    expect(within(list).getAllByText("Đã hủy")).toHaveLength(1);
+  });
+
+  // Value: protects=on mobile, where select-all is hidden, "Bỏ chọn" moves focus to the first row checkbox instead of the body;
+  // fails_when=returnFocusRefs only holds the desktop select-all, so a hidden select-all leaves keyboard focus nowhere;
+  // why_new=design/red-team review: select-all is desktop-only;
+  // seam=checkVisibility is stubbed on the select-all to stand in for the md:hidden layout; no_claim=does not prove CSS visibility
+  it("returns focus to the first mobile checkbox when select-all is hidden", () => {
+    renderPage({ initialTab: "sessions" });
+    const selectAll = screen.getByRole("checkbox", { name: "Chọn mọi buổi chưa bắt đầu trên trang" });
+    Object.defineProperty(selectAll, "checkVisibility", { value: () => false });
+    const list = screen.getByRole("list", { name: "Buổi học của lớp" });
+    fireEvent.click(within(list).getByRole("checkbox", { name: /Chọn buổi B4 / }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Bỏ chọn" }));
+
+    expect(screen.queryByRole("region", { name: /Đã chọn/ })).not.toBeInTheDocument();
+    expect(within(list).getByRole("checkbox", { name: /Chọn buổi B3 / })).toHaveFocus();
   });
 
   // Value: protects=the bulk cancel reason field is labelled and its error is linked for screen readers;
@@ -527,10 +632,21 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
 
 describe("ClassDetailPage enroll search", () => {
   const remoteStudent = { fullName: "Ngô Gia Huy", grade: 9, id: "student-huy", lifecycleStatus: "trial", publicCode: "HS27100", registeredMode: "offline" as const };
+  const preloadedNgoc = { fullName: "Hoàng Bảo Ngọc", grade: 9, id: "student-ngoc", lifecycleStatus: "trial", publicCode: "HS27001", registeredMode: "online" as const };
+
+  /** What the server's `ilike '%q%'` on name or code returns: case-insensitive but accent-sensitive. */
+  function ilikeResult(query: string, pool = [preloadedNgoc, remoteStudent]) {
+    const needle = query.toLowerCase();
+    return {
+      candidates: pool.filter((candidate) => candidate.fullName.toLowerCase().includes(needle) || candidate.publicCode.toLowerCase().includes(needle)),
+      status: "success" as const,
+      truncated: false,
+    };
+  }
 
   // Value: protects=typing two or more characters searches every candidate on the server, only the latest response is shown, and a remote result can be enrolled;
   // fails_when=the dialog only filters the preloaded list, a slow earlier response overwrites a newer one, one character already calls the server, or the chosen remote student is not sent;
-  // why_new=the dialog searched only the first 500 preloaded candidates;
+  // why_new=the dialog searched only the first 500 preloaded candidates; the mocked results now follow accent-sensitive ILIKE (accented queries);
   // seam=searchEnrollmentCandidatesAction is mocked; no_claim=does not prove the server query or its permission check
   it("searches on the server after two characters and ignores a stale response", async () => {
     const first = deferred<unknown>();
@@ -547,13 +663,13 @@ describe("ClassDetailPage enroll search", () => {
     await act(() => new Promise((settle) => setTimeout(settle, 350)));
     expect(mocks.searchEnrollmentCandidatesAction).not.toHaveBeenCalled();
 
-    fireEvent.change(search, { target: { value: "ngo" } });
-    await waitFor(() => expect(mocks.searchEnrollmentCandidatesAction).toHaveBeenCalledWith("ngo"));
+    fireEvent.change(search, { target: { value: "ngô" } });
+    await waitFor(() => expect(mocks.searchEnrollmentCandidatesAction).toHaveBeenCalledWith("ngô"));
     expect(within(dialog).getByRole("status")).toHaveTextContent("Đang tìm trong toàn bộ học sinh");
-    fireEvent.change(search, { target: { value: "ngo gia" } });
-    await waitFor(() => expect(mocks.searchEnrollmentCandidatesAction).toHaveBeenCalledWith("ngo gia"));
+    fireEvent.change(search, { target: { value: "ngô gia" } });
+    await waitFor(() => expect(mocks.searchEnrollmentCandidatesAction).toHaveBeenCalledWith("ngô gia"));
 
-    await act(async () => second.resolve({ candidates: [remoteStudent], status: "success", truncated: false }));
+    await act(async () => second.resolve(ilikeResult("ngô gia")));
     expect(await within(dialog).findByRole("radio", { name: /Ngô Gia Huy/ })).toBeInTheDocument();
     await act(async () => first.resolve({ candidates: [{ ...remoteStudent, fullName: "Kết quả cũ", id: "stale" }], status: "success", truncated: false }));
     expect(within(dialog).queryByText("Kết quả cũ")).not.toBeInTheDocument();
@@ -564,13 +680,38 @@ describe("ClassDetailPage enroll search", () => {
     await waitFor(() => expect(mocks.enrollStudentInClassAction).toHaveBeenCalledWith(expect.objectContaining({ studentId: "student-huy" })));
   });
 
-  // Value: protects=a failed server search says so and keeps the preloaded matches usable;
-  // fails_when=an error result or a thrown action leaves the dialog loading forever or empties the list;
-  // why_new=the server search is new;
+  // Value: protects=an accentless query keeps the preloaded accent-insensitive matches when the accent-sensitive server search returns nothing, and server-only students are added after them;
+  // fails_when=a ready server result replaces the local matches ("hoang" loses "Hoàng Bảo Ngọc"), or a server-only student is dropped or duplicated;
+  // why_new=review finding: the list showed only server results once the search was ready;
+  // seam=searchEnrollmentCandidatesAction is mocked with ILIKE semantics; no_claim=does not prove the real query is accent-sensitive
+  it("keeps accentless local matches next to the server results", async () => {
+    mocks.searchEnrollmentCandidatesAction.mockImplementation(async (query: string) => ilikeResult(query));
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ghi danh học sinh" }));
+    const dialog = screen.getByRole("dialog", { name: "Ghi danh học sinh" });
+    const search = within(dialog).getByRole("searchbox", { name: "Tìm học sinh theo tên hoặc mã" });
+
+    fireEvent.change(search, { target: { value: "hoang" } });
+    await waitFor(() => expect(mocks.searchEnrollmentCandidatesAction).toHaveBeenCalledWith("hoang"));
+    await waitFor(() => expect(within(dialog).queryByRole("status")).not.toBeInTheDocument());
+    expect(within(dialog).getByRole("radio", { name: /Hoàng Bảo Ngọc/ })).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Không có học sinh khớp/)).not.toBeInTheDocument();
+
+    // A code matches both the preloaded student and a server-only one: each shows once.
+    fireEvent.change(search, { target: { value: "HS27" } });
+    expect(await within(dialog).findByRole("radio", { name: /Ngô Gia Huy/ })).toBeInTheDocument();
+    expect(within(dialog).getAllByRole("radio", { name: /Hoàng Bảo Ngọc/ })).toHaveLength(1);
+    expect(search).toHaveAttribute("maxLength", "100");
+  });
+
+  // Value: protects=a failed server search shows the action's own message (fixed retry text only for a thrown call) and keeps the preloaded matches usable;
+  // fails_when=an error result's message is replaced by generic text, a thrown action leaves the dialog loading forever, or the list empties;
+  // why_new=the server search is new; review found the returned message was dropped;
   // seam=searchEnrollmentCandidatesAction is mocked; no_claim=none
   it("shows a retry message when the server search fails", async () => {
     mocks.searchEnrollmentCandidatesAction
-      .mockResolvedValueOnce({ message: "Chưa tìm được học sinh, thử lại.", status: "error" })
+      .mockResolvedValueOnce({ message: "Tài khoản hiện tại không có quyền xem học sinh.", status: "error" })
       .mockRejectedValueOnce(new Error("offline"));
     renderPage();
 
@@ -579,7 +720,7 @@ describe("ClassDetailPage enroll search", () => {
     const search = within(dialog).getByRole("searchbox", { name: "Tìm học sinh theo tên hoặc mã" });
 
     fireEvent.change(search, { target: { value: "hoang" } });
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Chưa tìm được học sinh, thử lại.");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Tài khoản hiện tại không có quyền xem học sinh.");
     expect(within(dialog).getByRole("radio", { name: /Hoàng Bảo Ngọc/ })).toBeInTheDocument();
 
     fireEvent.change(search, { target: { value: "hoang b" } });
@@ -640,5 +781,75 @@ describe("ActionMenu keyboard", () => {
     fireEvent.click(item(/Bảo lưu/));
     expect(onSelect).toHaveBeenCalledWith("reserve", trigger);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  // Value: protects=an outside press that closes the menu returns focus to the trigger, unless the press lands on a control that takes focus itself;
+  // fails_when=closing on an outside press drops focus to the body (the focused item unmounts), or the menu steals focus back from the input the user pressed;
+  // why_new=design/red-team review: keyboard users restarted from the top after clicking away;
+  // seam=none; no_claim=does not prove real browser mousedown focus order
+  it("returns focus to the trigger after an outside press on plain content only", async () => {
+    render(
+      <>
+        <p>Nội dung trang</p>
+        <input aria-label="Ô tìm kiếm" />
+        <ActionMenu items={items} label="Thêm hành động" onSelect={vi.fn()} />
+      </>,
+    );
+    const trigger = screen.getByRole("button", { name: "Thêm hành động" });
+
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menuitem", { name: /Bảo lưu/ })).toHaveFocus();
+    fireEvent.pointerDown(screen.getByText("Nội dung trang"));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menuitem", { name: /Bảo lưu/ })).toHaveFocus();
+    const input = screen.getByRole("textbox", { name: "Ô tìm kiếm" });
+    fireEvent.pointerDown(input);
+    input.focus();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await act(() => new Promise((settle) => setTimeout(settle, 10)));
+    expect(input).toHaveFocus();
+  });
+
+  // Value: protects=menu items keep a 44px touch target below md and their compact height on desktop;
+  // fails_when=the item classes lose min-h-11 or apply it on desktop too;
+  // why_new=design review: items were 36px on phones;
+  // seam=none; no_claim=does not prove the rendered height (jsdom has no layout)
+  it("gives menu items a 44px touch target below md", () => {
+    render(<ActionMenu items={items} label="Thêm hành động" onSelect={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Thêm hành động" }));
+    for (const menuItem of screen.getAllByRole("menuitem")) {
+      expect(menuItem).toHaveClass("min-h-11", "md:min-h-0");
+    }
+  });
+});
+
+describe("formatScheduleSummary", () => {
+  const schedule = (weekday: number, startTime = "19:30:00"): ClassScheduleReadModel => ({
+    componentCode: null,
+    effectiveFrom: "2026-09-01",
+    effectiveTo: null,
+    endReason: null,
+    endTime: "21:30:00",
+    id: `schedule-${weekday}-${startTime}`,
+    isActive: true,
+    learningMode: "offline",
+    meetingUrl: null,
+    roomName: null,
+    startTime,
+    weekday,
+  });
+
+  // Value: protects=the header never writes Sunday as a "Thứ": weekdays keep "Thứ 2-4", Sunday is spelled out after them;
+  // fails_when=a mixed schedule reads "Thứ 2-CN" or "Thứ CN", or a Sunday-only class loses "Chủ nhật";
+  // why_new=review finding: "Thứ 2-CN" was shown for classes meeting Monday and Sunday;
+  // seam=none; no_claim=none
+  it("keeps Sunday outside the Thứ prefix", () => {
+    expect(formatScheduleSummary([schedule(1), schedule(0)])).toBe("Thứ 2, Chủ nhật, 19:30–21:30");
+    expect(formatScheduleSummary([schedule(0)])).toBe("Chủ nhật, 19:30–21:30");
+    expect(formatScheduleSummary([schedule(2), schedule(4), schedule(6)])).toBe("Thứ 3-5-7, 19:30–21:30");
+    expect(formatScheduleSummary([schedule(1), schedule(0, "08:00:00")])).toBe("Thứ 2 19:30, Chủ nhật 08:00");
   });
 });

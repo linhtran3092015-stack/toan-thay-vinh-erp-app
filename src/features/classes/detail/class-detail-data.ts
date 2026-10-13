@@ -1,7 +1,10 @@
 import "server-only";
 
 import {
+  CLASS_SESSION_LIMIT,
+  ENROLLMENT_SEARCH_MAX_LENGTH,
   findAbsenceStreaks,
+  getTalliedStudents,
   isLockCountedAttendanceStatus,
   orderClassSessions,
   summarizeClassDebt,
@@ -19,8 +22,8 @@ import { summarizeDirectoryDebt } from "@/features/students/student-directory-me
 import { getVietnamToday } from "@/lib/datetime";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-/** Sessions read per class; a school year of three sessions a week fits well inside. */
-export const CLASS_SESSION_LIMIT = 400;
+/** Re-exported for callers that import it from the loader. */
+export { CLASS_SESSION_LIMIT };
 /** PostgREST returns at most this many rows per request; bigger reads are paged. */
 const PAGE_SIZE = 1000;
 /** Hard stop for paged reads (attendance of ~400 sessions × 25 students). */
@@ -125,6 +128,33 @@ async function getSessionClassIds(
   return { classIds: [classId, ...windows.keys()], windows };
 }
 
+/** Ids and dates go into a PostgREST filter string: allow only characters that cannot end or split it. */
+const FILTER_ID_PATTERN = /^[0-9A-Za-z-]+$/;
+const FILTER_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * `or()` filter for the class's own sessions plus each component's sessions
+ * inside a link window, so out-of-window rows never reach the limit. `null`
+ * when an id or date is not in the expected uuid / ISO date shape.
+ */
+export function buildSessionWindowFilter(classId: string, windows: ReadonlyMap<string, readonly LinkWindow[]>): string | null {
+  if (!FILTER_ID_PATTERN.test(classId)) return null;
+
+  const parts = [`class_id.eq.${classId}`];
+
+  for (const [componentId, componentWindows] of windows) {
+    if (!FILTER_ID_PATTERN.test(componentId)) return null;
+
+    for (const window of componentWindows) {
+      if (!FILTER_DATE_PATTERN.test(window.from) || (window.to !== null && !FILTER_DATE_PATTERN.test(window.to))) return null;
+      const to = window.to === null ? "" : `,session_date.lte.${window.to}`;
+      parts.push(`and(class_id.eq.${componentId},session_date.gte.${window.from}${to})`);
+    }
+  }
+
+  return parts.join(",");
+}
+
 function isSessionOfClass(classId: string, windows: ReadonlyMap<string, LinkWindow[]>, row: Pick<SessionQueryRow, "class_id" | "session_date">): boolean {
   if (row.class_id === classId) return true;
   return (windows.get(row.class_id) ?? []).some((window) => window.from <= row.session_date && (window.to === null || window.to >= row.session_date));
@@ -153,7 +183,11 @@ async function loadSessions(
 
   if (!links) return null;
 
-  const { data, error } = await supabase
+  const windowFilter = buildSessionWindowFilter(classId, links.windows);
+
+  if (!windowFilter) return null;
+
+  let query = supabase
     .from("class_sessions")
     .select(
       `
@@ -171,7 +205,13 @@ async function loadSessions(
       class:classes!class_sessions_class_id_fkey ( code )
       `,
     )
-    .in("class_id", links.classIds)
+    .in("class_id", links.classIds);
+
+  // Link windows are applied in the query, before the limit, so `truncated`
+  // counts only sessions this page shows.
+  if (links.windows.size > 0) query = query.or(windowFilter);
+
+  const { data, error } = await query
     .order("session_date", { ascending: false })
     .order("start_time", { ascending: false })
     .limit(CLASS_SESSION_LIMIT + 1);
@@ -189,7 +229,8 @@ async function loadSessions(
         (row) =>
           (sessionKinds as readonly string[]).includes(row.session_kind) &&
           (sessionStatuses as readonly string[]).includes(row.status) &&
-          // Component sessions outside every link window belong to another parent period.
+          // Safety net for the query's window filter: component sessions outside
+          // every link window belong to another parent period.
           isSessionOfClass(classId, links.windows, row),
       )
       .map((row) => {
@@ -217,7 +258,7 @@ async function loadSessions(
   };
 }
 
-/** Unlocked started sessions whose roster is resolved one RPC at a time. */
+/** Unlocked started sessions whose roster is resolved one RPC at a time (priority order in fillSessionFeeds). */
 export const OPEN_ROSTER_LIMIT = 40;
 const ROSTER_CONCURRENCY = 8;
 
@@ -275,23 +316,22 @@ async function loadAttendance(supabase: SupabaseClient, sessionIds: readonly str
   );
 }
 
-async function loadResultCounts(supabase: SupabaseClient, sessionIds: readonly string[]): Promise<Map<string, number> | null> {
-  const rows = await fetchChunked(sessionIds, (ids) =>
-    fetchPaged<{ class_session_id: string }>((from, to) =>
+interface ResultEntry {
+  class_session_id: string;
+  student_id: string;
+}
+
+async function loadResults(supabase: SupabaseClient, sessionIds: readonly string[]): Promise<ResultEntry[] | null> {
+  return fetchChunked(sessionIds, (ids) =>
+    fetchPaged<ResultEntry>((from, to) =>
       supabase
         .from("session_results")
-        .select("class_session_id")
+        .select("class_session_id, student_id")
         .in("class_session_id", ids)
         .order("id", { ascending: true })
         .range(from, to),
     ),
   );
-
-  if (!rows) return null;
-
-  const counts = new Map<string, number>();
-  for (const row of rows) counts.set(row.class_session_id, (counts.get(row.class_session_id) ?? 0) + 1);
-  return counts;
 }
 
 /** Every enrolment ever made in the class (any status), to tell its students apart on component sessions. */
@@ -354,6 +394,10 @@ async function loadDebt(supabase: SupabaseClient, studentIds: readonly string[])
   return rows ? summarizeClassDebt(summarizeDirectoryDebt(rows)) : null;
 }
 
+function compareSessionsAscending(a: Pick<ClassSessionRow, "sessionDate" | "startTime">, b: Pick<ClassSessionRow, "sessionDate" | "startTime">): number {
+  return a.sessionDate.localeCompare(b.sessionDate) || a.startTime.localeCompare(b.startTime);
+}
+
 type SessionsResult = NonNullable<Awaited<ReturnType<typeof loadSessions>>>;
 
 /** Fills the session-based feeds (sessions, attendance, results, streaks) of `workspace`. */
@@ -369,10 +413,14 @@ async function fillSessionFeeds(
   const startedRows = sessionsResult.rows.filter((row) => row.status === "in_progress" || row.status === "completed");
   const startedIds = startedRows.map((row) => row.id);
   const lockedIds = new Set(startedRows.filter((row) => row.lockedAt).map((row) => row.id));
-  // Newest first, so the cap keeps the sessions the team is working on.
-  const openIds = startedRows
-    .filter((row) => !row.lockedAt)
-    .sort((a, b) => b.sessionDate.localeCompare(a.sessionDate))
+  // Roster priority under the cap: every pending-lock (completed, unlocked)
+  // session oldest first, because the overview's needs-action list shows the
+  // oldest of those; then sessions in progress, newest first.
+  const unlockedRows = startedRows.filter((row) => !row.lockedAt);
+  const openIds = [
+    ...unlockedRows.filter((row) => row.status === "completed").sort(compareSessionsAscending),
+    ...unlockedRows.filter((row) => row.status === "in_progress").sort((a, b) => compareSessionsAscending(b, a)),
+  ]
     .slice(0, OPEN_ROSTER_LIMIT)
     .map((row) => row.id);
   // A component session's roster also holds students enrolled only in the
@@ -380,10 +428,10 @@ async function fillSessionFeeds(
   const ownSessionIds = new Set(sessionsResult.rows.filter((row) => row.classId === classId).map((row) => row.id));
   const hasLockedComponentSessions = [...lockedIds].some((id) => !ownSessionIds.has(id));
 
-  const [openRosters, attendance, resultCounts, classEnrollmentIds] = await Promise.all([
+  const [openRosters, attendance, results, classEnrollmentIds] = await Promise.all([
     permissions.canViewAttendance ? loadOpenRosters(supabase, openIds) : Promise.resolve(undefined),
     permissions.canViewAttendance ? loadAttendance(supabase, startedIds) : Promise.resolve(undefined),
-    permissions.canViewResults ? loadResultCounts(supabase, startedIds) : Promise.resolve(undefined),
+    permissions.canViewResults ? loadResults(supabase, startedIds) : Promise.resolve(undefined),
     // Locked rosters come from attendance, whose rows carry only the enrolment id.
     permissions.canViewAttendance && hasLockedComponentSessions ? loadClassEnrollmentIds(supabase, classId) : Promise.resolve(new Set<string>()),
   ]);
@@ -409,12 +457,26 @@ async function fillSessionFeeds(
   const tallies = rosters && attendance ? tallyClassSessionAttendance(rosters, attendance) : null;
   const resolved = new Set([...lockedIds, ...openIds]);
   const started = new Set(startedIds);
+  // Results on a component session count only the students its tally counts
+  // (the page class's roster plus walk-ins); own sessions count every result.
+  const talliedStudents = rosters && attendance ? getTalliedStudents(rosters, attendance) : null;
+  const resultCounts = new Map<string, number>();
+  for (const entry of results ?? []) {
+    if (!ownSessionIds.has(entry.class_session_id) && !talliedStudents?.get(entry.class_session_id)?.has(entry.student_id)) continue;
+    resultCounts.set(entry.class_session_id, (resultCounts.get(entry.class_session_id) ?? 0) + 1);
+  }
+  const getResultCount = (id: string): number | null => {
+    if (!started.has(id) || !results) return null;
+    if (ownSessionIds.has(id)) return resultCounts.get(id) ?? 0;
+    // A component session whose roster is unknown gets no count rather than an unfiltered one.
+    return resolved.has(id) && talliedStudents ? resultCounts.get(id) ?? 0 : null;
+  };
 
   const rows = orderClassSessions(
     sessionsResult.rows.map((row) => ({
       ...row,
       attendance: resolved.has(row.id) && tallies ? tallies.get(row.id) ?? { absent: 0, additional: 0, present: 0, unmarked: 0 } : null,
-      resultCount: started.has(row.id) && resultCounts ? resultCounts.get(row.id) ?? 0 : null,
+      resultCount: getResultCount(row.id),
       rosterCount: resolved.has(row.id) && rosters ? rosterCounts.get(row.id) ?? 0 : null,
     })),
   );
@@ -426,7 +488,7 @@ async function fillSessionFeeds(
   }
 
   if (permissions.canViewResults) {
-    workspace.results = resultCounts ? { status: "ready", value: true } : failed;
+    workspace.results = results ? { status: "ready", value: true } : failed;
   }
 
   if (permissions.canViewAttendance && permissions.canViewStudents) {
@@ -519,8 +581,6 @@ export interface ClassEnrollmentCandidate {
 export const ENROLLMENT_CANDIDATE_LIMIT = 500;
 /** Matches returned by one enroll-dialog search. */
 export const ENROLLMENT_SEARCH_LIMIT = 50;
-/** Longer search input is cut; nobody types a name or code this long. */
-const ENROLLMENT_SEARCH_MAX_LENGTH = 100;
 
 /**
  * `ilike` value for a PostgREST `or()` filter matching `input` anywhere. LIKE

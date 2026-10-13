@@ -8,7 +8,7 @@ interface BulkActionBarProps {
   selectedCount: number;
   /** Noun after the count, e.g. "học sinh". */
   subject: string;
-  /** 32px action buttons; use `variant="danger-outline"` for destructive ones. */
+  /** 32px action buttons (44px touch targets below md); use `variant="danger-outline"` for destructive ones. */
   children?: ReactNode;
   className?: string;
   onClear: () => void;
@@ -48,7 +48,7 @@ export function BulkActionBar({
       <span className="text-body font-semibold text-action-primary">
         Đã chọn {selectedCount} {subject}
       </span>
-      <div className="ml-auto flex flex-wrap items-center gap-2 [&>button]:h-8 [&>button]:text-[13px]/[18px]">
+      <div className="ml-auto flex flex-wrap items-center gap-2 max-md:[&>button]:h-11 md:[&>button]:h-8 [&>button]:text-[13px]/[18px]">
         {children}
         <Button
           onClick={() => {

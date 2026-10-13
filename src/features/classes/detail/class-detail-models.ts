@@ -7,6 +7,13 @@ import type { SessionKind, SessionStatus } from "@/features/sessions/read-models
  * the dev preview and unit tests can share it.
  */
 
+/** Sessions read per class; a school year of three sessions a week fits well inside. */
+export const CLASS_SESSION_LIMIT = 400;
+/** Shortest enroll-dialog search sent to the server; shorter input shows the initial list. */
+export const ENROLLMENT_SEARCH_MIN_LENGTH = 2;
+/** Longer enroll-dialog search input is cut; nobody types a name or code this long. */
+export const ENROLLMENT_SEARCH_MAX_LENGTH = 100;
+
 /** A feed the viewer may not read, or whose query failed, carries no value at all. */
 export type ClassDetailFeed<T> =
   | { status: "ready"; value: T }
@@ -59,6 +66,21 @@ function toTimeOfDay(value: string): string {
   return value.length === 5 ? `${value}:00` : value;
 }
 
+/**
+ * Whether a session's time is over: its date has passed, or (when `nowTime`,
+ * HH:MM[:SS] in Vietnam time, is given) it is today and its end time has been
+ * reached. Shared by getClassSessionStage and findNextClassSession so a session
+ * is never both "next" and overdue at the same moment.
+ */
+export function hasSessionEnded(
+  row: Pick<ClassSessionRow, "sessionDate"> & Partial<Pick<ClassSessionRow, "endTime">>,
+  today: string,
+  nowTime?: string,
+): boolean {
+  if (row.sessionDate !== today) return row.sessionDate < today;
+  return Boolean(nowTime && row.endTime && toTimeOfDay(row.endTime) <= toTimeOfDay(nowTime));
+}
+
 /** `nowTime` is HH:MM[:SS] in Vietnam time (getVietnamTime); without it only past dates are overdue. */
 export function getClassSessionStage(
   row: Pick<ClassSessionRow, "lockedAt" | "sessionDate" | "status"> & Partial<Pick<ClassSessionRow, "endTime">>,
@@ -69,8 +91,7 @@ export function getClassSessionStage(
   if (row.lockedAt) return "locked";
   if (row.status === "completed") return "pending_lock";
   if (row.status === "in_progress") return "live";
-  if (row.sessionDate < today) return "overdue";
-  if (row.sessionDate === today && nowTime && row.endTime && toTimeOfDay(row.endTime) <= toTimeOfDay(nowTime)) return "overdue";
+  if (hasSessionEnded(row, today, nowTime)) return "overdue";
   return "upcoming";
 }
 
@@ -86,10 +107,6 @@ export const classSessionStageMeta: Record<ClassSessionStage, { label: string; t
 export type ClassSessionFilter = "all" | "upcoming" | "pending_lock" | "locked" | "cancelled";
 
 export const classSessionFilters: readonly ClassSessionFilter[] = ["all", "upcoming", "pending_lock", "locked", "cancelled"];
-
-export function isClassSessionFilter(value: unknown): value is ClassSessionFilter {
-  return typeof value === "string" && (classSessionFilters as readonly string[]).includes(value);
-}
 
 export function matchesClassSessionFilter(stage: ClassSessionStage, filter: ClassSessionFilter): boolean {
   switch (filter) {
@@ -175,7 +192,7 @@ export function countClassSessionFilters(
 
 /**
  * The session the class meets next: one in progress, or the first scheduled one
- * that has not ended yet (`nowTime` is HH:MM[:SS] in Vietnam time).
+ * that has not ended yet (hasSessionEnded; `nowTime` is HH:MM[:SS] in Vietnam time).
  */
 export function findNextClassSession<T extends Pick<ClassSessionRow, "endTime" | "sessionDate" | "startTime" | "status">>(
   rows: readonly T[],
@@ -186,7 +203,7 @@ export function findNextClassSession<T extends Pick<ClassSessionRow, "endTime" |
     .filter((row) => {
       if (row.status === "in_progress") return true;
       if (row.status !== "scheduled") return false;
-      return row.sessionDate > today || (row.sessionDate === today && row.endTime.slice(0, 5) >= nowTime.slice(0, 5));
+      return !hasSessionEnded(row, today, nowTime);
     })
     .sort(compareSessions);
 
@@ -262,6 +279,31 @@ export function tallyClassSessionAttendance(
   }
 
   return tallies;
+}
+
+/**
+ * Per session, the students tallyClassSessionAttendance counts: the roster plus
+ * additional_study walk-ins off the roster. Like the tally, sessions without a
+ * roster entry are left out. Used to keep result counts to the same students.
+ */
+export function getTalliedStudents(rosters: readonly RosterEntry[], attendance: readonly AttendanceEntry[]): Map<string, Set<string>> {
+  const students = new Map<string, Set<string>>();
+
+  for (const entry of rosters) {
+    const set = students.get(entry.class_session_id) ?? new Set<string>();
+    set.add(entry.student_id);
+    students.set(entry.class_session_id, set);
+  }
+
+  const rosterStudents = new Map([...students].map(([sessionId, set]) => [sessionId, new Set(set)]));
+  for (const entry of attendance) {
+    const roster = rosterStudents.get(entry.class_session_id);
+    if (roster && !roster.has(entry.student_id) && entry.attendance_status === "additional_study") {
+      students.get(entry.class_session_id)?.add(entry.student_id);
+    }
+  }
+
+  return students;
 }
 
 export function getRecordedCount(tally: ClassSessionAttendanceTally): number {

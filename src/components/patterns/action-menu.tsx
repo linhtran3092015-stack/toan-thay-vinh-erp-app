@@ -15,6 +15,10 @@ export interface ActionMenuItem<T extends string = string> {
   value: T;
 }
 
+/** Elements that take focus themselves when pressed, so an outside press must not steal it back. */
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), label, summary, [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
+
 interface ActionMenuProps<T extends string> {
   items: readonly ActionMenuItem<T>[];
   label?: string;
@@ -42,7 +46,15 @@ export function ActionMenu<T extends string>({
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const refocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuId = useId();
+
+  useEffect(
+    () => () => {
+      if (refocusTimerRef.current) clearTimeout(refocusTimerRef.current);
+    },
+    [],
+  );
 
   function close({ returnFocus }: { returnFocus: boolean }) {
     setOpenFocus(null);
@@ -61,8 +73,26 @@ export function ActionMenu<T extends string>({
     }
 
     function handlePointerDown(event: PointerEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpenFocus(null);
+      const container = containerRef.current;
+
+      if (!container || container.contains(event.target as Node)) {
+        return;
+      }
+
+      // Closing unmounts the focused item. Unless the press lands on something that
+      // takes focus itself, hand focus back to the trigger once the press settles,
+      // so keyboard users do not restart from the top of the page.
+      const focusWasInside = container.contains(document.activeElement);
+      const pressedFocusable = event.target instanceof Element && event.target.closest(FOCUSABLE_SELECTOR) !== null;
+      setOpenFocus(null);
+
+      if (focusWasInside && !pressedFocusable) {
+        if (refocusTimerRef.current) clearTimeout(refocusTimerRef.current);
+        refocusTimerRef.current = setTimeout(() => {
+          refocusTimerRef.current = null;
+          const active = document.activeElement;
+          if (!active || active === document.body) triggerRef.current?.focus();
+        }, 0);
       }
     }
 
@@ -159,7 +189,7 @@ export function ActionMenu<T extends string>({
             <button
               aria-disabled={!item.enabled || undefined}
               className={cn(
-                "flex w-full flex-col items-start gap-0.5 rounded-md px-2.5 py-2 text-left text-body focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus",
+                "flex min-h-11 w-full flex-col items-start justify-center gap-0.5 rounded-md px-2.5 py-2 text-left text-body md:min-h-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus",
                 item.enabled
                   ? cn("hover:bg-interactive-hover", item.danger ? "text-danger" : "text-text-strong")
                   : "cursor-not-allowed text-text-disabled",

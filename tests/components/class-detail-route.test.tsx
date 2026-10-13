@@ -13,6 +13,14 @@ const dependencies = vi.hoisted(() => ({
   getClassDetail: vi.fn(),
   getClassDetailWorkspace: vi.fn(),
   getClassEnrollmentCandidates: vi.fn(),
+  getVietnamTime: vi.fn(() => "19:45:00"),
+  getVietnamToday: vi.fn(() => "2026-10-13"),
+}));
+
+vi.mock("@/lib/datetime", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/datetime")>()),
+  getVietnamTime: dependencies.getVietnamTime,
+  getVietnamToday: dependencies.getVietnamToday,
 }));
 
 vi.mock("@/lib/permissions/database-permissions", () => ({
@@ -111,5 +119,19 @@ describe("class detail route", () => {
     vi.clearAllMocks();
     arrange(["classes.view", "sessions.view", "classes.manage_schedule"]);
     expect(await renderRoute()).toMatchObject({ canBulkCancelSessions: false, canManageSessions: false });
+  });
+
+  // Value: protects=the class page receives the Vietnam wall-clock time and date (not server UTC) to decide started/overdue sessions;
+  // fails_when=nowTime/today are dropped, swapped, or computed from new Date() in server time instead of getVietnamTime/getVietnamToday;
+  // why_new=the route forwards nowTime and today but no test checked them;
+  // seam=none; no_claim=does not prove the Vietnam formatters themselves (getVietnamTime/getVietnamToday are mocked at their module)
+  it("passes the Vietnam time and date to the page", async () => {
+    arrange(["classes.view", "sessions.view"]);
+
+    const props = await renderRoute();
+
+    expect(dependencies.getVietnamTime).toHaveBeenCalled();
+    expect(dependencies.getVietnamToday).toHaveBeenCalled();
+    expect(props).toMatchObject({ nowTime: "19:45:00", today: "2026-10-13" });
   });
 });
