@@ -6,7 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export interface StudentActionMenuItem<T extends string = string> {
+export interface ActionMenuItem<T extends string = string> {
   danger?: boolean;
   enabled: boolean;
   label: string;
@@ -15,22 +15,22 @@ export interface StudentActionMenuItem<T extends string = string> {
   value: T;
 }
 
-interface StudentActionMenuProps<T extends string> {
-  items: readonly StudentActionMenuItem<T>[];
+interface ActionMenuProps<T extends string> {
+  items: readonly ActionMenuItem<T>[];
   label?: string;
   onSelect: (value: T, trigger: HTMLButtonElement) => void;
 }
 
 /**
- * Overflow "…" menu for consequential profile actions (design 05): the page
- * keeps one primary button; reserve / transfer / end live here, each with its
+ * Overflow "…" menu for consequential record actions (designs 03, 05): the page
+ * keeps one primary button; secondary operations live here, each with its
  * availability reason written out. The feature decides which items exist.
  */
-export function StudentActionMenu<T extends string>({
+export function ActionMenu<T extends string>({
   items,
   label = "Thêm hành động",
   onSelect,
-}: StudentActionMenuProps<T>) {
+}: ActionMenuProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -86,7 +86,7 @@ export function StudentActionMenu<T extends string>({
       {isOpen ? (
         <div
           aria-label={label}
-          className="panel-rise absolute right-0 top-[calc(100%+8px)] z-40 w-72 rounded-lg border border-border-subtle bg-surface-raised p-1.5 shadow-[var(--elevation-2)]"
+          className="panel-rise absolute top-[calc(100%+8px)] max-md:left-0 md:right-0 z-40 w-72 rounded-lg border border-border-subtle bg-surface-raised p-1.5 shadow-[var(--elevation-2)]"
           id={menuId}
           role="menu"
         >

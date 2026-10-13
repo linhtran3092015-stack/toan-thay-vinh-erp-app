@@ -1,653 +1,332 @@
-import type { ReactNode } from "react";
-import Link from "next/link";
+"use client";
 
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useId, useRef, useState } from "react";
+
+import { ActionMenu } from "@/components/patterns/action-menu";
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/patterns/page-header";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ClassScheduleCreateForm } from "@/features/classes/management/class-schedule-create-form";
-import { ClassScheduleEndAction } from "@/features/classes/management/class-schedule-end-action";
-import { ClassScheduleReplaceAction } from "@/features/classes/management/class-schedule-replace-action";
-import { ClassStatusActions } from "@/features/classes/management/class-status-actions";
-import type {
-  ClassDetailReadModel,
-  ClassLearningMode,
-  ClassScheduleReadModel,
-} from "@/features/classes/read-models";
+import { Button, getButtonClassName } from "@/components/ui/button";
+import { TabPanel, Tabs, type TabItem } from "@/components/ui/tabs";
+import type { ClassDetailWorkspace, ClassEnrollmentCandidate } from "@/features/classes/detail/class-detail-data";
+import { summarizeClassSessions } from "@/features/classes/detail/class-detail-models";
+import { ClassEnrollDialog } from "@/features/classes/detail/components/class-enroll-dialog";
+import { ClassOverviewTab } from "@/features/classes/detail/components/class-overview-tab";
+import { ClassScheduleSection, sortSchedules } from "@/features/classes/detail/components/class-schedule-section";
+import { ClassSessionsTab } from "@/features/classes/detail/components/class-sessions-tab";
+import type { ClassTargetStatus } from "@/features/classes/forms/class-action-types";
+import { useClassStatusOperations } from "@/features/classes/management/class-status-actions";
+import type { ClassDetailReadModel, ClassScheduleReadModel } from "@/features/classes/read-models";
+import { getVietnamTime, getVietnamToday } from "@/lib/datetime";
+import { formatLearningMode } from "@/lib/format";
+
+export type ClassDetailTab = "overview" | "sessions";
+
+const classDetailTabs: readonly ClassDetailTab[] = ["overview", "sessions"];
+
+function isClassDetailTab(value: unknown): value is ClassDetailTab {
+  return typeof value === "string" && (classDetailTabs as readonly string[]).includes(value);
+}
+
+const unavailableWorkspace: ClassDetailWorkspace = {
+  absenceStreaks: { reason: "forbidden", status: "unavailable" },
+  attendance: { reason: "forbidden", status: "unavailable" },
+  debt: { reason: "forbidden", status: "unavailable" },
+  results: { reason: "forbidden", status: "unavailable" },
+  sessions: { reason: "forbidden", status: "unavailable" },
+  students: { reason: "forbidden", status: "unavailable" },
+};
 
 interface ClassDetailPageProps {
   canEditClass: boolean;
+  /** students.manage_status: the enroll RPC's permission. */
+  canEnrollStudents?: boolean;
+  canLockSessions?: boolean;
   canManageSchedule: boolean;
+  /** sessions.manage: bulk cancel and the batch-creation link. */
+  canManageSessions?: boolean;
+  canViewCare?: boolean;
   canViewStudentCount: boolean;
   detail: ClassDetailReadModel;
   directoryQuery?: string;
+  /** `null` = failed to load; `undefined` = not loaded (no permission). */
+  enrollmentCandidates?: { candidates: ClassEnrollmentCandidate[]; truncated: boolean } | null;
+  initialTab?: string;
+  /** HH:MM in Vietnam time, computed on the server so both renders agree. */
+  nowTime?: string;
+  /** YYYY-MM-DD in Vietnam time, computed on the server so both renders agree. */
+  today?: string;
+  workspace?: ClassDetailWorkspace;
 }
 
+/**
+ * Class detail (design 03): header with one primary action ("Ghi danh học
+ * sinh"), status changes in the "…" menu, and tabs for the overview and the
+ * class's sessions. Students, results and tuition tabs follow in a later step.
+ */
 export function ClassDetailPage({
   canEditClass,
+  canEnrollStudents = false,
+  canLockSessions = false,
   canManageSchedule,
+  canManageSessions = false,
+  canViewCare = false,
   canViewStudentCount,
   detail,
   directoryQuery = "",
+  enrollmentCandidates,
+  initialTab,
+  nowTime,
+  today,
+  workspace = unavailableWorkspace,
 }: ClassDetailPageProps) {
-  const activeSchedules = detail.schedules.filter(
-    (schedule) => schedule.isActive,
-  );
-
-  const historicalSchedules = detail.schedules.filter(
-    (schedule) => !schedule.isActive,
-  );
-
+  const router = useRouter();
+  const tabsId = useId();
+  const resolvedToday = today ?? getVietnamToday();
+  const resolvedNow = nowTime ?? getVietnamTime();
+  const sessionRows = workspace.sessions.status === "ready" ? workspace.sessions.value.rows : null;
+  const summary = sessionRows ? summarizeClassSessions(sessionRows, resolvedToday) : null;
   const classStatus = getClassStatusMeta(detail.status);
+  const statusOperations = useClassStatusOperations({
+    classCode: detail.code,
+    classId: detail.id,
+    className: detail.name,
+    scheduledSessionCount: sessionRows ? sessionRows.filter((row) => row.status === "scheduled").length : null,
+    status: detail.status,
+  });
+  const [isEnrollOpen, setIsEnrollOpen] = useState(false);
+  const [enrollMessage, setEnrollMessage] = useState<string | null>(null);
+  const enrollTriggerRef = useRef<HTMLButtonElement>(null);
 
-  const remainingScheduleSlots = Math.max(
-    0,
-    detail.weeklySessionCount -
-      detail.activeScheduleCount,
+  const tabItems: TabItem[] = [{ label: "Tổng quan", value: "overview" }];
+
+  if (workspace.sessions.status !== "unavailable" || workspace.sessions.reason === "failed") {
+    const pending = summary ? summary.pendingLock + summary.overdue : 0;
+    tabItems.push({ count: summary?.total, label: "Buổi học", pending: pending > 0 ? pending : undefined, value: "sessions" });
+  }
+
+  const [activeTab, setActiveTab] = useState<ClassDetailTab>(() =>
+    isClassDetailTab(initialTab) && tabItems.some((item) => item.value === initialTab) ? initialTab : "overview",
   );
 
-  const canModifySchedule =
-    canManageSchedule &&
-    detail.status === "active" &&
-    detail.academicYear?.status === "active";
+  function changeTab(value: string) {
+    if (!isClassDetailTab(value)) {
+      return;
+    }
 
-  const canCreateSchedule =
-    canModifySchedule &&
-    remainingScheduleSlots > 0;
+    setActiveTab(value);
+
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", value);
+      // Next 16 tracks its own history entries: pass null, never window.history.state.
+      window.history.replaceState(null, "", url);
+    }
+  }
+
+  const isOpenForEnrollment = detail.status === "active";
+  const showEnroll = canEnrollStudents && (detail.status === "active" || detail.status === "draft");
+  const enrollDisabledReason = !isOpenForEnrollment
+    ? "Kích hoạt lớp trước khi ghi danh học sinh"
+    : enrollmentCandidates === null
+      ? "Chưa tải được danh sách học sinh, tải lại trang"
+      : null;
+  const batchHref =
+    canManageSessions && detail.status === "active"
+      ? `/sessions/batch?classId=${detail.id}${directoryQuery ? `&${directoryQuery}` : ""}`
+      : null;
+  const activeStudentCount =
+    workspace.students.status === "ready"
+      ? workspace.students.value.length
+      : canViewStudentCount
+        ? detail.activeStudentCount ?? null
+        : null;
+
+  // change_class_status rejects closing or archiving while any of these remain.
+  const closeBlockers = [
+    detail.activeScheduleCount > 0 ? `${detail.activeScheduleCount} lịch cố định đang hiệu lực` : null,
+    activeStudentCount ? `${activeStudentCount} học sinh đang học` : null,
+    sessionRows?.some((row) => row.status === "in_progress") ? "buổi đang diễn ra" : null,
+  ].filter((blocker): blocker is string => blocker !== null);
+
+  const metaParts = [
+    detail.code,
+    detail.academicYear ? `Năm học ${detail.academicYear.name}` : null,
+    `Khối ${detail.grade} · Mức ${detail.level}`,
+    formatScheduleSummary(detail.schedules.filter((schedule) => schedule.isActive)),
+    formatLearningMode(detail.defaultLearningMode),
+  ].filter((part): part is string => Boolean(part));
 
   return (
-    <div className="grid min-w-0 gap-4">
-      <section className="grid gap-4">
-        <nav aria-label="Điều hướng lớp học" className="flex flex-wrap items-center gap-2 text-secondary text-text-muted">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
+      <header className="grid gap-4">
+        <nav aria-label="Điều hướng lớp học" className="text-secondary">
           <Link
-            className="font-semibold text-action-link hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+            className="inline-flex items-center gap-1 font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
             href={directoryQuery ? `/classes?${directoryQuery}` : "/classes"}
           >
-            Lớp học
+            <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.8} />
+            Danh sách lớp
           </Link>
-          <span>/</span>
-          <span className="font-semibold text-ink">
-            {detail.code}
-          </span>
         </nav>
 
-        <PageHeader
-          context={<Badge tone={classStatus.tone}>{classStatus.label}</Badge>}
-          title={detail.name}
-          actions={canEditClass ? <div className="flex flex-wrap items-center gap-2">
-              {["draft", "active"].includes(detail.status) ? <Link className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-border-subtle bg-surface-base px-4 text-control font-semibold text-text-strong hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={`/classes/${detail.id}/edit${directoryQuery ? `?${directoryQuery}` : ""}`}>Chỉnh sửa lớp</Link> : null}
-              <ClassStatusActions classCode={detail.code} classId={detail.id} className={detail.name} status={detail.status} />
-            </div> : undefined}
-        >
-          <p className="mt-1 font-mono text-secondary font-semibold text-text-muted">
-              {detail.code}
-            </p>
-          <p className="mt-2 text-secondary text-text-muted">Khối {detail.grade} · Mức {detail.level} · {formatMode(detail.defaultLearningMode)}{detail.academicYear ? ` · ${detail.academicYear.code}` : ""}</p>
-        </PageHeader>
-      </section>
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-page-title font-semibold tracking-[-0.01em] text-text-strong">{detail.name}</h1>
+              <Badge tone={classStatus.tone}>{classStatus.label}</Badge>
+            </div>
+            <p className="mt-1 text-secondary text-text-muted">{metaParts.join(" · ")}</p>
+          </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-        <div className="grid content-start gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Thông tin lớp học</CardTitle>
-            </CardHeader>
+          <div className="flex shrink-0 flex-wrap items-start gap-2 md:justify-end">
+            {canEditClass ? (
+              <ActionMenu<ClassTargetStatus>
+                items={statusOperations.operations.map((operation) => {
+                  const blockers = operation.targetStatus === "active" ? [] : closeBlockers;
 
-            <CardContent className="grid gap-3 md:grid-cols-2">
-              <InfoTile
-                label="Mã lớp"
-                value={detail.code}
+                  return {
+                    danger: operation.danger,
+                    enabled: blockers.length === 0,
+                    label: operation.label,
+                    reason: blockers.length > 0 ? `Chưa thực hiện được: còn ${blockers.join(", ")}.` : null,
+                    value: operation.targetStatus,
+                  };
+                })}
+                label="Thêm hành động cho lớp"
+                onSelect={(value, trigger) => statusOperations.open(value, trigger)}
               />
-
-              <InfoTile
-                label="Tên lớp"
-                value={detail.name}
-              />
-
-              <InfoTile
-                label="Khối"
-                value={`Khối ${detail.grade}`}
-              />
-
-              <InfoTile
-                label="Mức"
-                value={detail.level}
-              />
-
-              <InfoTile
-                label="Hình thức mặc định"
-                value={formatMode(
-                  detail.defaultLearningMode,
-                )}
-              />
-
-              <InfoTile
-                label="Số buổi mỗi tuần"
-                value={String(
-                  detail.weeklySessionCount,
-                )}
-              />
-
-              <InfoTile
-                label="Trạng thái"
-                value={classStatus.label}
-              />
-
-              <InfoTile
-                label="Học viên đang học"
-                value={
-                  canViewStudentCount
-                    ? String(
-                        detail.activeStudentCount ?? 0,
-                      )
-                    : "Không có quyền students.view"
-                }
-              />
-
-              <InfoTile
-                label="Ghi chú"
-                value={
-                  detail.notes ?? "Chưa có ghi chú"
-                }
-                wide
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <CardTitle>
-                Lịch học đang hiệu lực
-              </CardTitle>
-              {detail.status === "active" ? (
-                <Link
-                  className="inline-flex min-h-8 items-center justify-center rounded-md border border-border-subtle bg-surface-base px-3 text-caption font-semibold text-action-link hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
-                  href={`/sessions/batch?classId=${detail.id}${directoryQuery ? `&${directoryQuery}` : ""}`}
-                >
-                  Tạo buổi học hàng loạt
-                </Link>
-              ) : null}
-            </CardHeader>
-
-            <CardContent className="grid gap-4">
-              {canCreateSchedule ? (
-                <ClassScheduleCreateForm
-                  classId={detail.id}
-                  defaultLearningMode={
-                    detail.defaultLearningMode
-                  }
-                  remainingScheduleSlots={
-                    remainingScheduleSlots
-                  }
-                />
-              ) : canManageSchedule ? (
-                <div className="rounded-md border border-warning-border bg-warning-bg p-3 text-sm text-warning">
-                  {detail.status !== "active"
-                    ? "Cần kích hoạt lớp trước khi thiết lập lịch học."
-                    : detail.academicYear?.status !==
-                        "active"
-                      ? "Năm học của lớp chưa ở trạng thái hoạt động."
-                      : "Lớp đã đủ số lịch học cố định theo cấu hình số buổi mỗi tuần."}
-                </div>
-              ) : null}
-
-              {activeSchedules.length === 0 ? (
-                <NoticeText>
-                  Lớp chưa có lịch học đang hiệu lực.
-                </NoticeText>
-              ) : (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {activeSchedules.map((schedule) => (
-                    <ScheduleCard
-                      canManageSchedule={
-                        canModifySchedule
-                      }
-                      key={schedule.id}
-                      schedule={schedule}
-                    />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                Lịch sử lịch học
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent>
-              {historicalSchedules.length === 0 ? (
-                <NoticeText>
-                  Chưa có lịch học cũ.
-                </NoticeText>
-              ) : (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {historicalSchedules.map(
-                    (schedule) => (
-                      <ScheduleCard
-                        key={schedule.id}
-                        schedule={schedule}
-                      />
-                    ),
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            ) : null}
+            {canEditClass && ["draft", "active"].includes(detail.status) ? (
+              <Link
+                className={getButtonClassName({ variant: "secondary" })}
+                href={`/classes/${detail.id}/edit${directoryQuery ? `?${directoryQuery}` : ""}`}
+              >
+                Sửa lớp
+              </Link>
+            ) : null}
+            {showEnroll ? (
+              <Button
+                disabled={enrollDisabledReason !== null}
+                disabledReason={enrollDisabledReason ?? undefined}
+                onClick={() => {
+                  setEnrollMessage(null);
+                  setIsEnrollOpen(true);
+                }}
+                ref={enrollTriggerRef}
+                type="button"
+                variant="primary"
+              >
+                Ghi danh học sinh
+              </Button>
+            ) : null}
+          </div>
         </div>
 
-        <div className="grid content-start gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Thông tin năm học</CardTitle>
-            </CardHeader>
+        {statusOperations.successMessage ? <ResultBanner title={statusOperations.successMessage} tone="success" /> : null}
+        {enrollMessage ? <ResultBanner title={enrollMessage} tone="success" /> : null}
+      </header>
 
-            <CardContent>
-              {!detail.academicYear ? (
-                <NoticeText>
-                  Chưa xác định năm học.
-                </NoticeText>
-              ) : (
-                <div className="grid gap-3 text-sm">
-                  <InfoLine
-                    label="Mã năm học"
-                    value={detail.academicYear.code}
-                  />
+      <div className="grid min-w-0 content-start gap-4">
+        <Tabs id={tabsId} items={tabItems} label="Mục trong lớp học" onValueChange={changeTab} value={activeTab} />
 
-                  <InfoLine
-                    label="Tên năm học"
-                    value={detail.academicYear.name}
-                  />
+        <TabPanel activeValue={activeTab} className="grid gap-4" tabsId={tabsId} value="overview">
+          <ClassOverviewTab
+            activeStudentCount={activeStudentCount}
+            batchHref={batchHref}
+            canLockSessions={canLockSessions}
+            canManageSchedule={canManageSchedule}
+            canViewCare={canViewCare}
+            detail={detail}
+            nowTime={resolvedNow}
+            onShowSessions={tabItems.some((item) => item.value === "sessions") ? () => changeTab("sessions") : undefined}
+            today={resolvedToday}
+            workspace={workspace}
+          />
+          <ClassScheduleSection canManageSchedule={canManageSchedule} detail={detail} />
+        </TabPanel>
 
-                  <InfoLine
-                    label="Ngày bắt đầu"
-                    value={formatDate(
-                      detail.academicYear.startsOn,
-                    )}
-                  />
-
-                  <InfoLine
-                    label="Ngày kết thúc"
-                    value={formatDate(
-                      detail.academicYear.endsOn,
-                    )}
-                  />
-
-                  <InfoLine
-                    label="Trạng thái"
-                    value={formatAcademicYearStatus(
-                      detail.academicYear.status,
-                    )}
-                  />
-
-                  <InfoLine
-                    label="Năm học hiện tại"
-                    value={
-                      detail.academicYear.isCurrent
-                        ? "Có"
-                        : "Không"
-                    }
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>ClassIn</CardTitle>
-            </CardHeader>
-
-            <CardContent>
-              {detail.classinUrl ? (
-                <a
-                  aria-label="Mở lớp trên ClassIn, mở trong thẻ mới"
-                  className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-hairline bg-white px-4 text-sm font-semibold text-primary transition hover:border-border-focus hover:bg-canvas"
-                  href={detail.classinUrl}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  Mở lớp trên ClassIn (thẻ mới)
-                </a>
-              ) : (
-                <NoticeText>
-                  Lớp chưa có đường dẫn ClassIn.
-                </NoticeText>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Trạng thái hệ thống</CardTitle>
-            </CardHeader>
-
-            <CardContent className="grid gap-3 text-sm">
-              <InfoLine
-                label="Trạng thái lớp"
-                value={classStatus.label}
+        {tabItems.some((item) => item.value === "sessions") ? (
+          <TabPanel activeValue={activeTab} tabsId={tabsId} value="sessions">
+            {sessionRows && workspace.sessions.status === "ready" ? (
+              <ClassSessionsTab
+                attendanceAvailable={workspace.attendance.status === "ready"}
+                batchHref={batchHref}
+                canCancelSessions={canManageSessions}
+                resultsAvailable={workspace.results.status === "ready"}
+                rows={sessionRows}
+                today={resolvedToday}
+                truncated={workspace.sessions.value.truncated}
               />
-
-              <InfoLine
-                label="Lịch đang hiệu lực"
-                value={String(
-                  detail.activeScheduleCount,
-                )}
-              />
-
-              <InfoLine
-                label="Hình thức mặc định"
-                value={formatMode(
-                  detail.defaultLearningMode,
-                )}
-              />
-
-              <InfoLine
-                label="Mức lớp"
-                value={detail.level}
-              />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ScheduleCard({
-  canManageSchedule = false,
-  schedule,
-}: {
-  canManageSchedule?: boolean;
-  schedule: ClassScheduleReadModel;
-}) {
-  return (
-    <article className="rounded-md border border-hairline bg-canvas p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold text-ink">
-            {formatWeekday(schedule.weekday)}
-          </p>
-
-          <p className="mt-1 text-sm text-ink-muted">
-            {formatTime(schedule.startTime)}
-            {" – "}
-            {formatTime(schedule.endTime)}
-          </p>
-        </div>
-
-        <Badge
-          tone={
-            schedule.isActive
-              ? "success"
-              : "neutral"
-          }
-        >
-          {schedule.isActive
-            ? "Đang hiệu lực"
-            : "Đã kết thúc"}
-        </Badge>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        <ModeBadge mode={schedule.learningMode} />
-
-        {schedule.componentCode ? (
-          <Badge tone="neutral">
-            {schedule.componentCode}
-          </Badge>
+            ) : (
+              <ResultBanner description="Tải lại trang để thử lại." title="Chưa tải được buổi học của lớp" tone="warning" />
+            )}
+          </TabPanel>
         ) : null}
       </div>
 
-      <div className="mt-4 grid gap-2 text-sm">
-        <InfoLine
-          label="Phòng"
-          value={
-            schedule.roomName ??
-            (schedule.learningMode === "online"
-              ? "Học trực tuyến"
-              : "Chưa cập nhật")
-          }
+      {statusOperations.dialog}
+
+      {isEnrollOpen && enrollmentCandidates ? (
+        <ClassEnrollDialog
+          candidates={enrollmentCandidates.candidates}
+          candidatesTruncated={enrollmentCandidates.truncated}
+          classCode={detail.code}
+          classDefaultMode={detail.defaultLearningMode}
+          classGrade={detail.grade}
+          classId={detail.id}
+          className={detail.name}
+          onClose={() => setIsEnrollOpen(false)}
+          onSuccess={(message) => {
+            setIsEnrollOpen(false);
+            setEnrollMessage(message);
+            router.refresh();
+          }}
+          returnFocusRef={enrollTriggerRef}
         />
-
-        <InfoLine
-          label="Hiệu lực từ"
-          value={formatDate(
-            schedule.effectiveFrom,
-          )}
-        />
-
-        <InfoLine
-          label="Hiệu lực đến"
-          value={
-            schedule.effectiveTo
-              ? formatDate(schedule.effectiveTo)
-              : "Hiện tại"
-          }
-        />
-      </div>
-
-      {schedule.meetingUrl ? (
-        <a
-          className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-md border border-hairline bg-white px-3 text-sm font-semibold text-primary hover:border-border-focus hover:bg-surface-1"
-          href={schedule.meetingUrl}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          Mở phòng học trực tuyến
-        </a>
       ) : null}
-
-      {canManageSchedule &&
-      schedule.isActive ? (
-        <div className="mt-4 grid gap-2">
-          <ClassScheduleReplaceAction
-            schedule={schedule}
-          />
-
-          <ClassScheduleEndAction
-            schedule={schedule}
-          />
-        </div>
-      ) : null}
-
-      {schedule.endReason ? (
-        <p className="mt-3 text-sm text-ink-muted">
-          Lý do kết thúc: {schedule.endReason}
-        </p>
-      ) : null}
-    </article>
-  );
-}
-
-function InfoTile({
-  label,
-  value,
-  wide = false,
-}: {
-  label: string;
-  value: string;
-  wide?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-md border border-hairline bg-canvas p-3 ${
-        wide ? "md:col-span-2" : ""
-      }`}
-    >
-      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-subtle">
-        {label}
-      </p>
-
-      <p className="mt-1 whitespace-pre-wrap text-sm font-semibold leading-6 text-ink">
-        {value}
-      </p>
     </div>
   );
 }
 
-function InfoLine({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <span className="text-ink-muted">
-        {label}
-      </span>
+const shortWeekdays: Record<number, string> = { 0: "CN", 1: "2", 2: "3", 3: "4", 4: "5", 5: "6", 6: "7", 7: "CN" };
 
-      <span className="text-right font-semibold text-ink">
-        {value}
-      </span>
-    </div>
-  );
-}
+/** "Thứ 2-4-6, 19:30–21:30" when all slots share a time, otherwise one entry per slot. */
+export function formatScheduleSummary(schedules: readonly ClassScheduleReadModel[]): string | null {
+  if (schedules.length === 0) {
+    return null;
+  }
 
-function NoticeText({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  return (
-    <div className="rounded-md border border-dashed border-hairline bg-canvas p-4 text-sm text-ink-muted">
-      {children}
-    </div>
-  );
-}
+  const sorted = sortSchedules(schedules);
+  const times = new Set(sorted.map((schedule) => `${schedule.startTime.slice(0, 5)}–${schedule.endTime.slice(0, 5)}`));
+  const days = sorted.map((schedule) => shortWeekdays[schedule.weekday] ?? String(schedule.weekday));
+  const rooms = [...new Set(sorted.map((schedule) => schedule.roomName).filter((room): room is string => Boolean(room)))];
+  const dayLabel = (values: string[]) => (values.every((value) => value === "CN") ? "Chủ nhật" : `Thứ ${values.join("-")}`);
 
-function ModeBadge({
-  mode,
-}: {
-  mode: ClassLearningMode;
-}) {
-  return (
-    <Badge
-      tone={
-        mode === "online"
-          ? "purple"
-          : mode === "offline"
-            ? "info"
-            : "warning"
-      }
-    >
-      {formatMode(mode)}
-    </Badge>
-  );
+  const slots =
+    times.size === 1
+      ? `${dayLabel(days)}, ${[...times][0]}`
+      : sorted.map((schedule, index) => `${dayLabel([days[index]])} ${schedule.startTime.slice(0, 5)}`).join(", ");
+
+  return rooms.length > 0 ? `${slots} · ${rooms.join(", ")}` : slots;
 }
 
 function getClassStatusMeta(status: string): {
   label: string;
-  tone:
-    | "info"
-    | "neutral"
-    | "success"
-    | "warning";
+  tone: "info" | "neutral" | "success" | "warning";
 } {
-  const metadata: Record<
-    string,
-    {
-      label: string;
-      tone:
-        | "info"
-        | "neutral"
-        | "success"
-        | "warning";
-    }
-  > = {
-    active: {
-      label: "Đang hoạt động",
-      tone: "success",
-    },
-    archived: {
-      label: "Lưu trữ",
-      tone: "neutral",
-    },
-    closed: {
-      label: "Đã đóng",
-      tone: "neutral",
-    },
-    draft: {
-      label: "Nháp",
-      tone: "warning",
-    },
+  const metadata: Record<string, { label: string; tone: "info" | "neutral" | "success" | "warning" }> = {
+    active: { label: "Đang hoạt động", tone: "success" },
+    archived: { label: "Lưu trữ", tone: "neutral" },
+    closed: { label: "Đã đóng", tone: "neutral" },
+    draft: { label: "Nháp", tone: "warning" },
   };
 
   if (!Object.hasOwn(metadata, status)) {
-    return {
-      label: `Trạng thái chưa hỗ trợ: ${status}`,
-      tone: "neutral",
-    };
+    return { label: `Trạng thái chưa hỗ trợ: ${status}`, tone: "neutral" };
   }
 
   return metadata[status];
-}
-
-function formatMode(value: string): string {
-  if (value === "online") {
-    return "Online";
-  }
-
-  if (value === "offline") {
-    return "Offline";
-  }
-
-  if (value === "hybrid") {
-    return "Kết hợp";
-  }
-
-  return value;
-}
-
-function formatAcademicYearStatus(
-  value: string,
-): string {
-  const labels: Record<string, string> = {
-    active: "Đang hoạt động",
-    archived: "Lưu trữ",
-    closed: "Đã đóng",
-    draft: "Nháp",
-  };
-
-  return Object.hasOwn(labels, value)
-    ? labels[value]
-    : `Trạng thái chưa hỗ trợ: ${value}`;
-}
-
-function formatWeekday(value: number): string {
-  const labels: Record<number, string> = {
-    0: "Chủ nhật",
-    1: "Thứ 2",
-    2: "Thứ 3",
-    3: "Thứ 4",
-    4: "Thứ 5",
-    5: "Thứ 6",
-    6: "Thứ 7",
-    7: "Chủ nhật",
-  };
-
-  return labels[value] ?? `Ngày ${value}`;
-}
-
-function formatDate(value: string): string {
-  const parts = value.split("-");
-
-  if (parts.length !== 3) {
-    return value;
-  }
-
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
-}
-
-function formatTime(value: string): string {
-  return value.slice(0, 5);
 }

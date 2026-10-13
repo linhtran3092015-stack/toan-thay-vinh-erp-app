@@ -4,6 +4,8 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { ClassDetailPage } from "@/features/classes/class-detail-page";
 import { getClassDirectoryQuery } from "@/features/classes/class-directory-url-state";
 import { getClassDetail } from "@/features/classes/data";
+import { getClassDetailWorkspace, getClassEnrollmentCandidates } from "@/features/classes/detail/class-detail-data";
+import { getVietnamTime, getVietnamToday } from "@/lib/datetime";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 import { permissionDeniedDescription } from "@/lib/permissions/labels";
@@ -60,20 +62,24 @@ export default async function ClassDetailRoute({
     );
   }
 
-  const canViewStudentCount =
-    permissionResult.permissions.includes(
-      "students.view",
-    );
+  const permissions = permissionResult.permissions;
+  const canViewStudentCount = permissions.includes("students.view");
 
-  const canEditClass =
-    permissionResult.permissions.includes(
-      "classes.create",
-    );
+  const canEditClass = permissions.includes("classes.create");
+  const canManageSchedule = permissions.includes("classes.manage_schedule");
 
-  const canManageSchedule =
-    permissionResult.permissions.includes(
-      "classes.manage_schedule",
-    );
+  const canViewSessions = permissions.includes("sessions.view");
+  const canEnrollStudents =
+    canViewStudentCount && permissions.includes("students.manage_status");
+
+  // The workspace does not depend on the class record: start it alongside.
+  const workspacePromise = getClassDetailWorkspace(classId, {
+    canViewAttendance: canViewSessions && permissions.includes("attendance.view"),
+    canViewPayments: permissions.includes("payments.view"),
+    canViewResults: canViewSessions && permissions.includes("results.view"),
+    canViewSessions,
+    canViewStudents: canViewStudentCount,
+  });
 
   const detailResult = await getClassDetail(classId, {
     includeStudentCounts: canViewStudentCount,
@@ -99,13 +105,30 @@ export default async function ClassDetailRoute({
     );
   }
 
+  const [workspace, enrollmentCandidates] = await Promise.all([
+    workspacePromise,
+    canEnrollStudents && detailResult.detail.status === "active"
+      ? getClassEnrollmentCandidates()
+      : Promise.resolve(undefined),
+  ]);
+  const initialTab = typeof resolvedSearchParams.tab === "string" ? resolvedSearchParams.tab : undefined;
+
   return (
     <ClassDetailPage
       canEditClass={canEditClass}
+      canEnrollStudents={canEnrollStudents}
+      canLockSessions={permissions.includes("sessions.lock")}
       canManageSchedule={canManageSchedule}
+      canManageSessions={permissions.includes("sessions.manage")}
+      canViewCare={permissions.includes("student_care.view")}
       canViewStudentCount={canViewStudentCount}
       directoryQuery={directoryQuery}
       detail={detailResult.detail}
+      enrollmentCandidates={enrollmentCandidates}
+      initialTab={initialTab}
+      nowTime={getVietnamTime()}
+      today={getVietnamToday()}
+      workspace={workspace}
     />
   );
 }

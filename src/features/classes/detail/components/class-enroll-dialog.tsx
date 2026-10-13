@@ -1,0 +1,259 @@
+"use client";
+
+import { X } from "lucide-react";
+import { useMemo, useRef, useState, useTransition, type FormEvent, type RefObject } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import type { ClassEnrollmentCandidate } from "@/features/classes/detail/class-detail-data";
+import { enrollStudentInClassAction } from "@/features/students/enrollment/student-enrollment-actions";
+import type {
+  StudentEnrollmentActionState,
+  StudentEnrollmentRegisteredMode,
+} from "@/features/students/enrollment/student-enrollment-action-types";
+import { FieldShell, fieldControlClass, textAreaControlClass } from "@/features/students/form/components/form-controls";
+import { getVietnamToday } from "@/lib/datetime";
+import { cn } from "@/lib/utils";
+
+/** Matches shown at once; typing narrows the rest. */
+const VISIBLE_MATCHES = 40;
+
+interface ClassEnrollDialogProps {
+  candidates: readonly ClassEnrollmentCandidate[];
+  candidatesTruncated?: boolean;
+  classCode: string;
+  classDefaultMode: string;
+  classGrade: number;
+  classId: string;
+  className: string;
+  onClose: () => void;
+  onSuccess: (message: string) => void;
+  returnFocusRef?: RefObject<HTMLElement | null>;
+}
+
+function normalize(value: string): string {
+  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/đ/g, "d").replace(/Đ/g, "d").toLowerCase();
+}
+
+function getDefaultMode(candidate: ClassEnrollmentCandidate | undefined, classDefaultMode: string): StudentEnrollmentRegisteredMode {
+  const mode = candidate?.registeredMode ?? classDefaultMode;
+  return mode === "online" ? "online" : "offline";
+}
+
+/**
+ * Enroll a student into this class (design 03 primary action). Only students
+ * without any enrollment history are offered: enroll_student_in_class rejects
+ * the others, who transfer or resume from their profile instead.
+ */
+export function ClassEnrollDialog({
+  candidates,
+  candidatesTruncated = false,
+  classCode,
+  classDefaultMode,
+  classGrade,
+  classId,
+  className,
+  onClose,
+  onSuccess,
+  returnFocusRef,
+}: ClassEnrollDialogProps) {
+  const [query, setQuery] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [effectiveFrom, setEffectiveFrom] = useState(() => getVietnamToday());
+  const [registeredMode, setRegisteredMode] = useState<StudentEnrollmentRegisteredMode>(() => getDefaultMode(undefined, classDefaultMode));
+  const [reason, setReason] = useState("");
+  const [actionState, setActionState] = useState<StudentEnrollmentActionState | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const matches = useMemo(() => {
+    const needle = normalize(query.trim());
+    const filtered = needle
+      ? candidates.filter((candidate) => normalize(`${candidate.fullName} ${candidate.publicCode}`).includes(needle))
+      : candidates;
+
+    // Same-grade students first: they are the likely ones for this class.
+    return [...filtered].sort((a, b) => Number(b.grade === classGrade) - Number(a.grade === classGrade));
+  }, [candidates, classGrade, query]);
+
+  const selected = candidates.find((candidate) => candidate.id === studentId);
+  const fieldError = (name: string) => actionState?.status === "error" ? actionState.fieldErrors?.[name]?.[0] : undefined;
+
+  function selectStudent(candidate: ClassEnrollmentCandidate) {
+    setStudentId(candidate.id);
+    setRegisteredMode(getDefaultMode(candidate, classDefaultMode));
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!studentId) {
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await enrollStudentInClassAction({ classId, effectiveFrom, reason, registeredMode, studentId });
+
+      setActionState(result);
+
+      if (result.status === "success") {
+        onSuccess(`Đã ghi danh ${selected?.fullName ?? "học sinh"} vào lớp ${classCode}.`);
+      }
+    });
+  }
+
+  return (
+    <Dialog
+      ariaDescribedBy="class-enroll-description"
+      ariaLabelledBy="class-enroll-title"
+      className="sm:max-w-[560px]"
+      initialFocusRef={searchRef}
+      isOpen
+      onClose={() => {
+        if (!isPending) onClose();
+      }}
+      returnFocusRef={returnFocusRef}
+    >
+      <form className="grid gap-4 p-5" onSubmit={handleSubmit}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-section-title font-semibold text-text-strong" id="class-enroll-title">
+              Ghi danh học sinh
+            </h2>
+            <p className="mt-1 text-secondary text-text-muted" id="class-enroll-description">
+              Vào lớp {classCode} · {className}. Chỉ hiện học sinh chưa từng ghi danh; em đã học lớp khác thì chuyển lớp
+              hoặc cho quay lại học từ hồ sơ.
+            </p>
+          </div>
+          <button
+            aria-label="Đóng hộp thoại ghi danh"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-interactive-hover hover:text-text-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isPending}
+            onClick={onClose}
+            type="button"
+          >
+            <X aria-hidden="true" size={20} strokeWidth={1.8} />
+          </button>
+        </div>
+
+        {actionState?.status === "error" ? (
+          <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2.5 text-secondary font-semibold text-danger" role="alert">
+            {actionState.message}
+          </div>
+        ) : null}
+
+        <fieldset className="grid min-w-0 gap-2">
+          <legend className="mb-1.5 text-sm font-semibold text-ink-muted">
+            Học sinh<span className="ml-1 text-danger">*</span>
+          </legend>
+          <input
+            aria-label="Tìm học sinh theo tên hoặc mã"
+            className={fieldControlClass()}
+            disabled={isPending}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Tìm theo tên hoặc mã học sinh"
+            ref={searchRef}
+            type="search"
+            value={query}
+          />
+          {candidates.length === 0 ? (
+            <p className="rounded-md border border-dashed border-border-strong bg-surface-subtle px-3 py-2.5 text-secondary text-text-muted">
+              Không có học sinh nào chưa ghi danh. Tạo học sinh mới trước, hoặc chuyển lớp từ hồ sơ của em.
+            </p>
+          ) : matches.length === 0 ? (
+            <p className="px-1 text-secondary text-text-muted">Không có học sinh khớp “{query.trim()}”.</p>
+          ) : (
+            <div className="max-h-64 overflow-y-auto rounded-md border border-border-subtle">
+              {matches.slice(0, VISIBLE_MATCHES).map((candidate) => (
+                <label
+                  className={cn(
+                    "flex min-h-11 cursor-pointer items-center gap-3 border-b border-border-row px-3 py-2 last:border-b-0 hover:bg-surface-hover",
+                    candidate.id === studentId && "bg-action-primary-soft",
+                  )}
+                  key={candidate.id}
+                >
+                  <input
+                    checked={candidate.id === studentId}
+                    className="h-4 w-4 accent-[var(--action-primary)]"
+                    disabled={isPending}
+                    name="class-enroll-student"
+                    onChange={() => selectStudent(candidate)}
+                    type="radio"
+                    value={candidate.id}
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-body font-medium text-text-strong">{candidate.fullName}</span>
+                    <span className="block text-caption tabular-nums text-text-muted">
+                      {candidate.publicCode} · Khối {candidate.grade}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+          {matches.length > VISIBLE_MATCHES || candidatesTruncated ? (
+            <p className="px-1 text-caption text-text-muted">
+              {matches.length > VISIBLE_MATCHES ? `Đang hiện ${VISIBLE_MATCHES}/${matches.length} học sinh khớp. ` : ""}
+              Gõ thêm tên hoặc mã để thu hẹp.
+            </p>
+          ) : null}
+          {fieldError("studentId") ? <p className="text-xs font-semibold text-danger">{fieldError("studentId")}</p> : null}
+        </fieldset>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldShell error={fieldError("effectiveFrom")} id="class-enroll-date" label="Ngày bắt đầu học" required>
+            <input
+              className={fieldControlClass(fieldError("effectiveFrom"))}
+              disabled={isPending}
+              id="class-enroll-date"
+              onChange={(event) => setEffectiveFrom(event.target.value)}
+              required
+              type="date"
+              value={effectiveFrom}
+            />
+          </FieldShell>
+          <FieldShell error={fieldError("registeredMode")} id="class-enroll-mode" label="Hình thức đăng ký" required>
+            <select
+              className={fieldControlClass(fieldError("registeredMode"))}
+              disabled={isPending}
+              id="class-enroll-mode"
+              onChange={(event) => setRegisteredMode(event.target.value as StudentEnrollmentRegisteredMode)}
+              value={registeredMode}
+            >
+              <option value="offline">Tại lớp</option>
+              <option value="online">Trực tuyến</option>
+            </select>
+          </FieldShell>
+        </div>
+
+        <FieldShell error={fieldError("reason")} hint="Lý do được lưu vào lịch sử nghiệp vụ." id="class-enroll-reason" label="Lý do thao tác" required>
+          <textarea
+            className={textAreaControlClass(fieldError("reason"))}
+            disabled={isPending}
+            id="class-enroll-reason"
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Ví dụ: Phụ huynh đăng ký sau buổi học thử"
+            required
+            value={reason}
+          />
+        </FieldShell>
+
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button disabled={isPending} onClick={onClose} type="button" variant="ghost">
+            Hủy
+          </Button>
+          <Button
+            disabled={isPending || !studentId || reason.trim().length === 0}
+            disabledReason={
+              isPending ? undefined : !studentId ? "Chọn một học sinh" : reason.trim().length === 0 ? "Nhập lý do thao tác" : undefined
+            }
+            type="submit"
+            variant="primary"
+          >
+            {isPending ? "Đang ghi danh..." : selected ? `Ghi danh ${selected.fullName}` : "Ghi danh"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
