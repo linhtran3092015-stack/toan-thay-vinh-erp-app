@@ -26,6 +26,9 @@ const sessionA = "11111111-1111-4111-8111-111111111111";
 const sessionB = "22222222-2222-4222-8222-222222222222";
 const sessionC = "33333333-3333-4333-8333-333333333333";
 const otherClassSession = "44444444-4444-4444-8444-444444444444";
+const sessionD = "55555555-5555-4555-8555-555555555555";
+const sessionE = "66666666-6666-4666-8666-666666666666";
+const sessionF = "77777777-7777-4777-8777-777777777777";
 const owner = { ok: true, permissions: ["sessions.manage", "classes.manage_schedule"] };
 
 type LookupRow = { id: string; locked_at?: string | null; status?: string };
@@ -227,39 +230,51 @@ describe("cancelClassSessionsAction", () => {
     expect(client.rpc.mock.calls).toEqual([["cancel_class_session", { p_class_session_id: sessionA, p_reason: "Trùng lịch thi" }]]);
   });
 
-  // Value: protects=an RPC call that returns neither an error nor a row id is reported as a failed session, never counted as cancelled;
-  // fails_when=the `!data?.id` branch is dropped or folded into the success path, so the owner reads "Đã hủy" for a session the database did not confirm and session routes are revalidated for it;
-  // why_new=every existing RPC double returns `{ id }` or an error; the empty-result branch had no test;
-  // seam=none; no_claim=does not prove cancel_class_session ever returns an empty row in production
   // Value: protects=a session that started (or was locked) after the batch lookup is re-read and refused just before its RPC, and a failed re-read never falls through to the RPC;
-  // fails_when=the per-session re-read is removed (cancel_class_session would cancel an in_progress session) or a re-read error/empty result still calls the RPC or counts as cancelled;
+  // fails_when=the per-session re-read is removed (cancel_class_session would cancel an in_progress session), a re-read error/empty result still calls the RPC or counts as cancelled, or the re-check ignores locked_at or a cancelled status;
   // why_new=the batch lookup alone left a window of up to 40 sequential RPCs in which a teacher could start a session (owner decision D9);
   // seam=none; no_claim=does not close the window between the re-read and the RPC; that needs a guard inside cancel_class_session
   it("re-reads each session just before its RPC and refuses one that started since the lookup", async () => {
     mocks.getCachedDatabasePermissions.mockResolvedValue(owner);
     const { client } = mockClient({
-      ownIds: [sessionA, sessionB, sessionC],
+      ownIds: [sessionA, sessionB, sessionC, sessionD, sessionE, sessionF],
       recheck: (sessionId) => {
         if (sessionId === sessionA) return { data: [{ id: sessionA, locked_at: null, status: "in_progress" }], error: null };
         if (sessionId === sessionB) return { data: null, error: { message: "timeout" } };
+        if (sessionId === sessionD) return { data: [], error: null };
+        if (sessionId === sessionE) return { data: [{ id: sessionE, locked_at: "2026-10-13T10:00:00Z", status: "scheduled" }], error: null };
+        if (sessionId === sessionF) return { data: [{ id: sessionF, locked_at: null, status: "cancelled" }], error: null };
         return { data: [{ id: sessionC, locked_at: null, status: "scheduled" }], error: null };
       },
       rpc: (sessionId) => ({ data: { id: sessionId }, error: null }),
     });
 
-    const result = await cancelClassSessionsAction({ classId, reason: "Trùng lịch thi", sessionIds: [sessionA, sessionB, sessionC] });
+    const result = await cancelClassSessionsAction({
+      classId,
+      reason: "Trùng lịch thi",
+      sessionIds: [sessionA, sessionB, sessionC, sessionD, sessionE, sessionF],
+    });
 
+    const refused = "Buổi học vừa được bắt đầu, khóa hoặc hủy nên không hủy hàng loạt.";
+    const notRechecked = "Không thể kiểm tra lại buổi học nên chưa hủy.";
     expect(result).toEqual({
       cancelled: 1,
       failed: [
-        { message: "Buổi học vừa được bắt đầu, khóa hoặc hủy nên không hủy hàng loạt.", sessionId: sessionA },
-        { message: "Không thể kiểm tra lại buổi học nên chưa hủy.", sessionId: sessionB },
+        { message: refused, sessionId: sessionA },
+        { message: notRechecked, sessionId: sessionB },
+        { message: notRechecked, sessionId: sessionD },
+        { message: refused, sessionId: sessionE },
+        { message: refused, sessionId: sessionF },
       ],
       status: "success",
     });
     expect(client.rpc.mock.calls.map(([, args]) => args.p_class_session_id)).toEqual([sessionC]);
   });
 
+  // Value: protects=an RPC call that returns neither an error nor a row id is reported as a failed session, never counted as cancelled;
+  // fails_when=the `!data?.id` branch is dropped or folded into the success path, so the owner reads "Đã hủy" for a session the database did not confirm and session routes are revalidated for it;
+  // why_new=every existing RPC double returns `{ id }` or an error; the empty-result branch had no test;
+  // seam=none; no_claim=does not prove cancel_class_session ever returns an empty row in production
   it("counts a session as failed when the RPC returns no row id", async () => {
     mocks.getCachedDatabasePermissions.mockResolvedValue(owner);
     mockClient({

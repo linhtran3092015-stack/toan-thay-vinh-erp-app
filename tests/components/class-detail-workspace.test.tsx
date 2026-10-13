@@ -578,6 +578,27 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     });
     expect(screen.getAllByText("Không có quyền xem điểm danh").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Cần quyền xem điểm danh để tính kết quả").length).toBeGreaterThan(0);
+    // Sessions not started yet have no results to count: a plain dash, no reason.
+    const table = screen.getByRole("table", { name: "Buổi học của lớp" });
+    const unstarted = within(table).getByRole("link", { name: / buổi B3 ngày / }).closest("tr") as HTMLElement;
+    expect(unstarted).not.toHaveTextContent("tính kết quả");
+
+    cleanup();
+    renderPage({
+      initialTab: "sessions",
+      workspace: workspace({
+        attendance: { reason: "failed", status: "unavailable" },
+        results: { status: "ready", value: true },
+        sessions: { status: "ready", value: { rows: noAttendanceRows, truncated: false } },
+      }),
+    });
+    expect(screen.getAllByText("Chưa tải được điểm danh để tính kết quả").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Cần quyền xem điểm danh để tính kết quả")).not.toBeInTheDocument();
+
+    cleanup();
+    renderPage({ initialTab: "sessions", workspace: workspace({ results: { reason: "failed", status: "unavailable" } }) });
+    expect(screen.getAllByText("Chưa tải được kết quả").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Không có quyền xem kết quả")).not.toBeInTheDocument();
   });
 
   // Value: protects=the truncation notice says honestly that only the newest 400 sessions are shown;
