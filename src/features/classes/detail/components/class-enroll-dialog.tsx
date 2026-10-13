@@ -7,14 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { searchEnrollmentCandidatesAction } from "@/features/classes/actions/class-enrollment-search-actions";
 import type { ClassEnrollmentCandidate } from "@/features/classes/detail/class-detail-data";
-import { ENROLLMENT_SEARCH_MAX_LENGTH, ENROLLMENT_SEARCH_MIN_LENGTH } from "@/features/classes/detail/class-detail-models";
+import {
+  ENROLLMENT_SEARCH_FAILED_MESSAGE,
+  ENROLLMENT_SEARCH_MAX_LENGTH,
+  ENROLLMENT_SEARCH_MIN_LENGTH,
+} from "@/features/classes/detail/class-detail-models";
 import { normalizeRosterSearch } from "@/features/sessions/components/roster-search";
 import { enrollStudentInClassAction } from "@/features/students/enrollment/student-enrollment-actions";
 import type {
   StudentEnrollmentActionState,
   StudentEnrollmentRegisteredMode,
 } from "@/features/students/enrollment/student-enrollment-action-types";
-import { FieldShell, fieldControlClass, textAreaControlClass } from "@/features/students/form/components/form-controls";
+import { describedBy, FieldShell, fieldControlClass, textAreaControlClass } from "@/features/students/form/components/form-controls";
 import { getVietnamToday } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +28,6 @@ const VISIBLE_MATCHES = 40;
 const ENROLL_SEARCH_DEBOUNCE_MS = 300;
 
 /** Shown when the search call itself fails; a returned error carries its own message. */
-const SEARCH_FAILED_MESSAGE = "Chưa tìm được học sinh, thử lại.";
 
 type RemoteSearch =
   | { status: "idle" }
@@ -134,7 +137,7 @@ export function ClassEnrollDialog({
           ? { candidates: result.candidates, status: "ready", truncated: result.truncated }
           : { message: result.message, status: "error" };
       } catch {
-        next = { message: SEARCH_FAILED_MESSAGE, status: "error" };
+        next = { message: ENROLLMENT_SEARCH_FAILED_MESSAGE, status: "error" };
       }
 
       if (sequence === searchSequenceRef.current) {
@@ -201,7 +204,11 @@ export function ClassEnrollDialog({
           </div>
         ) : null}
 
-        <fieldset className="grid min-w-0 gap-2">
+        <fieldset
+          aria-describedby={fieldError("studentId") ? "class-enroll-student-error" : undefined}
+          aria-invalid={fieldError("studentId") ? true : undefined}
+          className="grid min-w-0 gap-2"
+        >
           <legend className="mb-1.5 text-sm font-semibold text-ink-muted">
             Học sinh<span className="ml-1 text-danger">*</span>
           </legend>
@@ -268,12 +275,18 @@ export function ClassEnrollDialog({
             matchCount={matches.length}
             remote={remote}
           />
-          {fieldError("studentId") ? <p className="text-xs font-semibold text-danger">{fieldError("studentId")}</p> : null}
+          {fieldError("studentId") ? (
+            <p className="text-xs font-semibold text-danger" id="class-enroll-student-error">
+              {fieldError("studentId")}
+            </p>
+          ) : null}
         </fieldset>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <FieldShell error={fieldError("effectiveFrom")} id="class-enroll-date" label="Ngày bắt đầu học" required>
             <input
+              aria-describedby={describedBy("class-enroll-date", fieldError("effectiveFrom"))}
+              aria-invalid={fieldError("effectiveFrom") ? true : undefined}
               className={fieldControlClass(fieldError("effectiveFrom"))}
               disabled={isPending}
               id="class-enroll-date"
@@ -285,6 +298,8 @@ export function ClassEnrollDialog({
           </FieldShell>
           <FieldShell error={fieldError("registeredMode")} id="class-enroll-mode" label="Hình thức đăng ký" required>
             <select
+              aria-describedby={describedBy("class-enroll-mode", fieldError("registeredMode"))}
+              aria-invalid={fieldError("registeredMode") ? true : undefined}
               className={fieldControlClass(fieldError("registeredMode"))}
               disabled={isPending}
               id="class-enroll-mode"
@@ -299,6 +314,8 @@ export function ClassEnrollDialog({
 
         <FieldShell error={fieldError("reason")} hint="Lý do được lưu vào lịch sử nghiệp vụ." id="class-enroll-reason" label="Lý do thao tác" required>
           <textarea
+            aria-describedby={describedBy("class-enroll-reason", fieldError("reason"), "Lý do được lưu vào lịch sử nghiệp vụ.")}
+            aria-invalid={fieldError("reason") ? true : undefined}
             className={textAreaControlClass(fieldError("reason"))}
             disabled={isPending}
             id="class-enroll-reason"

@@ -3,7 +3,11 @@
 import { z } from "zod";
 
 import { searchClassEnrollmentCandidates, type ClassEnrollmentCandidate } from "@/features/classes/detail/class-detail-data";
-import { ENROLLMENT_SEARCH_MAX_LENGTH, ENROLLMENT_SEARCH_MIN_LENGTH } from "@/features/classes/detail/class-detail-models";
+import {
+  ENROLLMENT_SEARCH_FAILED_MESSAGE,
+  ENROLLMENT_SEARCH_MAX_LENGTH,
+  ENROLLMENT_SEARCH_MIN_LENGTH,
+} from "@/features/classes/detail/class-detail-models";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { permissionDeniedMessage } from "@/lib/permissions/labels";
 
@@ -45,7 +49,7 @@ export async function searchEnrollmentCandidatesAction(query: string): Promise<E
   const result = await searchClassEnrollmentCandidates(parsed.data);
 
   if (!result) {
-    return { message: "Chưa tìm được học sinh, thử lại.", status: "error" };
+    return { message: ENROLLMENT_SEARCH_FAILED_MESSAGE, status: "error" };
   }
 
   return { candidates: result.candidates, status: "success", truncated: result.truncated };

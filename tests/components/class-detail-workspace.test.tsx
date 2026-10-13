@@ -328,6 +328,8 @@ describe("ClassDetailPage enroll dialog", () => {
     expect(within(dialog).queryByText("Lý Minh Thư")).not.toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("radio", { name: /Hoàng Bảo Ngọc/ }));
     expect(within(dialog).getByRole("combobox", { name: /Hình thức đăng ký/ })).toHaveValue("online");
+    // The reason field announces its hint (screen readers hear where the reason is kept).
+    expect(within(dialog).getByRole("textbox", { name: /Lý do thao tác/ })).toHaveAccessibleDescription("Lý do được lưu vào lịch sử nghiệp vụ.");
     fireEvent.change(within(dialog).getByRole("textbox", { name: /Lý do thao tác/ }), { target: { value: "Đăng ký sau học thử" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Ghi danh Hoàng Bảo Ngọc" }));
 
@@ -432,6 +434,13 @@ describe("ClassDetailPage close blockers and composite classes", () => {
     expect(close).not.toHaveTextContent("buổi đang diễn ra");
     fireEvent.click(close);
     expect(within(screen.getByRole("dialog")).getByText(/1 buổi đã lên lịch còn lại sẽ bị hủy tự động/)).toBeInTheDocument();
+
+    // A truncated feed can miss older scheduled sessions that closing still cancels: no count, never "none left".
+    cleanup();
+    renderPage({ workspace: workspace({ sessions: { status: "ready", value: { rows: componentRows, truncated: true } } }) });
+    fireEvent.click(screen.getByRole("button", { name: "Thêm hành động cho lớp" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Đóng lớp/ }));
+    expect(within(screen.getByRole("dialog")).getByText("Lớp ngừng hoạt động. Mọi buổi đã lên lịch còn lại sẽ bị hủy tự động.")).toBeInTheDocument();
 
     cleanup();
     const ownRows = orderClassSessions([row({ id: "own-live", sessionDate: TODAY, status: "in_progress" })]);
@@ -617,6 +626,8 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     });
     expect(screen.getAllByText("Không có quyền xem điểm danh").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Cần quyền xem điểm danh để tính kết quả").length).toBeGreaterThan(0);
+    // Results are counted against attendance, so the note names both columns.
+    expect(screen.getByText("Không có quyền xem điểm danh nên cột Điểm danh và Kết quả để trống.")).toBeInTheDocument();
     // Sessions not started yet have no results to count: a plain dash, no reason.
     const table = screen.getByRole("table", { name: "Buổi học của lớp" });
     const unstarted = within(table).getByRole("link", { name: / buổi B3 ngày / }).closest("tr") as HTMLElement;
@@ -659,6 +670,12 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     const mobileList = container.querySelector(".class-sessions-record-list") as HTMLElement;
     expect(within(mobileList).getAllByText("Chưa tải được điểm danh").length).toBeGreaterThan(0);
     expect(within(mobileList).getAllByText("Chưa tải được kết quả").length).toBeGreaterThan(0);
+
+    // Both feeds ready but no tally for a started row (component session or past the roster cap): still explained on mobile.
+    cleanup();
+    const readyBare = renderPage({ initialTab: "sessions", workspace: workspace({ sessions: { status: "ready", value: { rows: bareRows, truncated: false } } }) });
+    const readyList = readyBare.container.querySelector(".class-sessions-record-list") as HTMLElement;
+    expect(within(readyList).getAllByText("Chưa tải được danh sách hoặc điểm danh của buổi").length).toBeGreaterThan(0);
 
     // The overview chart tells a failed attendance read from a missing permission.
     cleanup();
@@ -812,6 +829,22 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     fireEvent.click(screen.getByRole("button", { name: "Bỏ chọn" }));
 
     expect(screen.queryByRole("region", { name: /Đã chọn/ })).not.toBeInTheDocument();
+    expect(within(list).getByRole("checkbox", { name: /Chọn buổi B3 / })).toHaveFocus();
+  });
+
+  // Value: protects=without checkVisibility (Safari before 17.4), a select-all hidden by CSS that cannot take focus is skipped and focus lands on the first mobile checkbox;
+  // fails_when=the bar focuses the first connected candidate without checking it took focus, leaving keyboard focus on the body;
+  // why_new=ship pass-3 red-team finding; focus() on a display:none node is a silent no-op;
+  // seam=none (select-all's focus is stubbed as a no-op to stand in for display:none); no_claim=does not prove CSS hides select-all
+  it("skips a select-all that cannot take focus when checkVisibility is missing", () => {
+    renderPage({ initialTab: "sessions" });
+    const selectAll = screen.getByRole("checkbox", { name: "Chọn mọi buổi chưa bắt đầu trên trang" });
+    Object.defineProperty(selectAll, "focus", { value: () => undefined });
+    const list = screen.getByRole("list", { name: "Buổi học của lớp" });
+    fireEvent.click(within(list).getByRole("checkbox", { name: /Chọn buổi B4 / }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Bỏ chọn" }));
+
     expect(within(list).getByRole("checkbox", { name: /Chọn buổi B3 / })).toHaveFocus();
   });
 

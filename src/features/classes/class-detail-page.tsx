@@ -92,7 +92,11 @@ export function ClassDetailPage({
     classCode: detail.code,
     classId: detail.id,
     className: detail.name,
-    scheduledSessionCount: ownSessionRows ? ownSessionRows.filter((row) => row.status === "scheduled").length : null,
+    // A truncated feed (400 newest) can miss old scheduled sessions that closing still cancels: count unknown.
+    scheduledSessionCount:
+      ownSessionRows && workspace.sessions.status === "ready" && !workspace.sessions.value.truncated
+        ? ownSessionRows.filter((row) => row.status === "scheduled").length
+        : null,
     status: detail.status,
     successFocusRef: statusSuccessRef,
   });

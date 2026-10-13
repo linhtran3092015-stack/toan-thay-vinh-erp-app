@@ -299,6 +299,8 @@ export function ClassSessionsTab({
 
       {hasBulkCancellable ? (
         <BulkActionBar
+          // Same 864px container switch as the table/list (.class-sessions in globals.css).
+          actionSizeClassName="@max-[863px]:[&>button]:h-11 @min-[864px]:[&>button]:h-8"
           onClear={() => setSelectedIds(new Set())}
           returnFocusRefs={clearFocusRefs}
           selectedCount={selectedCount}
@@ -456,11 +458,8 @@ export function ClassSessionsTab({
                     // A cancelled session has no ordinal: its date is the title and the badge says "Đã hủy".
                     meta={row.ordinal === null ? timeAndRoom : `${formatWeekdayDate(row.sessionDate)} · ${timeAndRoom}`}
                     metrics={
-                      // Started sessions always get the cells, so an unavailable feed is explained on mobile too.
-                      row.attendance ||
-                      row.resultCount !== null ||
-                      ((row.status === "in_progress" || row.status === "completed") &&
-                        (attendanceFeed !== "ready" || resultsFeed !== "ready")) ? (
+                      // Every started session gets the cells, so each dash is explained on mobile as on desktop.
+                      row.attendance || row.resultCount !== null || row.status === "in_progress" || row.status === "completed" ? (
                         <span className="flex gap-4 text-secondary text-text-muted">
                           <span>
                             Điểm danh <AttendanceCell classId={classId} feed={attendanceFeed} row={row} />
@@ -523,7 +522,9 @@ function describeUnavailableColumns(attendanceFeed: ClassDetailFeedState, result
   const notes: string[] = [];
 
   if (attendanceFeed !== "ready") {
-    notes.push(`${attendanceFeed === "forbidden" ? "Không có quyền xem điểm danh" : "Chưa tải được điểm danh"} nên cột Điểm danh để trống.`);
+    // Results are counted against attendance, so a ready results feed is empty too.
+    const columns = resultsFeed === "ready" ? "cột Điểm danh và Kết quả" : "cột Điểm danh";
+    notes.push(`${attendanceFeed === "forbidden" ? "Không có quyền xem điểm danh" : "Chưa tải được điểm danh"} nên ${columns} để trống.`);
   }
 
   if (resultsFeed !== "ready") {
@@ -613,7 +614,8 @@ function ResultCell({
     return <span className="text-text-muted">—</span>;
   }
 
-  // The denominator is the students marked present, which needs attendance. With
+  // The denominator is the students marked present plus additional_study walk-ins,
+  // which needs attendance. With
   // the feed ready, a missing tally means this page did not resolve the session's
   // roster (a component session, or past the open-roster cap), not a failure.
   if (!row.attendance) {

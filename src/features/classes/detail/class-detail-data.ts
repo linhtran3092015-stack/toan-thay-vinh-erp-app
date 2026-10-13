@@ -26,7 +26,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /** PostgREST returns at most this many rows per request; bigger reads are paged. */
 const PAGE_SIZE = 1000;
-/** Hard stop for paged reads (attendance of ~400 sessions × 25 students). */
+/**
+ * Hard stop for one paged read. Reads are split into groups of IN_FILTER_CHUNK_SIZE
+ * ids, so this caps each group at 12 000 rows (about 80 marks per session).
+ */
 const MAX_PAGES = 12;
 /** Ids per `in` filter: PostgREST takes them in the URL, which must stay well under proxy length limits. */
 const IN_FILTER_CHUNK_SIZE = 150;
