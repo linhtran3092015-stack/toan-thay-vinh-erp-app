@@ -2,6 +2,26 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.9.0.0] - 2026-10-14
+
+Trang chi tiết lớp có đủ 3 tab còn lại theo phong cách Stumana (bước 5b, đợt 2): xem học sinh của lớp, bảng điểm theo buổi và học phí theo kỳ thu ngay trên trang lớp.
+
+### Added
+- **Tab Học sinh**: danh sách ghi danh của lớp với chip Đang học, Bảo lưu, Đã rời lớp (có đếm số). Mỗi dòng có mã, tên, ngày vào lớp (và ngày rời lớp), hình thức học, số dư buổi, công nợ và trạng thái ghi danh. Học sinh bảo lưu rồi học lại ở lớp khác hiện "Đã học lại lớp khác" thay vì nằm mãi trong danh sách bảo lưu.
+- **Chuyển lớp và Bảo lưu ngay trên dòng học sinh** (menu "…"), dùng chung hộp thoại với hồ sơ học sinh. Em mới vào lớp hôm nay hoặc vào lớp từ ngày sau thì nút bị khóa kèm lý do. Nếu ghi danh của em đó vừa thay đổi ở nơi khác, thao tác bị từ chối và yêu cầu tải lại trang thay vì tác động nhầm lớp.
+- **Tab Kết quả**: bảng điểm kiểm tra theo học sinh và buổi, buổi mới nhất hiện trước (8 buổi mỗi trang), cột trung bình của từng em và dòng trung bình của từng buổi. Ô đỏ có dấu "!" là em có mặt ở buổi đã kết thúc mà chưa có kết quả; buổi đã khóa không nhập thêm được thì hiện "Khóa"; "V" là vắng, "Vở" là chỉ chấm vở. Chấm việc tồn trên tab đếm số ô còn phải nhập.
+- **Tab Học phí** (chỉ xem): chọn kỳ thu; mỗi học sinh một dòng với số buổi và số tiền của riêng lớp này. Kỳ đã khóa có thêm tổng phiếu, đã thu, còn nợ và trạng thái thanh toán (cùng nhãn với trang Tài chính), ghi chú khi phiếu gồm lớp khác hoặc đã phát hành lại. Kỳ chưa khóa hiện số liệu dự kiến, số dư buổi đầu kỳ và vướng mắc khi khóa kỳ. Nút dẫn sang trang kỳ thu để khóa kỳ và tạo yêu cầu thanh toán.
+- Tab nào không có quyền xem thì ẩn; trợ giảng không thấy tab Học phí. Tab Học phí cần quyền xem lớp, buổi học, học sinh và kỳ thu.
+
+### Changed
+- Menu "…" trên điện thoại có nút 44px và không còn tràn khỏi màn hình khi nằm ở mép phải.
+- Hộp thoại chuyển lớp và bảo lưu trên hồ sơ học sinh cũng kiểm tra ghi danh hiện tại trước khi gửi.
+
+### Lưu ý triển khai
+- Không có migration.
+- Tab Học phí của kỳ chưa khóa chạy lại phần xem trước kỳ thu (tính trên toàn trung tâm) mỗi lần mở trang lớp; sẽ tối ưu sau.
+- Việc chặn chuyển lớp hoặc bảo lưu từ dữ liệu cũ mới làm ở server action; RPC vẫn chỉ nhận mã học sinh.
+
 ## [0.8.0.0] - 2026-10-13
 
 Trang chi tiết lớp dựng lại theo phong cách Stumana (bước 5b, đợt 1): tab Tổng quan cho biết lớp đang cần xử lý gì, tab Buổi học có hủy buổi hàng loạt và ghi danh học sinh ngay trên trang lớp.

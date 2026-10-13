@@ -258,16 +258,88 @@
 **Priority:** P1
 **Depends on:** None
 
-### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp
+### Tạo yêu cầu thanh toán theo lớp
 
-**What:** Làm 3 tab còn lại của trang chi tiết lớp theo thiết kế `03-chi-tiet-lop`.
+**What:** RPC khóa kỳ thu (hoặc tạo yêu cầu thanh toán) cho riêng một lớp, rồi thêm nút "Tạo yêu cầu thanh toán" hàng loạt vào tab Học phí của trang lớp như thiết kế 03.
 
-**Why:** Đợt 1 (v0.8.0.0) mới có Tổng quan và Buổi học; danh sách học sinh, kết quả và học phí của lớp vẫn phải xem ở trang khác.
+**Why:** Hiện chỉ khóa được cả kỳ (áp cho mọi lớp) ở trang kỳ thu; tab Học phí của lớp chỉ xem và dẫn sang trang đó (quyết định của anh ở bước 5b đợt 2).
 
-**Context:** Dữ liệu dùng chung nằm ở `src/features/classes/detail/class-detail-data.ts` và `class-detail-models.ts`; preview ở `/dev/class`.
+**Context:** Phiếu học phí (`tuition_collection_items`) gộp mọi lớp của học sinh trong một kỳ, nên khóa theo lớp phải tách phiếu hoặc khóa từng học sinh. `lock_tuition_collection_period` trong `supabase/migrations/20261012130100_tuition_period_cutoff_balance_and_overlap.sql`.
 
 **Effort:** L
-**Priority:** P1
+**Priority:** P2
+**Depends on:** Quyết định nghiệp vụ của chủ trung tâm (phiếu theo lớp hay theo học sinh)
+
+### Tab Học phí của lớp cần cả sessions.view và students.view
+
+**What:** Cho người có `tuition_periods.view` nhưng thiếu `sessions.view` hoặc `students.view` (ví dụ kế toán) vẫn xem được tab Học phí: đọc dòng phiếu theo lớp mà không cần đọc `class_sessions`, lấy tên từ `tuition_collection_items.student_snapshot`.
+
+**Why:** Kỳ đã khóa phải đọc buổi của lớp để tách phần tiền của lớp, và tên học sinh đi qua RLS của `students`, nên tab đang ẩn với vai trò thiếu một trong hai quyền.
+
+**Context:** `CLASS_TUITION_PERMISSIONS` trong `src/features/classes/detail/class-tuition-models.ts`; có thể thêm `class_id` vào snapshot dòng phiếu khi khóa kỳ, hoặc một RPC đọc theo lớp.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Giảm dữ liệu tải sẵn của trang lớp
+
+**What:** Tải tab Học phí và ma trận Kết quả khi người dùng mở tab (hoặc nén ô ma trận), thay vì dựng sẵn ở server mỗi lần mở trang lớp.
+
+**Why:** Trang lớp giờ đọc thêm kỳ thu (preview của kỳ chưa khóa tính trên toàn trung tâm) và gửi ma trận điểm tới 400 buổi × số học sinh cho mọi lần xem.
+
+**Context:** `tuitionPromise` trong `src/app/(app)/classes/[classId]/page.tsx`; `buildClassResultMatrix` trong `class-roster-models.ts`. Đổi kỳ đã dùng server action `loadClassTuitionPeriodAction`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Chặn ở database cho chuyển lớp / bảo lưu từ dữ liệu cũ
+
+**What:** Thêm tham số `p_expected_enrollment_id` vào RPC `transfer_student_class` và `reserve_student_enrollment`, từ chối khi ghi danh đang hoạt động của học sinh không phải ghi danh đó.
+
+**Why:** Hai RPC tự chọn "ghi danh đang hoạt động duy nhất" của học sinh. Server action giờ đọc lại và so sánh (`getStaleEnrollmentError`) nhưng vẫn còn cửa sổ một round trip; chặn trong RPC mới đóng hẳn.
+
+**Context:** `src/features/students/enrollment/student-enrollment-actions.ts`; RPC ở `supabase/migrations/20260723085911_student_enrollment_workflows.sql`. Phát hiện ở review đối kháng /ship bước 5b đợt 2.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Index student_enrollments theo class_id
+
+**What:** Migration `create index student_enrollments_class_idx on public.student_enrollments (class_id, id);`.
+
+**Why:** Tab Học sinh và tab Học phí đọc mọi ghi danh của lớp (mọi trạng thái) mỗi lần mở trang lớp; index hiện có chỉ là partial (`status='active' and effective_to is null`), nên các lượt đọc này quét cả bảng.
+
+**Context:** `loadClassEnrollments` trong `src/features/classes/detail/class-detail-data.ts`. Phát hiện ở review /ship bước 5b đợt 2 (performance).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Tải danh sách lớp chuyển đến khi mở hộp thoại
+
+**What:** Đọc lớp đích của "Chuyển lớp" (tab Học sinh) qua server action khi mở hộp thoại, hoặc bằng một truy vấn nhẹ (id, mã, tên, khối, mức của lớp active), thay vì `getClassDirectory` đầy đủ mỗi lần mở trang lớp.
+
+**Why:** Người có `students.transfer_class` hiện tải cả danh bạ lớp (kèm lịch, năm học) trên mọi lần xem trang lớp đang hoạt động.
+
+**Context:** `getTransferClassOptions` trong `src/features/students/enrollment/student-enrollment-data.ts`, gọi từ `src/app/(app)/classes/[classId]/page.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Tab Học phí: kỳ nháp và kỳ đã khóa tính phần của lớp khác nhau
+
+**What:** Với kỳ đã khóa, chỉ tính dòng phiếu có ngày học nằm trong khoảng ghi danh của học sinh ở lớp này (thêm `session_date` của dòng và `effective_from/to` của ghi danh), cho khớp với kỳ nháp (preview lọc theo `enrollment_class_id`).
+
+**Why:** Học sinh chuyển giữa lớp thành phần và lớp ghép trong kỳ có thể bị tính buổi ở cả hai trang lớp sau khi khóa kỳ.
+
+**Context:** `loadLockedRows` trong `src/features/classes/detail/class-tuition-data.ts`. Red team review /ship bước 5b đợt 2.
+
+**Effort:** S
+**Priority:** P3
 **Depends on:** None
 
 ### Mô hình dữ liệu giáo viên/trợ giảng theo lớp hoặc buổi
@@ -601,6 +673,20 @@
 **Depends on:** None
 
 ## Completed
+
+### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp
+
+**What:** Làm 3 tab còn lại của trang chi tiết lớp theo thiết kế `03-chi-tiet-lop`.
+
+**Why:** Đợt 1 (v0.8.0.0) mới có Tổng quan và Buổi học; danh sách học sinh, kết quả và học phí của lớp vẫn phải xem ở trang khác.
+
+**Context:** Dữ liệu dùng chung nằm ở `src/features/classes/detail/class-detail-data.ts` và `class-detail-models.ts`; preview ở `/dev/class`.
+
+**Effort:** L
+**Priority:** P1
+**Depends on:** None
+
+**Completed:** v0.9.0.0 (2026-10-14).
 
 ### Thêm trạng thái "withdrawn" vào danh sách trạng thái hợp lệ của loader
 
