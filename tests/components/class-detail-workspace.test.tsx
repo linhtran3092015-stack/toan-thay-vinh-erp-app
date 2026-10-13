@@ -344,6 +344,28 @@ describe("ClassDetailPage enroll dialog", () => {
     expect(mocks.refresh).not.toHaveBeenCalled();
   });
 
+  // Value: protects=the enrolment start date defaults to the Vietnam calendar date, not the UTC date;
+  // fails_when=the dialog's default effectiveFrom is taken from UTC (a day early between 00:00 and 07:00 in Vietnam) or from a stale render date;
+  // why_new=the success test only matched /^\d{4}-\d{2}-\d{2}$/ (pass-2 review, owner decision D14);
+  // seam=none; no_claim=does not prove enroll_student_in_class accepts that date
+  it("defaults the enrolment start to the Vietnam date, not the UTC date", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-12T17:30:00Z")); // 00:30 on 13/10 in Vietnam
+    try {
+      mocks.enrollStudentInClassAction.mockResolvedValueOnce({ message: "ok", status: "success" });
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: "Ghi danh học sinh" }));
+      const dialog = screen.getByRole("dialog", { name: "Ghi danh học sinh" });
+      fireEvent.click(within(dialog).getByRole("radio", { name: /Hoàng Bảo Ngọc/ }));
+      fireEvent.change(within(dialog).getByRole("textbox", { name: /Lý do thao tác/ }), { target: { value: "Đăng ký sau học thử" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Ghi danh Hoàng Bảo Ngọc" }));
+
+      await waitFor(() => expect(mocks.enrollStudentInClassAction).toHaveBeenCalledWith(expect.objectContaining({ effectiveFrom: "2026-10-13" })));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   // Value: protects=a rejected enrolment keeps the dialog open with the RPC message and no success banner; a failed candidate read disables enrolment with a reason;
   // fails_when=onSuccess fires on an error result, the error alert is dropped, the page refreshes on failure, or candidates=null opens an empty dialog;
   // why_new=only the success path of the enroll dialog and the draft-class disabled state were tested;
@@ -554,7 +576,7 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
   });
 
   // Value: protects=the attendance and result columns say why a value is missing: no permission, a failed load, or results needing attendance;
-  // fails_when=a failed attendance or results read is reported as "Không có quyền", or the results dash has no reason for assistive tech;
+  // fails_when=a failed attendance or results read is reported as "Không có quyền" (table or overview chart), a row whose roster was not resolved claims a load failure, or the results dash has no reason for assistive tech;
   // why_new=the cells took a boolean, so a failed read and a missing permission rendered the same "no permission" text, and the results reason branch was unreachable;
   // seam=none; no_claim=does not prove the loader nulls attendance tallies when attendance fails
   it("explains missing attendance and result values by permission or failed load", () => {
@@ -565,6 +587,10 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     expect(screen.getAllByText("Chưa tải được điểm danh").length).toBeGreaterThan(0);
     expect(screen.queryByText("Không có quyền xem điểm danh")).not.toBeInTheDocument();
     expect(screen.getAllByText("Không có quyền xem kết quả").length).toBeGreaterThan(0);
+    // One visible line says why the columns are empty, not only each dash's tooltip.
+    expect(
+      screen.getByText("Chưa tải được điểm danh nên cột Điểm danh để trống. Không có quyền xem kết quả nên cột Kết quả để trống."),
+    ).toBeInTheDocument();
 
     cleanup();
     const noAttendanceRows = sessionRows.map((sessionRow) => ({ ...sessionRow, attendance: null }));
@@ -599,6 +625,20 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     renderPage({ initialTab: "sessions", workspace: workspace({ results: { reason: "failed", status: "unavailable" } }) });
     expect(screen.getAllByText("Chưa tải được kết quả").length).toBeGreaterThan(0);
     expect(screen.queryByText("Không có quyền xem kết quả")).not.toBeInTheDocument();
+
+    // Attendance ready but this row's roster was not resolved here (component session or past the cap): no failure claim.
+    cleanup();
+    renderPage({ initialTab: "sessions", workspace: workspace({ sessions: { status: "ready", value: { rows: noAttendanceRows, truncated: false } } }) });
+    expect(screen.getAllByText("Mở buổi để xem điểm danh và kết quả").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Chưa tải được điểm danh để tính kết quả")).not.toBeInTheDocument();
+
+    // The overview chart tells a failed attendance read from a missing permission.
+    cleanup();
+    renderPage({ workspace: workspace({ attendance: { reason: "failed", status: "unavailable" } }) });
+    expect(screen.getByText("Chưa tải được điểm danh, tải lại trang để thử lại.")).toBeInTheDocument();
+    cleanup();
+    renderPage({ workspace: workspace({ attendance: { reason: "forbidden", status: "unavailable" } }) });
+    expect(screen.getByText("Không có quyền xem điểm danh.")).toBeInTheDocument();
   });
 
   // Value: protects=the truncation notice says honestly that only the newest 400 sessions are shown;

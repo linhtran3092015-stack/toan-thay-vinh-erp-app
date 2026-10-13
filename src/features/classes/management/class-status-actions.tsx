@@ -81,9 +81,11 @@ export function getClassStatusOperations(
         conditions:
           "Chỉ đóng được khi lớp không còn lịch học đang hiệu lực, không còn học sinh đang học và không có buổi đang diễn ra.",
         consequence:
-          scheduledSessionCount && scheduledSessionCount > 0
-            ? `Lớp ngừng hoạt động. ${scheduledSessionCount} buổi đã lên lịch còn lại sẽ bị hủy tự động.`
-            : "Lớp ngừng hoạt động. Mọi buổi đã lên lịch còn lại sẽ bị hủy tự động.",
+          scheduledSessionCount === null
+            ? "Lớp ngừng hoạt động. Mọi buổi đã lên lịch còn lại sẽ bị hủy tự động."
+            : scheduledSessionCount > 0
+              ? `Lớp ngừng hoạt động. ${scheduledSessionCount} buổi đã lên lịch còn lại sẽ bị hủy tự động.`
+              : "Lớp ngừng hoạt động. Lớp không còn buổi nào đã lên lịch.",
         danger: true,
         label: "Đóng lớp",
         submitLabel: "Xác nhận đóng lớp",

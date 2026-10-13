@@ -6,6 +6,8 @@ import { Badge, CountChip } from "@/components/ui/badge";
 import { getButtonClassName } from "@/components/ui/button";
 import type { ClassDetailWorkspace } from "@/features/classes/detail/class-detail-data";
 import {
+  getClassDetailFeedState,
+  type ClassDetailFeedState,
   ABSENCE_STREAK_DANGER_COUNT,
   classSessionStageMeta,
   findNextClassSession,
@@ -90,7 +92,7 @@ export function ClassOverviewTab({
           today={today}
           workspace={workspace}
         />
-        {sessionRows ? <AttendanceChartPanel attendanceReady={workspace.attendance.status === "ready"} rows={sessionRows} /> : null}
+        {sessionRows ? <AttendanceChartPanel attendanceFeed={getClassDetailFeedState(workspace.attendance)} rows={sessionRows} /> : null}
       </div>
 
       <aside className="grid content-start gap-4">
@@ -193,12 +195,12 @@ function NextSessionPanel({
             </div>
             {isCompositeParent ? null : detail.status === "active" && hasSchedule && batchHref ? (
               <Link className={cn(getButtonClassName({ variant: "secondary" }), "shrink-0")} href={batchHref}>
-                <CalendarPlus aria-hidden="true" size={16} strokeWidth={2} />
+                <CalendarPlus aria-hidden="true" size={18} strokeWidth={1.8} />
                 Xếp lịch
               </Link>
             ) : detail.status === "active" && !hasSchedule && canManageSchedule ? (
               <a className={cn(getButtonClassName({ variant: "secondary" }), "shrink-0")} href="#class-schedule-management">
-                <CalendarPlus aria-hidden="true" size={16} strokeWidth={2} />
+                <CalendarPlus aria-hidden="true" size={18} strokeWidth={1.8} />
                 Thiết lập lịch
               </a>
             ) : null}
@@ -448,8 +450,8 @@ function describePendingLock(row: ClassSessionRow, classId: string, canLockSessi
   }
 }
 
-function AttendanceChartPanel({ attendanceReady, rows }: { attendanceReady: boolean; rows: ClassSessionRow[] }) {
-  const bars = attendanceReady ? getAttendanceChart(rows) : [];
+function AttendanceChartPanel({ attendanceFeed, rows }: { attendanceFeed: ClassDetailFeedState; rows: ClassSessionRow[] }) {
+  const bars = attendanceFeed === "ready" ? getAttendanceChart(rows) : [];
   const lowBar = bars.find((bar) => bar.low);
   const latestBar = bars.at(-1);
   const latestRoster = latestBar?.roster;
@@ -469,8 +471,10 @@ function AttendanceChartPanel({ attendanceReady, rows }: { attendanceReady: bool
         ) : null}
       </div>
 
-      {!attendanceReady ? (
-        <PanelNotice>Không có quyền xem điểm danh hoặc chưa tải được.</PanelNotice>
+      {attendanceFeed === "forbidden" ? (
+        <PanelNotice>Không có quyền xem điểm danh.</PanelNotice>
+      ) : attendanceFeed === "failed" ? (
+        <PanelNotice>Chưa tải được điểm danh, tải lại trang để thử lại.</PanelNotice>
       ) : bars.length === 0 ? (
         <PanelNotice>Chưa có buổi nào kết thúc để tính chuyên cần.</PanelNotice>
       ) : (

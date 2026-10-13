@@ -107,7 +107,7 @@ interface LinkWindow {
 /**
  * The class plus its component classes: composite classes hold sessions on
  * components, but only while a link covers the session date (the same window
- * resolve_class_session_rosters applies).
+ * per-session resolve_class_session_roster RPC applies).
  */
 async function getSessionClassIds(
   supabase: SupabaseClient,

@@ -174,7 +174,7 @@ export function ActionMenu<T extends string>({
         type="button"
         variant="secondary"
       >
-        <MoreHorizontal aria-hidden="true" size={18} strokeWidth={2} />
+        <MoreHorizontal aria-hidden="true" size={18} strokeWidth={1.8} />
       </Button>
 
       {isOpen ? (

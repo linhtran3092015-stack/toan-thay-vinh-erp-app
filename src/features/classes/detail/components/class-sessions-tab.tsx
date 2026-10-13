@@ -258,8 +258,11 @@ export function ClassSessionsTab({
     total: filtered.length,
   };
 
+  const unavailableColumnsNote = describeUnavailableColumns(attendanceFeed, resultsFeed);
+
   return (
-    <div className="grid min-w-0 gap-3">
+    // Container for the table/list switch in globals.css (.class-sessions).
+    <div className="class-sessions grid min-w-0 gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div ref={chipsRef}>
           <QuickFilterChips chips={chips} label="Lọc buổi học theo trạng thái" onChange={changeFilter} value={filter} />
@@ -270,7 +273,7 @@ export function ClassSessionsTab({
             href={batchHref}
           >
             Tạo buổi hàng loạt cho lớp này
-            <ArrowRight aria-hidden="true" size={14} strokeWidth={2} />
+            <ArrowRight aria-hidden="true" size={16} strokeWidth={1.8} />
           </Link>
         ) : null}
       </div>
@@ -316,7 +319,9 @@ export function ClassSessionsTab({
         </BulkActionBar>
       ) : null}
 
-      <div className="hidden md:block">
+      {unavailableColumnsNote ? <p className="text-secondary text-text-muted">{unavailableColumnsNote}</p> : null}
+
+      <div className="class-sessions-table">
         <DataTableFrame
           body={pageRows.map((row) => {
             const stage = getClassSessionStage(row, today, nowTime);
@@ -408,7 +413,7 @@ export function ClassSessionsTab({
         />
       </div>
 
-      <div className="grid gap-2 md:hidden">
+      <div className="class-sessions-record-list gap-2">
         {filtered.length === 0 ? (
           <p className="rounded-lg border border-border-subtle bg-surface-base px-4 py-6 text-center text-secondary text-text-muted">
             Không có buổi nào ở mục “{filterLabels[filter]}”.
@@ -451,7 +456,11 @@ export function ClassSessionsTab({
                     // A cancelled session has no ordinal: its date is the title and the badge says "Đã hủy".
                     meta={row.ordinal === null ? timeAndRoom : `${formatWeekdayDate(row.sessionDate)} · ${timeAndRoom}`}
                     metrics={
-                      row.attendance || row.resultCount !== null ? (
+                      // Started sessions always get the cells, so an unavailable feed is explained on mobile too.
+                      row.attendance ||
+                      row.resultCount !== null ||
+                      ((row.status === "in_progress" || row.status === "completed") &&
+                        (attendanceFeed !== "ready" || resultsFeed !== "ready")) ? (
                         <span className="flex gap-4 text-secondary text-text-muted">
                           <span>
                             Điểm danh <AttendanceCell classId={classId} feed={attendanceFeed} row={row} />
@@ -504,6 +513,24 @@ export function ClassSessionsTab({
       ) : null}
     </div>
   );
+}
+
+/**
+ * One visible line for a column every row leaves empty, so the reason is not
+ * only in each dash's tooltip and screen-reader text.
+ */
+function describeUnavailableColumns(attendanceFeed: ClassDetailFeedState, resultsFeed: ClassDetailFeedState): string | null {
+  const notes: string[] = [];
+
+  if (attendanceFeed !== "ready") {
+    notes.push(`${attendanceFeed === "forbidden" ? "Không có quyền xem điểm danh" : "Chưa tải được điểm danh"} nên cột Điểm danh để trống.`);
+  }
+
+  if (resultsFeed !== "ready") {
+    notes.push(`${resultsFeed === "forbidden" ? "Không có quyền xem kết quả" : "Chưa tải được kết quả"} nên cột Kết quả để trống.`);
+  }
+
+  return notes.length > 0 ? notes.join(" ") : null;
 }
 
 /** "—" that also tells assistive tech and hover why there is no number. */
@@ -586,11 +613,19 @@ function ResultCell({
     return <span className="text-text-muted">—</span>;
   }
 
-  // The denominator is the students marked present, which needs attendance.
+  // The denominator is the students marked present, which needs attendance. With
+  // the feed ready, a missing tally means this page did not resolve the session's
+  // roster (a component session, or past the open-roster cap), not a failure.
   if (!row.attendance) {
     return (
       <ExplainedDash
-        reason={attendanceFeed === "forbidden" ? "Cần quyền xem điểm danh để tính kết quả" : "Chưa tải được điểm danh để tính kết quả"}
+        reason={
+          attendanceFeed === "forbidden"
+            ? "Cần quyền xem điểm danh để tính kết quả"
+            : attendanceFeed === "failed"
+              ? "Chưa tải được điểm danh để tính kết quả"
+              : "Mở buổi để xem điểm danh và kết quả"
+        }
       />
     );
   }

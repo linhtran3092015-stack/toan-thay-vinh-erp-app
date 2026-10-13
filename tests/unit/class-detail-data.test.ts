@@ -161,6 +161,48 @@ describe("getClassDetailWorkspace", () => {
     expect(workspace.debt).toEqual({ status: "ready", value: { outstandingVnd: 1_000_000, overdueStudentCount: 0, studentCount: 1 } });
   });
 
+  // Value: protects=the loader feeds the resolved rosters and the Vietnam date into findAbsenceStreaks, so an unmarked roster session breaks a streak (owner rule D2) and a future-dated session is ignored;
+  // fails_when=getClassDetailWorkspace drops `rosters` (two absences read as a streak despite a later unmarked session) or drops `today` (a session dated later counts);
+  // why_new=findAbsenceStreaks is tested alone; no loader test reached its rosters/today wiring (pass-2 review, owner decision D14);
+  // seam=none; no_claim=does not prove resolve_class_session_roster returns the students the care rule expects
+  it("breaks an absence streak on an unmarked roster session and ignores sessions after today", async () => {
+    const absentRows = [
+      { ...sessionRow("s1", "2026-10-01", "completed"), locked_at: "2026-10-01T15:00:00Z" },
+      { ...sessionRow("s2", "2026-10-05", "completed"), locked_at: "2026-10-05T15:00:00Z" },
+    ];
+    const setup = (latest: ReturnType<typeof sessionRow>, rosterIncludesA: boolean) => {
+      tables({
+        class_component_links: { data: [], error: null },
+        class_sessions: { data: [...absentRows, latest], error: null },
+        session_attendance: {
+          data: [
+            { attendance_status: "unexcused_absence", class_session_id: "s1", student_id: "a" },
+            { attendance_status: "unexcused_absence", class_session_id: "s2", student_id: "a" },
+          ],
+          error: null,
+        },
+        session_results: { data: [], error: null },
+        student_enrollments: { data: [{ student: { full_name: "An", id: "a", public_code: "HS1" }, student_id: "a" }], error: null },
+      });
+      supabase.rpc.mockResolvedValue({ data: rosterIncludesA ? [{ enrollment_class_id: "class-1", student_id: "a" }] : [], error: null });
+    };
+
+    // a is on the newest session's roster without a mark: the streak is broken.
+    setup(sessionRow("s3", "2026-10-08", "completed"), true);
+    let workspace = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
+    expect(workspace.absenceStreaks).toEqual({ status: "ready", value: [] });
+
+    // Control: a is not on that roster, so the two absences stand as a streak.
+    setup(sessionRow("s3", "2026-10-08", "completed"), false);
+    workspace = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
+    expect(workspace.absenceStreaks).toMatchObject({ status: "ready", value: [{ count: 2, student: { id: "a" } }] });
+
+    // The same unmarked session dated after today is not counted, so it cannot break the streak.
+    setup(sessionRow("s3", "2099-01-01", "completed"), true);
+    workspace = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
+    expect(workspace.absenceStreaks).toMatchObject({ status: "ready", value: [{ count: 2, student: { id: "a" } }] });
+  });
+
   it("fails attendance on its own when the roster RPC fails, keeping sessions", async () => {
     tables({
       class_component_links: { data: [], error: null },

@@ -361,6 +361,31 @@ body::before {
   }
 }
 
+/* Class detail, Buổi học tab. */
+.class-sessions {
+  container-type: inline-size;
+}
+
+.class-sessions-table {
+  display: none;
+}
+
+.class-sessions-record-list {
+  display: grid;
+}
+
+/* 864px covers the class sessions table's 860px min width + the frame border:
+   tablets beside the rail get the record list (44px targets), not a scrolling table. */
+@container (min-width: 864px) {
+  .class-sessions-table {
+    display: block;
+  }
+
+  .class-sessions-record-list {
+    display: none;
+  }
+}
+
 /* Wave 4 Classes: the directory uses its own, wider safe operational width. */
 .classes-directory {
   container-type: inline-size;

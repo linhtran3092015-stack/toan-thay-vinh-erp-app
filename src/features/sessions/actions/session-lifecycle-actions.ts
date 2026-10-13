@@ -686,9 +686,9 @@ export async function cancelClassSessionsAction(
   }
 
   // revalidatePath in a server action also re-renders the calling page in this
-  // response, so the class page needs no router.refresh(). When nothing was
-  // cancelled but sessions were refused, the page's view of them was stale:
-  // refresh just the class page so its selection drops them.
+  // response, so the class page needs no router.refresh(). The class page is
+  // always revalidated once, so its rows and selection reflect both cancels and
+  // refusals; session routes only when something was cancelled.
   if (cancelled > 0) {
     revalidateSessionRoutes();
   }
