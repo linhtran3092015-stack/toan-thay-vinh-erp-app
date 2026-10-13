@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const states: ClassPreviewState[] = ["active", "unscheduled", "draft", "closed"];
+const states: ClassPreviewState[] = ["active", "unscheduled", "draft", "closed", "composite"];
 
 /**
  * Class detail preview mirroring `03-chi-tiet-lop.dc.html` with fixture data

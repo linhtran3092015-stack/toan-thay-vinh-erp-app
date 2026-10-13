@@ -6,6 +6,7 @@ import { Badge, CountChip } from "@/components/ui/badge";
 import { getButtonClassName } from "@/components/ui/button";
 import type { ClassDetailWorkspace } from "@/features/classes/detail/class-detail-data";
 import {
+  ABSENCE_STREAK_DANGER_COUNT,
   classSessionStageMeta,
   findNextClassSession,
   formatSessionOrdinal,
@@ -13,10 +14,12 @@ import {
   getClassAttendanceRate,
   getClassSessionStage,
   getRecordedCount,
+  LOW_ATTENDANCE_RATE,
   summarizeClassSessions,
   type ClassSessionRow,
 } from "@/features/classes/detail/class-detail-models";
 import {
+  CompositeComponentsNotice,
   formatWeekdayName,
   getDurationMinutes,
   sortSchedules,
@@ -77,12 +80,19 @@ export function ClassOverviewTab({
           sessionsFeed={workspace.sessions}
           today={today}
         />
-        <NeedsActionPanel canLockSessions={canLockSessions} canViewCare={canViewCare} rows={sessionRows} today={today} workspace={workspace} />
+        <NeedsActionPanel
+          canLockSessions={canLockSessions}
+          canViewCare={canViewCare}
+          nowTime={nowTime}
+          rows={sessionRows}
+          today={today}
+          workspace={workspace}
+        />
         {sessionRows ? <AttendanceChartPanel attendanceReady={workspace.attendance.status === "ready"} rows={sessionRows} /> : null}
       </div>
 
       <aside className="grid content-start gap-4">
-        <HealthPanel activeStudentCount={activeStudentCount} rows={sessionRows} today={today} workspace={workspace} />
+        <HealthPanel activeStudentCount={activeStudentCount} nowTime={nowTime} rows={sessionRows} today={today} workspace={workspace} />
         <WeeklySchedulePanel
           canManageSchedule={canManageSchedule}
           detail={detail}
@@ -96,7 +106,7 @@ export function ClassOverviewTab({
 
 function SectionTitle({ children, id }: { children: ReactNode; id: string }) {
   return (
-    <h2 className="text-caption font-semibold uppercase tracking-[0.06em] text-text-muted" id={id}>
+    <h2 className="text-caption font-semibold uppercase tracking-[0.02em] text-text-muted" id={id}>
       {children}
     </h2>
   );
@@ -124,9 +134,11 @@ function NextSessionPanel({
   today: string;
 }) {
   const next = rows ? findNextClassSession(rows, today, nowTime) : null;
-  const summary = rows ? summarizeClassSessions(rows, today) : null;
+  const summary = rows ? summarizeClassSessions(rows, today, nowTime) : null;
   const progress = summary && summary.total > 0 ? Math.round((summary.completed / summary.total) * 100) : 0;
   const hasSchedule = detail.activeScheduleCount > 0;
+  // A composite parent holds no schedule or sessions of its own: its components do.
+  const isCompositeParent = detail.componentClasses.length > 0;
 
   return (
     <section aria-labelledby="class-next-session-title" className="rounded-lg border border-border-subtle bg-surface-base shadow-[var(--panel-shadow)]">
@@ -144,11 +156,11 @@ function NextSessionPanel({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[18px] font-semibold leading-7 text-text-strong">
+                <p className="text-section-title font-semibold text-text-strong">
                   Buổi {next.ordinal ?? "—"} · {formatWeekdayDate(next.sessionDate, { year: false })} · {formatTime(next.startTime)}
                 </p>
-                <Badge tone={classSessionStageMeta[getClassSessionStage(next, today)].tone}>
-                  {classSessionStageMeta[getClassSessionStage(next, today)].label}
+                <Badge tone={classSessionStageMeta[getClassSessionStage(next, today, nowTime)].tone}>
+                  {classSessionStageMeta[getClassSessionStage(next, today, nowTime)].label}
                 </Badge>
               </div>
               <p className="mt-1 text-secondary text-text-muted">
@@ -169,16 +181,20 @@ function NextSessionPanel({
         ) : (
           <div className="flex flex-col gap-3 rounded-md border border-dashed border-border-strong bg-surface-subtle px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-semibold text-text-strong">Chưa xếp lịch</p>
+              <p className="font-semibold text-text-strong">
+                {hasSchedule || isCompositeParent || detail.status !== "active" ? "Không có buổi sắp tới" : "Chưa xếp lịch"}
+              </p>
               <p className="mt-0.5 text-secondary text-text-muted">
                 {detail.status !== "active"
                   ? "Lớp không ở trạng thái hoạt động nên không có buổi sắp tới."
-                  : hasSchedule
-                    ? "Lớp có lịch cố định nhưng chưa có buổi nào sắp tới. Tạo buổi theo lịch để bắt đầu."
-                    : "Lớp chưa có lịch học cố định và chưa có buổi sắp tới."}
+                  : isCompositeParent
+                    ? "Lớp ghép không có buổi riêng; các lớp thành phần chưa có buổi nào sắp tới."
+                    : hasSchedule
+                      ? "Lớp có lịch cố định nhưng chưa có buổi nào sắp tới. Tạo buổi theo lịch để bắt đầu."
+                      : "Lớp chưa có lịch học cố định và chưa có buổi sắp tới."}
               </p>
             </div>
-            {detail.status === "active" && hasSchedule && batchHref ? (
+            {isCompositeParent ? null : detail.status === "active" && hasSchedule && batchHref ? (
               <Link className={cn(getButtonClassName({ variant: "secondary" }), "shrink-0")} href={batchHref}>
                 <CalendarPlus aria-hidden="true" size={16} strokeWidth={2} />
                 Xếp lịch
@@ -210,7 +226,7 @@ function NextSessionPanel({
             </span>
             {onShowSessions ? (
               <button
-                className="font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+                className="inline-flex min-h-11 items-center font-semibold text-action-link hover:underline md:min-h-8 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
                 onClick={onShowSessions}
                 type="button"
               >
@@ -237,12 +253,14 @@ const inlineLinkClassName = cn(getButtonClassName({ size: "sm", variant: "second
 function NeedsActionPanel({
   canLockSessions,
   canViewCare,
+  nowTime,
   rows,
   today,
   workspace,
 }: {
   canLockSessions: boolean;
   canViewCare: boolean;
+  nowTime: string;
   rows: ClassSessionRow[] | null;
   today: string;
   workspace: ClassDetailWorkspace;
@@ -251,8 +269,8 @@ function NeedsActionPanel({
   const notes: string[] = [];
 
   if (rows) {
-    const pendingLock = rows.filter((row) => getClassSessionStage(row, today) === "pending_lock");
-    const overdue = rows.filter((row) => getClassSessionStage(row, today) === "overdue");
+    const pendingLock = rows.filter((row) => getClassSessionStage(row, today, nowTime) === "pending_lock");
+    const overdue = rows.filter((row) => getClassSessionStage(row, today, nowTime) === "overdue");
 
     for (const row of pendingLock.slice(0, NEEDS_ACTION_ROWS)) {
       const recorded = row.attendance ? getRecordedCount(row.attendance) : null;
@@ -337,7 +355,7 @@ function NeedsActionPanel({
         detail: `${streak.ordinals.length > 0 ? `Buổi ${streak.ordinals.join(", ")} · ` : ""}vắng có phép hoặc không phép`,
         key: `absence-${streak.student.id}`,
         title: `${streak.student.fullName} vắng ${streak.count} buổi liên tiếp`,
-        tone: streak.count >= 3 ? "danger" : "warning",
+        tone: streak.count >= ABSENCE_STREAK_DANGER_COUNT ? "danger" : "warning",
       });
     }
 
@@ -418,18 +436,21 @@ function AttendanceChartPanel({ attendanceReady, rows }: { attendanceReady: bool
         <PanelNotice>Chưa có buổi nào kết thúc để tính chuyên cần.</PanelNotice>
       ) : (
         <>
-          <div aria-hidden="true" className="flex h-40 items-end gap-1.5 sm:gap-2">
+          <div aria-hidden="true" className="flex h-40 items-stretch gap-1.5 sm:gap-2">
             {bars.map((bar) => (
-              <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1" key={bar.id}>
+              <div className="flex min-w-0 flex-1 flex-col items-center gap-1" key={bar.id}>
                 <span className="text-caption tabular-nums text-text-muted">{bar.present}</span>
-                <span
-                  className={cn(
-                    "w-full rounded-t-[4px]",
-                    bar.low ? "bg-warning" : bar.latest ? "bg-action-primary" : "bg-[var(--action-primary-soft-border)]",
-                  )}
-                  style={{ height: `${Math.max(bar.rate, 4)}%` }}
-                />
-                <span className="truncate text-caption tabular-nums text-text-muted">{formatSessionOrdinal(bar.ordinal)}</span>
+                {/* The bar's height is a share of this track only, so the labels cannot squeeze it. */}
+                <div className="flex min-h-0 w-full flex-1 items-end">
+                  <span
+                    className={cn(
+                      "w-full shrink-0 rounded-t-[4px]",
+                      bar.low ? "bg-warning" : bar.latest ? "bg-action-primary" : "bg-[var(--action-primary-soft-border)]",
+                    )}
+                    style={{ height: `${Math.max(bar.rate, 4)}%` }}
+                  />
+                </div>
+                <span className="max-w-full truncate text-caption tabular-nums text-text-muted">{formatSessionOrdinal(bar.ordinal)}</span>
               </div>
             ))}
           </div>
@@ -474,16 +495,18 @@ function AttendanceChartPanel({ attendanceReady, rows }: { attendanceReady: bool
 
 function HealthPanel({
   activeStudentCount,
+  nowTime,
   rows,
   today,
   workspace,
 }: {
   activeStudentCount: number | null;
+  nowTime: string;
   rows: ClassSessionRow[] | null;
   today: string;
   workspace: ClassDetailWorkspace;
 }) {
-  const summary = rows ? summarizeClassSessions(rows, today) : null;
+  const summary = rows ? summarizeClassSessions(rows, today, nowTime) : null;
   const rate = rows && workspace.attendance.status === "ready" ? getClassAttendanceRate(rows) : null;
   const debt = workspace.debt.status === "ready" ? workspace.debt.value : null;
   const sessionsHint = workspace.sessions.status === "unavailable" ? (workspace.sessions.reason === "failed" ? "chưa tải được" : "không có quyền") : undefined;
@@ -505,7 +528,7 @@ function HealthPanel({
                 : undefined
           }
           label="Chuyên cần"
-          tone={rate !== null && rate < 85 ? "warning" : "default"}
+          tone={rate !== null && rate < LOW_ATTENDANCE_RATE ? "warning" : "default"}
           value={rate === null ? "—" : `${rate}%`}
         />
         <HealthTile hint={activeStudentCount === null ? "không có quyền" : undefined} label="Sĩ số đang học" value={activeStudentCount === null ? "—" : String(activeStudentCount)} />
@@ -559,13 +582,14 @@ function WeeklySchedulePanel({
   showTuitionNote: boolean;
 }) {
   const schedules = sortSchedules(detail.schedules.filter((schedule) => schedule.isActive));
+  const isCompositeParent = detail.componentClasses.length > 0;
 
   return (
     <ProfilePanel
       action={
-        canManageSchedule ? (
+        canManageSchedule && !isCompositeParent ? (
           <a
-            className="text-secondary font-medium text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+            className="inline-flex min-h-11 items-center text-secondary font-medium text-action-link hover:underline md:min-h-8 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
             href="#class-schedule-management"
           >
             Sửa lịch
@@ -576,7 +600,11 @@ function WeeklySchedulePanel({
       titleId="class-weekly-schedule-title"
     >
       {schedules.length === 0 ? (
-        <PanelNotice>Chưa có lịch cố định.</PanelNotice>
+        isCompositeParent ? (
+          <CompositeComponentsNotice components={detail.componentClasses} />
+        ) : (
+          <PanelNotice>Chưa có lịch cố định.</PanelNotice>
+        )
       ) : (
         <ul className="divide-y divide-border-row">
           {schedules.map((schedule) => {

@@ -1,10 +1,11 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useMemo, useRef, useState, useTransition, type FormEvent, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { searchEnrollmentCandidatesAction } from "@/features/classes/actions/class-enrollment-search-actions";
 import type { ClassEnrollmentCandidate } from "@/features/classes/detail/class-detail-data";
 import { enrollStudentInClassAction } from "@/features/students/enrollment/student-enrollment-actions";
 import type {
@@ -17,6 +18,16 @@ import { cn } from "@/lib/utils";
 
 /** Matches shown at once; typing narrows the rest. */
 const VISIBLE_MATCHES = 40;
+
+/** From this many characters the dialog searches every candidate on the server. */
+const ENROLL_SEARCH_MIN_LENGTH = 2;
+const ENROLL_SEARCH_DEBOUNCE_MS = 300;
+
+type RemoteSearch =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "error" }
+  | { candidates: ClassEnrollmentCandidate[]; status: "ready"; truncated: boolean };
 
 interface ClassEnrollDialogProps {
   candidates: readonly ClassEnrollmentCandidate[];
@@ -58,30 +69,75 @@ export function ClassEnrollDialog({
   returnFocusRef,
 }: ClassEnrollDialogProps) {
   const [query, setQuery] = useState("");
-  const [studentId, setStudentId] = useState("");
+  const [remote, setRemote] = useState<RemoteSearch>({ status: "idle" });
+  const [selected, setSelected] = useState<ClassEnrollmentCandidate | null>(null);
   const [effectiveFrom, setEffectiveFrom] = useState(() => getVietnamToday());
   const [registeredMode, setRegisteredMode] = useState<StudentEnrollmentRegisteredMode>(() => getDefaultMode(undefined, classDefaultMode));
   const [reason, setReason] = useState("");
   const [actionState, setActionState] = useState<StudentEnrollmentActionState | null>(null);
   const [isPending, startTransition] = useTransition();
   const searchRef = useRef<HTMLInputElement>(null);
+  // Every keystroke bumps the sequence; a response only lands if it is still the latest.
+  const searchSequenceRef = useRef(0);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      searchSequenceRef.current += 1;
+    },
+    [],
+  );
 
   const matches = useMemo(() => {
     const needle = normalize(query.trim());
-    const filtered = needle
-      ? candidates.filter((candidate) => normalize(`${candidate.fullName} ${candidate.publicCode}`).includes(needle))
-      : candidates;
+    // While the server search is pending or failed, the preloaded list still narrows locally.
+    const source = remote.status === "ready" ? remote.candidates : candidates;
+    const filtered = needle && remote.status !== "ready"
+      ? source.filter((candidate) => normalize(`${candidate.fullName} ${candidate.publicCode}`).includes(needle))
+      : source;
 
     // Same-grade students first: they are the likely ones for this class.
     return [...filtered].sort((a, b) => Number(b.grade === classGrade) - Number(a.grade === classGrade));
-  }, [candidates, classGrade, query]);
+  }, [candidates, classGrade, query, remote]);
 
-  const selected = candidates.find((candidate) => candidate.id === studentId);
+  const studentId = selected?.id ?? "";
   const fieldError = (name: string) => actionState?.status === "error" ? actionState.fieldErrors?.[name]?.[0] : undefined;
 
   function selectStudent(candidate: ClassEnrollmentCandidate) {
-    setStudentId(candidate.id);
+    setSelected(candidate);
     setRegisteredMode(getDefaultMode(candidate, classDefaultMode));
+  }
+
+  function changeQuery(value: string) {
+    setQuery(value);
+
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    const sequence = ++searchSequenceRef.current;
+    const needle = value.trim();
+
+    if (needle.length < ENROLL_SEARCH_MIN_LENGTH) {
+      setRemote({ status: "idle" });
+      return;
+    }
+
+    setRemote({ status: "loading" });
+    searchTimerRef.current = setTimeout(async () => {
+      let next: RemoteSearch;
+
+      try {
+        const result = await searchEnrollmentCandidatesAction(needle);
+        next = result.status === "success"
+          ? { candidates: result.candidates, status: "ready", truncated: result.truncated }
+          : { status: "error" };
+      } catch {
+        next = { status: "error" };
+      }
+
+      if (sequence === searchSequenceRef.current) {
+        setRemote(next);
+      }
+    }, ENROLL_SEARCH_DEBOUNCE_MS);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -137,7 +193,7 @@ export function ClassEnrollDialog({
         </div>
 
         {actionState?.status === "error" ? (
-          <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2.5 text-secondary font-semibold text-danger" role="alert">
+          <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2.5 text-secondary font-semibold text-danger-ink" role="alert">
             {actionState.message}
           </div>
         ) : null}
@@ -150,18 +206,30 @@ export function ClassEnrollDialog({
             aria-label="Tìm học sinh theo tên hoặc mã"
             className={fieldControlClass()}
             disabled={isPending}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => changeQuery(event.target.value)}
             placeholder="Tìm theo tên hoặc mã học sinh"
             ref={searchRef}
             type="search"
             value={query}
           />
-          {candidates.length === 0 ? (
+          {remote.status === "loading" ? (
+            <p aria-live="polite" className="px-1 text-caption text-text-muted" role="status">
+              Đang tìm trong toàn bộ học sinh…
+            </p>
+          ) : null}
+          {remote.status === "error" ? (
+            <p className="rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-secondary text-warning-ink" role="alert">
+              Chưa tìm được học sinh, thử lại.
+            </p>
+          ) : null}
+          {remote.status === "idle" && candidates.length === 0 && !candidatesTruncated ? (
             <p className="rounded-md border border-dashed border-border-strong bg-surface-subtle px-3 py-2.5 text-secondary text-text-muted">
               Không có học sinh nào chưa ghi danh. Tạo học sinh mới trước, hoặc chuyển lớp từ hồ sơ của em.
             </p>
           ) : matches.length === 0 ? (
-            <p className="px-1 text-secondary text-text-muted">Không có học sinh khớp “{query.trim()}”.</p>
+            remote.status === "loading" ? null : (
+              <p className="px-1 text-secondary text-text-muted">Không có học sinh khớp “{query.trim()}”.</p>
+            )
           ) : (
             <div className="max-h-64 overflow-y-auto rounded-md border border-border-subtle">
               {matches.slice(0, VISIBLE_MATCHES).map((candidate) => (
@@ -191,12 +259,11 @@ export function ClassEnrollDialog({
               ))}
             </div>
           )}
-          {matches.length > VISIBLE_MATCHES || candidatesTruncated ? (
-            <p className="px-1 text-caption text-text-muted">
-              {matches.length > VISIBLE_MATCHES ? `Đang hiện ${VISIBLE_MATCHES}/${matches.length} học sinh khớp. ` : ""}
-              Gõ thêm tên hoặc mã để thu hẹp.
-            </p>
-          ) : null}
+          <SearchHint
+            candidatesTruncated={candidatesTruncated}
+            matchCount={matches.length}
+            remote={remote}
+          />
           {fieldError("studentId") ? <p className="text-xs font-semibold text-danger">{fieldError("studentId")}</p> : null}
         </fieldset>
 
@@ -256,4 +323,31 @@ export function ClassEnrollDialog({
       </form>
     </Dialog>
   );
+}
+
+/** How much of the candidate list is on screen and how to reach the rest. */
+function SearchHint({
+  candidatesTruncated,
+  matchCount,
+  remote,
+}: {
+  candidatesTruncated: boolean;
+  matchCount: number;
+  remote: RemoteSearch;
+}) {
+  const shown = matchCount > VISIBLE_MATCHES ? `Đang hiện ${VISIBLE_MATCHES}/${matchCount} học sinh khớp. ` : "";
+  let text: string | null = null;
+
+  if (remote.status === "ready") {
+    text = matchCount > VISIBLE_MATCHES || remote.truncated ? `${shown}Còn nhiều học sinh khớp hơn; gõ thêm tên hoặc mã để thu hẹp.` : null;
+  } else if (remote.status === "idle") {
+    text =
+      candidatesTruncated
+        ? `${shown}Danh sách ban đầu chỉ có một phần học sinh; gõ từ ${ENROLL_SEARCH_MIN_LENGTH} ký tự để tìm trong toàn bộ.`
+        : matchCount > VISIBLE_MATCHES
+          ? `${shown}Gõ thêm tên hoặc mã để thu hẹp.`
+          : null;
+  }
+
+  return text ? <p className="px-1 text-caption text-text-muted">{text}</p> : null;
 }

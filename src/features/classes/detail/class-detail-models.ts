@@ -49,16 +49,29 @@ export interface ClassSessionRow {
 
 /**
  * Where a session stands for the class team. `overdue` = still scheduled although
- * its date has passed (nobody started or cancelled it).
+ * its date has passed, or (when `nowTime` is given) it ended earlier today:
+ * nobody started or cancelled it.
  */
 export type ClassSessionStage = "upcoming" | "live" | "overdue" | "pending_lock" | "locked" | "cancelled";
 
-export function getClassSessionStage(row: Pick<ClassSessionRow, "lockedAt" | "sessionDate" | "status">, today: string): ClassSessionStage {
+/** `HH:MM` → `HH:MM:00`, so it compares with `time` columns. */
+function toTimeOfDay(value: string): string {
+  return value.length === 5 ? `${value}:00` : value;
+}
+
+/** `nowTime` is HH:MM[:SS] in Vietnam time (getVietnamTime); without it only past dates are overdue. */
+export function getClassSessionStage(
+  row: Pick<ClassSessionRow, "lockedAt" | "sessionDate" | "status"> & Partial<Pick<ClassSessionRow, "endTime">>,
+  today: string,
+  nowTime?: string,
+): ClassSessionStage {
   if (row.status === "cancelled") return "cancelled";
   if (row.lockedAt) return "locked";
   if (row.status === "completed") return "pending_lock";
   if (row.status === "in_progress") return "live";
-  return row.sessionDate < today ? "overdue" : "upcoming";
+  if (row.sessionDate < today) return "overdue";
+  if (row.sessionDate === today && nowTime && row.endTime && toTimeOfDay(row.endTime) <= toTimeOfDay(nowTime)) return "overdue";
+  return "upcoming";
 }
 
 export const classSessionStageMeta: Record<ClassSessionStage, { label: string; tone: "info" | "success" | "warning" | "danger" | "neutral" | "primary" }> = {
@@ -120,11 +133,11 @@ export interface ClassSessionSummary {
   cancelled: number;
 }
 
-export function summarizeClassSessions(rows: readonly ClassSessionRow[], today: string): ClassSessionSummary {
+export function summarizeClassSessions(rows: readonly ClassSessionRow[], today: string, nowTime?: string): ClassSessionSummary {
   const summary: ClassSessionSummary = { cancelled: 0, completed: 0, locked: 0, overdue: 0, pendingLock: 0, total: 0, upcoming: 0 };
 
   for (const row of rows) {
-    const stage = getClassSessionStage(row, today);
+    const stage = getClassSessionStage(row, today, nowTime);
 
     if (stage === "cancelled") {
       summary.cancelled += 1;
@@ -142,11 +155,15 @@ export function summarizeClassSessions(rows: readonly ClassSessionRow[], today: 
   return summary;
 }
 
-export function countClassSessionFilters(rows: readonly ClassSessionRow[], today: string): Record<ClassSessionFilter, number> {
+export function countClassSessionFilters(
+  rows: readonly ClassSessionRow[],
+  today: string,
+  nowTime?: string,
+): Record<ClassSessionFilter, number> {
   const counts: Record<ClassSessionFilter, number> = { all: rows.length, cancelled: 0, locked: 0, pending_lock: 0, upcoming: 0 };
 
   for (const row of rows) {
-    const stage = getClassSessionStage(row, today);
+    const stage = getClassSessionStage(row, today, nowTime);
 
     for (const filter of classSessionFilters) {
       if (filter !== "all" && matchesClassSessionFilter(stage, filter)) counts[filter] += 1;
@@ -185,6 +202,17 @@ export interface AttendanceEntry {
   attendance_status: string;
   class_session_id: string;
   student_id: string;
+  /** Enrolment the mark was made under; `null` for walk-ins. Not always selected. */
+  student_enrollment_id?: string | null;
+}
+
+export function isAbsenceStatus(status: string): boolean {
+  return status === "excused_absence" || status === "unexcused_absence";
+}
+
+/** Statuses lock_class_session_internal accepts as recorded: present or an absence. */
+export function isLockCountedAttendanceStatus(status: string): boolean {
+  return status === "present" || isAbsenceStatus(status);
 }
 
 /**
@@ -222,7 +250,7 @@ export function tallyClassSessionAttendance(
     for (const studentId of roster) {
       const status = statuses.get(studentId);
       if (status === "present") tally.present += 1;
-      else if (status === "excused_absence" || status === "unexcused_absence") tally.absent += 1;
+      else if (status && isAbsenceStatus(status)) tally.absent += 1;
       else tally.unmarked += 1;
     }
 
@@ -269,7 +297,7 @@ export interface AttendanceChartBar {
 }
 
 /** A session this far below the window's typical attendance is called out. */
-const LOW_ATTENDANCE_RATE = 85;
+export const LOW_ATTENDANCE_RATE = 85;
 
 /** Last `limit` completed sessions with a roster, oldest first. */
 export function getAttendanceChart(rows: readonly ClassSessionRow[], limit = 12): AttendanceChartBar[] {
@@ -319,43 +347,73 @@ export interface AbsenceStreak {
 
 /** Same threshold as the care rule `absence_streak`: the last two sessions both missed. */
 export const ABSENCE_STREAK_THRESHOLD = 2;
+/** From this many consecutive absences the streak is shown as danger rather than warning. */
+export const ABSENCE_STREAK_DANGER_COUNT = 3;
+
+export interface AbsenceStreakOptions {
+  /**
+   * Resolved rosters of this page's sessions. A roster student without a mark on
+   * a completed non-additional session is an observation that breaks the streak.
+   * Without rosters only sessions where the student has a mark are observed.
+   */
+  rosters?: readonly RosterEntry[];
+  /** Vietnam date; completed sessions after it are ignored, as in the care rule. */
+  today?: string;
+}
 
 /**
- * Active students whose most recent attendances in this class are absences.
- * Only completed sessions where the student has present or an absence count;
- * additional study and unmarked sessions are skipped, as in the care rule.
+ * Active students whose latest observations in this class are absences, following
+ * the care rule (student_care_observations + student_care_calculate): a student is
+ * observed on a completed session where they have any mark, or on a completed
+ * non-additional session where they are on the roster. Present, additional_study
+ * or no mark breaks the streak. Differences that remain: the care rule looks across
+ * all of the student's classes and counts enrolments of any status, while this page
+ * sees only its own sessions, rosters only of active enrolments, and no roster for
+ * open sessions beyond OPEN_ROSTER_LIMIT (those count only when marked).
  */
 export function findAbsenceStreaks(
   students: readonly ClassStudentRef[],
   sessions: readonly ClassSessionRow[],
   attendance: readonly AttendanceEntry[],
-  threshold = ABSENCE_STREAK_THRESHOLD,
+  options: AbsenceStreakOptions = {},
 ): AbsenceStreak[] {
-  const completed = new Map(sessions.filter((row) => row.status === "completed").map((row) => [row.id, row]));
-  const byStudent = new Map<string, Array<{ absent: boolean; session: ClassSessionRow }>>();
+  const completed = new Map(
+    sessions
+      .filter((row) => row.status === "completed" && (!options.today || row.sessionDate <= options.today))
+      .map((row) => [row.id, row]),
+  );
+  // Student → session → status; `null` = on the roster without a mark.
+  const byStudent = new Map<string, Map<string, string | null>>();
+  const observe = (studentId: string, sessionId: string, status: string | null) => {
+    const observations = byStudent.get(studentId) ?? new Map<string, string | null>();
+    if (status !== null || !observations.has(sessionId)) observations.set(sessionId, status);
+    byStudent.set(studentId, observations);
+  };
+
+  for (const entry of options.rosters ?? []) {
+    const session = completed.get(entry.class_session_id);
+    if (session && session.sessionKind !== "additional") observe(entry.student_id, session.id, null);
+  }
 
   for (const entry of attendance) {
-    const session = completed.get(entry.class_session_id);
-    if (!session) continue;
-    const status = entry.attendance_status;
-    if (status !== "present" && status !== "excused_absence" && status !== "unexcused_absence") continue;
-    const list = byStudent.get(entry.student_id) ?? [];
-    list.push({ absent: status !== "present", session });
-    byStudent.set(entry.student_id, list);
+    if (completed.has(entry.class_session_id)) observe(entry.student_id, entry.class_session_id, entry.attendance_status);
   }
 
   const streaks: AbsenceStreak[] = [];
 
   for (const student of students) {
-    const history = (byStudent.get(student.id) ?? []).sort((a, b) => compareSessions(b.session, a.session));
+    const history = [...(byStudent.get(student.id) ?? new Map<string, string | null>())]
+      .map(([sessionId, status]) => ({ session: completed.get(sessionId) as ClassSessionRow, status }))
+      // Newest first, ties broken by id as in the care rule.
+      .sort((a, b) => compareSessions(b.session, a.session) || b.session.id.localeCompare(a.session.id));
     const absences: ClassSessionRow[] = [];
 
     for (const item of history) {
-      if (!item.absent) break;
+      if (item.status === null || !isAbsenceStatus(item.status)) break;
       absences.push(item.session);
     }
 
-    if (absences.length >= threshold) {
+    if (absences.length >= ABSENCE_STREAK_THRESHOLD) {
       streaks.push({
         count: absences.length,
         ordinals: absences

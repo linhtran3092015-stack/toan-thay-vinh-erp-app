@@ -243,18 +243,22 @@ export const sessionIdSchema = z.object({
     .uuid("Mã buổi học không hợp lệ."),
 });
 
+/** Bounds of a cancel reason; the single-session and bulk cancel dialogs use the same ones. */
+export const CANCEL_REASON_MIN_LENGTH = 3;
+export const CANCEL_REASON_MAX_LENGTH = 500;
+
 export const cancelSessionSchema =
   sessionIdSchema.extend({
     reason: z
       .string()
       .trim()
       .min(
-        3,
-        "Lý do hủy phải có ít nhất 3 ký tự.",
+        CANCEL_REASON_MIN_LENGTH,
+        `Lý do hủy phải có ít nhất ${CANCEL_REASON_MIN_LENGTH} ký tự.`,
       )
       .max(
-        500,
-        "Lý do hủy không được vượt quá 500 ký tự.",
+        CANCEL_REASON_MAX_LENGTH,
+        `Lý do hủy không được vượt quá ${CANCEL_REASON_MAX_LENGTH} ký tự.`,
       ),
   });
 

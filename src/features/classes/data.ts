@@ -9,8 +9,10 @@ import type {
   ClassDirectoryResult,
   ClassLearningLevel,
   ClassLearningMode,
+  ClassComponentRef,
   ClassScheduleReadModel,
 } from "@/features/classes/read-models";
+import { getVietnamToday } from "@/lib/datetime";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.generated";
 
@@ -44,6 +46,8 @@ function createClassDataError(
       "Không tìm thấy lớp học.",
     classes_query_failed:
       "Không thể tải danh sách lớp học.",
+    component_links_query_failed:
+      "Không thể tải các lớp thành phần của lớp ghép.",
     enrollments_query_failed:
       "Không thể tải số lượng học viên của lớp.",
     invalid_class_data:
@@ -373,7 +377,7 @@ export async function getClassDetail(
     };
   }
 
-  const [academicYearResult, schedulesResult] =
+  const [academicYearResult, schedulesResult, componentLinksResult] =
     await Promise.all([
       supabase
         .from("academic_years")
@@ -387,6 +391,14 @@ export async function getClassDetail(
         .order("is_active", { ascending: false })
         .order("weekday", { ascending: true })
         .order("start_time", { ascending: true }),
+      // Links still in force today or starting later: a composite parent cannot
+      // hold its own sessions or schedule templates while one overlaps.
+      supabase
+        .from("class_component_links")
+        .select("component_order, component:classes!class_component_links_component_class_id_fkey(id, code, name)")
+        .eq("parent_class_id", classId)
+        .or(`effective_to.is.null,effective_to.gte.${getVietnamToday()}`)
+        .order("component_order", { ascending: true }),
     ]);
 
   if (academicYearResult.error) {
@@ -403,6 +415,15 @@ export async function getClassDetail(
       ok: false,
       error: createClassDataError(
         "schedules_query_failed",
+      ),
+    };
+  }
+
+  if (componentLinksResult.error) {
+    return {
+      ok: false,
+      error: createClassDataError(
+        "component_links_query_failed",
       ),
     };
   }
@@ -462,6 +483,7 @@ export async function getClassDetail(
       detail: {
         ...baseClass,
         classinUrl: classRow.classin_url,
+        componentClasses: mapComponentClasses(componentLinksResult.data ?? []),
         schedules,
       },
     };
@@ -473,4 +495,23 @@ export async function getClassDetail(
       ),
     };
   }
+}
+
+type ComponentLinkRow = {
+  component: { code: string; id: string; name: string } | { code: string; id: string; name: string }[] | null;
+};
+
+/** One entry per component class, in component order; a class linked twice (consecutive periods) appears once. */
+function mapComponentClasses(rows: readonly ComponentLinkRow[]): ClassComponentRef[] {
+  const byId = new Map<string, ClassComponentRef>();
+
+  for (const row of rows) {
+    const component = Array.isArray(row.component) ? row.component[0] : row.component;
+
+    if (component && !byId.has(component.id)) {
+      byId.set(component.id, { code: component.code, id: component.id, name: component.name });
+    }
+  }
+
+  return [...byId.values()];
 }

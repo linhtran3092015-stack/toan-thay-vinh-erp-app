@@ -27,11 +27,16 @@ import {
   type ClassSessionStage,
 } from "@/features/classes/detail/class-detail-models";
 import { cancelSessionAction } from "@/features/sessions/actions/session-lifecycle-actions";
+import { CANCEL_REASON_MAX_LENGTH, CANCEL_REASON_MIN_LENGTH } from "@/features/sessions/forms/session-lifecycle-form-schema";
+import { textAreaControlClass } from "@/features/students/form/components/form-controls";
 import { formatTime, formatWeekdayDate } from "@/lib/datetime";
 import { formatLearningMode } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const CLASS_SESSIONS_PAGE_SIZE = 20;
+
+/** Mirrors CLASS_SESSION_LIMIT in class-detail-data (server-only, so not importable here). */
+const CLASS_SESSION_DISPLAY_LIMIT = 400;
 
 const filterLabels: Record<ClassSessionFilter, string> = {
   all: "Tất cả",
@@ -48,7 +53,10 @@ interface ClassSessionsTabProps {
   /** False when attendance is not readable or failed to load (column shows "—"). */
   attendanceAvailable: boolean;
   batchHref: string | null;
-  canCancelSessions: boolean;
+  /** Bulk cancel is owner-only: sessions.manage and classes.manage_schedule (TAs hold only the first). */
+  canBulkCancelSessions: boolean;
+  /** HH:MM in Vietnam time: a session that ended earlier today without starting is overdue. */
+  nowTime?: string;
   resultsAvailable: boolean;
   rows: readonly ClassSessionRow[];
   today: string;
@@ -74,7 +82,8 @@ function getInitialPage(rows: readonly ClassSessionRow[], today: string): number
 export function ClassSessionsTab({
   attendanceAvailable,
   batchHref,
-  canCancelSessions,
+  canBulkCancelSessions,
+  nowTime,
   resultsAvailable,
   rows,
   today,
@@ -89,10 +98,10 @@ export function ClassSessionsTab({
   const selectAllRef = useRef<HTMLInputElement>(null);
   const cancelTriggerRef = useRef<HTMLButtonElement>(null);
 
-  const counts = useMemo(() => countClassSessionFilters(rows, today), [rows, today]);
+  const counts = useMemo(() => countClassSessionFilters(rows, today, nowTime), [nowTime, rows, today]);
   const filtered = useMemo(
-    () => rows.filter((row) => matchesClassSessionFilter(getClassSessionStage(row, today), filter)),
-    [filter, rows, today],
+    () => rows.filter((row) => matchesClassSessionFilter(getClassSessionStage(row, today, nowTime), filter)),
+    [filter, nowTime, rows, today],
   );
   const pageCount = Math.max(1, Math.ceil(filtered.length / CLASS_SESSIONS_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -115,8 +124,9 @@ export function ClassSessionsTab({
     });
   }
 
-  const selectableOnPage = canCancelSessions
-    ? pageRows.filter((row) => isBulkCancellable(row, getClassSessionStage(row, today))).map((row) => row.id)
+  const hasBulkCancellable = canBulkCancelSessions && rows.some((row) => isBulkCancellable(row, getClassSessionStage(row, today, nowTime)));
+  const selectableOnPage = canBulkCancelSessions
+    ? pageRows.filter((row) => isBulkCancellable(row, getClassSessionStage(row, today, nowTime))).map((row) => row.id)
     : [];
   const selectedOnPage = selectableOnPage.filter((id) => selectedIds.has(id)).length;
   const allOnPageSelected = selectableOnPage.length > 0 && selectedOnPage === selectableOnPage.length;
@@ -154,7 +164,7 @@ export function ClassSessionsTab({
         <QuickFilterChips chips={chips} label="Lọc buổi học theo trạng thái" onChange={changeFilter} value={filter} />
         {batchHref ? (
           <Link
-            className="inline-flex min-h-8 items-center gap-1 text-secondary font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+            className="inline-flex min-h-11 items-center gap-1 text-secondary md:min-h-8 font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
             href={batchHref}
           >
             Tạo buổi hàng loạt cho lớp này
@@ -165,15 +175,15 @@ export function ClassSessionsTab({
 
       {truncated ? (
         <ResultBanner
-          description="Lớp có nhiều buổi hơn giới hạn hiển thị; các buổi cũ nhất không có trong bảng. Xem đủ ở mục Buổi học."
-          title="Chỉ hiện các buổi gần nhất"
+          description={`Lớp có hơn ${CLASS_SESSION_DISPLAY_LIMIT} buổi. Bảng chỉ hiện ${CLASS_SESSION_DISPLAY_LIMIT} buổi mới nhất; các buổi cũ hơn không có trong bảng và không được tính vào số đếm ở trên.`}
+          title={`Chỉ hiện ${CLASS_SESSION_DISPLAY_LIMIT} buổi mới nhất`}
           tone="info"
         />
       ) : null}
 
       {resultMessage ? <ResultBanner description={resultMessage.description} title={resultMessage.title} tone={resultMessage.tone} /> : null}
 
-      {canCancelSessions ? (
+      {hasBulkCancellable ? (
         <BulkActionBar
           onClear={() => setSelectedIds(new Set())}
           returnFocusRefs={[selectAllRef]}
@@ -195,13 +205,13 @@ export function ClassSessionsTab({
       <div className="hidden md:block">
         <DataTableFrame
           body={pageRows.map((row) => {
-            const stage = getClassSessionStage(row, today);
-            const selectable = canCancelSessions && isBulkCancellable(row, stage);
+            const stage = getClassSessionStage(row, today, nowTime);
+            const selectable = canBulkCancelSessions && isBulkCancellable(row, stage);
             const isSelected = selectedIds.has(row.id);
 
             return (
               <TableRow key={row.id} selected={isSelected}>
-                {canCancelSessions ? (
+                {canBulkCancelSessions ? (
                   <TableCell className="w-12">
                     {selectable ? (
                       <input
@@ -250,7 +260,7 @@ export function ClassSessionsTab({
           footer={<Pagination {...pagerProps} label="Phân trang buổi học" variant="frame" />}
           header={
             <tr>
-              {canCancelSessions ? (
+              {canBulkCancelSessions ? (
                 <TableHeaderCell className="w-12">
                   {selectableOnPage.length > 0 ? (
                     <input
@@ -293,7 +303,8 @@ export function ClassSessionsTab({
           <>
             <ResponsiveRecordList label="Buổi học của lớp">
               {pageRows.map((row) => {
-                const stage = getClassSessionStage(row, today);
+                const stage = getClassSessionStage(row, today, nowTime);
+                const selectable = canBulkCancelSessions && isBulkCancellable(row, stage);
 
                 return (
                   <RecordListItem
@@ -301,6 +312,25 @@ export function ClassSessionsTab({
                     badge={<Badge tone={classSessionStageMeta[stage].tone}>{classSessionStageMeta[stage].label}</Badge>}
                     href={`/sessions/${row.id}`}
                     key={row.id}
+                    leading={
+                      // Same eligibility as the desktop table; the 44px label is the touch target.
+                      // The gutter only appears on pages that have something to select.
+                      selectableOnPage.length > 0 ? (
+                        <span className="flex w-11 shrink-0 items-center justify-center">
+                          {selectable ? (
+                            <label className="flex h-11 w-11 cursor-pointer items-center justify-center">
+                              <input
+                                aria-label={`Chọn buổi ${formatSessionOrdinal(row.ordinal)} ngày ${formatWeekdayDate(row.sessionDate)}`}
+                                checked={selectedIds.has(row.id)}
+                                className={checkboxClassName}
+                                onChange={() => toggle(row.id)}
+                                type="checkbox"
+                              />
+                            </label>
+                          ) : null}
+                        </span>
+                      ) : undefined
+                    }
                     meta={`${formatWeekdayDate(row.sessionDate)} · ${formatTime(row.startTime)}–${formatTime(row.endTime)}${row.roomName ? ` · ${row.roomName}` : ""}`}
                     metrics={
                       row.attendance || row.resultCount !== null ? (
@@ -434,12 +464,13 @@ function BulkCancelDialog({
   const [progress, setProgress] = useState(0);
   const [isPending, startTransition] = useTransition();
   const trimmed = reason.trim();
-  const reasonError = trimmed.length > 0 && trimmed.length < 3 ? "Lý do hủy phải có ít nhất 3 ký tự." : null;
+  const isReasonTooShort = trimmed.length < CANCEL_REASON_MIN_LENGTH;
+  const reasonError = trimmed.length > 0 && isReasonTooShort ? `Lý do hủy phải có ít nhất ${CANCEL_REASON_MIN_LENGTH} ký tự.` : null;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (trimmed.length < 3) {
+    if (isReasonTooShort) {
       return;
     }
 
@@ -488,22 +519,29 @@ function BulkCancelDialog({
           </div>
         </div>
 
-        <label className="grid gap-2 text-sm font-semibold text-ink">
-          <span>
+        <div className="grid gap-1.5">
+          <label className="text-sm font-semibold text-ink-muted" htmlFor="class-bulk-cancel-reason">
             Lý do hủy<span className="ml-1 text-danger">*</span>
-          </span>
+          </label>
           <textarea
+            aria-describedby={reasonError ? "class-bulk-cancel-reason-error" : undefined}
             aria-invalid={reasonError ? true : undefined}
             autoFocus
-            className="min-h-24 w-full rounded-md border border-hairline bg-surface-base px-3 py-2 text-sm font-normal text-ink outline-none focus:border-action-primary focus:ring-[3px] focus:ring-focus-ring disabled:bg-disabled-bg"
+            className={textAreaControlClass(reasonError ?? undefined)}
             disabled={isPending}
-            maxLength={500}
+            id="class-bulk-cancel-reason"
+            maxLength={CANCEL_REASON_MAX_LENGTH}
             onChange={(event) => setReason(event.target.value)}
             placeholder="Ví dụ: Trùng lịch thi giữa kỳ ở trường"
+            required
             value={reason}
           />
-          {reasonError ? <span className="text-xs font-medium text-danger">{reasonError}</span> : null}
-        </label>
+          {reasonError ? (
+            <p className="text-xs font-semibold leading-5 text-danger" id="class-bulk-cancel-reason-error">
+              {reasonError}
+            </p>
+          ) : null}
+        </div>
 
         {isPending ? (
           <p aria-live="polite" className="text-secondary text-text-muted">
@@ -516,8 +554,8 @@ function BulkCancelDialog({
             Không hủy
           </Button>
           <Button
-            disabled={isPending || trimmed.length < 3}
-            disabledReason={isPending ? undefined : trimmed.length < 3 ? "Nhập lý do hủy (ít nhất 3 ký tự)" : undefined}
+            disabled={isPending || isReasonTooShort}
+            disabledReason={isPending ? undefined : isReasonTooShort ? `Nhập lý do hủy (ít nhất ${CANCEL_REASON_MIN_LENGTH} ký tự)` : undefined}
             type="submit"
             variant="danger-solid"
           >

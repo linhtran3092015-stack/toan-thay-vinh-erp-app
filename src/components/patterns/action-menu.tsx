@@ -1,7 +1,7 @@
 "use client";
 
 import { MoreHorizontal } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -25,16 +25,35 @@ interface ActionMenuProps<T extends string> {
  * Overflow "…" menu for consequential record actions (designs 03, 05): the page
  * keeps one primary button; secondary operations live here, each with its
  * availability reason written out. The feature decides which items exist.
+ *
+ * Keyboard follows the WAI-ARIA menu button pattern: opening focuses the first
+ * enabled item, arrows/Home/End move focus (wrapping), Escape closes and returns
+ * to the trigger, Tab closes and continues the page's tab order. Disabled items
+ * stay focusable so their reason is read, but they do nothing when activated.
  */
 export function ActionMenu<T extends string>({
   items,
   label = "Thêm hành động",
   onSelect,
 }: ActionMenuProps<T>) {
-  const [isOpen, setIsOpen] = useState(false);
+  /** Index of the item focused when the menu opened; `null` while closed. */
+  const [openFocus, setOpenFocus] = useState<number | null>(null);
+  const isOpen = openFocus !== null;
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const menuId = useId();
+
+  function close({ returnFocus }: { returnFocus: boolean }) {
+    setOpenFocus(null);
+    if (returnFocus) triggerRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (openFocus !== null) {
+      itemRefs.current[openFocus]?.focus();
+    }
+  }, [openFocus]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -43,13 +62,13 @@ export function ActionMenu<T extends string>({
 
     function handlePointerDown(event: PointerEvent) {
       if (!containerRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
+        setOpenFocus(null);
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsOpen(false);
+        setOpenFocus(null);
         triggerRef.current?.focus();
       }
     }
@@ -67,6 +86,50 @@ export function ActionMenu<T extends string>({
     return null;
   }
 
+  function getOpenFocus(edge: "first" | "last"): number {
+    const enabled = items.flatMap((item, index) => (item.enabled ? [index] : []));
+    return edge === "last" ? (enabled.at(-1) ?? items.length - 1) : (enabled[0] ?? 0);
+  }
+
+  function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setOpenFocus(getOpenFocus(event.key === "ArrowUp" ? "last" : "first"));
+    }
+  }
+
+  function handleMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const nodes = itemRefs.current.slice(0, items.length);
+    const current = nodes.findIndex((node) => node === document.activeElement);
+    const focusAt = (index: number) => nodes[(index + nodes.length) % nodes.length]?.focus();
+
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        focusAt(current < 0 ? 0 : current + 1);
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        focusAt(current < 0 ? nodes.length - 1 : current - 1);
+        break;
+      case "Home":
+        event.preventDefault();
+        focusAt(0);
+        break;
+      case "End":
+        event.preventDefault();
+        focusAt(nodes.length - 1);
+        break;
+      case "Tab":
+        // Hand focus back to the trigger first so the browser's Tab continues
+        // from there instead of from a menu item that is about to unmount.
+        close({ returnFocus: true });
+        break;
+      default:
+        break;
+    }
+  }
+
   return (
     <div className="relative" ref={containerRef}>
       <Button
@@ -75,7 +138,8 @@ export function ActionMenu<T extends string>({
         aria-haspopup="menu"
         aria-label={label}
         iconOnly
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={() => setOpenFocus(isOpen ? null : getOpenFocus("first"))}
+        onKeyDown={handleTriggerKeyDown}
         ref={triggerRef}
         type="button"
         variant="secondary"
@@ -88,9 +152,10 @@ export function ActionMenu<T extends string>({
           aria-label={label}
           className="panel-rise absolute top-[calc(100%+8px)] max-md:left-0 md:right-0 z-40 w-72 rounded-lg border border-border-subtle bg-surface-raised p-1.5 shadow-[var(--elevation-2)]"
           id={menuId}
+          onKeyDown={handleMenuKeyDown}
           role="menu"
         >
-          {items.map((item) => (
+          {items.map((item, index) => (
             <button
               aria-disabled={!item.enabled || undefined}
               className={cn(
@@ -105,10 +170,14 @@ export function ActionMenu<T extends string>({
                   return;
                 }
 
-                setIsOpen(false);
+                setOpenFocus(null);
                 onSelect(item.value, triggerRef.current ?? event.currentTarget);
               }}
+              ref={(node) => {
+                itemRefs.current[index] = node;
+              }}
               role="menuitem"
+              tabIndex={-1}
               type="button"
             >
               <span className="font-medium">{item.label}</span>

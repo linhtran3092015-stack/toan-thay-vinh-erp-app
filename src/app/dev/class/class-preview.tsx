@@ -13,7 +13,7 @@ import type { ClassDetailReadModel, ClassScheduleReadModel } from "@/features/cl
 import { addDays, getVietnamToday } from "@/lib/datetime";
 import { DATABASE_PERMISSION_CODES, type PermissionCode } from "@/lib/permissions/types";
 
-export type ClassPreviewState = "active" | "unscheduled" | "draft" | "closed";
+export type ClassPreviewState = "active" | "unscheduled" | "draft" | "closed" | "composite";
 
 const taPermissions: readonly PermissionCode[] = [
   "app.access",
@@ -61,20 +61,28 @@ function buildDetail(state: ClassPreviewState): ClassDetailReadModel {
     activeScheduleCount: hasSchedule ? 3 : 0,
     activeStudentCount: state === "active" ? 22 : state === "unscheduled" ? 6 : 0,
     classinUrl: state === "active" ? "https://www.classin.com/" : null,
-    code: "L-9A26",
+    code: state === "composite" ? "L-9G26" : "L-9A26",
+    // A composite parent ("lớp ghép"): no schedule or sessions of its own.
+    componentClasses:
+      state === "composite"
+        ? [
+            { code: "L-9A26-T2", id: "class-preview-component-1", name: "Toán 9 ghép · thứ 2" },
+            { code: "L-9A26-T5", id: "class-preview-component-2", name: "Toán 9 ghép · thứ 5" },
+          ]
+        : [],
     defaultLearningMode: "offline",
     grade: 9,
     id: "class-preview",
     level: "A",
-    name: state === "unscheduled" ? "Toán 9B chiều 3-5" : "Toán 9A tối 2-4-6",
+    name: state === "unscheduled" ? "Toán 9B chiều 3-5" : state === "composite" ? "Toán 9 ghép 2-5" : "Toán 9A tối 2-4-6",
     notes: state === "active" ? "Lớp ôn thi vào 10, ưu tiên đề tổng hợp từ tháng 3." : null,
     schedules: hasSchedule
       ? schedules
       : state === "closed"
         ? schedules.map((schedule) => ({ ...schedule, effectiveTo: "2026-06-30", endReason: "Kết thúc năm học", isActive: false }))
         : [],
-    status: state === "unscheduled" ? "active" : state,
-    weeklySessionCount: 3,
+    status: state === "unscheduled" || state === "composite" ? "active" : state,
+    weeklySessionCount: state === "composite" ? 2 : 3,
   };
 }
 
@@ -212,6 +220,7 @@ export function ClassPreview({ initialTab, role, state }: { initialTab?: string;
       unreadNotificationCount={4}
     >
       <ClassDetailPage
+        canBulkCancelSessions={can("sessions.manage") && can("classes.manage_schedule")}
         canEditClass={can("classes.create")}
         canEnrollStudents={can("students.manage_status") && can("students.view")}
         canLockSessions={can("sessions.lock")}

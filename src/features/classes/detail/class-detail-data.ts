@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   findAbsenceStreaks,
+  isLockCountedAttendanceStatus,
   orderClassSessions,
   summarizeClassDebt,
   tallyClassSessionAttendance,
@@ -15,6 +16,7 @@ import {
 } from "@/features/classes/detail/class-detail-models";
 import type { SessionKind, SessionStatus } from "@/features/sessions/read-models";
 import { summarizeDirectoryDebt } from "@/features/students/student-directory-metrics";
+import { getVietnamToday } from "@/lib/datetime";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /** Sessions read per class; a school year of three sessions a week fits well inside. */
@@ -23,6 +25,8 @@ export const CLASS_SESSION_LIMIT = 400;
 const PAGE_SIZE = 1000;
 /** Hard stop for paged reads (attendance of ~400 sessions × 25 students). */
 const MAX_PAGES = 12;
+/** Ids per `in` filter: PostgREST takes them in the URL, which must stay well under proxy length limits. */
+const IN_FILTER_CHUNK_SIZE = 150;
 
 const sessionKinds: readonly SessionKind[] = ["regular", "makeup", "additional"];
 const sessionStatuses: readonly SessionStatus[] = ["scheduled", "in_progress", "completed", "cancelled"];
@@ -52,6 +56,18 @@ export interface ClassDetailWorkspace {
 const forbidden = { reason: "forbidden", status: "unavailable" } as const;
 const failed = { reason: "failed", status: "unavailable" } as const;
 
+/** Every feed the viewer may read is `failed`, the rest `forbidden`. */
+function unavailableWorkspace(permissions: ClassDetailWorkspacePermissions): ClassDetailWorkspace {
+  return {
+    absenceStreaks: permissions.canViewSessions && permissions.canViewAttendance && permissions.canViewStudents ? failed : forbidden,
+    attendance: permissions.canViewSessions && permissions.canViewAttendance ? failed : forbidden,
+    debt: permissions.canViewPayments ? failed : forbidden,
+    results: permissions.canViewSessions && permissions.canViewResults ? failed : forbidden,
+    sessions: permissions.canViewSessions ? failed : forbidden,
+    students: permissions.canViewStudents ? failed : forbidden,
+  };
+}
+
 type SupabaseClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
 async function fetchPaged<T>(
@@ -80,16 +96,38 @@ function chunk<T>(values: readonly T[], size: number): T[][] {
   return chunks;
 }
 
-/** The class plus its component classes: composite classes hold sessions on components. */
-async function getSessionClassIds(supabase: SupabaseClient, classId: string): Promise<string[] | null> {
+interface LinkWindow {
+  from: string;
+  to: string | null;
+}
+
+/**
+ * The class plus its component classes: composite classes hold sessions on
+ * components, but only while a link covers the session date (the same window
+ * resolve_class_session_rosters applies).
+ */
+async function getSessionClassIds(
+  supabase: SupabaseClient,
+  classId: string,
+): Promise<{ classIds: string[]; windows: Map<string, LinkWindow[]> } | null> {
   const { data, error } = await supabase
     .from("class_component_links")
-    .select("component_class_id")
+    .select("component_class_id, effective_from, effective_to")
     .eq("parent_class_id", classId);
 
   if (error) return null;
 
-  return [classId, ...new Set((data ?? []).map((link) => link.component_class_id))];
+  const windows = new Map<string, LinkWindow[]>();
+  for (const link of data ?? []) {
+    windows.set(link.component_class_id, [...(windows.get(link.component_class_id) ?? []), { from: link.effective_from, to: link.effective_to }]);
+  }
+
+  return { classIds: [classId, ...windows.keys()], windows };
+}
+
+function isSessionOfClass(classId: string, windows: ReadonlyMap<string, LinkWindow[]>, row: Pick<SessionQueryRow, "class_id" | "session_date">): boolean {
+  if (row.class_id === classId) return true;
+  return (windows.get(row.class_id) ?? []).some((window) => window.from <= row.session_date && (window.to === null || window.to >= row.session_date));
 }
 
 interface SessionQueryRow {
@@ -111,9 +149,9 @@ async function loadSessions(
   supabase: SupabaseClient,
   classId: string,
 ): Promise<{ rows: Omit<ClassSessionRow, "ordinal">[]; truncated: boolean } | null> {
-  const classIds = await getSessionClassIds(supabase, classId);
+  const links = await getSessionClassIds(supabase, classId);
 
-  if (!classIds) return null;
+  if (!links) return null;
 
   const { data, error } = await supabase
     .from("class_sessions")
@@ -133,7 +171,7 @@ async function loadSessions(
       class:classes!class_sessions_class_id_fkey ( code )
       `,
     )
-    .in("class_id", classIds)
+    .in("class_id", links.classIds)
     .order("session_date", { ascending: false })
     .order("start_time", { ascending: false })
     .limit(CLASS_SESSION_LIMIT + 1);
@@ -150,7 +188,9 @@ async function loadSessions(
       .filter(
         (row) =>
           (sessionKinds as readonly string[]).includes(row.session_kind) &&
-          (sessionStatuses as readonly string[]).includes(row.status),
+          (sessionStatuses as readonly string[]).includes(row.status) &&
+          // Component sessions outside every link window belong to another parent period.
+          isSessionOfClass(classId, links.windows, row),
       )
       .map((row) => {
         const klass = Array.isArray(row.class) ? row.class[0] ?? null : row.class;
@@ -187,8 +227,11 @@ const ROSTER_CONCURRENCY = 8;
  * lock requires every roster student to be present or absent, and only roster
  * students may hold those statuses, so their roster is read off the attendance.
  */
-async function loadOpenRosters(supabase: SupabaseClient, sessionIds: readonly string[]): Promise<RosterEntry[] | null> {
-  const entries: RosterEntry[] = [];
+async function loadOpenRosters(
+  supabase: SupabaseClient,
+  sessionIds: readonly string[],
+): Promise<Array<RosterEntry & { enrollment_class_id: string }> | null> {
+  const entries: Array<RosterEntry & { enrollment_class_id: string }> = [];
 
   for (const ids of chunk(sessionIds, ROSTER_CONCURRENCY)) {
     const results = await Promise.all(
@@ -197,7 +240,9 @@ async function loadOpenRosters(supabase: SupabaseClient, sessionIds: readonly st
 
     for (const { id, result } of results) {
       if (result.error) return null;
-      entries.push(...(result.data ?? []).map((row) => ({ class_session_id: id, student_id: row.student_id })));
+      entries.push(
+        ...(result.data ?? []).map((row) => ({ class_session_id: id, enrollment_class_id: row.enrollment_class_id, student_id: row.student_id })),
+      );
     }
   }
 
@@ -207,52 +252,55 @@ async function loadOpenRosters(supabase: SupabaseClient, sessionIds: readonly st
 /** Roster of a locked session = its students marked present or absent. */
 export function getLockedSessionRosters(lockedIds: ReadonlySet<string>, attendance: readonly AttendanceEntry[]): RosterEntry[] {
   return attendance
-    .filter(
-      (entry) =>
-        lockedIds.has(entry.class_session_id) &&
-        (entry.attendance_status === "present" ||
-          entry.attendance_status === "excused_absence" ||
-          entry.attendance_status === "unexcused_absence"),
-    )
+    .filter((entry) => lockedIds.has(entry.class_session_id) && isLockCountedAttendanceStatus(entry.attendance_status))
     .map((entry) => ({ class_session_id: entry.class_session_id, student_id: entry.student_id }));
 }
 
-async function loadAttendance(supabase: SupabaseClient, sessionIds: readonly string[]): Promise<AttendanceEntry[] | null> {
-  const entries: AttendanceEntry[] = [];
+/** Runs one paged read per id chunk in parallel; `null` when any chunk fails. */
+async function fetchChunked<T>(ids: readonly string[], load: (chunkIds: string[]) => Promise<T[] | null>): Promise<T[] | null> {
+  const pages = await Promise.all(chunk(ids, IN_FILTER_CHUNK_SIZE).map(load));
+  return pages.some((page) => page === null) ? null : pages.flatMap((page) => page ?? []);
+}
 
-  for (const ids of chunk(sessionIds, 150)) {
-    const rows = await fetchPaged<AttendanceEntry>((from, to) =>
+async function loadAttendance(supabase: SupabaseClient, sessionIds: readonly string[]): Promise<AttendanceEntry[] | null> {
+  return fetchChunked(sessionIds, (ids) =>
+    fetchPaged<AttendanceEntry>((from, to) =>
       supabase
         .from("session_attendance")
-        .select("class_session_id, student_id, attendance_status")
+        .select("class_session_id, student_id, student_enrollment_id, attendance_status")
         .in("class_session_id", ids)
         .order("id", { ascending: true })
         .range(from, to),
-    );
-    if (!rows) return null;
-    entries.push(...rows);
-  }
-
-  return entries;
+    ),
+  );
 }
 
 async function loadResultCounts(supabase: SupabaseClient, sessionIds: readonly string[]): Promise<Map<string, number> | null> {
-  const counts = new Map<string, number>();
-
-  for (const ids of chunk(sessionIds, 150)) {
-    const rows = await fetchPaged<{ class_session_id: string }>((from, to) =>
+  const rows = await fetchChunked(sessionIds, (ids) =>
+    fetchPaged<{ class_session_id: string }>((from, to) =>
       supabase
         .from("session_results")
         .select("class_session_id")
         .in("class_session_id", ids)
         .order("id", { ascending: true })
         .range(from, to),
-    );
-    if (!rows) return null;
-    for (const row of rows) counts.set(row.class_session_id, (counts.get(row.class_session_id) ?? 0) + 1);
-  }
+    ),
+  );
 
+  if (!rows) return null;
+
+  const counts = new Map<string, number>();
+  for (const row of rows) counts.set(row.class_session_id, (counts.get(row.class_session_id) ?? 0) + 1);
   return counts;
+}
+
+/** Every enrolment ever made in the class (any status), to tell its students apart on component sessions. */
+async function loadClassEnrollmentIds(supabase: SupabaseClient, classId: string): Promise<Set<string> | null> {
+  const rows = await fetchPaged<{ id: string }>((from, to) =>
+    supabase.from("student_enrollments").select("id").eq("class_id", classId).order("id", { ascending: true }).range(from, to),
+  );
+
+  return rows ? new Set(rows.map((row) => row.id)) : null;
 }
 
 interface EnrollmentQueryRow {
@@ -291,10 +339,8 @@ async function loadActiveStudents(
 async function loadDebt(supabase: SupabaseClient, studentIds: readonly string[]): Promise<ClassDebtSummary | null> {
   if (studentIds.length === 0) return summarizeClassDebt({});
 
-  const rows: Parameters<typeof summarizeDirectoryDebt>[0][number][] = [];
-
-  for (const ids of chunk(studentIds, 150)) {
-    const page = await fetchPaged<Parameters<typeof summarizeDirectoryDebt>[0][number]>((from, to) =>
+  const rows = await fetchChunked(studentIds, (ids) =>
+    fetchPaged<Parameters<typeof summarizeDirectoryDebt>[0][number]>((from, to) =>
       supabase
         .from("student_payment_requests")
         .select("student_id, status, expected_amount_vnd, paid_amount_vnd, created_at")
@@ -302,12 +348,97 @@ async function loadDebt(supabase: SupabaseClient, studentIds: readonly string[])
         .in("status", ["pending", "partially_paid"])
         .order("id", { ascending: true })
         .range(from, to),
-    );
-    if (!page) return null;
-    rows.push(...page);
+    ),
+  );
+
+  return rows ? summarizeClassDebt(summarizeDirectoryDebt(rows)) : null;
+}
+
+type SessionsResult = NonNullable<Awaited<ReturnType<typeof loadSessions>>>;
+
+/** Fills the session-based feeds (sessions, attendance, results, streaks) of `workspace`. */
+async function fillSessionFeeds(
+  supabase: SupabaseClient,
+  classId: string,
+  permissions: ClassDetailWorkspacePermissions,
+  sessionsResult: SessionsResult,
+  workspace: ClassDetailWorkspace,
+): Promise<void> {
+  // Attendance, rosters and results matter for sessions that have started; an
+  // overdue "scheduled" session has none and shows "—".
+  const startedRows = sessionsResult.rows.filter((row) => row.status === "in_progress" || row.status === "completed");
+  const startedIds = startedRows.map((row) => row.id);
+  const lockedIds = new Set(startedRows.filter((row) => row.lockedAt).map((row) => row.id));
+  // Newest first, so the cap keeps the sessions the team is working on.
+  const openIds = startedRows
+    .filter((row) => !row.lockedAt)
+    .sort((a, b) => b.sessionDate.localeCompare(a.sessionDate))
+    .slice(0, OPEN_ROSTER_LIMIT)
+    .map((row) => row.id);
+  // A component session's roster also holds students enrolled only in the
+  // component class; on the parent's page only the parent's students count.
+  const ownSessionIds = new Set(sessionsResult.rows.filter((row) => row.classId === classId).map((row) => row.id));
+  const hasLockedComponentSessions = [...lockedIds].some((id) => !ownSessionIds.has(id));
+
+  const [openRosters, attendance, resultCounts, classEnrollmentIds] = await Promise.all([
+    permissions.canViewAttendance ? loadOpenRosters(supabase, openIds) : Promise.resolve(undefined),
+    permissions.canViewAttendance ? loadAttendance(supabase, startedIds) : Promise.resolve(undefined),
+    permissions.canViewResults ? loadResultCounts(supabase, startedIds) : Promise.resolve(undefined),
+    // Locked rosters come from attendance, whose rows carry only the enrolment id.
+    permissions.canViewAttendance && hasLockedComponentSessions ? loadClassEnrollmentIds(supabase, classId) : Promise.resolve(new Set<string>()),
+  ]);
+
+  const rosters =
+    openRosters && attendance && classEnrollmentIds
+      ? [
+          ...openRosters
+            .filter((entry) => ownSessionIds.has(entry.class_session_id) || entry.enrollment_class_id === classId)
+            .map(({ class_session_id, student_id }) => ({ class_session_id, student_id })),
+          ...getLockedSessionRosters(
+            lockedIds,
+            attendance.filter(
+              (entry) =>
+                ownSessionIds.has(entry.class_session_id) ||
+                (entry.student_enrollment_id != null && classEnrollmentIds.has(entry.student_enrollment_id)),
+            ),
+          ),
+        ]
+      : null;
+  const rosterCounts = new Map<string, number>();
+  for (const entry of rosters ?? []) rosterCounts.set(entry.class_session_id, (rosterCounts.get(entry.class_session_id) ?? 0) + 1);
+  const tallies = rosters && attendance ? tallyClassSessionAttendance(rosters, attendance) : null;
+  const resolved = new Set([...lockedIds, ...openIds]);
+  const started = new Set(startedIds);
+
+  const rows = orderClassSessions(
+    sessionsResult.rows.map((row) => ({
+      ...row,
+      attendance: resolved.has(row.id) && tallies ? tallies.get(row.id) ?? { absent: 0, additional: 0, present: 0, unmarked: 0 } : null,
+      resultCount: started.has(row.id) && resultCounts ? resultCounts.get(row.id) ?? 0 : null,
+      rosterCount: resolved.has(row.id) && rosters ? rosterCounts.get(row.id) ?? 0 : null,
+    })),
+  );
+
+  workspace.sessions = { status: "ready", value: { rows, truncated: sessionsResult.truncated } };
+
+  if (permissions.canViewAttendance) {
+    workspace.attendance = tallies ? { status: "ready", value: true } : failed;
   }
 
-  return summarizeClassDebt(summarizeDirectoryDebt(rows));
+  if (permissions.canViewResults) {
+    workspace.results = resultCounts ? { status: "ready", value: true } : failed;
+  }
+
+  if (permissions.canViewAttendance && permissions.canViewStudents) {
+    // Without rosters (RPC failed) streaks fall back to the marks alone.
+    workspace.absenceStreaks =
+      attendance && workspace.students.status === "ready"
+        ? {
+            status: "ready",
+            value: findAbsenceStreaks(workspace.students.value, rows, attendance, { rosters: rosters ?? undefined, today: getVietnamToday() }),
+          }
+        : failed;
+  }
 }
 
 /**
@@ -333,14 +464,7 @@ export async function getClassDetailWorkspace(
   try {
     supabase = await createSupabaseServerClient();
   } catch {
-    return {
-      absenceStreaks: permissions.canViewSessions && permissions.canViewAttendance && permissions.canViewStudents ? failed : forbidden,
-      attendance: permissions.canViewSessions && permissions.canViewAttendance ? failed : forbidden,
-      debt: permissions.canViewPayments ? failed : forbidden,
-      results: permissions.canViewSessions && permissions.canViewResults ? failed : forbidden,
-      sessions: permissions.canViewSessions ? failed : forbidden,
-      students: permissions.canViewStudents ? failed : forbidden,
-    };
+    return unavailableWorkspace(permissions);
   }
 
   try {
@@ -352,83 +476,33 @@ export async function getClassDetailWorkspace(
     if (studentsResult === null) {
       workspace.students = permissions.canViewStudents ? failed : forbidden;
       workspace.debt = permissions.canViewPayments ? failed : forbidden;
-    } else {
-      if (studentsResult.students) workspace.students = { status: "ready", value: studentsResult.students };
-      if (permissions.canViewPayments) {
-        const debt = await loadDebt(supabase, studentsResult.ids);
-        workspace.debt = debt ? { status: "ready", value: debt } : failed;
-      }
+    } else if (studentsResult.students) {
+      workspace.students = { status: "ready", value: studentsResult.students };
     }
 
-    if (sessionsResult === undefined) {
-      return workspace;
-    }
+    // Debt runs alongside the session reads; a throw there is a failed read.
+    const debt =
+      studentsResult && permissions.canViewPayments ? loadDebt(supabase, studentsResult.ids).catch(() => null) : undefined;
 
     if (sessionsResult === null) {
       workspace.sessions = failed;
       if (permissions.canViewAttendance) workspace.attendance = failed;
       if (permissions.canViewResults) workspace.results = failed;
       if (permissions.canViewAttendance && permissions.canViewStudents) workspace.absenceStreaks = failed;
-      return workspace;
+    } else if (sessionsResult !== undefined) {
+      await fillSessionFeeds(supabase, classId, permissions, sessionsResult, workspace);
     }
 
-    // Attendance, rosters and results matter for sessions that have started; an
-    // overdue "scheduled" session has none and shows "—".
-    const startedRows = sessionsResult.rows.filter((row) => row.status === "in_progress" || row.status === "completed");
-    const startedIds = startedRows.map((row) => row.id);
-    const lockedIds = new Set(startedRows.filter((row) => row.lockedAt).map((row) => row.id));
-    // Newest first, so the cap keeps the sessions the team is working on.
-    const openIds = startedRows
-      .filter((row) => !row.lockedAt)
-      .sort((a, b) => b.sessionDate.localeCompare(a.sessionDate))
-      .slice(0, OPEN_ROSTER_LIMIT)
-      .map((row) => row.id);
-
-    const [openRosters, attendance, resultCounts] = await Promise.all([
-      permissions.canViewAttendance ? loadOpenRosters(supabase, openIds) : Promise.resolve(undefined),
-      permissions.canViewAttendance ? loadAttendance(supabase, startedIds) : Promise.resolve(undefined),
-      permissions.canViewResults ? loadResultCounts(supabase, startedIds) : Promise.resolve(undefined),
-    ]);
-
-    const rosters = openRosters && attendance ? [...openRosters, ...getLockedSessionRosters(lockedIds, attendance)] : null;
-    const rosterCounts = new Map<string, number>();
-    for (const entry of rosters ?? []) rosterCounts.set(entry.class_session_id, (rosterCounts.get(entry.class_session_id) ?? 0) + 1);
-    const tallies = rosters && attendance ? tallyClassSessionAttendance(rosters, attendance) : null;
-    const resolved = new Set([...lockedIds, ...openIds]);
-    const started = new Set(startedIds);
-
-    const rows = orderClassSessions(
-      sessionsResult.rows.map((row) => ({
-        ...row,
-        attendance: resolved.has(row.id) && tallies ? tallies.get(row.id) ?? { absent: 0, additional: 0, present: 0, unmarked: 0 } : null,
-        resultCount: started.has(row.id) && resultCounts ? resultCounts.get(row.id) ?? 0 : null,
-        rosterCount: resolved.has(row.id) && rosters ? rosterCounts.get(row.id) ?? 0 : null,
-      })),
-    );
-
-    workspace.sessions = { status: "ready", value: { rows, truncated: sessionsResult.truncated } };
-
-    if (permissions.canViewAttendance) {
-      workspace.attendance = tallies ? { status: "ready", value: true } : failed;
-    }
-
-    if (permissions.canViewResults) {
-      workspace.results = resultCounts ? { status: "ready", value: true } : failed;
-    }
-
-    if (permissions.canViewAttendance && permissions.canViewStudents) {
-      workspace.absenceStreaks =
-        attendance && workspace.students.status === "ready"
-          ? { status: "ready", value: findAbsenceStreaks(workspace.students.value, rows, attendance) }
-          : failed;
+    if (debt) {
+      const value = await debt;
+      workspace.debt = value ? { status: "ready", value } : failed;
     }
 
     return workspace;
   } catch {
-    return {
-      ...workspace,
-      sessions: permissions.canViewSessions && workspace.sessions.status !== "ready" ? failed : workspace.sessions,
-    };
+    // Keep what already loaded; everything else permitted is failed.
+    const ready = Object.fromEntries(Object.entries(workspace).filter(([, feed]) => feed.status === "ready"));
+    return { ...unavailableWorkspace(permissions), ...ready };
   }
 }
 
@@ -443,27 +517,46 @@ export interface ClassEnrollmentCandidate {
 
 /** Candidates shown in the enroll dialog; the RPC accepts only students without enrollment history. */
 export const ENROLLMENT_CANDIDATE_LIMIT = 500;
+/** Matches returned by one enroll-dialog search. */
+export const ENROLLMENT_SEARCH_LIMIT = 50;
+/** Longer search input is cut; nobody types a name or code this long. */
+const ENROLLMENT_SEARCH_MAX_LENGTH = 100;
 
 /**
- * Students who were never enrolled anywhere, the only ones enroll_student_in_class
- * accepts (others transfer or resume from their profile). `null` = query failed.
+ * `ilike` value for a PostgREST `or()` filter matching `input` anywhere. LIKE
+ * wildcards (`%`, `_`, `\`) are escaped so they match literally, and the value is
+ * double-quoted (with `"` and `\` escaped) so `,`, `(`, `)` cannot end the filter.
+ * PostgREST still reads `*` as `%`; that only widens the match.
  */
-export async function getClassEnrollmentCandidates(): Promise<{ candidates: ClassEnrollmentCandidate[]; truncated: boolean } | null> {
+export function toContainsFilterValue(input: string): string {
+  const pattern = `%${input.replace(/[\\%_]/g, "\\$&")}%`;
+  return `"${pattern.replace(/[\\"]/g, "\\$&")}"`;
+}
+
+async function queryEnrollmentCandidates(
+  search: string | null,
+  limit: number,
+): Promise<{ candidates: ClassEnrollmentCandidate[]; truncated: boolean } | null> {
   try {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("students")
       .select("id, full_name, public_code, current_grade, lifecycle_status, registered_mode, student_enrollments!left ( id )")
-      .is("student_enrollments", null)
-      .order("full_name", { ascending: true })
-      .limit(ENROLLMENT_CANDIDATE_LIMIT + 1);
+      .is("student_enrollments", null);
+
+    if (search) {
+      const value = toContainsFilterValue(search);
+      query = query.or(`full_name.ilike.${value},public_code.ilike.${value}`);
+    }
+
+    const { data, error } = await query.order("full_name", { ascending: true }).limit(limit + 1);
 
     if (error) return null;
 
     const rows = data ?? [];
 
     return {
-      candidates: rows.slice(0, ENROLLMENT_CANDIDATE_LIMIT).map((row) => ({
+      candidates: rows.slice(0, limit).map((row) => ({
         fullName: row.full_name,
         grade: row.current_grade,
         id: row.id,
@@ -471,9 +564,30 @@ export async function getClassEnrollmentCandidates(): Promise<{ candidates: Clas
         publicCode: row.public_code,
         registeredMode: row.registered_mode,
       })),
-      truncated: rows.length > ENROLLMENT_CANDIDATE_LIMIT,
+      truncated: rows.length > limit,
     };
   } catch {
     return null;
   }
+}
+
+/**
+ * Students who were never enrolled anywhere, the only ones enroll_student_in_class
+ * accepts (others transfer or resume from their profile). `null` = query failed.
+ */
+export async function getClassEnrollmentCandidates(): Promise<{ candidates: ClassEnrollmentCandidate[]; truncated: boolean } | null> {
+  return queryEnrollmentCandidates(null, ENROLLMENT_CANDIDATE_LIMIT);
+}
+
+/**
+ * Never-enrolled students whose name or public code contains `query`, at most
+ * ENROLLMENT_SEARCH_LIMIT. A blank query returns the initial list. The caller
+ * checks permissions. `null` = query failed.
+ */
+export async function searchClassEnrollmentCandidates(
+  query: string,
+): Promise<{ candidates: ClassEnrollmentCandidate[]; truncated: boolean } | null> {
+  const search = query.trim().slice(0, ENROLLMENT_SEARCH_MAX_LENGTH);
+
+  return search ? queryEnrollmentCandidates(search, ENROLLMENT_SEARCH_LIMIT) : getClassEnrollmentCandidates();
 }

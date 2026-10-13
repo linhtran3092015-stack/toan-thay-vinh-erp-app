@@ -62,6 +62,7 @@ describe("class detail route", () => {
     });
     expect(dependencies.getClassEnrollmentCandidates).not.toHaveBeenCalled();
     expect(props).toMatchObject({
+      canBulkCancelSessions: false,
       canEnrollStudents: false,
       canLockSessions: false,
       canManageSessions: true,
@@ -97,5 +98,18 @@ describe("class detail route", () => {
     arrange(["classes.view", "students.manage_status"]);
     expect(await renderRoute()).toMatchObject({ canEnrollStudents: false });
     expect(dependencies.getClassEnrollmentCandidates).not.toHaveBeenCalled();
+  });
+
+  // Value: protects=bulk cancel is offered only to roles holding both sessions.manage and classes.manage_schedule (owner decision);
+  // fails_when=canBulkCancelSessions follows sessions.manage alone, so a teaching assistant can cancel many sessions at once;
+  // why_new=TAs received sessions.manage (migration 20261014090100) and the bulk flag used to be that permission;
+  // seam=ClassDetailPage is mocked and its props inspected; no_claim=does not prove cancel_session's own permission check
+  it("allows bulk cancel only with sessions.manage and classes.manage_schedule", async () => {
+    arrange(["classes.view", "sessions.view", "sessions.manage", "classes.manage_schedule"]);
+    expect(await renderRoute()).toMatchObject({ canBulkCancelSessions: true, canManageSessions: true });
+
+    vi.clearAllMocks();
+    arrange(["classes.view", "sessions.view", "classes.manage_schedule"]);
+    expect(await renderRoute()).toMatchObject({ canBulkCancelSessions: false, canManageSessions: false });
   });
 });

@@ -6,12 +6,17 @@ import { describe, expect, it } from "vitest";
 
 import { formatScheduleSummary } from "@/features/classes/class-detail-page";
 import {
+  ABSENCE_STREAK_DANGER_COUNT,
+  ABSENCE_STREAK_THRESHOLD,
   countClassSessionFilters,
   findAbsenceStreaks,
   findNextClassSession,
   getAttendanceChart,
   getClassAttendanceRate,
   getClassSessionStage,
+  isAbsenceStatus,
+  isLockCountedAttendanceStatus,
+  LOW_ATTENDANCE_RATE,
   orderClassSessions,
   summarizeClassDebt,
   summarizeClassSessions,
@@ -69,6 +74,21 @@ describe("getClassSessionStage", () => {
     expect(getClassSessionStage({ lockedAt: "2026-10-12T15:00:00Z", sessionDate: "2026-10-12", status: "completed" }, TODAY)).toBe("locked");
     expect(getClassSessionStage({ lockedAt: null, sessionDate: "2026-10-20", status: "cancelled" }, TODAY)).toBe("cancelled");
   });
+
+  // Value: protects=a session still "scheduled" after it ended earlier today is called overdue once the caller passes the time;
+  // fails_when=nowTime is ignored, the end time is compared as a mismatched string (HH:MM vs HH:MM:SS), or callers without nowTime change behaviour;
+  // why_new=red-team found today's ended sessions shown as upcoming until midnight;
+  // seam=none; no_claim=does not prove the page passes getVietnamTime() as nowTime
+  it("calls a session that ended earlier today overdue when given the time", () => {
+    const tonight = { endTime: "21:30:00", lockedAt: null, sessionDate: TODAY, status: "scheduled" as const };
+
+    expect(getClassSessionStage(tonight, TODAY, "21:29:59")).toBe("upcoming");
+    expect(getClassSessionStage(tonight, TODAY, "21:30:00")).toBe("overdue");
+    expect(getClassSessionStage(tonight, TODAY, "22:00")).toBe("overdue");
+    expect(getClassSessionStage(tonight, TODAY)).toBe("upcoming");
+    expect(getClassSessionStage({ ...tonight, sessionDate: "2026-10-14" }, TODAY, "23:00:00")).toBe("upcoming");
+    expect(getClassSessionStage({ ...tonight, status: "in_progress" }, TODAY, "23:00:00")).toBe("live");
+  });
 });
 
 describe("summarizeClassSessions and countClassSessionFilters", () => {
@@ -96,6 +116,19 @@ describe("summarizeClassSessions and countClassSessionFilters", () => {
   it("gives each chip its count; overdue sessions only appear under all", () => {
     expect(countClassSessionFilters(rows, TODAY)).toEqual({ all: 6, cancelled: 1, locked: 1, pending_lock: 1, upcoming: 2 });
   });
+
+  // Value: protects=the stage counts and chips move a session that ended earlier today from upcoming to overdue when nowTime is passed;
+  // fails_when=summarizeClassSessions or countClassSessionFilters drop the nowTime argument on the way to getClassSessionStage;
+  // why_new=nowTime is a new optional parameter threaded through both helpers;
+  // seam=none; no_claim=does not prove the UI passes nowTime
+  it("counts a session that ended earlier today as overdue when given the time", () => {
+    const withEnded = [...rows, session({ endTime: "09:00:00", id: "7", sessionDate: TODAY, startTime: "07:30:00" })];
+
+    expect(summarizeClassSessions(withEnded, TODAY, "10:00:00")).toMatchObject({ overdue: 2, upcoming: 2 });
+    expect(summarizeClassSessions(withEnded, TODAY)).toMatchObject({ overdue: 1, upcoming: 3 });
+    expect(countClassSessionFilters(withEnded, TODAY, "10:00:00")).toMatchObject({ all: 7, upcoming: 2 });
+    expect(countClassSessionFilters(withEnded, TODAY)).toMatchObject({ upcoming: 3 });
+  });
 });
 
 describe("findNextClassSession", () => {
@@ -118,6 +151,18 @@ describe("findNextClassSession", () => {
 
     expect(findNextClassSession(rows, TODAY, "10:00:00")?.id).toBe("tonight");
     expect(findNextClassSession(rows, TODAY, "22:00")?.id).toBe("friday");
+  });
+});
+
+describe("attendance status helpers", () => {
+  // Value: protects=one definition of "recorded" (present or an absence) shared by tallies, streaks and locked rosters, plus the exported thresholds the UI reads;
+  // fails_when=additional_study or an unknown status counts as recorded or as an absence, or a threshold constant changes silently;
+  // why_new=the status checks were duplicated in three places and the thresholds were private literals;
+  // seam=none; no_claim=does not prove lock_class_session_internal still uses the same statuses
+  it("treats only present and the two absences as recorded", () => {
+    expect(["present", "excused_absence", "unexcused_absence", "additional_study", "late"].map(isLockCountedAttendanceStatus)).toEqual([true, true, true, false, false]);
+    expect(["present", "excused_absence", "unexcused_absence", "additional_study"].map(isAbsenceStatus)).toEqual([false, true, true, false]);
+    expect([ABSENCE_STREAK_THRESHOLD, ABSENCE_STREAK_DANGER_COUNT, LOW_ATTENDANCE_RATE]).toEqual([2, 3, 85]);
   });
 });
 
@@ -208,15 +253,51 @@ describe("findAbsenceStreaks", () => {
       { attendance_status: "present", class_session_id: "s2", student_id: "an" },
       { attendance_status: "unexcused_absence", class_session_id: "s3", student_id: "an" },
       { attendance_status: "excused_absence", class_session_id: "s2", student_id: "chi" },
-      // Additional study does not break or extend a streak.
-      { attendance_status: "additional_study", class_session_id: "s3", student_id: "chi" },
-      { attendance_status: "excused_absence", class_session_id: "s1", student_id: "chi" },
+      { attendance_status: "excused_absence", class_session_id: "s3", student_id: "chi" },
     ]);
 
     expect(streaks.map((streak) => [streak.student.id, streak.count, streak.ordinals])).toEqual([
       ["bao", 3, [1, 2, 3]],
-      ["chi", 2, [1, 2]],
+      ["chi", 2, [2, 3]],
     ]);
+  });
+
+  // Value: protects=streaks follow the care rule: the latest observations must both be absences, and an additional_study mark or an unmarked roster session is an observation that breaks the streak;
+  // fails_when=additional_study is skipped instead of breaking, unmarked roster sessions are ignored, additional-kind sessions without a mark count as observations, or future completed sessions are observed;
+  // why_new=the owner chose exact parity with student_care_observations/student_care_calculate (the old helper skipped those sessions);
+  // seam=none; no_claim=does not cover the care rule's other classes or enrolments of non-active status
+  it("breaks a streak on additional study or an unmarked roster session, as the care rule does", () => {
+    const rows = orderClassSessions([
+      session({ id: "s1", sessionDate: "2026-10-01", status: "completed" }),
+      session({ id: "s2", sessionDate: "2026-10-03", status: "completed" }),
+      session({ id: "s3", sessionDate: "2026-10-05", status: "completed" }),
+      session({ id: "extra", sessionDate: "2026-10-06", sessionKind: "additional", status: "completed" }),
+      session({ id: "future", sessionDate: "2026-10-20", status: "completed" }),
+    ]);
+    const attendance = [
+      // Bảo: additional study on the latest session breaks two earlier absences.
+      { attendance_status: "excused_absence", class_session_id: "s1", student_id: "bao" },
+      { attendance_status: "unexcused_absence", class_session_id: "s2", student_id: "bao" },
+      { attendance_status: "additional_study", class_session_id: "s3", student_id: "bao" },
+      // An: the latest roster session is unmarked.
+      { attendance_status: "unexcused_absence", class_session_id: "s1", student_id: "an" },
+      { attendance_status: "unexcused_absence", class_session_id: "s2", student_id: "an" },
+      // Chi: the two latest observations are absences; the unmarked additional
+      // session and the future session are not observations.
+      { attendance_status: "present", class_session_id: "s1", student_id: "chi" },
+      { attendance_status: "excused_absence", class_session_id: "s2", student_id: "chi" },
+      { attendance_status: "unexcused_absence", class_session_id: "s3", student_id: "chi" },
+      { attendance_status: "present", class_session_id: "future", student_id: "chi" },
+    ];
+    const rosters = ["s1", "s2", "s3", "extra", "future"].flatMap((id) =>
+      ["an", "bao", "chi"].map((student) => ({ class_session_id: id, student_id: student })),
+    );
+
+    const streaks = findAbsenceStreaks(students, rows, attendance, { rosters, today: TODAY });
+
+    expect(streaks.map((streak) => [streak.student.id, streak.count, streak.ordinals])).toEqual([["chi", 2, [2, 3]]]);
+    // Without rosters An's unmarked session is unknown, so only the marks count.
+    expect(findAbsenceStreaks(students, rows, attendance, { today: TODAY }).map((streak) => streak.student.id)).toEqual(["an", "chi"]);
   });
 });
 

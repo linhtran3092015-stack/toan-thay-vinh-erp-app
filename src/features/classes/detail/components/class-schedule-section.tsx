@@ -1,8 +1,10 @@
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
 import { ClassScheduleCreateForm } from "@/features/classes/management/class-schedule-create-form";
 import { ClassScheduleEndAction } from "@/features/classes/management/class-schedule-end-action";
 import { ClassScheduleReplaceAction } from "@/features/classes/management/class-schedule-replace-action";
-import type { ClassDetailReadModel, ClassScheduleReadModel } from "@/features/classes/read-models";
+import type { ClassComponentRef, ClassDetailReadModel, ClassScheduleReadModel } from "@/features/classes/read-models";
 import { PanelNotice, ProfilePanel } from "@/features/students/detail/components/student-profile-shared";
 import { formatIsoDate, formatTime } from "@/lib/datetime";
 import { formatLearningMode } from "@/lib/format";
@@ -29,6 +31,30 @@ export function getDurationMinutes(startTime: string, endTime: string): number |
   return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
 }
 
+/**
+ * Note for a composite parent ("lớp ghép"): it has no schedule of its own, its
+ * component classes do. Links to each component instead of a merged schedule.
+ */
+export function CompositeComponentsNotice({ components }: { components: readonly ClassComponentRef[] }) {
+  return (
+    <div className="rounded-md border border-dashed border-border-strong bg-surface-subtle px-3 py-2.5 text-secondary text-text-muted">
+      <p>Lớp ghép không có lịch riêng. Lịch và buổi học nằm ở các lớp thành phần:</p>
+      <ul className="mt-1.5 grid gap-0.5">
+        {components.map((component) => (
+          <li key={component.id}>
+            <Link
+              className="inline-flex min-h-11 items-center font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus md:min-h-8"
+              href={`/classes/${component.id}`}
+            >
+              {component.code} · {component.name}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** Monday-first order; Sunday is stored as 0 or 7. */
 export function sortSchedules(schedules: readonly ClassScheduleReadModel[]): ClassScheduleReadModel[] {
   const order = (weekday: number) => (weekday === 0 ? 7 : weekday);
@@ -49,52 +75,60 @@ export function ClassScheduleSection({ canManageSchedule, detail }: ClassSchedul
   const activeSchedules = sortSchedules(detail.schedules.filter((schedule) => schedule.isActive));
   const historicalSchedules = detail.schedules.filter((schedule) => !schedule.isActive);
   const remainingScheduleSlots = Math.max(0, detail.weeklySessionCount - detail.activeScheduleCount);
-  const canModifySchedule = canManageSchedule && detail.status === "active" && detail.academicYear?.status === "active";
+  // The database rejects schedule templates on a linked composite parent.
+  const isCompositeParent = detail.componentClasses.length > 0;
+  const canModifySchedule =
+    canManageSchedule && !isCompositeParent && detail.status === "active" && detail.academicYear?.status === "active";
   const canCreateSchedule = canModifySchedule && remainingScheduleSlots > 0;
 
   return (
-    <ProfilePanel className="scroll-mt-20" title="Lịch học cố định" titleId="class-schedule-management">
-      <div className="grid gap-4">
-        {canCreateSchedule ? (
-          <ClassScheduleCreateForm
-            classId={detail.id}
-            defaultLearningMode={detail.defaultLearningMode}
-            remainingScheduleSlots={remainingScheduleSlots}
-          />
-        ) : canManageSchedule ? (
-          <PanelNotice tone={canModifySchedule ? "neutral" : "warning"}>
-            {detail.status !== "active"
-              ? "Cần kích hoạt lớp trước khi thiết lập lịch học."
-              : detail.academicYear?.status !== "active"
-                ? "Năm học của lớp chưa ở trạng thái hoạt động."
-                : "Lớp đã đủ số lịch học cố định theo cấu hình số buổi mỗi tuần."}
-          </PanelNotice>
-        ) : null}
+    // The overview's "#class-schedule-management" links land here; the margin clears the 64px sticky topbar.
+    <div className="scroll-mt-24" id="class-schedule-management">
+      <ProfilePanel title="Lịch học cố định" titleId="class-schedule-management-title">
+        <div className="grid gap-4">
+          {isCompositeParent ? (
+            <CompositeComponentsNotice components={detail.componentClasses} />
+          ) : canCreateSchedule ? (
+            <ClassScheduleCreateForm
+              classId={detail.id}
+              defaultLearningMode={detail.defaultLearningMode}
+              remainingScheduleSlots={remainingScheduleSlots}
+            />
+          ) : canManageSchedule ? (
+            <PanelNotice tone={canModifySchedule ? "neutral" : "warning"}>
+              {detail.status !== "active"
+                ? "Cần kích hoạt lớp trước khi thiết lập lịch học."
+                : detail.academicYear?.status !== "active"
+                  ? "Năm học của lớp chưa ở trạng thái hoạt động."
+                  : "Lớp đã đủ số lịch học cố định theo cấu hình số buổi mỗi tuần."}
+            </PanelNotice>
+          ) : null}
 
-        {activeSchedules.length === 0 ? (
-          <PanelNotice>Lớp chưa có lịch học đang hiệu lực.</PanelNotice>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {activeSchedules.map((schedule) => (
-              <ScheduleCard canManageSchedule={canModifySchedule} key={schedule.id} schedule={schedule} />
-            ))}
-          </div>
-        )}
-
-        {historicalSchedules.length > 0 ? (
-          <details className="group rounded-md border border-border-subtle">
-            <summary className="flex min-h-11 cursor-pointer items-center px-3 text-secondary font-semibold text-text-strong focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus">
-              Lịch đã kết thúc ({historicalSchedules.length})
-            </summary>
-            <div className="grid gap-3 border-t border-border-row p-3 md:grid-cols-2">
-              {historicalSchedules.map((schedule) => (
-                <ScheduleCard key={schedule.id} schedule={schedule} />
+          {activeSchedules.length === 0 ? (
+            isCompositeParent ? null : <PanelNotice>Lớp chưa có lịch học đang hiệu lực.</PanelNotice>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {activeSchedules.map((schedule) => (
+                <ScheduleCard canManageSchedule={canModifySchedule} key={schedule.id} schedule={schedule} />
               ))}
             </div>
-          </details>
-        ) : null}
-      </div>
-    </ProfilePanel>
+          )}
+
+          {historicalSchedules.length > 0 ? (
+            <details className="group rounded-md border border-border-subtle">
+              <summary className="flex min-h-11 cursor-pointer items-center px-3 text-secondary font-semibold text-text-strong focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus">
+                Lịch đã kết thúc ({historicalSchedules.length})
+              </summary>
+              <div className="grid gap-3 border-t border-border-row p-3 md:grid-cols-2">
+                {historicalSchedules.map((schedule) => (
+                  <ScheduleCard key={schedule.id} schedule={schedule} />
+                ))}
+              </div>
+            </details>
+          ) : null}
+        </div>
+      </ProfilePanel>
+    </div>
   );
 }
 

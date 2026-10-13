@@ -23,6 +23,10 @@ import {
   startSessionAction,
 } from "@/features/sessions/actions/session-lifecycle-actions";
 import type { SessionLifecycleActionState } from "@/features/sessions/forms/session-action-types";
+import {
+  CANCEL_REASON_MAX_LENGTH,
+  CANCEL_REASON_MIN_LENGTH,
+} from "@/features/sessions/forms/session-lifecycle-form-schema";
 import type { SessionStatus } from "@/features/sessions/read-models";
 
 type LifecycleIntent =
@@ -285,7 +289,7 @@ export function SessionLifecycleActions({
               <textarea
                 className="min-h-28 rounded-md border border-border-subtle bg-field-bg px-3 py-2 text-body font-normal text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring disabled:cursor-not-allowed disabled:bg-disabled-bg"
                 disabled={isInteractionLocked}
-                maxLength={500}
+                maxLength={CANCEL_REASON_MAX_LENGTH}
                 onChange={(event) => {
                   setCancelReason(
                     event.target.value,
@@ -297,7 +301,7 @@ export function SessionLifecycleActions({
               />
 
               <span className="text-xs font-normal text-ink-muted">
-                {cancelReason.trim().length}/500
+                {cancelReason.trim().length}/{CANCEL_REASON_MAX_LENGTH}
                 ký tự
               </span>
             </label>
@@ -316,7 +320,7 @@ export function SessionLifecycleActions({
               className="inline-flex min-h-10 items-center justify-center rounded-md border border-danger bg-danger px-4 text-control font-semibold text-text-on-danger transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={
                   isInteractionLocked ||
-                  cancelReason.trim().length < 3
+                  cancelReason.trim().length < CANCEL_REASON_MIN_LENGTH
                 }
                 onClick={() =>
                   runLifecycleAction("cancel")

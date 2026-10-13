@@ -44,9 +44,23 @@ export interface ClassDirectoryItem {
   weeklySessionCount: number;
 }
 
+/** A component class of a composite ("lớp ghép") parent. */
+export interface ClassComponentRef {
+  code: string;
+  id: string;
+  name: string;
+}
+
 export interface ClassDetailReadModel
   extends ClassDirectoryItem {
   classinUrl: string | null;
+  /**
+   * Component classes linked to this class as a composite parent, for links
+   * effective today or later. Non-empty means the class is a composite parent:
+   * the database rejects its own sessions and schedule templates
+   * (COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION / _SCHEDULE_TEMPLATE).
+   */
+  componentClasses: ClassComponentRef[];
   schedules: ClassScheduleReadModel[];
 }
 
@@ -54,6 +68,7 @@ export type ClassDataErrorCode =
   | "academic_years_query_failed"
   | "class_not_found"
   | "classes_query_failed"
+  | "component_links_query_failed"
   | "enrollments_query_failed"
   | "invalid_class_data"
   | "schedules_query_failed";

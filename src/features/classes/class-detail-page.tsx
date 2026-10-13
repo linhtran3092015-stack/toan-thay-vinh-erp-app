@@ -40,12 +40,17 @@ const unavailableWorkspace: ClassDetailWorkspace = {
 };
 
 interface ClassDetailPageProps {
+  /**
+   * Bulk cancel in the sessions tab is owner-only: sessions.manage AND
+   * classes.manage_schedule (teaching assistants hold only sessions.manage).
+   */
+  canBulkCancelSessions?: boolean;
   canEditClass: boolean;
   /** students.manage_status: the enroll RPC's permission. */
   canEnrollStudents?: boolean;
   canLockSessions?: boolean;
   canManageSchedule: boolean;
-  /** sessions.manage: bulk cancel and the batch-creation link. */
+  /** sessions.manage: the batch-creation link. */
   canManageSessions?: boolean;
   canViewCare?: boolean;
   canViewStudentCount: boolean;
@@ -67,6 +72,7 @@ interface ClassDetailPageProps {
  * class's sessions. Students, results and tuition tabs follow in a later step.
  */
 export function ClassDetailPage({
+  canBulkCancelSessions = false,
   canEditClass,
   canEnrollStudents = false,
   canLockSessions = false,
@@ -87,18 +93,22 @@ export function ClassDetailPage({
   const resolvedToday = today ?? getVietnamToday();
   const resolvedNow = nowTime ?? getVietnamTime();
   const sessionRows = workspace.sessions.status === "ready" ? workspace.sessions.value.rows : null;
-  const summary = sessionRows ? summarizeClassSessions(sessionRows, resolvedToday) : null;
+  const summary = sessionRows ? summarizeClassSessions(sessionRows, resolvedToday, resolvedNow) : null;
+  // The feed also holds a composite's component sessions; change_class_status only
+  // cancels (and is only blocked by) the class's own sessions.
+  const ownSessionRows = sessionRows ? sessionRows.filter((row) => row.classId === detail.id) : null;
   const classStatus = getClassStatusMeta(detail.status);
   const statusOperations = useClassStatusOperations({
     classCode: detail.code,
     classId: detail.id,
     className: detail.name,
-    scheduledSessionCount: sessionRows ? sessionRows.filter((row) => row.status === "scheduled").length : null,
+    scheduledSessionCount: ownSessionRows ? ownSessionRows.filter((row) => row.status === "scheduled").length : null,
     status: detail.status,
   });
   const [isEnrollOpen, setIsEnrollOpen] = useState(false);
   const [enrollMessage, setEnrollMessage] = useState<string | null>(null);
   const enrollTriggerRef = useRef<HTMLButtonElement>(null);
+  const enrollReasonId = useId();
 
   const tabItems: TabItem[] = [{ label: "Tổng quan", value: "overview" }];
 
@@ -129,12 +139,16 @@ export function ClassDetailPage({
   const isOpenForEnrollment = detail.status === "active";
   const showEnroll = canEnrollStudents && (detail.status === "active" || detail.status === "draft");
   const enrollDisabledReason = !isOpenForEnrollment
-    ? "Kích hoạt lớp trước khi ghi danh học sinh"
+    ? canEditClass
+      ? "Kích hoạt lớp (menu …) trước khi ghi danh học sinh"
+      : "Lớp chưa kích hoạt nên chưa ghi danh được"
     : enrollmentCandidates === null
       ? "Chưa tải được danh sách học sinh, tải lại trang"
       : null;
+  // The database rejects sessions on a linked composite parent: its components hold them.
+  const isCompositeParent = detail.componentClasses.length > 0;
   const batchHref =
-    canManageSessions && detail.status === "active"
+    canManageSessions && detail.status === "active" && !isCompositeParent
       ? `/sessions/batch?classId=${detail.id}${directoryQuery ? `&${directoryQuery}` : ""}`
       : null;
   const activeStudentCount =
@@ -148,7 +162,7 @@ export function ClassDetailPage({
   const closeBlockers = [
     detail.activeScheduleCount > 0 ? `${detail.activeScheduleCount} lịch cố định đang hiệu lực` : null,
     activeStudentCount ? `${activeStudentCount} học sinh đang học` : null,
-    sessionRows?.some((row) => row.status === "in_progress") ? "buổi đang diễn ra" : null,
+    ownSessionRows?.some((row) => row.status === "in_progress") ? "buổi đang diễn ra" : null,
   ].filter((blocker): blocker is string => blocker !== null);
 
   const metaParts = [
@@ -181,46 +195,55 @@ export function ClassDetailPage({
             <p className="mt-1 text-secondary text-text-muted">{metaParts.join(" · ")}</p>
           </div>
 
-          <div className="flex shrink-0 flex-wrap items-start gap-2 md:justify-end">
-            {canEditClass ? (
-              <ActionMenu<ClassTargetStatus>
-                items={statusOperations.operations.map((operation) => {
-                  const blockers = operation.targetStatus === "active" ? [] : closeBlockers;
+          <div className="grid shrink-0 gap-1 md:justify-items-end">
+            <div className="flex flex-wrap items-start gap-2 md:justify-end">
+              {canEditClass ? (
+                <ActionMenu<ClassTargetStatus>
+                  items={statusOperations.operations.map((operation) => {
+                    const blockers = operation.targetStatus === "active" ? [] : closeBlockers;
 
-                  return {
-                    danger: operation.danger,
-                    enabled: blockers.length === 0,
-                    label: operation.label,
-                    reason: blockers.length > 0 ? `Chưa thực hiện được: còn ${blockers.join(", ")}.` : null,
-                    value: operation.targetStatus,
-                  };
-                })}
-                label="Thêm hành động cho lớp"
-                onSelect={(value, trigger) => statusOperations.open(value, trigger)}
-              />
-            ) : null}
-            {canEditClass && ["draft", "active"].includes(detail.status) ? (
-              <Link
-                className={getButtonClassName({ variant: "secondary" })}
-                href={`/classes/${detail.id}/edit${directoryQuery ? `?${directoryQuery}` : ""}`}
-              >
-                Sửa lớp
-              </Link>
-            ) : null}
-            {showEnroll ? (
-              <Button
-                disabled={enrollDisabledReason !== null}
-                disabledReason={enrollDisabledReason ?? undefined}
-                onClick={() => {
-                  setEnrollMessage(null);
-                  setIsEnrollOpen(true);
-                }}
-                ref={enrollTriggerRef}
-                type="button"
-                variant="primary"
-              >
-                Ghi danh học sinh
-              </Button>
+                    return {
+                      danger: operation.danger,
+                      enabled: blockers.length === 0,
+                      label: operation.label,
+                      reason: blockers.length > 0 ? `Chưa thực hiện được: còn ${blockers.join(", ")}.` : null,
+                      value: operation.targetStatus,
+                    };
+                  })}
+                  label="Thêm hành động cho lớp"
+                  onSelect={(value, trigger) => statusOperations.open(value, trigger)}
+                />
+              ) : null}
+              {canEditClass && ["draft", "active"].includes(detail.status) ? (
+                <Link
+                  className={getButtonClassName({ variant: "secondary" })}
+                  href={`/classes/${detail.id}/edit${directoryQuery ? `?${directoryQuery}` : ""}`}
+                >
+                  Sửa lớp
+                </Link>
+              ) : null}
+              {showEnroll ? (
+                // The reason is rendered under the whole action row (below), not by
+                // Button's disabledReason wrapper, so the buttons stay on one line.
+                <Button
+                  aria-describedby={enrollDisabledReason ? enrollReasonId : undefined}
+                  disabled={enrollDisabledReason !== null}
+                  onClick={() => {
+                    setEnrollMessage(null);
+                    setIsEnrollOpen(true);
+                  }}
+                  ref={enrollTriggerRef}
+                  type="button"
+                  variant="primary"
+                >
+                  Ghi danh học sinh
+                </Button>
+              ) : null}
+            </div>
+            {showEnroll && enrollDisabledReason ? (
+              <p className="max-w-80 text-caption text-text-muted md:text-right" id={enrollReasonId}>
+                {enrollDisabledReason}
+              </p>
             ) : null}
           </div>
         </div>
@@ -254,8 +277,9 @@ export function ClassDetailPage({
               <ClassSessionsTab
                 attendanceAvailable={workspace.attendance.status === "ready"}
                 batchHref={batchHref}
-                canCancelSessions={canManageSessions}
+                canBulkCancelSessions={canBulkCancelSessions}
                 resultsAvailable={workspace.results.status === "ready"}
+                nowTime={resolvedNow}
                 rows={sessionRows}
                 today={resolvedToday}
                 truncated={workspace.sessions.value.truncated}

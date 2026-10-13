@@ -67,6 +67,9 @@ export default async function ClassDetailRoute({
 
   const canEditClass = permissions.includes("classes.create");
   const canManageSchedule = permissions.includes("classes.manage_schedule");
+  const canManageSessions = permissions.includes("sessions.manage");
+  // Owner decision: bulk cancel needs both; teaching assistants hold only sessions.manage.
+  const canBulkCancelSessions = canManageSessions && canManageSchedule;
 
   const canViewSessions = permissions.includes("sessions.view");
   const canEnrollStudents =
@@ -115,11 +118,12 @@ export default async function ClassDetailRoute({
 
   return (
     <ClassDetailPage
+      canBulkCancelSessions={canBulkCancelSessions}
       canEditClass={canEditClass}
       canEnrollStudents={canEnrollStudents}
       canLockSessions={permissions.includes("sessions.lock")}
       canManageSchedule={canManageSchedule}
-      canManageSessions={permissions.includes("sessions.manage")}
+      canManageSessions={canManageSessions}
       canViewCare={permissions.includes("student_care.view")}
       canViewStudentCount={canViewStudentCount}
       directoryQuery={directoryQuery}
