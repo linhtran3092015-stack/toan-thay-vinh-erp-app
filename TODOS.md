@@ -244,7 +244,189 @@
 **Priority:** P3
 **Depends on:** None
 
+## Lớp học
+
+### Chặn ở database cho hủy buổi hàng loạt
+
+**What:** Migration cho `cancel_class_session` (hoặc một RPC hủy hàng loạt riêng) nhận trạng thái mong đợi và từ chối buổi `in_progress` khi gọi từ hủy hàng loạt; đồng thời kiểm quyền "chỉ chủ trung tâm" (`sessions.manage` + `classes.manage_schedule`) ngay trong database.
+
+**Why:** `cancelClassSessionsAction` đọc lại từng buổi ngay trước khi hủy (D9) nên cửa sổ race chỉ còn một round trip, nhưng chưa đóng hẳn: RPC vẫn hủy được buổi giáo viên vừa bấm Bắt đầu. Quy tắc chỉ chủ hủy hàng loạt (D3) cũng mới chặn ở server action.
+
+**Context:** RPC ở `supabase/migrations/20260725120000_session_lifecycle_workflows.sql` khóa dòng `for update` rồi chỉ kiểm `locked_at`; trạng thái `in_progress` được chấp nhận. Comment trong `session-lifecycle-actions.ts` trỏ tới mục này.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** None
+
+### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp
+
+**What:** Làm 3 tab còn lại của trang chi tiết lớp theo thiết kế `03-chi-tiet-lop`.
+
+**Why:** Đợt 1 (v0.8.0.0) mới có Tổng quan và Buổi học; danh sách học sinh, kết quả và học phí của lớp vẫn phải xem ở trang khác.
+
+**Context:** Dữ liệu dùng chung nằm ở `src/features/classes/detail/class-detail-data.ts` và `class-detail-models.ts`; preview ở `/dev/class`.
+
+**Effort:** L
+**Priority:** P1
+**Depends on:** None
+
+### Mô hình dữ liệu giáo viên/trợ giảng theo lớp hoặc buổi
+
+**What:** Thêm phân công GV/TG theo lớp và theo buổi (đổi giáo viên một buổi), làm khối Đội ngũ trên trang lớp.
+
+**Why:** Thiết kế trang lớp có khối Đội ngũ và thao tác đổi giáo viên, nhưng database chưa có quan hệ phân công.
+
+**Context:** Cần migration và quyết định nghiệp vụ (phân công mặc định theo lớp, ghi đè theo buổi?).
+
+**Effort:** L
+**Priority:** P2
+**Depends on:** Quyết định nghiệp vụ của chủ trung tâm
+
+### Dời lịch hàng loạt
+
+**What:** Thao tác dời nhiều buổi cùng lúc từ tab Buổi học (như hủy hàng loạt).
+
+**Why:** Hiện chỉ dời được từng buổi ở trang buổi học.
+
+**Context:** Có thể dùng lại `BulkActionBar`, cách chọn buổi và mẫu server action `cancelClassSessionsAction` (giới hạn 40, kiểm quyền và đọc lại trên server).
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Số liệu lớp ghép: bỏ dấu "học thêm" của học sinh chỉ thuộc lớp thành phần
+
+**What:** Với buổi của lớp thành phần trên trang lớp cha, chỉ giữ dòng điểm danh có `student_enrollment_id` thuộc lớp cha trước khi tính tally và kết quả.
+
+**Why:** Roster đã lọc theo học sinh lớp cha (D1), nhưng dấu `additional_study` của học sinh chỉ thuộc lớp thành phần vẫn bị đếm là "học thêm", làm lệch số học thêm và mẫu số Kết quả.
+
+**Context:** `fillSessionFeeds` trong `class-detail-data.ts`; `tallyClassSessionAttendance` và `getTalliedStudents` trong `class-detail-models.ts`. Phát hiện ở pass đối kháng của lần ship v0.8.0.0 (D19).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Học sinh ghi danh ở cả lớp cha lẫn lớp thành phần bị loại khỏi roster buổi thành phần
+
+**What:** Xác định cách tính khi một học sinh có ghi danh ở cả hai lớp, rồi sửa bộ lọc roster buổi thành phần trên trang lớp cha.
+
+**Why:** Em đó hiện không được tính ở buổi của lớp thành phần khi xem từ lớp cha.
+
+**Context:** Bộ lọc `entry.enrollment_class_id === classId` trong `fillSessionFeeds`.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Danh sách ghi danh có cả học sinh đã nghỉ hoặc đã hoàn thành
+
+**What:** Quyết định có cho ghi danh học sinh `withdrawn`/`completed` chưa từng ghi danh hay không; nếu không, lọc theo `lifecycle_status` trong `getClassEnrollmentCandidates` và `searchClassEnrollmentCandidates`.
+
+**Why:** `enroll_student_in_class` đặt lại `lifecycle_status = 'active'`, nên ghi danh nhầm sẽ tự kích hoạt lại một em đã nghỉ.
+
+**Context:** `class-detail-data.ts` (truy vấn ứng viên); D19.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Quyết định nghiệp vụ của chủ trung tâm
+
+### Hiệu năng tải trang lớp
+
+**What:** Tải 500 ứng viên ghi danh khi mở hộp thoại thay vì lúc tải trang; gọi RPC roster bằng worker pool thay vì từng đợt 8; đếm kết quả bằng aggregate phía server; bỏ lần đọc `class_component_links` thứ hai; cân nhắc `maxDuration` hoặc đo p95 cho hủy 40 buổi kèm render lại trang.
+
+**Why:** Trang lớp là trang nặng nhất: tối đa 40 RPC roster, đọc phân trang điểm danh/kết quả và danh sách ứng viên mỗi lần tải.
+
+**Context:** `src/app/(app)/classes/[classId]/page.tsx`, `class-detail-data.ts`, `src/features/classes/data.ts`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Index cho tìm học sinh và đọc ghi danh theo lớp
+
+**What:** Migration thêm index trigram (`pg_trgm`) cho `students.full_name` và index không-partial `student_enrollments(class_id)`.
+
+**Why:** Tìm ghi danh dùng `ilike` trên tên; đọc ghi danh theo lớp không có index phù hợp khi bảng lớn.
+
+**Context:** `searchClassEnrollmentCandidates` trong `class-detail-data.ts`. `ilike` của PostgREST phân biệt dấu, nên client vẫn gộp kết quả lọc không dấu (`normalizeRosterSearch`).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Số thứ tự buổi (B#) ổn định
+
+**What:** Tính số thứ tự buổi ở server (hoặc lưu sẵn) để B# không đổi khi danh sách bị cắt ở 400 buổi hay khi hủy buổi.
+
+**Why:** `orderClassSessions` đánh số trên tập đã tải, nên lớp hơn 400 buổi hoặc vừa hủy buổi sẽ thấy B# thay đổi.
+
+**Context:** `class-detail-models.ts`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Lớp chỉ có liên kết lớp ghép bắt đầu sau
+
+**What:** Cho phép tạo lịch cố định kết thúc trước ngày liên kết bắt đầu (database đã cho phép), thay vì ẩn toàn bộ nút tạo lịch.
+
+**Why:** Hiện cứ có liên kết chưa kết thúc là UI ẩn tạo lịch, kể cả khi lịch nằm trọn trước liên kết.
+
+**Context:** Trigger `validate_component_parent_schedule`; `ClassScheduleSection` dùng `componentClasses` (D1).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Trang sửa lớp lỗi khi đọc liên kết lớp ghép bị lỗi thoáng qua
+
+**What:** Để `/classes/[id]/edit` không phụ thuộc vào lần đọc `class_component_links` (trang chi tiết vẫn fail-closed).
+
+**Why:** `getClassDetail` giờ trả `component_links_query_failed` cho mọi trang dùng nó, kể cả trang sửa lớp vốn không cần dữ liệu này.
+
+**Context:** `src/features/classes/data.ts`; D19.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Chỉ nhận đường dẫn http/https cho ClassIn và phòng học trực tuyến
+
+**What:** Giới hạn `optionalUrlSchema` (class form, schedule form, session meetingUrl) về giao thức `http`/`https`.
+
+**Why:** `z.url()` nhận cả `javascript:`/`data:`. React 19 chặn `javascript:` trong `href` nên rủi ro thấp, nhưng nên chặn từ khâu nhập.
+
+**Context:** `class-form-schema.ts`, `class-schedule-form-schema.ts`; chỗ hiển thị ở `class-schedule-section.tsx` và `class-overview-tab.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Test còn thiếu cho trang lớp
+
+**What:** Test chặn quá 40 buổi ở hộp thoại hủy (client); chip lọc, trang mở đầu và phân trang tab Buổi học; test trình duyệt cho container query 864px (bảng hay danh sách thẻ, nút 44px).
+
+**Why:** Các nhánh này chỉ được kiểm bằng tay hoặc ở server.
+
+**Context:** `tests/components/class-detail-workspace.test.tsx`; jsdom không áp CSS nên phần bố cục cần Playwright.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
 ## Giao diện
+
+### Nút cỡ md 40px trên điện thoại
+
+**What:** Đưa nút cỡ `md` lên 44px trên màn hình cảm ứng trong toàn app.
+
+**Why:** Mục tiêu chạm tối thiểu 44px; hiện nút md cao 40px.
+
+**Context:** `src/components/ui/button.tsx`; ảnh hưởng mọi trang.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
 
 ### Restyle EmptyState theo thiết kế
 
@@ -379,6 +561,42 @@
 **Context:** Quyết định D7 và các gợi ý mức advisory của review lượt /ship 3.
 
 **Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Rút gọn code trang chi tiết lớp
+
+**What:** Dùng lại hàm bỏ dấu có sẵn thay vì `normalizeRosterSearch` riêng; debounce tìm kiếm bằng `useEffect`; bỏ nhánh query rỗng không bao giờ chạy; gộp `createBulkCancelErrorState` với `createErrorState`; bỏ bản sao map trong `getTalliedStudents`; bỏ ref giả `clearFocusRefs`; dùng chung bảng tên thứ (`VIETNAMESE_WEEKDAY_NAMES`) thay cho `weekdayNames` trong `class-schedule-section.tsx`.
+
+**Why:** Các bản trùng có thể lệch nhau theo thời gian.
+
+**Context:** Gợi ý advisory của các lượt review khi ship v0.7.0.0 và v0.8.0.0 (D7, D11).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Dời các thành phần dùng chung khỏi module học sinh
+
+**What:** Chuyển `FieldShell`, `fieldControlClass`, `textAreaControlClass`, `describedBy` (đang ở `features/students/form/components/form-controls`) và `ProfilePanel`/`PanelNotice` sang `components/patterns` hoặc `components/ui`; chuyển kiểu `ClassDetailWorkspace`, `ClassEnrollmentCandidate` khỏi file server-only `class-detail-data.ts` sang `class-detail-models.ts`.
+
+**Why:** Trang lớp import nội bộ form học sinh, nên sửa style form học sinh sẽ đổi luôn 3 màn hình lớp. Kiểu dữ liệu dùng ở client đang nằm trong file `server-only`; chỉ cần một import giá trị là build client hỏng.
+
+**Context:** Gợi ý advisory của review khi ship v0.8.0.0.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Test flaky khi chạy cả suite
+
+**What:** Ổn định `tests/components/advances-management.test.tsx` (assert focus), `tests/components/legacy-consequential-dialogs.test.tsx` (thu hồi lời mời) và các test tìm học sinh ghi danh dùng debounce 300ms bằng timer thật (`class-detail-workspace.test.tsx`).
+
+**Why:** Thỉnh thoảng fail khi chạy cả suite song song nhưng chạy riêng thì đạt (legacy-consequential-dialogs: 5/5 khi chạy riêng, 1 lần fail trong cả suite ngày 2026-10-13), làm CI đỏ vô cớ.
+
+**Context:** Hướng sửa: `vi.useFakeTimers({ shouldAdvanceTime: true })` cho debounce; tìm nguyên nhân phụ thuộc thời gian ở 2 file còn lại thay vì nới timeout (D10).
+
+**Effort:** S
 **Priority:** P2
 **Depends on:** None
 

@@ -117,6 +117,7 @@ Development-only preview routes render redesigned components with fixture data i
 | `/dev/lists` | Student and class directory previews: DataTableFrame, FilterBar, quick filter chips, bulk bar, record list. |
 | `/dev/session` | Session workbench with fixture data: attendance group, results, guarded lock panel. Buttons call real server actions, so look only. |
 | `/dev/student` | Student profile with fixture data. Enrollment dialogs open but their server actions fail on fixture ids. |
+| `/dev/class` | Class detail with fixture data: header, Tổng quan and Buổi học tabs, enrol dialog. Query params `state` (`active`, `unscheduled`, `draft`, `closed`, `composite`), `role` (`owner`, `ta`) and `tab` (`overview`, `sessions`). Dialogs open but their server actions fail on fixture ids. |
 
 ---
 
@@ -510,10 +511,10 @@ Responsive behavior changes layout, not data availability, permissions, route ac
 
 ## Implementation guardrails
 
-- This document directs Wave 1+ presentation work only. It authorizes no route, permission, action, RPC, schema, RLS, RBAC, audit, state-machine, server filtering, or pagination change.
+- This document directs Wave 1+ presentation work only. It authorizes no route, permission, action, RPC, schema, RLS, RBAC, audit, state-machine, server filtering, or pagination change. Changes the owner approved separately are recorded in `docs/redesign/WORKFLOW_CONTRACTS_A_E.md` (for example v0.8.0.0: class-page bulk cancel and enrolment search).
 - `components/ui` implements domain-agnostic tokens/primitives; `components/shared` presents generic loading/empty/error/permission/result/pending states; `components/patterns` composes reusable page and operational presentation. Features keep all domain behavior.
 - New pattern primitives require two real workflow uses or an approved contractual need.
-- Dev preview routes (`/dev/ui`, `/dev/shell`, `/dev/lists`, `/dev/session`, `/dev/student`) skip sign-in for GET/HEAD only, and only outside production, and use fixture data; see the 2026-10-12 update at the top.
+- Dev preview routes (`/dev/ui`, `/dev/shell`, `/dev/lists`, `/dev/session`, `/dev/student`, `/dev/class`) skip sign-in for GET/HEAD only, and only outside production, and use fixture data; see the 2026-10-12 update at the top.
 - Preserve non-A–E visual debt until its feature enters a later approved wave, except for the smallest compatibility fix required by the global typography foundation.
 
 ## Decisions log

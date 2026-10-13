@@ -39,6 +39,25 @@ export interface RescheduleSessionActionInput
   startTime: string;
 }
 
+export interface CancelClassSessionsActionInput {
+  classId: string;
+  reason: string;
+  sessionIds: string[];
+}
+
+/** Bulk cancel result: a per-session failure does not stop the others. */
+export type CancelClassSessionsActionState =
+  | {
+      fieldErrors?: SessionLifecycleFieldErrors;
+      message: string;
+      status: "error";
+    }
+  | {
+      cancelled: number;
+      failed: Array<{ message: string; sessionId: string }>;
+      status: "success";
+    };
+
 export type SessionLifecycleFieldErrors =
   Record<string, string[] | undefined>;
 

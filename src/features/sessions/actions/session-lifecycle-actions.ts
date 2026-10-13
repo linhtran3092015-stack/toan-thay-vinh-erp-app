@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
+import { compositeParentRpcMessages } from "@/features/classes/composite-parent-messages";
+
 import type {
+  CancelClassSessionsActionInput,
+  CancelClassSessionsActionState,
   CancelSessionActionInput,
   CreateSessionActionInput,
   RescheduleSessionActionInput,
@@ -11,12 +15,16 @@ import type {
   SessionLifecycleFieldErrors,
 } from "@/features/sessions/forms/session-action-types";
 import {
+  cancelClassSessionsSchema,
   cancelSessionSchema,
   createSessionSchema,
   rescheduleSessionSchema,
   sessionIdSchema,
 } from "@/features/sessions/forms/session-lifecycle-form-schema";
-import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
+import {
+  getCachedDatabasePermissions,
+  getDatabasePermissions,
+} from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { permissionDeniedMessage } from "@/lib/permissions/labels";
@@ -24,6 +32,17 @@ function createErrorState(
   message: string,
   fieldErrors?: SessionLifecycleFieldErrors,
 ): SessionLifecycleActionState {
+  return {
+    fieldErrors,
+    message,
+    status: "error",
+  };
+}
+
+function createBulkCancelErrorState(
+  message: string,
+  fieldErrors?: SessionLifecycleFieldErrors,
+): Extract<CancelClassSessionsActionState, { status: "error" }> {
   return {
     fieldErrors,
     message,
@@ -84,6 +103,12 @@ function getLifecycleRpcErrorMessage(
 
     CLASS_SESSION_CANCELLATION_REASON_REQUIRED:
       "Bắt buộc nhập lý do hủy buổi học.",
+
+    CLASS_SESSION_ALREADY_LOCKED:
+      "Buổi học đã khóa nên không hủy được.",
+
+    CLASS_SESSION_CANCEL_STATUS_INVALID:
+      "Buổi học không còn ở trạng thái có thể hủy.",
 
     CLASS_SESSION_CANCEL_TRANSITION_INVALID:
       "Trạng thái hiện tại không cho phép hủy buổi học.",
@@ -185,8 +210,7 @@ function getLifecycleRpcErrorMessage(
       "Chưa đến giờ bắt đầu buổi học. Hãy bấm Bắt đầu khi tới giờ học theo lịch.",
     CLASS_SESSION_START_STATUS_INVALID:
       "Buổi học không ở trạng thái có thể bắt đầu.",
-    COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION:
-      "Lớp ghép không có buổi học riêng. Hãy tạo buổi trên lớp thành phần (ví dụ 7A hoặc 7B).",
+    ...compositeParentRpcMessages,
   };
 
   for (
@@ -465,6 +489,216 @@ export async function cancelSessionAction(
       "Không thể kết nối tới hệ thống buổi học. Vui lòng thử lại.",
     );
   }
+}
+
+/**
+ * Bulk cancel from a class page (owner decision D6). Owner-only: needs both
+ * sessions.manage and classes.manage_schedule, which teaching assistants lack.
+ * Sessions must belong to `classId` (a composite parent's page also lists its
+ * components' sessions) and must still be scheduled and unlocked: the RPC
+ * itself also cancels an in-progress session, which a bulk action must never
+ * do. Each eligible one goes through the same cancel_class_session RPC as a
+ * single cancel, one after another, and a failure does not stop the rest.
+ * Routes are revalidated once, after the loop.
+ */
+export async function cancelClassSessionsAction(
+  input: CancelClassSessionsActionInput,
+): Promise<CancelClassSessionsActionState> {
+  const permissionResult =
+    await getCachedDatabasePermissions();
+
+  if (!permissionResult.ok) {
+    return createBulkCancelErrorState(
+      "Không thể xác minh quyền quản lý buổi học. Vui lòng đăng nhập lại hoặc thử lại.",
+    );
+  }
+
+  for (const permission of [
+    "sessions.manage",
+    "classes.manage_schedule",
+  ] as const) {
+    if (
+      !permissionResult.permissions.includes(
+        permission,
+      )
+    ) {
+      return createBulkCancelErrorState(
+        permissionDeniedMessage(permission),
+      );
+    }
+  }
+
+  const parsed =
+    cancelClassSessionsSchema.safeParse(input);
+
+  if (!parsed.success) {
+    const fieldErrors =
+      parsed.error.flatten().fieldErrors;
+
+    return createBulkCancelErrorState(
+      fieldErrors.reason?.[0] ??
+        fieldErrors.sessionIds?.[0] ??
+        "Vui lòng kiểm tra lại các buổi cần hủy và lý do hủy.",
+      fieldErrors,
+    );
+  }
+
+  const { classId, reason, sessionIds } =
+    parsed.data;
+
+  let supabase: Awaited<
+    ReturnType<typeof createSupabaseServerClient>
+  >;
+  let ownSessions: Map<
+    string,
+    { lockedAt: string | null; status: string }
+  >;
+
+  try {
+    supabase =
+      await createSupabaseServerClient();
+
+    const { data, error } = await supabase
+      .from("class_sessions")
+      .select("id, status, locked_at")
+      .eq("class_id", classId)
+      .in("id", sessionIds);
+
+    if (error) {
+      return createBulkCancelErrorState(
+        "Không thể kiểm tra buổi học của lớp. Chưa hủy buổi nào.",
+      );
+    }
+
+    ownSessions = new Map(
+      (data ?? []).map((row) => [
+        row.id,
+        {
+          lockedAt: row.locked_at,
+          status: row.status,
+        },
+      ]),
+    );
+  } catch {
+    return createBulkCancelErrorState(
+      "Không thể kết nối tới hệ thống buổi học. Chưa hủy buổi nào.",
+    );
+  }
+
+  let cancelled = 0;
+  const failed: Array<{
+    message: string;
+    sessionId: string;
+  }> = [];
+
+  for (const sessionId of sessionIds) {
+    const session = ownSessions.get(sessionId);
+
+    if (!session) {
+      failed.push({
+        message:
+          "Buổi học không thuộc lớp này nên không hủy ở đây.",
+        sessionId,
+      });
+      continue;
+    }
+
+    // Only sessions nobody started: cancel_class_session also accepts
+    // in_progress, which the class page never offers in bulk.
+    if (
+      session.status !== "scheduled" ||
+      session.lockedAt !== null
+    ) {
+      failed.push({
+        message:
+          "Buổi học đã bắt đầu, đã khóa hoặc đã hủy nên không hủy hàng loạt.",
+        sessionId,
+      });
+      continue;
+    }
+
+    try {
+      // Re-read just before the RPC: cancel_class_session also cancels an
+      // in_progress session, so one started since the lookup above must not be
+      // cancelled here. This narrows the window to this round trip; closing it
+      // needs a status guard inside the RPC (TODOS).
+      const { data: current, error: currentError } =
+        await supabase
+          .from("class_sessions")
+          .select("id, status, locked_at")
+          .eq("class_id", classId)
+          .in("id", [sessionId]);
+      const currentRow = current?.[0];
+
+      if (currentError || !currentRow) {
+        failed.push({
+          message:
+            "Không thể kiểm tra lại buổi học nên chưa hủy.",
+          sessionId,
+        });
+        continue;
+      }
+
+      if (
+        currentRow.status !== "scheduled" ||
+        currentRow.locked_at !== null
+      ) {
+        failed.push({
+          message:
+            "Buổi học vừa được bắt đầu, khóa hoặc hủy nên không hủy hàng loạt.",
+          sessionId,
+        });
+        continue;
+      }
+
+      const { data, error } =
+        await supabase.rpc(
+          "cancel_class_session",
+          {
+            p_class_session_id: sessionId,
+            p_reason: reason,
+          },
+        );
+
+      if (error) {
+        failed.push({
+          message: getLifecycleRpcErrorMessage(
+            error.message,
+          ),
+          sessionId,
+        });
+      } else if (!data?.id) {
+        failed.push({
+          message:
+            "Database không trả về kết quả hủy buổi học.",
+          sessionId,
+        });
+      } else {
+        cancelled += 1;
+      }
+    } catch {
+      failed.push({
+        message:
+          "Không thể kết nối tới hệ thống buổi học.",
+        sessionId,
+      });
+    }
+  }
+
+  // revalidatePath in a server action also re-renders the calling page in this
+  // response, so the class page needs no router.refresh(). The class page is
+  // always revalidated once, so its rows and selection reflect both cancels and
+  // refusals; session routes only when something was cancelled.
+  if (cancelled > 0) {
+    revalidateSessionRoutes();
+  }
+  revalidatePath(`/classes/${classId}`);
+
+  return {
+    cancelled,
+    failed,
+    status: "success",
+  };
 }
 
 export async function rescheduleSessionAction(

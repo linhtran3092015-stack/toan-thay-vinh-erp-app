@@ -156,6 +156,7 @@ describe("Legacy unknown-status fail-closed presentation", () => {
         status: "constructor",
       },
       classinUrl: null,
+      componentClasses: [],
       schedules: [],
     };
     const { rerender } = render(

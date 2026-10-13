@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, getButtonClassName } from "@/components/ui/button";
 import { TabPanel, Tabs, type TabItem } from "@/components/ui/tabs";
 import { StudentStatusBadge } from "@/features/students/components/student-status-badge";
-import { StudentActionMenu } from "@/features/students/detail/components/student-action-menu";
+import { ActionMenu } from "@/components/patterns/action-menu";
 import { StudentAttendanceTab } from "@/features/students/detail/components/student-attendance-tab";
 import { StudentClassesTab } from "@/features/students/detail/components/student-classes-tab";
 import { StudentHistoryTab } from "@/features/students/detail/components/student-history-tab";
@@ -244,7 +244,7 @@ export function StudentProfilePage({
           </div>
 
           <div className="flex shrink-0 flex-wrap items-start gap-2 md:justify-end">
-            <StudentActionMenu items={menuItems} onSelect={(operation, trigger) => operations.open(operation, trigger)} />
+            <ActionMenu items={menuItems} onSelect={(operation, trigger) => operations.open(operation, trigger)} />
             {canUpdateStudent ? (
               <Link className={getButtonClassName({ variant: "secondary" })} href={editHref}>
                 Sửa hồ sơ

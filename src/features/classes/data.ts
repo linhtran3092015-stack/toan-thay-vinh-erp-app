@@ -9,8 +9,10 @@ import type {
   ClassDirectoryResult,
   ClassLearningLevel,
   ClassLearningMode,
+  ClassComponentRef,
   ClassScheduleReadModel,
 } from "@/features/classes/read-models";
+import { getVietnamToday } from "@/lib/datetime";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.generated";
 
@@ -44,6 +46,8 @@ function createClassDataError(
       "Không tìm thấy lớp học.",
     classes_query_failed:
       "Không thể tải danh sách lớp học.",
+    component_links_query_failed:
+      "Không thể tải các lớp thành phần của lớp ghép.",
     enrollments_query_failed:
       "Không thể tải số lượng học viên của lớp.",
     invalid_class_data:
@@ -373,7 +377,8 @@ export async function getClassDetail(
     };
   }
 
-  const [academicYearResult, schedulesResult] =
+  const today = getVietnamToday();
+  const [academicYearResult, schedulesResult, componentLinksResult] =
     await Promise.all([
       supabase
         .from("academic_years")
@@ -387,6 +392,15 @@ export async function getClassDetail(
         .order("is_active", { ascending: false })
         .order("weekday", { ascending: true })
         .order("start_time", { ascending: true }),
+      // Links not ended before today, future-starting ones included: the
+      // database rejects a schedule template on the parent while any such link
+      // exists and its own sessions dated on/after a link's effective_from.
+      supabase
+        .from("class_component_links")
+        .select("component_order, effective_from, effective_to, component:classes!class_component_links_component_class_id_fkey(id, code, name)")
+        .eq("parent_class_id", classId)
+        .or(`effective_to.is.null,effective_to.gte.${today}`)
+        .order("component_order", { ascending: true }),
     ]);
 
   if (academicYearResult.error) {
@@ -403,6 +417,15 @@ export async function getClassDetail(
       ok: false,
       error: createClassDataError(
         "schedules_query_failed",
+      ),
+    };
+  }
+
+  if (componentLinksResult.error) {
+    return {
+      ok: false,
+      error: createClassDataError(
+        "component_links_query_failed",
       ),
     };
   }
@@ -462,6 +485,7 @@ export async function getClassDetail(
       detail: {
         ...baseClass,
         classinUrl: classRow.classin_url,
+        componentClasses: mapComponentClasses(componentLinksResult.data ?? [], today),
         schedules,
       },
     };
@@ -473,4 +497,42 @@ export async function getClassDetail(
       ),
     };
   }
+}
+
+type ComponentLinkRow = {
+  component: { code: string; id: string; name: string } | { code: string; id: string; name: string }[] | null;
+  effective_from: string;
+  effective_to: string | null;
+};
+
+/**
+ * One entry per component class with a link not ended before `today`, in
+ * component order; a class linked for several non-ended periods appears once,
+ * with the earliest effectiveFrom.
+ */
+function mapComponentClasses(rows: readonly ComponentLinkRow[], today: string): ClassComponentRef[] {
+  const byId = new Map<string, ClassComponentRef>();
+
+  for (const row of rows) {
+    // The query already filters ended links; re-check so a stale row cannot mark the class composite.
+    if (row.effective_to !== null && row.effective_to < today) continue;
+
+    const component = Array.isArray(row.component) ? row.component[0] : row.component;
+    if (!component) continue;
+
+    const existing = byId.get(component.id);
+
+    if (!existing) {
+      byId.set(component.id, {
+        code: component.code,
+        effectiveFrom: row.effective_from,
+        id: component.id,
+        name: component.name,
+      });
+    } else if (row.effective_from < existing.effectiveFrom) {
+      existing.effectiveFrom = row.effective_from;
+    }
+  }
+
+  return [...byId.values()];
 }

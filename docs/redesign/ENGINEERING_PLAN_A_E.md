@@ -106,7 +106,7 @@ The following patterns are proven by the completed Foundation through Wave 6 ref
 
 - Feature folders own permissions, domain state, URL parser/serializer, filter semantics, action availability, confirmation meaning, Server Action/RPC bindings, validation, and domain copy. Shared UI owns presentation and interaction states only.
 - Directory URL state is feature-local: it preserves unrelated parameters, resets page on filter changes, composes rapid updates before navigation settles, and retains existing client-side full-directory filtering and pagination behavior.
-- This program does not introduce a generic application-wide URL-state framework or server-side filtering/pagination. Any server-read optimization requires its own measured, approved contract.
+- This program does not introduce a generic application-wide URL-state framework or server-side filtering/pagination. Any server-read optimization requires its own measured, approved contract. Approved exception: the class-page enrolment search `searchEnrollmentCandidatesAction` (server-side search over students without enrolment history, because the page ships only the first 500 candidates). Owner-approved for the Stumana redesign step 5b (v0.8.0.0).
 
 ### High-trust actions, status, and feedback
 

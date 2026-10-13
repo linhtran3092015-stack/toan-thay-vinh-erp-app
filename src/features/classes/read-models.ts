@@ -44,9 +44,27 @@ export interface ClassDirectoryItem {
   weeklySessionCount: number;
 }
 
+/** A component class of a composite ("lớp ghép") parent. */
+export interface ClassComponentRef {
+  code: string;
+  /** ISO date (YYYY-MM-DD) the earliest non-ended link to this component starts; may be after today. */
+  effectiveFrom: string;
+  id: string;
+  name: string;
+}
+
 export interface ClassDetailReadModel
   extends ClassDirectoryItem {
   classinUrl: string | null;
+  /**
+   * Component classes linked to this class as a composite parent, for every
+   * non-ended link (effective_to null or >= Vietnam today), future-starting
+   * links included. Non-empty means the database rejects schedule templates on
+   * this parent (COMPOSITE_PARENT_CANNOT_HAVE_SCHEDULE_TEMPLATE) and its own
+   * session creation (COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION) for dates
+   * on/after each link's effectiveFrom.
+   */
+  componentClasses: ClassComponentRef[];
   schedules: ClassScheduleReadModel[];
 }
 
@@ -54,6 +72,7 @@ export type ClassDataErrorCode =
   | "academic_years_query_failed"
   | "class_not_found"
   | "classes_query_failed"
+  | "component_links_query_failed"
   | "enrollments_query_failed"
   | "invalid_class_data"
   | "schedules_query_failed";

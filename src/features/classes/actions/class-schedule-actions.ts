@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { compositeParentRpcMessages } from "@/features/classes/composite-parent-messages";
+
 import type {
   ClassManagementActionState,
   CreateClassScheduleActionInput,
@@ -128,6 +130,9 @@ function getRpcErrorMessage(
 
     CLASS_SCHEDULE_REQUIRES_ACTIVE_CLASS:
       "Chỉ có thể quản lý lịch của lớp đang hoạt động.",
+
+    // A linked composite parent ("lớp ghép"), including a link that starts later.
+    ...compositeParentRpcMessages,
 
     ENDED_CLASS_SCHEDULE_IS_IMMUTABLE:
       "Lịch đã kết thúc nên không thể thay đổi.",
