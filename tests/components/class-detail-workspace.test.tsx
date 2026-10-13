@@ -9,6 +9,7 @@ import { ActionMenu } from "@/components/patterns/action-menu";
 import { ClassDetailPage, formatScheduleSummary } from "@/features/classes/class-detail-page";
 import type { ClassDetailWorkspace } from "@/features/classes/detail/class-detail-data";
 import { orderClassSessions, type ClassSessionRow } from "@/features/classes/detail/class-detail-models";
+import { getClassStatusOperations } from "@/features/classes/management/class-status-actions";
 import type { ClassDetailReadModel, ClassScheduleReadModel } from "@/features/classes/read-models";
 
 const mocks = vi.hoisted(() => ({
@@ -401,6 +402,18 @@ function deferred<T>() {
 }
 
 describe("ClassDetailPage close blockers and composite classes", () => {
+  // Value: protects=the close dialog's consequence states the real number of scheduled sessions to be cancelled, says none remain at 0, and falls back to a general sentence only when the count is unknown;
+  // fails_when=a count of 0 still promises cancellations, an unknown count is shown as 0, or a known count is dropped for the general sentence;
+  // why_new=the 0 and unknown branches were split in pass 2 of this ship run and only the >0 branch was rendered;
+  // seam=none; no_claim=does not prove change_class_status cancels exactly these sessions
+  it.each([
+    [null, "Lớp ngừng hoạt động. Mọi buổi đã lên lịch còn lại sẽ bị hủy tự động."],
+    [0, "Lớp ngừng hoạt động. Lớp không còn buổi nào đã lên lịch."],
+    [3, "Lớp ngừng hoạt động. 3 buổi đã lên lịch còn lại sẽ bị hủy tự động."],
+  ])("states the close consequence for %s scheduled sessions", (count, consequence) => {
+    expect(getClassStatusOperations("active", count).find((operation) => operation.targetStatus === "closed")?.consequence).toBe(consequence);
+  });
+
   // Value: protects=closing is blocked only by the class's own in-progress session, and the closing consequence counts only its own scheduled sessions;
   // fails_when=a component class's in-progress or scheduled row (the feed includes a composite's components) blocks "Đóng lớp" or inflates the cancelled-session count, or the class's own in-progress session no longer blocks;
   // why_new=the feed was widened to component classes while change_class_status only touches class_sessions.class_id = the class (migration 20261013090100);
@@ -631,6 +644,21 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     renderPage({ initialTab: "sessions", workspace: workspace({ sessions: { status: "ready", value: { rows: noAttendanceRows, truncated: false } } }) });
     expect(screen.getAllByText("Mở buổi để xem điểm danh và kết quả").length).toBeGreaterThan(0);
     expect(screen.queryByText("Chưa tải được điểm danh để tính kết quả")).not.toBeInTheDocument();
+
+    // Mobile cards of started sessions keep the explanation even when neither tally exists.
+    cleanup();
+    const bareRows = sessionRows.map((sessionRow) => ({ ...sessionRow, attendance: null, resultCount: null }));
+    const { container } = renderPage({
+      initialTab: "sessions",
+      workspace: workspace({
+        attendance: { reason: "failed", status: "unavailable" },
+        results: { reason: "failed", status: "unavailable" },
+        sessions: { status: "ready", value: { rows: bareRows, truncated: false } },
+      }),
+    });
+    const mobileList = container.querySelector(".class-sessions-record-list") as HTMLElement;
+    expect(within(mobileList).getAllByText("Chưa tải được điểm danh").length).toBeGreaterThan(0);
+    expect(within(mobileList).getAllByText("Chưa tải được kết quả").length).toBeGreaterThan(0);
 
     // The overview chart tells a failed attendance read from a missing permission.
     cleanup();
