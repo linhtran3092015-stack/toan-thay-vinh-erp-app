@@ -838,6 +838,13 @@ describe("ClassDetailPage sessions tab, bulk and mobile", () => {
     const dialog = screen.getByRole("dialog", { name: "Hủy 3 buổi học" });
     expect(dialog).toHaveTextContent(/B1 \([^)]*, đã qua ngày\)/);
     expect(within(dialog).getByText(/1 buổi đã qua ngày mà chưa bắt đầu trên hệ thống/)).toBeInTheDocument();
+
+    // A page whose only cancellable sessions are overdue still offers each one a checkbox on mobile.
+    cleanup();
+    renderPage({ initialTab: "sessions", workspace: withRows(orderClassSessions([row({ id: "s-overdue", sessionDate: "2026-10-09" })])) });
+    const list = screen.getByRole("list", { name: "Buổi học của lớp" });
+    expect(within(list).getByRole("checkbox", { name: /Chọn buổi B1 / })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Chọn mọi buổi sắp tới trên trang" })).not.toBeInTheDocument();
   });
 
   // Value: protects=on mobile, where select-all is hidden, "Bỏ chọn" moves focus to the first row checkbox instead of the body;

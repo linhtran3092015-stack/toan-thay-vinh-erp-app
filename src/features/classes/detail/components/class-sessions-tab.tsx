@@ -230,6 +230,8 @@ export function ClassSessionsTab({
   // Select-all takes only upcoming sessions: an overdue one may have been taught
   // without being started in the app, and a cancel cannot be undone, so it must be
   // ticked on its own (owner decision D17).
+  // Every cancellable session on the page, overdue included: each gets its own checkbox.
+  const cancellableOnPage = pageRows.filter((row) => eligibleIds.has(row.id)).map((row) => row.id);
   const selectableOnPage = pageRows
     .filter((row) => eligibleIds.has(row.id) && getClassSessionStage(row, today, nowTime) !== "overdue")
     .map((row) => row.id);
@@ -431,7 +433,7 @@ export function ClassSessionsTab({
               {pageRows.map((row) => {
                 const stage = getClassSessionStage(row, today, nowTime);
                 const selectable = eligibleIds.has(row.id);
-                const isFirstSelectable = selectable && row.id === selectableOnPage[0];
+                const isFirstSelectable = selectable && row.id === cancellableOnPage[0];
                 const timeAndRoom = `${formatTime(row.startTime)}–${formatTime(row.endTime)}${row.roomName ? ` · ${row.roomName}` : ""}`;
 
                 return (
@@ -443,7 +445,7 @@ export function ClassSessionsTab({
                     leading={
                       // Same eligibility as the desktop table; the 44px label is the touch target.
                       // The gutter only appears on pages that have something to select.
-                      selectableOnPage.length > 0 ? (
+                      cancellableOnPage.length > 0 ? (
                         <span className="flex w-11 shrink-0 items-center justify-center">
                           {selectable ? (
                             <label className="flex h-11 w-11 cursor-pointer items-center justify-center">
@@ -623,7 +625,8 @@ function ResultCell({
   // The denominator is the students marked present plus additional_study walk-ins,
   // which needs attendance. With
   // the feed ready, a missing tally means this page did not resolve the session's
-  // roster (a component session, or past the open-roster cap), not a failure.
+  // roster here (a component session, past the open-roster cap, or a failed
+  // per-session roster call); the session page has the full picture.
   if (!row.attendance) {
     return (
       <ExplainedDash
