@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { FormEvent, ReactNode } from "react";
+import type { FormEvent, ReactNode, RefObject } from "react";
 import {
+  useEffect,
   useRef,
   useState,
   useTransition,
@@ -31,6 +32,11 @@ interface ClassStatusOperationsOptions {
    * `null` when the viewer cannot read sessions.
    */
   scheduledSessionCount?: number | null;
+  /**
+   * Focusable (tabIndex -1) wrapper of the page's success banner. Focus moves there
+   * when the new status leaves no operations, since the "…" trigger then unmounts.
+   */
+  successFocusRef?: RefObject<HTMLElement | null>;
 }
 
 export interface ClassStatusOperation {
@@ -119,6 +125,7 @@ export function useClassStatusOperations({
   className,
   scheduledSessionCount = null,
   status,
+  successFocusRef,
 }: ClassStatusOperationsOptions): {
   dialog: ReactNode;
   open: (targetStatus: ClassTargetStatus, trigger: HTMLElement) => void;
@@ -133,6 +140,16 @@ export function useClassStatusOperations({
   const [actionState, setActionState] = useState<ClassManagementActionState>(initialClassManagementActionState);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  /** Set when the new status has no further operations: the "…" trigger is about to unmount. */
+  const focusSuccessRef = useRef(false);
+
+  // Runs after the dialog's own cleanup returned focus to the trigger, so it wins.
+  useEffect(() => {
+    if (successMessage && focusSuccessRef.current) {
+      focusSuccessRef.current = false;
+      successFocusRef?.current?.focus();
+    }
+  }, [successFocusRef, successMessage]);
 
   const closeDialog = (): void => {
     if (isPending) {
@@ -175,6 +192,7 @@ export function useClassStatusOperations({
       setActionState(result);
 
       if (result.status === "success") {
+        focusSuccessRef.current = getClassStatusOperations(selectedOperation.targetStatus).length === 0;
         setSelectedOperation(null);
         setReason("");
         setSuccessMessage(result.message || "Đã đổi trạng thái lớp.");
@@ -250,7 +268,7 @@ export function useClassStatusOperations({
           </div>
 
           {actionState.status === "error" && actionState.message ? (
-            <div aria-live="polite" className="rounded-md border border-danger-border bg-danger-bg p-3 text-secondary font-semibold text-danger-ink">
+            <div className="rounded-md border border-danger-border bg-danger-bg p-3 text-secondary font-semibold text-danger-ink" role="alert">
               {actionState.message}
             </div>
           ) : null}

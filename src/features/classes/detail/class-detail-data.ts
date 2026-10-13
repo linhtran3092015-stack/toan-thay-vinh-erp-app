@@ -22,8 +22,6 @@ import { summarizeDirectoryDebt } from "@/features/students/student-directory-me
 import { getVietnamToday } from "@/lib/datetime";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-/** Re-exported for callers that import it from the loader. */
-export { CLASS_SESSION_LIMIT };
 /** PostgREST returns at most this many rows per request; bigger reads are paged. */
 const PAGE_SIZE = 1000;
 /** Hard stop for paged reads (attendance of ~400 sessions × 25 students). */
@@ -413,13 +411,15 @@ async function fillSessionFeeds(
   const startedRows = sessionsResult.rows.filter((row) => row.status === "in_progress" || row.status === "completed");
   const startedIds = startedRows.map((row) => row.id);
   const lockedIds = new Set(startedRows.filter((row) => row.lockedAt).map((row) => row.id));
-  // Roster priority under the cap: every pending-lock (completed, unlocked)
-  // session oldest first, because the overview's needs-action list shows the
-  // oldest of those; then sessions in progress, newest first.
+  // Roster priority under the cap: sessions in progress first, newest first
+  // (teachers are marking them right now, so a backlog of pending-lock sessions
+  // must not hide their roster); then pending-lock (completed, unlocked)
+  // sessions oldest first, because the overview's needs-action list shows the
+  // oldest of those.
   const unlockedRows = startedRows.filter((row) => !row.lockedAt);
   const openIds = [
-    ...unlockedRows.filter((row) => row.status === "completed").sort(compareSessionsAscending),
     ...unlockedRows.filter((row) => row.status === "in_progress").sort((a, b) => compareSessionsAscending(b, a)),
+    ...unlockedRows.filter((row) => row.status === "completed").sort(compareSessionsAscending),
   ]
     .slice(0, OPEN_ROSTER_LIMIT)
     .map((row) => row.id);
@@ -457,19 +457,25 @@ async function fillSessionFeeds(
   const tallies = rosters && attendance ? tallyClassSessionAttendance(rosters, attendance) : null;
   const resolved = new Set([...lockedIds, ...openIds]);
   const started = new Set(startedIds);
-  // Results on a component session count only the students its tally counts
-  // (the page class's roster plus walk-ins); own sessions count every result.
+  // Once a session's roster is resolved, its results count only the students
+  // its tally counts (roster plus additional_study walk-ins), so a withdrawn
+  // student's result (open rosters hold only active enrolments) or a component
+  // session's other students never push the count past the roster. An own
+  // session whose roster is unknown (beyond OPEN_ROSTER_LIMIT, no attendance
+  // permission, or a failed read) counts every result: there is no roster
+  // denominator to exceed. A component session with an unknown roster gets no
+  // count rather than an unfiltered one.
   const talliedStudents = rosters && attendance ? getTalliedStudents(rosters, attendance) : null;
+  const hasResolvedRoster = (id: string) => resolved.has(id) && talliedStudents !== null;
   const resultCounts = new Map<string, number>();
   for (const entry of results ?? []) {
-    if (!ownSessionIds.has(entry.class_session_id) && !talliedStudents?.get(entry.class_session_id)?.has(entry.student_id)) continue;
-    resultCounts.set(entry.class_session_id, (resultCounts.get(entry.class_session_id) ?? 0) + 1);
+    const id = entry.class_session_id;
+    const counted = hasResolvedRoster(id) ? Boolean(talliedStudents?.get(id)?.has(entry.student_id)) : ownSessionIds.has(id);
+    if (counted) resultCounts.set(id, (resultCounts.get(id) ?? 0) + 1);
   }
   const getResultCount = (id: string): number | null => {
     if (!started.has(id) || !results) return null;
-    if (ownSessionIds.has(id)) return resultCounts.get(id) ?? 0;
-    // A component session whose roster is unknown gets no count rather than an unfiltered one.
-    return resolved.has(id) && talliedStudents ? resultCounts.get(id) ?? 0 : null;
+    return hasResolvedRoster(id) || ownSessionIds.has(id) ? resultCounts.get(id) ?? 0 : null;
   };
 
   const rows = orderClassSessions(

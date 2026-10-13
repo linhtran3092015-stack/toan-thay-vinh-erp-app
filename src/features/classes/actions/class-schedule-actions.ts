@@ -129,6 +129,13 @@ function getRpcErrorMessage(
     CLASS_SCHEDULE_REQUIRES_ACTIVE_CLASS:
       "Chỉ có thể quản lý lịch của lớp đang hoạt động.",
 
+    // A linked composite parent ("lớp ghép"), including a link that starts later.
+    COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION:
+      "Lớp ghép không có buổi học riêng. Hãy tạo buổi trên lớp thành phần.",
+
+    COMPOSITE_PARENT_CANNOT_HAVE_SCHEDULE_TEMPLATE:
+      "Lớp ghép không có lịch cố định riêng; lịch học nằm ở các lớp thành phần.",
+
     ENDED_CLASS_SCHEDULE_IS_IMMUTABLE:
       "Lịch đã kết thúc nên không thể thay đổi.",
 

@@ -392,12 +392,12 @@ export async function getClassDetail(
         .order("is_active", { ascending: false })
         .order("weekday", { ascending: true })
         .order("start_time", { ascending: true }),
-      // Links not ended before today; those starting later are dropped below
-      // (a composite parent cannot hold its own sessions while a link covers
-      // the session date, so a future link does not make the class composite yet).
+      // Links not ended before today, future-starting ones included: the
+      // database rejects a schedule template on the parent while any such link
+      // exists and its own sessions dated on/after a link's effective_from.
       supabase
         .from("class_component_links")
-        .select("component_order, effective_from, component:classes!class_component_links_component_class_id_fkey(id, code, name)")
+        .select("component_order, effective_from, effective_to, component:classes!class_component_links_component_class_id_fkey(id, code, name)")
         .eq("parent_class_id", classId)
         .or(`effective_to.is.null,effective_to.gte.${today}`)
         .order("component_order", { ascending: true }),
@@ -485,9 +485,7 @@ export async function getClassDetail(
       detail: {
         ...baseClass,
         classinUrl: classRow.classin_url,
-        componentClasses: mapComponentClasses(
-          (componentLinksResult.data ?? []).filter((link) => link.effective_from <= today),
-        ),
+        componentClasses: mapComponentClasses(componentLinksResult.data ?? [], today),
         schedules,
       },
     };
@@ -503,17 +501,36 @@ export async function getClassDetail(
 
 type ComponentLinkRow = {
   component: { code: string; id: string; name: string } | { code: string; id: string; name: string }[] | null;
+  effective_from: string;
+  effective_to: string | null;
 };
 
-/** One entry per component class, in component order; a class linked twice (consecutive periods) appears once. */
-function mapComponentClasses(rows: readonly ComponentLinkRow[]): ClassComponentRef[] {
+/**
+ * One entry per component class with a link not ended before `today`, in
+ * component order; a class linked for several non-ended periods appears once,
+ * with the earliest effectiveFrom.
+ */
+function mapComponentClasses(rows: readonly ComponentLinkRow[], today: string): ClassComponentRef[] {
   const byId = new Map<string, ClassComponentRef>();
 
   for (const row of rows) {
-    const component = Array.isArray(row.component) ? row.component[0] : row.component;
+    // The query already filters ended links; re-check so a stale row cannot mark the class composite.
+    if (row.effective_to !== null && row.effective_to < today) continue;
 
-    if (component && !byId.has(component.id)) {
-      byId.set(component.id, { code: component.code, id: component.id, name: component.name });
+    const component = Array.isArray(row.component) ? row.component[0] : row.component;
+    if (!component) continue;
+
+    const existing = byId.get(component.id);
+
+    if (!existing) {
+      byId.set(component.id, {
+        code: component.code,
+        effectiveFrom: row.effective_from,
+        id: component.id,
+        name: component.name,
+      });
+    } else if (row.effective_from < existing.effectiveFrom) {
+      existing.effectiveFrom = row.effective_from;
     }
   }
 

@@ -47,6 +47,8 @@ export interface ClassDirectoryItem {
 /** A component class of a composite ("lớp ghép") parent. */
 export interface ClassComponentRef {
   code: string;
+  /** ISO date (YYYY-MM-DD) the earliest non-ended link to this component starts; may be after today. */
+  effectiveFrom: string;
   id: string;
   name: string;
 }
@@ -55,10 +57,12 @@ export interface ClassDetailReadModel
   extends ClassDirectoryItem {
   classinUrl: string | null;
   /**
-   * Component classes linked to this class as a composite parent, for links
-   * effective today or later. Non-empty means the class is a composite parent:
-   * the database rejects its own sessions and schedule templates
-   * (COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION / _SCHEDULE_TEMPLATE).
+   * Component classes linked to this class as a composite parent, for every
+   * non-ended link (effective_to null or >= Vietnam today), future-starting
+   * links included. Non-empty means the database rejects schedule templates on
+   * this parent (COMPOSITE_PARENT_CANNOT_HAVE_SCHEDULE_TEMPLATE) and its own
+   * session creation (COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION) for dates
+   * on/after each link's effectiveFrom.
    */
   componentClasses: ClassComponentRef[];
   schedules: ClassScheduleReadModel[];

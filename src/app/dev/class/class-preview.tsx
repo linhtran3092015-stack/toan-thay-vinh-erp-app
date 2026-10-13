@@ -45,7 +45,7 @@ const schedules: ClassScheduleReadModel[] = [1, 3, 5].map((weekday) => ({
   weekday,
 }));
 
-function buildDetail(state: ClassPreviewState): ClassDetailReadModel {
+function buildDetail(state: ClassPreviewState, today: string): ClassDetailReadModel {
   const hasSchedule = state === "active";
 
   return {
@@ -62,12 +62,13 @@ function buildDetail(state: ClassPreviewState): ClassDetailReadModel {
     activeStudentCount: state === "active" ? 22 : state === "unscheduled" ? 6 : 0,
     classinUrl: state === "active" ? "https://www.classin.com/" : null,
     code: state === "composite" ? "L-9G26" : "L-9A26",
-    // A composite parent ("lớp ghép"): no schedule or sessions of its own.
+    // A composite parent ("lớp ghép"): no schedule or sessions of its own. The second
+    // link starts in two weeks, so the notice shows "từ dd/mm/yyyy" for it.
     componentClasses:
       state === "composite"
         ? [
-            { code: "L-9A26-T2", id: "class-preview-component-1", name: "Toán 9 ghép · thứ 2" },
-            { code: "L-9A26-T5", id: "class-preview-component-2", name: "Toán 9 ghép · thứ 5" },
+            { code: "L-9A26-T2", effectiveFrom: "2026-09-07", id: "class-preview-component-1", name: "Toán 9 ghép · thứ 2" },
+            { code: "L-9A26-T5", effectiveFrom: addDays(today, 14), id: "class-preview-component-2", name: "Toán 9 ghép · thứ 5" },
           ]
         : [],
     defaultLearningMode: "offline",
@@ -209,7 +210,7 @@ export function ClassPreview({ initialTab, role, state }: { initialTab?: string;
   const permissions = role === "ta" ? taPermissions : DATABASE_PERMISSION_CODES;
   const can = (code: PermissionCode) => permissions.includes(code);
   const today = getVietnamToday();
-  const detail = buildDetail(state);
+  const detail = buildDetail(state, today);
 
   return (
     <AppShell

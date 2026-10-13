@@ -2,7 +2,6 @@
 
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent, type RefObject } from "react";
 
 import { BulkActionBar } from "@/components/patterns/bulk-action-bar";
@@ -22,6 +21,7 @@ import {
   formatSessionOrdinal,
   getClassSessionStage,
   getRecordedCount,
+  getSessionAttendanceReadiness,
   matchesClassSessionFilter,
   type ClassSessionFilter,
   type ClassSessionRow,
@@ -61,6 +61,8 @@ interface ClassSessionsTabProps {
   batchHref: string | null;
   /** Bulk cancel is owner-only: sessions.manage and classes.manage_schedule (TAs hold only the first). */
   canBulkCancelSessions: boolean;
+  /** sessions.lock: without it a session ready to lock offers "Mở buổi", never "Khóa buổi". */
+  canLockSessions?: boolean;
   /** The page's class: only its own sessions are bulk-cancelled, never a component class's. */
   classId: string;
   /** HH:MM in Vietnam time: a session that ended earlier today without starting is overdue. */
@@ -78,6 +80,14 @@ interface ClassSessionsTabProps {
  */
 function isBulkCancellable(row: ClassSessionRow, stage: ClassSessionStage, classId: string): boolean {
   return row.classId === classId && row.status === "scheduled" && !row.lockedAt && (stage === "upcoming" || stage === "overdue");
+}
+
+interface BulkResultMessage {
+  description?: string;
+  /** Failed sessions left selected for a retry; the title mentions them only while they still are. */
+  keptIds?: readonly string[];
+  title: string;
+  tone: "success" | "warning";
 }
 
 /** "B3 ngày T4, 14/10/2026", or "đã hủy ngày …" for a cancelled session (it has no ordinal). */
@@ -112,6 +122,7 @@ export function ClassSessionsTab({
   attendanceAvailable,
   batchHref,
   canBulkCancelSessions,
+  canLockSessions = false,
   classId,
   nowTime,
   resultsAvailable,
@@ -119,18 +130,20 @@ export function ClassSessionsTab({
   today,
   truncated = false,
 }: ClassSessionsTabProps) {
-  const router = useRouter();
   const [filter, setFilter] = useState<ClassSessionFilter>("all");
   const [page, setPage] = useState(() => getInitialPage(rows, today));
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [isCancelOpen, setIsCancelOpen] = useState(false);
-  const [resultMessage, setResultMessage] = useState<{ tone: "success" | "warning"; title: string; description?: string } | null>(null);
+  const [resultMessage, setResultMessage] = useState<BulkResultMessage | null>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const firstMobileCheckboxRef = useRef<HTMLInputElement>(null);
   const chipsRef = useRef<HTMLDivElement>(null);
   const cancelTriggerRef = useRef<HTMLButtonElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
-  /** Set when a bulk cancel cleared the selection: its trigger is gone, so focus goes to the result. */
+  /**
+   * Set after a bulk cancel. Once nothing is selected the bar and its trigger are
+   * gone, so a focus that fell to the body moves to the result instead.
+   */
   const focusResultRef = useRef(false);
   // "Bỏ chọn" fallbacks: select-all is desktop-only, so mobile lands on the first row
   // checkbox, or on the active filter chip when this page has nothing to select.
@@ -147,12 +160,31 @@ export function ClassSessionsTab({
     [],
   );
 
-  useEffect(() => {
-    if (resultMessage && focusResultRef.current) {
-      focusResultRef.current = false;
-      resultRef.current?.focus();
-    }
-  }, [resultMessage]);
+  // Eligibility is re-derived from the current rows on every render: after a refresh a
+  // selected session may have started, been locked or cancelled elsewhere, and must
+  // drop out of the count, the bar and the dialog at once.
+  const eligibleIds = useMemo(
+    () =>
+      new Set(
+        canBulkCancelSessions
+          ? rows.filter((row) => isBulkCancellable(row, getClassSessionStage(row, today, nowTime), classId)).map((row) => row.id)
+          : [],
+      ),
+    [canBulkCancelSessions, classId, nowTime, rows, today],
+  );
+
+  // When the rows change, forget ids that are no longer eligible so they cannot come
+  // back if a session becomes eligible again. Adjusted during render (React's pattern
+  // for state derived from props) rather than in an effect; selectedRows below
+  // already ignores them for this render.
+  const [prunedFor, setPrunedFor] = useState(eligibleIds);
+  if (prunedFor !== eligibleIds) {
+    setPrunedFor(eligibleIds);
+    setSelectedIds((current) => {
+      const next = new Set([...current].filter((id) => eligibleIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }
 
   const counts = useMemo(() => countClassSessionFilters(rows, today, nowTime), [nowTime, rows, today]);
   const filtered = useMemo(
@@ -164,7 +196,19 @@ export function ClassSessionsTab({
   const pageRows = filtered.slice((currentPage - 1) * CLASS_SESSIONS_PAGE_SIZE, currentPage * CLASS_SESSIONS_PAGE_SIZE);
   const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * CLASS_SESSIONS_PAGE_SIZE + 1;
   const rangeEnd = Math.min(currentPage * CLASS_SESSIONS_PAGE_SIZE, filtered.length);
-  const selectedRows = rows.filter((row) => selectedIds.has(row.id));
+  const selectedRows = rows.filter((row) => selectedIds.has(row.id) && eligibleIds.has(row.id));
+  const selectedCount = selectedRows.length;
+
+  useEffect(() => {
+    if (!resultMessage || !focusResultRef.current || selectedCount > 0) return;
+    const active = document.activeElement;
+    // Focus is still somewhere useful (e.g. "Bỏ chọn" moved it to a checkbox): leave it.
+    if (active && active !== document.body && active.isConnected) return;
+    focusResultRef.current = false;
+    resultRef.current?.focus();
+  }, [resultMessage, selectedCount]);
+
+  const keptSelectedCount = resultMessage?.keptIds?.filter((id) => selectedRows.some((row) => row.id === id)).length ?? 0;
 
   function changeFilter(value: ClassSessionFilter) {
     setFilter(value);
@@ -180,10 +224,8 @@ export function ClassSessionsTab({
     });
   }
 
-  const hasBulkCancellable = canBulkCancelSessions && rows.some((row) => isBulkCancellable(row, getClassSessionStage(row, today, nowTime), classId));
-  const selectableOnPage = canBulkCancelSessions
-    ? pageRows.filter((row) => isBulkCancellable(row, getClassSessionStage(row, today, nowTime), classId)).map((row) => row.id)
-    : [];
+  const hasBulkCancellable = eligibleIds.size > 0;
+  const selectableOnPage = pageRows.filter((row) => eligibleIds.has(row.id)).map((row) => row.id);
   const selectedOnPage = selectableOnPage.filter((id) => selectedIds.has(id)).length;
   const allOnPageSelected = selectableOnPage.length > 0 && selectedOnPage === selectableOnPage.length;
 
@@ -242,7 +284,11 @@ export function ClassSessionsTab({
       {resultMessage ? (
         // Focus target after a bulk cancel that cleared the selection (its trigger unmounted).
         <div className="rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus" ref={resultRef} tabIndex={-1}>
-          <ResultBanner description={resultMessage.description} title={resultMessage.title} tone={resultMessage.tone} />
+          <ResultBanner
+            description={resultMessage.description}
+            title={keptSelectedCount > 0 ? `${resultMessage.title} Các buổi lỗi vẫn đang được chọn.` : resultMessage.title}
+            tone={resultMessage.tone}
+          />
         </div>
       ) : null}
 
@@ -250,11 +296,14 @@ export function ClassSessionsTab({
         <BulkActionBar
           onClear={() => setSelectedIds(new Set())}
           returnFocusRefs={clearFocusRefs}
-          selectedCount={selectedIds.size}
+          selectedCount={selectedCount}
           subject={formatBulkSubject(selectedRows)}
         >
           <Button
-            onClick={() => setIsCancelOpen(true)}
+            onClick={() => {
+              focusResultRef.current = false;
+              setIsCancelOpen(true);
+            }}
             ref={cancelTriggerRef}
             size="sm"
             type="button"
@@ -269,8 +318,8 @@ export function ClassSessionsTab({
         <DataTableFrame
           body={pageRows.map((row) => {
             const stage = getClassSessionStage(row, today, nowTime);
-            const selectable = canBulkCancelSessions && isBulkCancellable(row, stage, classId);
-            const isSelected = selectedIds.has(row.id);
+            const selectable = eligibleIds.has(row.id);
+            const isSelected = selectable && selectedIds.has(row.id);
 
             return (
               <TableRow key={row.id} selected={isSelected}>
@@ -304,7 +353,7 @@ export function ClassSessionsTab({
                   </span>
                 </TableCell>
                 <TableCell numeric>
-                  <AttendanceCell available={attendanceAvailable} row={row} />
+                  <AttendanceCell available={attendanceAvailable} classId={classId} row={row} />
                 </TableCell>
                 <TableCell numeric>
                   <ResultCell available={resultsAvailable} row={row} />
@@ -313,7 +362,7 @@ export function ClassSessionsTab({
                   <Badge tone={classSessionStageMeta[stage].tone}>{classSessionStageMeta[stage].label}</Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <SessionRowAction row={row} stage={stage} />
+                  <SessionRowAction canLockSessions={canLockSessions} classId={classId} row={row} stage={stage} />
                 </TableCell>
               </TableRow>
             );
@@ -367,7 +416,7 @@ export function ClassSessionsTab({
             <ResponsiveRecordList label="Buổi học của lớp">
               {pageRows.map((row) => {
                 const stage = getClassSessionStage(row, today, nowTime);
-                const selectable = canBulkCancelSessions && isBulkCancellable(row, stage, classId);
+                const selectable = eligibleIds.has(row.id);
                 const isFirstSelectable = selectable && row.id === selectableOnPage[0];
                 const timeAndRoom = `${formatTime(row.startTime)}–${formatTime(row.endTime)}${row.roomName ? ` · ${row.roomName}` : ""}`;
 
@@ -403,7 +452,7 @@ export function ClassSessionsTab({
                       row.attendance || row.resultCount !== null ? (
                         <span className="flex gap-4 text-secondary text-text-muted">
                           <span>
-                            Điểm danh <AttendanceCell available={attendanceAvailable} row={row} />
+                            Điểm danh <AttendanceCell available={attendanceAvailable} classId={classId} row={row} />
                           </span>
                           <span>
                             Kết quả <ResultCell available={resultsAvailable} row={row} />
@@ -427,8 +476,11 @@ export function ClassSessionsTab({
           onClose={() => setIsCancelOpen(false)}
           onDone={(outcome) => {
             setIsCancelOpen(false);
-            setSelectedIds(new Set(outcome.failed.map((item) => item.row.id)));
-            focusResultRef.current = outcome.failed.length === 0;
+            // Keep failed sessions selected for a retry only while they still look
+            // cancellable; the effect above drops the rest once fresh rows arrive.
+            const keptIds = outcome.failed.map((item) => item.row.id).filter((id) => eligibleIds.has(id));
+            setSelectedIds(new Set(keptIds));
+            focusResultRef.current = true;
             setResultMessage(
               outcome.failed.length === 0
                 ? { title: `Đã hủy ${outcome.cancelled} buổi.`, tone: "success" }
@@ -436,11 +488,13 @@ export function ClassSessionsTab({
                     description: outcome.failed
                       .map((item) => `${identifySession(item.row)}: ${item.message}`)
                       .join(" · "),
-                    title: `Đã hủy ${outcome.cancelled}/${outcome.cancelled + outcome.failed.length} buổi. Các buổi lỗi vẫn đang được chọn.`,
+                    keptIds,
+                    title: `Đã hủy ${outcome.cancelled}/${outcome.cancelled + outcome.failed.length} buổi.`,
                     tone: "warning",
                   },
             );
-            if (outcome.cancelled > 0) router.refresh();
+            // No router.refresh(): the action's revalidatePath(`/classes/${classId}`)
+            // already re-renders this page in the same response (Next 16 docs).
           }}
           returnFocusRef={cancelTriggerRef}
           rows={selectedRows}
@@ -450,21 +504,53 @@ export function ClassSessionsTab({
   );
 }
 
-function AttendanceCell({ available, row }: { available: boolean; row: ClassSessionRow }) {
-  if (row.status === "cancelled" || row.rosterCount === null) {
+/** "—" that also tells assistive tech and hover why there is no number. */
+function ExplainedDash({ reason }: { reason: string }) {
+  return (
+    <span className="text-text-muted" title={reason}>
+      <span aria-hidden="true">—</span>
+      <span className="sr-only">{reason}</span>
+    </span>
+  );
+}
+
+function AttendanceCell({ available, classId, row }: { available: boolean; classId: string; row: ClassSessionRow }) {
+  if (row.status === "cancelled") {
     return <span className="text-text-muted">—</span>;
   }
 
-  if (!available || !row.attendance) {
+  if (!available) {
+    return <ExplainedDash reason="Không có quyền xem điểm danh" />;
+  }
+
+  const readiness = getSessionAttendanceReadiness(row, classId);
+
+  if (readiness === "no_roster" || row.rosterCount === 0) {
+    return <span className="text-caption text-text-muted">Không có học sinh trong danh sách</span>;
+  }
+
+  if (readiness === "unknown") {
     return (
-      <span className="text-text-muted" title={available ? "Chưa tải được điểm danh" : "Không có quyền xem điểm danh"}>
-        —
-      </span>
+      <ExplainedDash
+        reason={
+          row.classId !== classId
+            ? `Buổi của lớp ${row.classCode}: danh sách ở đây chỉ gồm học sinh lớp này, mở buổi để xem đủ điểm danh`
+            : "Chưa tải được danh sách hoặc điểm danh của buổi"
+        }
+      />
     );
   }
 
+  if (row.rosterCount === null) {
+    return <span className="text-text-muted">—</span>;
+  }
+
+  if (!row.attendance) {
+    return <ExplainedDash reason="Chưa tải được điểm danh" />;
+  }
+
   const recorded = getRecordedCount(row.attendance);
-  const complete = row.rosterCount > 0 && recorded >= row.rosterCount;
+  const complete = recorded >= row.rosterCount;
 
   return (
     <span
@@ -497,10 +583,38 @@ function ResultCell({ available, row }: { available: boolean; row: ClassSessionR
   );
 }
 
-function SessionRowAction({ row, stage }: { row: ClassSessionRow; stage: ClassSessionStage }) {
-  const needsAttendance =
-    (stage === "live" || stage === "pending_lock") && row.attendance && row.rosterCount !== null && getRecordedCount(row.attendance) < row.rosterCount;
-  const label = needsAttendance ? "Điểm danh" : stage === "pending_lock" ? "Khóa buổi" : "Xem";
+/**
+ * Row CTA from getSessionAttendanceReadiness: "Điểm danh" while roster students are
+ * unrecorded, "Khóa buổi" only for a completed session whose attendance is complete
+ * and a viewer with sessions.lock, "Mở buổi" when the page cannot tell (component
+ * session, roster not loaded, empty roster), "Xem" otherwise.
+ */
+function getSessionRowActionLabel(row: ClassSessionRow, stage: ClassSessionStage, classId: string, canLockSessions: boolean): string {
+  switch (getSessionAttendanceReadiness(row, classId)) {
+    case "incomplete":
+      return "Điểm danh";
+    case "complete":
+      return stage === "pending_lock" && canLockSessions ? "Khóa buổi" : "Mở buổi";
+    case "unknown":
+    case "no_roster":
+      return "Mở buổi";
+    default:
+      return "Xem";
+  }
+}
+
+function SessionRowAction({
+  canLockSessions,
+  classId,
+  row,
+  stage,
+}: {
+  canLockSessions: boolean;
+  classId: string;
+  row: ClassSessionRow;
+  stage: ClassSessionStage;
+}) {
+  const label = getSessionRowActionLabel(row, stage, classId, canLockSessions);
 
   return (
     <Link
@@ -523,7 +637,7 @@ function BulkCancelDialog({
   onClose,
   onDone,
   returnFocusRef,
-  rows,
+  rows: liveRows,
 }: {
   classId: string;
   onClose: () => void;
@@ -534,26 +648,33 @@ function BulkCancelDialog({
   const [reason, setReason] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // The live selection follows eligibility; while the call runs the dialog keeps
+  // naming what was sent, even if the response's re-render prunes the selection.
+  const [sentRows, setSentRows] = useState<readonly ClassSessionRow[] | null>(null);
+  const rows = isPending && sentRows ? sentRows : liveRows;
   const trimmed = reason.trim();
   const isReasonTooShort = trimmed.length < CANCEL_REASON_MIN_LENGTH;
   const isTooMany = rows.length > BULK_CANCEL_MAX_SESSIONS;
+  const isEmpty = rows.length === 0;
   const reasonError = trimmed.length > 0 && isReasonTooShort ? `Lý do hủy phải có ít nhất ${CANCEL_REASON_MIN_LENGTH} ký tự.` : null;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isReasonTooShort || isTooMany) {
+    if (isReasonTooShort || isTooMany || isEmpty) {
       return;
     }
 
+    const submitted = rows;
     setSubmitError(null);
+    setSentRows(submitted);
     startTransition(async () => {
       let result: CancelClassSessionsActionState;
 
       // One call: the server cancels the sessions one by one, in date order, and a
       // failure does not stop the others.
       try {
-        result = await cancelClassSessionsAction({ classId, reason: trimmed, sessionIds: rows.map((row) => row.id) });
+        result = await cancelClassSessionsAction({ classId, reason: trimmed, sessionIds: submitted.map((row) => row.id) });
       } catch {
         setSubmitError("Không kết nối được hệ thống. Tải lại trang để xem buổi nào đã hủy rồi thử lại.");
         return;
@@ -564,7 +685,7 @@ function BulkCancelDialog({
         return;
       }
 
-      const rowsById = new Map(rows.map((row) => [row.id, row]));
+      const rowsById = new Map(submitted.map((row) => [row.id, row]));
 
       onDone({
         cancelled: result.cancelled,
@@ -643,11 +764,13 @@ function BulkCancelDialog({
             Không hủy
           </Button>
           <Button
-            disabled={isPending || isReasonTooShort || isTooMany}
+            disabled={isPending || isReasonTooShort || isTooMany || isEmpty}
             disabledReason={
               isPending
                 ? undefined
-                : isTooMany
+                : isEmpty
+                  ? "Không còn buổi nào hủy được; đóng hộp thoại"
+                  : isTooMany
                   ? `Mỗi lần hủy tối đa ${BULK_CANCEL_MAX_SESSIONS} buổi; bỏ chọn bớt`
                   : isReasonTooShort
                     ? `Nhập lý do hủy (ít nhất ${CANCEL_REASON_MIN_LENGTH} ký tự)`

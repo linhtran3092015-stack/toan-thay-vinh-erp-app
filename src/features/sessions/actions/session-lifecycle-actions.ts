@@ -102,6 +102,12 @@ function getLifecycleRpcErrorMessage(
     CLASS_SESSION_CANCELLATION_REASON_REQUIRED:
       "Bắt buộc nhập lý do hủy buổi học.",
 
+    CLASS_SESSION_ALREADY_LOCKED:
+      "Buổi học đã khóa nên không hủy được.",
+
+    CLASS_SESSION_CANCEL_STATUS_INVALID:
+      "Buổi học không còn ở trạng thái có thể hủy.",
+
     CLASS_SESSION_CANCEL_TRANSITION_INVALID:
       "Trạng thái hiện tại không cho phép hủy buổi học.",
 
@@ -204,6 +210,8 @@ function getLifecycleRpcErrorMessage(
       "Buổi học không ở trạng thái có thể bắt đầu.",
     COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION:
       "Lớp ghép không có buổi học riêng. Hãy tạo buổi trên lớp thành phần (ví dụ 7A hoặc 7B).",
+    COMPOSITE_PARENT_CANNOT_HAVE_SCHEDULE_TEMPLATE:
+      "Lớp ghép không có lịch cố định riêng; lịch học nằm ở các lớp thành phần.",
   };
 
   for (
@@ -488,9 +496,11 @@ export async function cancelSessionAction(
  * Bulk cancel from a class page (owner decision D6). Owner-only: needs both
  * sessions.manage and classes.manage_schedule, which teaching assistants lack.
  * Sessions must belong to `classId` (a composite parent's page also lists its
- * components' sessions); each one goes through the same cancel_class_session
- * RPC as a single cancel, one after another, and a failure does not stop the
- * rest. Routes are revalidated once, after the loop.
+ * components' sessions) and must still be scheduled and unlocked: the RPC
+ * itself also cancels an in-progress session, which a bulk action must never
+ * do. Each eligible one goes through the same cancel_class_session RPC as a
+ * single cancel, one after another, and a failure does not stop the rest.
+ * Routes are revalidated once, after the loop.
  */
 export async function cancelClassSessionsAction(
   input: CancelClassSessionsActionInput,
@@ -540,7 +550,10 @@ export async function cancelClassSessionsAction(
   let supabase: Awaited<
     ReturnType<typeof createSupabaseServerClient>
   >;
-  let ownSessionIds: Set<string>;
+  let ownSessions: Map<
+    string,
+    { lockedAt: string | null; status: string }
+  >;
 
   try {
     supabase =
@@ -548,7 +561,7 @@ export async function cancelClassSessionsAction(
 
     const { data, error } = await supabase
       .from("class_sessions")
-      .select("id")
+      .select("id, status, locked_at")
       .eq("class_id", classId)
       .in("id", sessionIds);
 
@@ -558,8 +571,14 @@ export async function cancelClassSessionsAction(
       );
     }
 
-    ownSessionIds = new Set(
-      (data ?? []).map((row) => row.id),
+    ownSessions = new Map(
+      (data ?? []).map((row) => [
+        row.id,
+        {
+          lockedAt: row.locked_at,
+          status: row.status,
+        },
+      ]),
     );
   } catch {
     return createBulkCancelErrorState(
@@ -574,10 +593,26 @@ export async function cancelClassSessionsAction(
   }> = [];
 
   for (const sessionId of sessionIds) {
-    if (!ownSessionIds.has(sessionId)) {
+    const session = ownSessions.get(sessionId);
+
+    if (!session) {
       failed.push({
         message:
           "Buổi học không thuộc lớp này nên không hủy ở đây.",
+        sessionId,
+      });
+      continue;
+    }
+
+    // Only sessions nobody started: cancel_class_session also accepts
+    // in_progress, which the class page never offers in bulk.
+    if (
+      session.status !== "scheduled" ||
+      session.lockedAt !== null
+    ) {
+      failed.push({
+        message:
+          "Buổi học đã bắt đầu, đã khóa hoặc đã hủy nên không hủy hàng loạt.",
         sessionId,
       });
       continue;
@@ -618,8 +653,14 @@ export async function cancelClassSessionsAction(
     }
   }
 
+  // revalidatePath in a server action also re-renders the calling page in this
+  // response, so the class page needs no router.refresh(). When nothing was
+  // cancelled but sessions were refused, the page's view of them was stale:
+  // refresh just the class page so its selection drops them.
   if (cancelled > 0) {
     revalidateSessionRoutes();
+    revalidatePath(`/classes/${classId}`);
+  } else if (failed.length > 0) {
     revalidatePath(`/classes/${classId}`);
   }
 

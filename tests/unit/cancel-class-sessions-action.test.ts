@@ -1,7 +1,7 @@
-// Value: protects=bulk cancel from the class page stays owner-only (sessions.manage AND classes.manage_schedule), only cancels sessions of the given class, runs the same cancel_class_session RPC per session without stopping on a failure, and revalidates once after the loop;
-// fails_when=a permission check is dropped or a failed lookup falls through, bad input reaches the database, a component class's session is cancelled from a parent page, one failed RPC aborts the rest or is counted as cancelled, or revalidatePath runs per session;
-// why_new=new public server action replacing N client-side cancelSessionAction calls (owner decision D6);
-// seam=none; no_claim=does not prove cancel_class_session or RLS accept these calls
+// Value: protects=bulk cancel from the class page stays owner-only (sessions.manage AND classes.manage_schedule), only cancels scheduled, unlocked sessions of the given class, caps one call at 40 sessions, runs the same cancel_class_session RPC per session without stopping on a failure, maps the RPC's lock/status errors to Vietnamese, and revalidates once after the loop;
+// fails_when=a permission check is dropped or a failed lookup falls through, bad input reaches the database, a component class's session or an in-progress/locked session reaches the RPC, the cap is raised, one failed RPC aborts the rest or is counted as cancelled, a real RPC error code falls back to the generic message, revalidatePath runs per session, or a refused-only call leaves the class page stale;
+// why_new=new public server action replacing N client-side cancelSessionAction calls (owner decision D6); status pre-filter, 40 cap and error codes added after red-team review;
+// seam=none; no_claim=does not prove cancel_class_session or RLS accept these calls, nor that a session cannot start between the lookup and the RPC
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -28,12 +28,18 @@ const sessionC = "33333333-3333-4333-8333-333333333333";
 const otherClassSession = "44444444-4444-4444-8444-444444444444";
 const owner = { ok: true, permissions: ["sessions.manage", "classes.manage_schedule"] };
 
-/** Supabase double: `ownIds` are the rows the class_sessions lookup returns; `rpc` answers per session. */
-function mockClient({ lookupError = null, ownIds, rpc }: { lookupError?: unknown; ownIds: string[]; rpc: (sessionId: string) => unknown }) {
+type LookupRow = { id: string; locked_at?: string | null; status?: string };
+
+/**
+ * Supabase double: `ownIds` are the rows the class_sessions lookup returns (a bare id
+ * is a scheduled, unlocked session); `rpc` answers per session.
+ */
+function mockClient({ lookupError = null, ownIds, rpc }: { lookupError?: unknown; ownIds: Array<string | LookupRow>; rpc: (sessionId: string) => unknown }) {
   const lookup = { eq: vi.fn(), in: vi.fn(), select: vi.fn() };
   lookup.select.mockReturnValue(lookup);
   lookup.eq.mockReturnValue(lookup);
-  lookup.in.mockResolvedValue({ data: lookupError ? null : ownIds.map((id) => ({ id })), error: lookupError });
+  const rows = ownIds.map((row) => ({ locked_at: null, status: "scheduled", ...(typeof row === "string" ? { id: row } : row) }));
+  lookup.in.mockResolvedValue({ data: lookupError ? null : rows, error: lookupError });
   const client = {
     from: vi.fn().mockReturnValue(lookup),
     rpc: vi.fn().mockImplementation(async (_name: string, args: { p_class_session_id: string }) => rpc(args.p_class_session_id)),
@@ -75,7 +81,7 @@ describe("cancelClassSessionsAction", () => {
   it.each([
     ["no sessions", { classId, reason: "Trùng lịch thi", sessionIds: [] }, "Chọn ít nhất 1 buổi học cần hủy."],
     ["a duplicated session", { classId, reason: "Trùng lịch thi", sessionIds: [sessionA, sessionA] }, "Danh sách buổi học bị trùng."],
-    ["more than 100 sessions", { classId, reason: "Trùng lịch thi", sessionIds: Array.from({ length: 101 }, (_, index) => `${String(index).padStart(8, "0")}-1111-4111-8111-111111111111`) }, "Mỗi lần chỉ hủy được tối đa 100 buổi."],
+    ["more than 40 sessions", { classId, reason: "Trùng lịch thi", sessionIds: Array.from({ length: 41 }, (_, index) => `${String(index).padStart(8, "0")}-1111-4111-8111-111111111111`) }, "Mỗi lần chỉ hủy được tối đa 40 buổi."],
     ["a short reason", { classId, reason: "  ab ", sessionIds: [sessionA] }, "Lý do hủy phải có ít nhất 3 ký tự."],
     ["a non-uuid session", { classId, reason: "Trùng lịch thi", sessionIds: ["s-1"] }, "Mã buổi học không hợp lệ."],
   ])("rejects %s before touching the database", async (_label, input, message) => {
@@ -111,6 +117,7 @@ describe("cancelClassSessionsAction", () => {
       ],
       status: "success",
     });
+    expect(lookup.select).toHaveBeenCalledWith("id, status, locked_at");
     expect(lookup.eq).toHaveBeenCalledWith("class_id", classId);
     expect(lookup.in).toHaveBeenCalledWith("id", [sessionA, sessionB, sessionC]);
     expect(client.rpc.mock.calls).toEqual([
@@ -139,7 +146,7 @@ describe("cancelClassSessionsAction", () => {
     expect(client.rpc).toHaveBeenCalledWith("cancel_class_session", { p_class_session_id: sessionA, p_reason: "Trùng lịch thi" });
   });
 
-  it("cancels nothing when the class lookup fails, and skips revalidation when nothing was cancelled", async () => {
+  it("cancels nothing when the class lookup fails, and refreshes only the class page when nothing was cancelled", async () => {
     mocks.getCachedDatabasePermissions.mockResolvedValue(owner);
     const failedLookup = mockClient({ lookupError: { message: "boom" }, ownIds: [], rpc: () => ({ data: null, error: null }) });
 
@@ -153,6 +160,65 @@ describe("cancelClassSessionsAction", () => {
 
     expect(result).toEqual({ cancelled: 0, failed: [{ message: "Buổi học đã khóa nên không thể thay đổi.", sessionId: sessionA }], status: "success" });
     expect(allFailed.client.rpc).toHaveBeenCalledTimes(1);
-    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    // The refused session's state was stale on the page: refresh the class page only, not the session routes.
+    expect(mocks.revalidatePath.mock.calls).toEqual([[`/classes/${classId}`]]);
+  });
+
+  it("accepts exactly 40 sessions", async () => {
+    mocks.getCachedDatabasePermissions.mockResolvedValue(owner);
+    const ids = Array.from({ length: 40 }, (_, index) => `${String(index).padStart(8, "0")}-1111-4111-8111-111111111111`);
+    const { client } = mockClient({ ownIds: ids, rpc: (sessionId) => ({ data: { id: sessionId }, error: null }) });
+
+    const result = await cancelClassSessionsAction({ classId, reason: "Trùng lịch thi", sessionIds: ids });
+
+    expect(result).toEqual({ cancelled: 40, failed: [], status: "success" });
+    expect(client.rpc).toHaveBeenCalledTimes(40);
+  });
+
+  it("never sends an in-progress, locked or already cancelled session to the RPC", async () => {
+    mocks.getCachedDatabasePermissions.mockResolvedValue(owner);
+    const inProgress = sessionB;
+    const lockedScheduled = sessionC;
+    const { client } = mockClient({
+      ownIds: [
+        sessionA,
+        { id: inProgress, status: "in_progress" },
+        { id: lockedScheduled, locked_at: "2026-10-12T15:00:00Z", status: "scheduled" },
+        { id: otherClassSession, status: "cancelled" },
+      ],
+      rpc: (sessionId) => ({ data: { id: sessionId }, error: null }),
+    });
+
+    const result = await cancelClassSessionsAction({
+      classId,
+      reason: "Trùng lịch thi",
+      sessionIds: [sessionA, inProgress, lockedScheduled, otherClassSession],
+    });
+
+    const refused = "Buổi học đã bắt đầu, đã khóa hoặc đã hủy nên không hủy hàng loạt.";
+    expect(result).toEqual({
+      cancelled: 1,
+      failed: [
+        { message: refused, sessionId: inProgress },
+        { message: refused, sessionId: lockedScheduled },
+        { message: refused, sessionId: otherClassSession },
+      ],
+      status: "success",
+    });
+    expect(client.rpc.mock.calls).toEqual([["cancel_class_session", { p_class_session_id: sessionA, p_reason: "Trùng lịch thi" }]]);
+  });
+
+  // Messages exactly as cancel_class_session raises them (20260725120000_session_lifecycle_workflows.sql).
+  it.each([
+    ["CLASS_SESSION_ALREADY_LOCKED", "Buổi học đã khóa nên không hủy được."],
+    ["CLASS_SESSION_CANCEL_STATUS_INVALID", "Buổi học không còn ở trạng thái có thể hủy."],
+    ["CLASS_SESSION_CANCEL_TRANSITION_INVALID", "Trạng thái hiện tại không cho phép hủy buổi học."],
+  ])("maps the RPC error %s to its Vietnamese message", async (databaseMessage, userMessage) => {
+    mocks.getCachedDatabasePermissions.mockResolvedValue(owner);
+    mockClient({ ownIds: [sessionA], rpc: () => ({ data: null, error: { code: "23514", message: databaseMessage } }) });
+
+    const result = await cancelClassSessionsAction({ classId, reason: "Trùng lịch thi", sessionIds: [sessionA] });
+
+    expect(result).toEqual({ cancelled: 0, failed: [{ message: userMessage, sessionId: sessionA }], status: "success" });
   });
 });

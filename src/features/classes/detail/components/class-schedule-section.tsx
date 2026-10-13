@@ -33,21 +33,23 @@ export function getDurationMinutes(startTime: string, endTime: string): number |
 
 /**
  * Note for a composite parent ("lớp ghép"): it has no schedule of its own, its
- * component classes do. Links to each component instead of a merged schedule.
+ * component classes do. Links to each component instead of a merged schedule;
+ * a link that starts after `today` (YYYY-MM-DD) says from when.
  */
-export function CompositeComponentsNotice({ components }: { components: readonly ClassComponentRef[] }) {
+export function CompositeComponentsNotice({ components, today }: { components: readonly ClassComponentRef[]; today: string }) {
   return (
     <div className="rounded-md border border-dashed border-border-strong bg-surface-subtle px-3 py-2.5 text-secondary text-text-muted">
       <p>Lớp ghép không có lịch riêng. Lịch và buổi học nằm ở các lớp thành phần:</p>
       <ul className="mt-1.5 grid gap-0.5">
         {components.map((component) => (
-          <li key={component.id}>
+          <li className="flex flex-wrap items-center gap-x-2" key={component.id}>
             <Link
               className="inline-flex min-h-11 items-center font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus md:min-h-8"
               href={`/classes/${component.id}`}
             >
               {component.code} · {component.name}
             </Link>
+            {component.effectiveFrom > today ? <span>từ {formatIsoDate(component.effectiveFrom)}</span> : null}
           </li>
         ))}
       </ul>
@@ -64,6 +66,8 @@ export function sortSchedules(schedules: readonly ClassScheduleReadModel[]): Cla
 interface ClassScheduleSectionProps {
   canManageSchedule: boolean;
   detail: ClassDetailReadModel;
+  /** YYYY-MM-DD in Vietnam time: component links that start later show their start date. */
+  today: string;
 }
 
 /**
@@ -71,11 +75,12 @@ interface ClassScheduleSectionProps {
  * create form while slots remain, and the history. Moved unchanged in behaviour
  * from the old detail page; the overview's "Sửa lịch" link jumps here.
  */
-export function ClassScheduleSection({ canManageSchedule, detail }: ClassScheduleSectionProps) {
+export function ClassScheduleSection({ canManageSchedule, detail, today }: ClassScheduleSectionProps) {
   const activeSchedules = sortSchedules(detail.schedules.filter((schedule) => schedule.isActive));
   const historicalSchedules = detail.schedules.filter((schedule) => !schedule.isActive);
   const remainingScheduleSlots = Math.max(0, detail.weeklySessionCount - detail.activeScheduleCount);
-  // The database rejects schedule templates on a linked composite parent.
+  // The database rejects schedule templates on a linked composite parent, also
+  // while the link has not started yet (any overlap with an open-ended template).
   const isCompositeParent = detail.componentClasses.length > 0;
   const canModifySchedule =
     canManageSchedule && !isCompositeParent && detail.status === "active" && detail.academicYear?.status === "active";
@@ -87,7 +92,7 @@ export function ClassScheduleSection({ canManageSchedule, detail }: ClassSchedul
       <ProfilePanel title="Lịch học cố định" titleId="class-schedule-management-title">
         <div className="grid gap-4">
           {isCompositeParent ? (
-            <CompositeComponentsNotice components={detail.componentClasses} />
+            <CompositeComponentsNotice components={detail.componentClasses} today={today} />
           ) : canCreateSchedule ? (
             <ClassScheduleCreateForm
               classId={detail.id}
@@ -163,7 +168,7 @@ function ScheduleCard({ canManageSchedule = false, schedule }: { canManageSchedu
 
       {schedule.meetingUrl ? (
         <a
-          className="mt-3 inline-flex min-h-10 items-center text-secondary font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+          className="mt-3 inline-flex min-h-11 items-center text-secondary md:min-h-8 font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
           href={schedule.meetingUrl}
           rel="noopener noreferrer"
           target="_blank"

@@ -98,12 +98,14 @@ export function ClassDetailPage({
   // cancels (and is only blocked by) the class's own sessions.
   const ownSessionRows = sessionRows ? sessionRows.filter((row) => row.classId === detail.id) : null;
   const classStatus = getClassStatusMeta(detail.status);
+  const statusSuccessRef = useRef<HTMLDivElement>(null);
   const statusOperations = useClassStatusOperations({
     classCode: detail.code,
     classId: detail.id,
     className: detail.name,
     scheduledSessionCount: ownSessionRows ? ownSessionRows.filter((row) => row.status === "scheduled").length : null,
     status: detail.status,
+    successFocusRef: statusSuccessRef,
   });
   const [isEnrollOpen, setIsEnrollOpen] = useState(false);
   const [enrollMessage, setEnrollMessage] = useState<string | null>(null);
@@ -146,6 +148,7 @@ export function ClassDetailPage({
       ? "Chưa tải được danh sách học sinh, tải lại trang"
       : null;
   // The database rejects sessions on a linked composite parent: its components hold them.
+  // componentClasses also lists links that start later, so the link hides before then.
   const isCompositeParent = detail.componentClasses.length > 0;
   const batchHref =
     canManageSessions && detail.status === "active" && !isCompositeParent
@@ -178,7 +181,7 @@ export function ClassDetailPage({
       <header className="grid gap-4">
         <nav aria-label="Điều hướng lớp học" className="text-secondary">
           <Link
-            className="inline-flex items-center gap-1 font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+            className="inline-flex min-h-11 items-center gap-1 font-semibold text-action-link hover:underline md:min-h-8 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
             href={directoryQuery ? `/classes?${directoryQuery}` : "/classes"}
           >
             <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.8} />
@@ -248,7 +251,16 @@ export function ClassDetailPage({
           </div>
         </div>
 
-        {statusOperations.successMessage ? <ResultBanner title={statusOperations.successMessage} tone="success" /> : null}
+        {statusOperations.successMessage ? (
+          // Focus target when the new status leaves the "…" menu empty (archived): its trigger unmounts.
+          <div
+            className="rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+            ref={statusSuccessRef}
+            tabIndex={-1}
+          >
+            <ResultBanner title={statusOperations.successMessage} tone="success" />
+          </div>
+        ) : null}
         {enrollMessage ? <ResultBanner title={enrollMessage} tone="success" /> : null}
       </header>
 
@@ -268,7 +280,7 @@ export function ClassDetailPage({
             today={resolvedToday}
             workspace={workspace}
           />
-          <ClassScheduleSection canManageSchedule={canManageSchedule} detail={detail} />
+          <ClassScheduleSection canManageSchedule={canManageSchedule} detail={detail} today={resolvedToday} />
         </TabPanel>
 
         {tabItems.some((item) => item.value === "sessions") ? (
@@ -278,6 +290,7 @@ export function ClassDetailPage({
                 attendanceAvailable={workspace.attendance.status === "ready"}
                 batchHref={batchHref}
                 canBulkCancelSessions={canBulkCancelSessions}
+                canLockSessions={canLockSessions}
                 classId={detail.id}
                 resultsAvailable={workspace.results.status === "ready"}
                 nowTime={resolvedNow}

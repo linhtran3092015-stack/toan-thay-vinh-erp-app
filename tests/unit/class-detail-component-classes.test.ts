@@ -1,6 +1,6 @@
-// Value: protects=a composite class lists each in-force component class once, in component_order, for object or array embeds;
-// a link read error fails the page;
-// fails_when=the today filter or component_order sort is dropped, a component linked for two periods shows twice, an array embed is lost, or a link error is swallowed;
+// Value: protects=a composite class lists each non-ended component class once (future links included, with effectiveFrom), in component_order,
+// for object or array embeds; a link read error fails the page;
+// fails_when=future links are dropped again, ended links are listed, the component_order sort or dedupe is lost, an array embed is lost, or a link error is swallowed;
 // why_new=getClassDetail's componentClasses mapping had no unit test (the workspace tests mock it);
 // seam=none; no_claim=does not prove PostgREST accepts the embed alias or the or() filter syntax
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -72,18 +72,18 @@ beforeEach(() => {
 });
 
 describe("getClassDetail componentClasses", () => {
-  // Value: protects=links that started on or before today (including one starting today) are listed once each, in component order;
-  // fails_when=the effective_from <= today filter becomes strict (a link starting today is dropped) or the dedupe/order is lost;
-  // why_new=fixtures gained effective_from when componentClasses started filtering on it;
+  // Value: protects=every non-ended link is listed once per component in component order, carrying the earliest effectiveFrom;
+  // fails_when=the dedupe/order is lost, effectiveFrom is missing, or a later window overwrites an earlier effectiveFrom;
+  // why_new=componentClasses now carries effectiveFrom and keeps future links (api-contract review);
   // seam=none; no_claim=does not prove PostgREST returns effective_from as an ISO date string
-  it("lists in-force components once each, in component order, for object and array embeds", async () => {
+  it("lists non-ended components once each, in component order, with the earliest effectiveFrom", async () => {
     const calls = arrange({
       data: [
-        { component: algebra, component_order: 1, effective_from: "2026-09-01" },
+        { component: algebra, component_order: 1, effective_from: "2026-09-01", effective_to: "2026-10-31" },
         // Same component linked again for a later period.
-        { component: [algebra], component_order: 1, effective_from: "2026-10-13" },
-        { component: [geometry], component_order: 2, effective_from: "2026-10-13" },
-        { component: null, component_order: 3, effective_from: "2026-09-01" },
+        { component: [algebra], component_order: 1, effective_from: "2026-11-01", effective_to: null },
+        { component: [geometry], component_order: 2, effective_from: "2026-10-13", effective_to: null },
+        { component: null, component_order: 3, effective_from: "2026-09-01", effective_to: null },
       ],
       error: null,
     });
@@ -95,18 +95,22 @@ describe("getClassDetail componentClasses", () => {
     expect(calls.class_component_links).toContainEqual(["order", ["component_order", { ascending: true }]]);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.detail.componentClasses).toEqual([algebra, geometry]);
+    expect(result.detail.componentClasses).toEqual([
+      { ...algebra, effectiveFrom: "2026-09-01" },
+      { ...geometry, effectiveFrom: "2026-10-13" },
+    ]);
   });
 
-  // Value: protects=a link that starts after today does not make the class composite today (the UI would hide its own session and schedule controls);
-  // fails_when=componentClasses ignores effective_from again, or effective_from stops being selected;
-  // why_new=red-team found a future-starting link listed as a component while the database still accepts the parent's own sessions dated before it;
-  // seam=none; no_claim=does not cover open-ended schedule templates, which the database rejects while any future link overlaps them
-  it("leaves out links that start after today", async () => {
+  // Value: protects=a link starting after today still marks the class composite (the database already rejects its schedule templates and
+  // sessions dated from that start), exposing effectiveFrom so the UI can say when;
+  // fails_when=componentClasses filters on effective_from <= today again, or effective_from stops being selected;
+  // why_new=api-contract review: b6d2930 dropped future links while validate_component_parent_schedule rejects templates overlapping any link;
+  // seam=none; no_claim=does not prove which session dates the database accepts before effectiveFrom
+  it("keeps links that start after today, with their effectiveFrom", async () => {
     const calls = arrange({
       data: [
-        { component: algebra, component_order: 1, effective_from: "2026-10-14" },
-        { component: [geometry], component_order: 2, effective_from: "2026-11-01" },
+        { component: algebra, component_order: 1, effective_from: "2026-10-14", effective_to: null },
+        { component: [geometry], component_order: 2, effective_from: "2026-11-01", effective_to: "2027-05-31" },
       ],
       error: null,
     });
@@ -116,7 +120,30 @@ describe("getClassDetail componentClasses", () => {
     expect(calls.class_component_links?.find(([method]) => method === "select")?.[1][0]).toContain("effective_from");
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.detail.componentClasses).toEqual([]);
+    expect(result.detail.componentClasses).toEqual([
+      { ...algebra, effectiveFrom: "2026-10-14" },
+      { ...geometry, effectiveFrom: "2026-11-01" },
+    ]);
+  });
+
+  // Value: protects=a link that ended before today does not make the class composite, even if the server filter lets it through;
+  // fails_when=the effective_to >= today check is dropped on both the query and the mapping, or a link ending today is treated as ended;
+  // why_new=componentClasses now keeps future links, so ended-link exclusion needs its own test;
+  // seam=none; no_claim=does not prove PostgREST applies the or() filter
+  it("leaves out links that ended before today but keeps one ending today", async () => {
+    arrange({
+      data: [
+        { component: algebra, component_order: 1, effective_from: "2026-09-01", effective_to: "2026-10-12" },
+        { component: geometry, component_order: 2, effective_from: "2026-09-01", effective_to: "2026-10-13" },
+      ],
+      error: null,
+    });
+
+    const result = await getClassDetail("class-1", { includeStudentCounts: false });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.detail.componentClasses).toEqual([{ ...geometry, effectiveFrom: "2026-09-01" }]);
   });
 
   it("fails with component_links_query_failed when the link read errors", async () => {

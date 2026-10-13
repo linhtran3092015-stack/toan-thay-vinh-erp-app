@@ -262,8 +262,11 @@ export const cancelSessionSchema =
       ),
   });
 
-/** Most sessions one bulk cancel may touch; the server cancels them one by one. */
-export const BULK_CANCEL_MAX_SESSIONS = 100;
+/**
+ * Most sessions one bulk cancel may touch. The server cancels them one RPC at a
+ * time, so the cap keeps one action well inside the server function timeout.
+ */
+export const BULK_CANCEL_MAX_SESSIONS = 40;
 
 /** Bulk cancel from a class page: every session must belong to that class (checked on the server). */
 export const cancelClassSessionsSchema = z.object({

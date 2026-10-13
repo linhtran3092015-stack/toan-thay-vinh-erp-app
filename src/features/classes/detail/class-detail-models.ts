@@ -310,6 +310,27 @@ export function getRecordedCount(tally: ClassSessionAttendanceTally): number {
   return tally.present + tally.absent;
 }
 
+/**
+ * Whether a session's attendance is ready to lock, as far as this page can tell.
+ * `not_applicable` = not in progress or completed, or already locked or cancelled;
+ * `unknown` = a component class's session on a composite parent's page (its
+ * roster here is filtered, while lock_class_session_internal checks the full
+ * roster) or roster / attendance not loaded; `no_roster` = resolved roster is
+ * empty; `incomplete` = fewer roster students recorded (present or an absence)
+ * than on the roster; `complete` otherwise. Show a lock CTA only on `complete`.
+ */
+export type SessionAttendanceReadiness = "not_applicable" | "unknown" | "no_roster" | "incomplete" | "complete";
+
+export function getSessionAttendanceReadiness(
+  row: Pick<ClassSessionRow, "attendance" | "classId" | "lockedAt" | "rosterCount" | "status">,
+  classId: string,
+): SessionAttendanceReadiness {
+  if ((row.status !== "in_progress" && row.status !== "completed") || row.lockedAt) return "not_applicable";
+  if (row.classId !== classId || row.rosterCount === null || row.attendance === null) return "unknown";
+  if (row.rosterCount === 0) return "no_roster";
+  return getRecordedCount(row.attendance) < row.rosterCount ? "incomplete" : "complete";
+}
+
 /** Present / (present + absences) over completed sessions with a tally; `null` when none. */
 export function getClassAttendanceRate(rows: readonly ClassSessionRow[]): number | null {
   let present = 0;

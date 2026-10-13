@@ -14,6 +14,7 @@ import {
   getAttendanceChart,
   getClassAttendanceRate,
   getClassSessionStage,
+  getSessionAttendanceReadiness,
   hasSessionEnded,
   isAbsenceStatus,
   isLockCountedAttendanceStatus,
@@ -154,17 +155,19 @@ describe("findNextClassSession", () => {
     expect(findNextClassSession(rows, TODAY, "22:00")?.id).toBe("friday");
   });
 
-  // Value: protects=the "next session" card never shows a session the sessions list already calls overdue, at the exact end minute and seconds after it;
-  // fails_when=findNextClassSession and getClassSessionStage use different end-time rules again (e.g. HH:MM slices with >=, which kept a session ending 21:30 as next until 21:31);
-  // why_new=review found findNextClassSession compared minutes with >= while the stage used full times with <=, so at 21:30–21:30:59 a row was both next and overdue;
+  // Value: protects=a session ending 21:30:00 has ended exactly at 21:30 (HH:MM or HH:MM:SS) and not one second before, and the "next session"
+  // card never shows a session the sessions list already calls overdue;
+  // fails_when=hasSessionEnded compares with < instead of <=, mishandles HH:MM vs HH:MM:SS, or findNextClassSession and getClassSessionStage use different end-time rules again;
+  // why_new=testing review: the old check compared hasSessionEnded with getClassSessionStage, which calls it (a tautology); now literal expectations;
   // seam=none; no_claim=does not prove getVietnamTime returns seconds in production
-  it("agrees with the stage on when a session has ended", () => {
+  it("ends a session exactly at its end time and agrees with the stage", () => {
     const rows = [session({ id: "tonight", sessionDate: TODAY }), session({ id: "friday", sessionDate: "2026-10-16" })];
+
+    expect(["21:29:59", "21:30", "21:30:00", "21:30:30"].map((nowTime) => hasSessionEnded(rows[0], TODAY, nowTime))).toEqual([false, true, true, true]);
 
     for (const nowTime of ["21:29:59", "21:30", "21:30:00", "21:30:30"]) {
       const next = findNextClassSession(rows, TODAY, nowTime);
       expect(next && getClassSessionStage(next, TODAY, nowTime)).toBe("upcoming");
-      expect(hasSessionEnded(rows[0], TODAY, nowTime)).toBe(getClassSessionStage(rows[0], TODAY, nowTime) === "overdue");
     }
 
     expect(findNextClassSession(rows, TODAY, "21:29:59")?.id).toBe("tonight");
@@ -184,6 +187,33 @@ describe("attendance status helpers", () => {
     expect(["present", "excused_absence", "unexcused_absence", "additional_study", "late"].map(isLockCountedAttendanceStatus)).toEqual([true, true, true, false, false]);
     expect(["present", "excused_absence", "unexcused_absence", "additional_study"].map(isAbsenceStatus)).toEqual([false, true, true, false]);
     expect([ABSENCE_STREAK_THRESHOLD, ABSENCE_STREAK_DANGER_COUNT, LOW_ATTENDANCE_RATE]).toEqual([2, 3, 85]);
+  });
+});
+
+describe("getSessionAttendanceReadiness", () => {
+  // Value: protects=the lock CTA readiness for both tabs: only an own, open, unlocked session with a loaded non-empty roster whose every
+  // student has present or an absence is "complete"; a component class's session on a parent page is "unknown";
+  // fails_when=a locked, cancelled or scheduled session gets a readiness, a component session is judged from the parent's filtered roster,
+  // additional_study walk-ins or unmarked roster students count as recorded, an empty roster reads as complete, or unloaded data reads as complete;
+  // why_new=red-team: lock readiness on a composite parent used the filtered roster while the lock RPC checks the full one;
+  // seam=none; no_claim=does not prove lock_class_session_internal accepts every session this calls complete
+  it("covers every readiness branch", () => {
+    const tally = (present: number, absent: number, unmarked = 0, additional = 0) => ({ absent, additional, present, unmarked });
+    const open = { attendance: tally(3, 1), classId: "class-1", rosterCount: 4, status: "completed" as const };
+
+    expect(getSessionAttendanceReadiness(session({ ...open, id: "s", sessionDate: TODAY, status: "scheduled" }), "class-1")).toBe("not_applicable");
+    expect(getSessionAttendanceReadiness(session({ ...open, id: "s", sessionDate: TODAY, status: "cancelled" }), "class-1")).toBe("not_applicable");
+    expect(getSessionAttendanceReadiness(session({ ...open, id: "s", lockedAt: "2026-10-13T15:00:00Z", sessionDate: TODAY }), "class-1")).toBe("not_applicable");
+
+    expect(getSessionAttendanceReadiness(session({ ...open, classId: "component-1", id: "s", sessionDate: TODAY }), "class-1")).toBe("unknown");
+    expect(getSessionAttendanceReadiness(session({ ...open, id: "s", rosterCount: null, sessionDate: TODAY }), "class-1")).toBe("unknown");
+    expect(getSessionAttendanceReadiness(session({ ...open, attendance: null, id: "s", sessionDate: TODAY }), "class-1")).toBe("unknown");
+
+    expect(getSessionAttendanceReadiness(session({ ...open, attendance: tally(0, 0), id: "s", rosterCount: 0, sessionDate: TODAY }), "class-1")).toBe("no_roster");
+    // One roster student unmarked; a walk-in does not make up for it.
+    expect(getSessionAttendanceReadiness(session({ ...open, attendance: tally(2, 1, 1, 1), id: "s", sessionDate: TODAY }), "class-1")).toBe("incomplete");
+    expect(getSessionAttendanceReadiness(session({ ...open, id: "s", sessionDate: TODAY }), "class-1")).toBe("complete");
+    expect(getSessionAttendanceReadiness(session({ ...open, id: "s", sessionDate: TODAY, status: "in_progress" }), "class-1")).toBe("complete");
   });
 });
 

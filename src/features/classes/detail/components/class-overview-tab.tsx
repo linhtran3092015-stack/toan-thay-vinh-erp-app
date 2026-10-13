@@ -14,6 +14,7 @@ import {
   getClassAttendanceRate,
   getClassSessionStage,
   getRecordedCount,
+  getSessionAttendanceReadiness,
   LOW_ATTENDANCE_RATE,
   summarizeClassSessions,
   type ClassSessionRow,
@@ -83,6 +84,7 @@ export function ClassOverviewTab({
         <NeedsActionPanel
           canLockSessions={canLockSessions}
           canViewCare={canViewCare}
+          classId={detail.id}
           nowTime={nowTime}
           rows={sessionRows}
           today={today}
@@ -97,6 +99,7 @@ export function ClassOverviewTab({
           canManageSchedule={canManageSchedule}
           detail={detail}
           showTuitionNote={workspace.debt.status === "ready" || workspace.debt.reason === "failed"}
+          today={today}
         />
         <ClassFactsPanel detail={detail} />
       </aside>
@@ -248,6 +251,7 @@ const inlineLinkClassName = cn(getButtonClassName({ size: "sm", variant: "second
 function NeedsActionPanel({
   canLockSessions,
   canViewCare,
+  classId,
   nowTime,
   rows,
   today,
@@ -255,6 +259,8 @@ function NeedsActionPanel({
 }: {
   canLockSessions: boolean;
   canViewCare: boolean;
+  /** The page's class: a component class's session has a partial roster here. */
+  classId: string;
   nowTime: string;
   rows: ClassSessionRow[] | null;
   today: string;
@@ -268,29 +274,7 @@ function NeedsActionPanel({
     const overdue = rows.filter((row) => getClassSessionStage(row, today, nowTime) === "overdue");
 
     for (const row of pendingLock.slice(0, NEEDS_ACTION_ROWS)) {
-      const recorded = row.attendance ? getRecordedCount(row.attendance) : null;
-      const attendanceComplete = recorded !== null && row.rosterCount !== null && recorded >= row.rosterCount && row.rosterCount > 0;
-      const parts = [
-        formatWeekdayDate(row.sessionDate, { year: false }),
-        recorded !== null && row.rosterCount !== null
-          ? attendanceComplete
-            ? `điểm danh ${recorded}/${row.rosterCount} xong`
-            : `điểm danh ${recorded}/${row.rosterCount}, còn thiếu ${row.rosterCount - recorded}`
-          : null,
-        row.resultCount !== null && row.attendance ? `${row.resultCount} kết quả đã nhập` : null,
-      ];
-
-      items.push({
-        action: (
-          <Link className={inlineLinkClassName} href={`/sessions/${row.id}`}>
-            {!attendanceComplete && recorded !== null ? "Điểm danh" : canLockSessions ? "Khóa buổi" : "Mở buổi"}
-          </Link>
-        ),
-        detail: parts.filter(Boolean).join(" · "),
-        key: `lock-${row.id}`,
-        title: `Buổi ${row.ordinal ?? "—"} chưa khóa`,
-        tone: attendanceComplete ? "warning" : "danger",
-      });
+      items.push(describePendingLock(row, classId, canLockSessions));
     }
 
     if (pendingLock.length > NEEDS_ACTION_ROWS) {
@@ -405,6 +389,61 @@ function NeedsActionPanel({
       ) : null}
     </section>
   );
+}
+
+/**
+ * A completed session awaiting lock. The CTA and tone follow
+ * getSessionAttendanceReadiness, so "Khóa buổi" appears only when the page can
+ * tell attendance is complete and the viewer holds sessions.lock.
+ */
+function describePendingLock(row: ClassSessionRow, classId: string, canLockSessions: boolean): NeedsActionItem {
+  const readiness = getSessionAttendanceReadiness(row, classId);
+  const date = formatWeekdayDate(row.sessionDate, { year: false });
+  const recorded = row.attendance ? getRecordedCount(row.attendance) : 0;
+  const roster = row.rosterCount ?? 0;
+  const results = row.resultCount !== null && row.attendance ? `${row.resultCount} kết quả đã nhập` : null;
+  const link = (label: string) => (
+    <Link className={inlineLinkClassName} href={`/sessions/${row.id}`}>
+      {label}
+    </Link>
+  );
+  const base = { key: `lock-${row.id}`, title: `Buổi ${row.ordinal ?? "—"} chưa khóa` };
+
+  switch (readiness) {
+    case "incomplete":
+      return {
+        ...base,
+        action: link("Điểm danh"),
+        detail: [date, `điểm danh ${recorded}/${roster}, còn thiếu ${roster - recorded}`, results].filter(Boolean).join(" · "),
+        tone: "danger",
+      };
+    case "complete":
+      return {
+        ...base,
+        action: link(canLockSessions ? "Khóa buổi" : "Mở buổi"),
+        detail: [date, `điểm danh ${recorded}/${roster} xong`, results].filter(Boolean).join(" · "),
+        tone: "warning",
+      };
+    case "no_roster":
+      return {
+        ...base,
+        action: link("Mở buổi"),
+        detail: `${date} · Không có học sinh trong danh sách`,
+        tone: "neutral",
+      };
+    default:
+      // "unknown": a component class's session (partial roster here) or attendance
+      // not loaded. No readiness claim; the session page shows the full picture.
+      return {
+        ...base,
+        action: link("Mở buổi"),
+        detail:
+          row.classId !== classId
+            ? `${date} · buổi của lớp ${row.classCode}, xem điểm danh ở trang buổi`
+            : `${date} · chưa xem được điểm danh, mở buổi để kiểm tra`,
+        tone: "warning",
+      };
+  }
 }
 
 function AttendanceChartPanel({ attendanceReady, rows }: { attendanceReady: boolean; rows: ClassSessionRow[] }) {
@@ -579,10 +618,12 @@ function WeeklySchedulePanel({
   canManageSchedule,
   detail,
   showTuitionNote,
+  today,
 }: {
   canManageSchedule: boolean;
   detail: ClassDetailReadModel;
   showTuitionNote: boolean;
+  today: string;
 }) {
   const schedules = sortSchedules(detail.schedules.filter((schedule) => schedule.isActive));
   const isCompositeParent = detail.componentClasses.length > 0;
@@ -604,7 +645,7 @@ function WeeklySchedulePanel({
     >
       {schedules.length === 0 ? (
         isCompositeParent ? (
-          <CompositeComponentsNotice components={detail.componentClasses} />
+          <CompositeComponentsNotice components={detail.componentClasses} today={today} />
         ) : (
           <PanelNotice>Chưa có lịch cố định.</PanelNotice>
         )

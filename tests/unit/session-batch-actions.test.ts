@@ -168,6 +168,23 @@ describe("createBatchSessionsAction", () => {
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
+  // Value: protects=a batch rejected because the class is a linked composite parent (future links included) explains where sessions belong;
+  // fails_when=either composite-parent code falls through to the generic database message;
+  // why_new=componentClasses now includes links that start later, and a link added after the page loaded still makes the trigger raise;
+  // seam=none; no_claim=does not prove create_batch_class_sessions raises these codes
+  it.each([
+    ["COMPOSITE_PARENT_CANNOT_HAVE_CLASS_SESSION", "Lớp ghép không tạo buổi trực tiếp; hãy tạo ở lớp thành phần."],
+    ["COMPOSITE_PARENT_CANNOT_HAVE_SCHEDULE_TEMPLATE", "Lớp ghép không có lịch cố định riêng; lịch học nằm ở các lớp thành phần."],
+  ])("explains the composite-parent rejection %s", async (databaseMessage, userMessage) => {
+    mocks.server.mockResolvedValue(createMockServerClient({ rpcResult: { data: null, error: { message: databaseMessage } } }));
+
+    const res = await createBatchSessionsAction(samplePayload);
+
+    expect(res.status).toBe("error");
+    expect(res.message).toBe(userMessage);
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
   it("maps unknown RPC failures to a generic message without leaking raw SQL text", async () => {
     const mockClient = createMockServerClient({
       rpcResult: {

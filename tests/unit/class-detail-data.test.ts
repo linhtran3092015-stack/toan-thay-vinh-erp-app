@@ -215,11 +215,13 @@ describe("getClassDetailWorkspace", () => {
     expect(owner.debt).toEqual({ reason: "failed", status: "unavailable" });
   });
 
-  // Value: protects=the per-session roster RPC fan-out stays capped at 40, 8 in flight at a time, and spends the cap on pending-lock sessions oldest first, then live sessions newest first;
-  // fails_when=the OPEN_ROSTER_LIMIT slice or the chunked concurrency is removed, or the cap keeps the newest pending-lock sessions (the overview's needs-action list, which shows the oldest, then gets "—" rosters);
-  // why_new=red-team found the cap kept the 40 newest open sessions while needs-action lists the oldest pending-lock ones;
+  // Value: protects=the per-session roster RPC fan-out stays capped at 40, 8 in flight at a time, and spends the cap on live sessions first
+  // (newest first), then pending-lock sessions oldest first;
+  // fails_when=the OPEN_ROSTER_LIMIT slice or the chunked concurrency is removed, a backlog of pending-lock sessions crowds out a live session's
+  // roster, or the cap keeps the newest pending-lock sessions (the overview's needs-action list, which shows the oldest, then gets "—" rosters);
+  // why_new=red-team found 40+ pending-lock sessions left a session being marked right now without a roster;
   // seam=none; no_claim=does not measure real RPC latency or prove the database tolerates 8 concurrent calls
-  it("resolves at most 40 open rosters, oldest pending-lock first, 8 at a time", async () => {
+  it("resolves at most 40 open rosters, live first, then oldest pending-lock, 8 at a time", async () => {
     const day = (offset: number) => new Date(Date.UTC(2026, 7, 1 + offset)).toISOString().slice(0, 10);
     const arrange = (completed: number, live: number) => {
       tables({
@@ -251,25 +253,27 @@ describe("getClassDetailWorkspace", () => {
     const workspace = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
 
     expect(supabase.rpc).toHaveBeenCalledTimes(40);
-    // The 40 oldest pending-lock sessions win over the newest one and the live one.
-    expect(new Set(resolvedIds())).toEqual(new Set(Array.from({ length: 40 }, (_, index) => `s${String(index).padStart(2, "0")}`)));
+    // The live session and the 39 oldest pending-lock sessions win over the two newest pending-lock ones.
+    expect(new Set(resolvedIds())).toEqual(new Set(["live0", ...Array.from({ length: 39 }, (_, index) => `s${String(index).padStart(2, "0")}`)]));
     expect(maxInFlight).toBe(8);
     expect(workspace.sessions.status).toBe("ready");
     if (workspace.sessions.status !== "ready") return;
     const byId = Object.fromEntries(workspace.sessions.value.rows.map((row) => [row.id, row]));
     // An open session outside the cap shows "—" rather than 0/0.
+    expect(byId.s39).toMatchObject({ attendance: null, rosterCount: null });
     expect(byId.s40).toMatchObject({ attendance: null, rosterCount: null });
-    expect(byId.live0).toMatchObject({ attendance: null, rosterCount: null });
+    expect(byId.live0).toMatchObject({ attendance: { absent: 0, additional: 0, present: 0, unmarked: 1 }, rosterCount: 1 });
     expect(byId.s00).toMatchObject({ attendance: { absent: 0, additional: 0, present: 0, unmarked: 1 }, rosterCount: 1 });
+    expect(byId.s38).toMatchObject({ rosterCount: 1 });
 
-    // Pending-lock sessions first, then live sessions newest first.
+    // Live sessions newest first, then pending-lock sessions oldest first.
     supabase.rpc.mockClear();
     arrange(38, 3);
     await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
 
     expect(resolvedIds()).toHaveLength(40);
-    expect(resolvedIds().slice(0, 2)).toEqual(["s00", "s01"]);
-    expect(resolvedIds().slice(38)).toEqual(["live2", "live1"]);
+    expect(resolvedIds().slice(0, 5)).toEqual(["live2", "live1", "live0", "s00", "s01"]);
+    expect(resolvedIds().at(-1)).toBe("s36");
   });
 
   // Value: protects=an exception thrown after the client exists (G1) marks every permitted feed that had not loaded as failed and keeps loaded ones;
@@ -536,9 +540,12 @@ describe("getClassDetailWorkspace", () => {
     expect(workspace.sessions.value.rows.some((row) => row.id === "s400")).toBe(false);
   });
 
-  // Value: protects=on a composite parent page, result counts of component sessions count only students the attendance tally counts (the parent's roster plus walk-ins), and stay "—" when that roster is unknown;
-  // fails_when=a result of a student enrolled only in the component class is counted, the walk-in rule differs from the tally, an unresolved component session shows an unfiltered count, or own sessions get filtered;
+  // Value: protects=on a composite parent page, result counts of resolved sessions (component or own) count only students the attendance tally
+  // counts (the roster plus walk-ins); component sessions stay "—" when their roster is unknown, own sessions then count every result;
+  // fails_when=a result of a student enrolled only in the component class is counted, the walk-in rule differs from the tally, an unresolved
+  // component session shows an unfiltered count, a resolved own session counts an off-roster result, or an unresolved own session loses its count;
   // why_new=red-team found loadResultCounts counted every session_results row while attendance was already restricted to the parent's roster;
+  // own sessions are now filtered once resolved (a withdrawn student's result made "6/5");
   // seam=none; no_claim=does not cover a student enrolled in both the parent and the component (the RPC then reports the component enrolment)
   it("counts component-session results only for the page class's students", async () => {
     const arrange = () =>
@@ -598,8 +605,8 @@ describe("getClassDetailWorkspace", () => {
     // z is enrolled only in the component class: not counted; the walk-in w is, as in the tally.
     expect(byId["open-component"]).toMatchObject({ attendance: { additional: 1, present: 1 }, resultCount: 2 });
     expect(byId["locked-component"]).toMatchObject({ resultCount: 1 });
-    // Own sessions keep every result.
-    expect(byId["locked-own"]).toMatchObject({ resultCount: 2 });
+    // A resolved own session counts only its tallied students: q has a result but no lock-counted mark.
+    expect(byId["locked-own"]).toMatchObject({ resultCount: 1 });
 
     // Without attendance rights the component rosters are unknown: no count rather than an unfiltered one.
     arrange();
@@ -610,7 +617,65 @@ describe("getClassDetailWorkspace", () => {
     const noAttendanceById = Object.fromEntries(noAttendance.sessions.value.rows.map((row) => [row.id, row]));
     expect(noAttendanceById["open-component"]).toMatchObject({ resultCount: null });
     expect(noAttendanceById["locked-component"]).toMatchObject({ resultCount: null });
+    // An own session with an unknown roster has no denominator to exceed: every result counts.
     expect(noAttendanceById["locked-own"]).toMatchObject({ resultCount: 2 });
+  });
+
+  // Value: protects=an own open session's result count never exceeds its roster: a withdrawn student's result (open rosters list only active
+  // enrolments) is left out, a walk-in's is kept, and an own session beyond OPEN_ROSTER_LIMIT still counts every result;
+  // fails_when=own sessions skip the tallied-student filter once their roster is resolved, the walk-in rule differs from the tally, or an
+  // unresolved own session's count becomes null or filtered;
+  // why_new=red-team found "6/5" on an own session after a student withdrew while holding a result;
+  // seam=none; no_claim=does not prove resolve_class_session_roster drops withdrawn enrolments (the RPC is mocked)
+  it("counts own open-session results only for the resolved roster and walk-ins", async () => {
+    tables({
+      class_component_links: { data: [], error: null },
+      class_sessions: { data: [sessionRow("open-own", "2026-10-12", "completed")], error: null },
+      session_attendance: {
+        data: [
+          { attendance_status: "present", class_session_id: "open-own", student_enrollment_id: "e-a", student_id: "a" },
+          { attendance_status: "present", class_session_id: "open-own", student_enrollment_id: "e-x", student_id: "withdrawn" },
+          { attendance_status: "additional_study", class_session_id: "open-own", student_enrollment_id: null, student_id: "w" },
+        ],
+        error: null,
+      },
+      session_results: {
+        data: [
+          { class_session_id: "open-own", student_id: "a" },
+          { class_session_id: "open-own", student_id: "withdrawn" },
+          { class_session_id: "open-own", student_id: "w" },
+        ],
+        error: null,
+      },
+      student_enrollments: { data: [], error: null },
+    });
+    // The withdrawn student is no longer on the roster.
+    supabase.rpc.mockResolvedValue({ data: [{ enrollment_class_id: "class-1", student_id: "a" }], error: null });
+
+    const workspace = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
+
+    if (workspace.sessions.status !== "ready") throw new Error("sessions not ready");
+    expect(workspace.sessions.value.rows[0]).toMatchObject({ resultCount: 2, rosterCount: 1 });
+
+    // Roster RPC failure: the roster is unknown, so the own session counts every result.
+    supabase.rpc.mockResolvedValue({ data: null, error: { message: "boom" } });
+    tables({
+      class_component_links: { data: [], error: null },
+      class_sessions: { data: [sessionRow("open-own", "2026-10-12", "completed")], error: null },
+      session_attendance: { data: [], error: null },
+      session_results: {
+        data: [
+          { class_session_id: "open-own", student_id: "a" },
+          { class_session_id: "open-own", student_id: "withdrawn" },
+        ],
+        error: null,
+      },
+      student_enrollments: { data: [], error: null },
+    });
+    const unresolved = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
+
+    if (unresolved.sessions.status !== "ready") throw new Error("sessions not ready");
+    expect(unresolved.sessions.value.rows[0]).toMatchObject({ resultCount: 2, rosterCount: null });
   });
 
   // Value: protects=link windows filter component sessions in the query, before the 400 limit, so out-of-window rows neither take the budget nor make `truncated` true; malformed ids or dates never reach the filter string;
