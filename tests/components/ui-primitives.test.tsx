@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge, CountChip } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, getButtonClassName } from "@/components/ui/button";
 import { TabPanel, Tabs } from "@/components/ui/tabs";
 
 afterEach(cleanup);
@@ -50,6 +50,16 @@ describe("Button (handoff 12/10)", () => {
     expect(screen.getByRole("button", { name: "Cũ" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Hủy" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Thêm hành động" })).toBeVisible();
+  });
+
+  // Value: protects=a link styled as a coloured button keeps its button text colour: globals.css has an unlayered `a { color: inherit }`, which beats layered Tailwind utilities, so without `!` a primary link (e.g. the home "Điểm danh buổi này") renders dark text on the primary fill, and the disabled colour must be important too to still win;
+  // fails_when=the `!` is dropped from a coloured variant's text or disabled-text class; why_new=getButtonClassName is applied to <Link> on the home dashboard; seam=none (class strings only);
+  // no_claim=does not prove the computed colour in a browser (jsdom has no Tailwind cascade)
+  it("marks coloured variants' text colours important so a global link colour cannot override them", () => {
+    const primary = getButtonClassName({ variant: "primary" }).split(/\s+/);
+    expect(primary).toEqual(expect.arrayContaining(["text-text-on-primary!", "disabled:text-text-disabled!"]));
+    expect(getButtonClassName({ variant: "danger-solid" }).split(/\s+/)).toEqual(expect.arrayContaining(["text-text-on-danger!", "disabled:text-text-disabled!"]));
+    expect(getButtonClassName({ variant: "danger-outline" }).split(/\s+/)).toEqual(expect.arrayContaining(["text-danger!", "disabled:text-text-disabled!"]));
   });
 });
 

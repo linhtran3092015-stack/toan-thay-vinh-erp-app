@@ -46,13 +46,17 @@ type VariantPresentation = {
   spinner: string;
 };
 
+// Coloured variants mark their text colour important: the unlayered global
+// `a { color: inherit }` in globals.css otherwise beats the utility when the
+// classes are put on a link (getButtonClassName), e.g. dark text on the
+// primary fill. Their disabled colour is important too so it still wins.
 const variants: Record<ButtonVariant, VariantPresentation> = {
   primary: {
     base:
-      "border-transparent bg-action-primary font-medium text-text-on-primary shadow-[var(--action-primary-shadow)] hover:bg-action-primary-hover active:translate-y-px",
+      "border-transparent bg-action-primary font-medium text-text-on-primary! shadow-[var(--action-primary-shadow)] hover:bg-action-primary-hover active:translate-y-px",
     padding: "px-[18px]",
     disabled:
-      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled disabled:shadow-none",
+      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled! disabled:shadow-none",
     pending: "opacity-80",
     spinner: "border-current/40 border-t-current",
   },
@@ -84,28 +88,28 @@ const variants: Record<ButtonVariant, VariantPresentation> = {
   },
   "danger-outline": {
     base:
-      "border-danger bg-surface-base font-semibold text-danger hover:bg-danger-bg",
+      "border-danger bg-surface-base font-semibold text-danger! hover:bg-danger-bg",
     padding: "px-4",
     disabled:
-      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
+      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled!",
     pending: "opacity-80",
     spinner: "border-current/40 border-t-current",
   },
   danger: {
     base:
-      "border-danger bg-surface-base font-semibold text-danger hover:bg-danger-bg",
+      "border-danger bg-surface-base font-semibold text-danger! hover:bg-danger-bg",
     padding: "px-4",
     disabled:
-      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
+      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled!",
     pending: "opacity-80",
     spinner: "border-current/40 border-t-current",
   },
   "danger-solid": {
     base:
-      "border-transparent bg-danger font-semibold text-text-on-danger hover:bg-[color-mix(in_srgb,var(--status-danger)_88%,black)] active:translate-y-px",
+      "border-transparent bg-danger font-semibold text-text-on-danger! hover:bg-[color-mix(in_srgb,var(--status-danger)_88%,black)] active:translate-y-px",
     padding: "px-4",
     disabled:
-      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled",
+      "disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled!",
     pending: "opacity-80",
     spinner: "border-current/40 border-t-current",
   },
