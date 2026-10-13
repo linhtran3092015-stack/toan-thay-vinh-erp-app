@@ -13,6 +13,9 @@ const dependencies = vi.hoisted(() => ({
   getClassDetail: vi.fn(),
   getClassDetailWorkspace: vi.fn(),
   getClassEnrollmentCandidates: vi.fn(),
+  getClassTuitionPeriods: vi.fn(),
+  getClassTuitionView: vi.fn(),
+  getTransferClassOptions: vi.fn(),
   getVietnamTime: vi.fn(() => "19:45:00"),
   getVietnamToday: vi.fn(() => "2026-10-13"),
 }));
@@ -30,6 +33,13 @@ vi.mock("@/features/classes/data", () => ({ getClassDetail: dependencies.getClas
 vi.mock("@/features/classes/detail/class-detail-data", () => ({
   getClassDetailWorkspace: dependencies.getClassDetailWorkspace,
   getClassEnrollmentCandidates: dependencies.getClassEnrollmentCandidates,
+}));
+vi.mock("@/features/classes/detail/class-tuition-data", () => ({
+  getClassTuitionPeriods: dependencies.getClassTuitionPeriods,
+  getClassTuitionView: dependencies.getClassTuitionView,
+}));
+vi.mock("@/features/students/enrollment/student-enrollment-data", () => ({
+  getTransferClassOptions: dependencies.getTransferClassOptions,
 }));
 vi.mock("@/features/classes/class-detail-page", () => ({ ClassDetailPage: dependencies.ClassDetailPage }));
 
@@ -63,6 +73,7 @@ describe("class detail route", () => {
 
     expect(dependencies.getClassDetailWorkspace).toHaveBeenCalledWith(CLASS_ID, {
       canViewAttendance: true,
+      canViewLedger: false,
       canViewPayments: false,
       canViewResults: true,
       canViewSessions: true,
@@ -133,5 +144,48 @@ describe("class detail route", () => {
     expect(dependencies.getVietnamTime).toHaveBeenCalled();
     expect(dependencies.getVietnamToday).toHaveBeenCalled();
     expect(props).toMatchObject({ nowTime: "19:45:00", today: "2026-10-13" });
+  });
+
+  // Value: protects=the tuition tab loads only for classes.view+sessions.view+students.view+tuition_periods.view, opens on today's period, and transfer targets load only with students.transfer_class on an active class;
+  // fails_when=tuition loads without one of its permissions, the default period is not the one covering today, payments.view is not forwarded, a failed period list is not null, or transfer options load for a draft class;
+  // why_new=step 5b part 2 added the tuition and transfer gates to the route; earlier route tests use roles holding neither;
+  // seam=loaders mocked at module boundaries; no_claim=does not prove RLS on tuition tables or the transfer RPC's own permission check
+  it("gates the tuition tab and transfer targets on permissions and opens the current period", async () => {
+    const tuition = ["classes.view", "sessions.view", "students.view", "tuition_periods.view"];
+    const sep = { dueOn: null, endsOn: "2026-09-30", id: "sep", name: "T9", startsOn: "2026-09-01", status: "locked" };
+    const oct = { dueOn: null, endsOn: "2026-10-31", id: "oct", name: "T10", startsOn: "2026-10-01", status: "draft" };
+
+    arrange(["classes.view", "sessions.view", "payments.view", "students.view", "students.transfer_class"]);
+    dependencies.getTransferClassOptions.mockResolvedValue([{ id: "class-2" }]);
+    let props = await renderRoute();
+    expect(dependencies.getClassTuitionPeriods).not.toHaveBeenCalled();
+    expect(props).toMatchObject({ canTransferStudents: true, transferClassOptions: [{ id: "class-2" }], tuition: undefined });
+    expect(dependencies.getTransferClassOptions).toHaveBeenCalledWith(CLASS_ID);
+
+    vi.clearAllMocks();
+    arrange([...tuition, "payments.view"]);
+    dependencies.getClassTuitionPeriods.mockResolvedValue([oct, sep]);
+    dependencies.getClassTuitionView.mockResolvedValue({ marker: "view" });
+    props = await renderRoute();
+    expect(dependencies.getClassTuitionView).toHaveBeenCalledWith(CLASS_ID, oct, { canViewPayments: true });
+    expect(props).toMatchObject({ canTransferStudents: false, transferClassOptions: undefined, tuition: { initialPeriodId: "oct", initialView: { marker: "view" }, periods: [oct, sep] } });
+    expect(dependencies.getTransferClassOptions).not.toHaveBeenCalled();
+
+    // Without students.view the tab could not name the students (students RLS): no tuition read.
+    vi.clearAllMocks();
+    arrange(tuition.filter((code) => code !== "students.view"));
+    expect(await renderRoute()).toMatchObject({ tuition: undefined });
+    expect(dependencies.getClassTuitionPeriods).not.toHaveBeenCalled();
+
+    vi.clearAllMocks();
+    arrange(tuition);
+    dependencies.getClassTuitionPeriods.mockResolvedValue(null);
+    expect(await renderRoute()).toMatchObject({ tuition: null });
+    expect(dependencies.getClassTuitionView).not.toHaveBeenCalled();
+
+    vi.clearAllMocks();
+    arrange(["classes.view", "students.view", "students.transfer_class"], "draft");
+    expect(await renderRoute()).toMatchObject({ canTransferStudents: true, transferClassOptions: undefined });
+    expect(dependencies.getTransferClassOptions).not.toHaveBeenCalled();
   });
 });

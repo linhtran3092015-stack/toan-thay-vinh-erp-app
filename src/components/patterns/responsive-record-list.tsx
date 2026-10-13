@@ -39,6 +39,8 @@ interface RecordListItemProps {
   /** Metric row under a top divider (attendance, balance, debt). */
   metrics?: ReactNode;
   title: ReactNode;
+  /** Control placed after the card, outside its link (e.g. a row "…" menu), inside the list item. */
+  trailing?: ReactNode;
 }
 
 /**
@@ -54,6 +56,7 @@ export function RecordListItem({
   meta,
   metrics,
   title,
+  trailing,
 }: RecordListItemProps) {
   // The short aria-label names the link; the status, meta and metrics stay
   // announced as its description instead of being hidden behind the label.
@@ -85,9 +88,10 @@ export function RecordListItem({
   );
 
   return (
-    <article className={cn("min-w-0", leading ? "flex items-center gap-1" : undefined, className)} role="listitem">
+    <article className={cn("min-w-0", leading ? "flex items-center gap-1" : trailing ? "flex items-start gap-1" : undefined, className)} role="listitem">
       {leading}
-      {leading ? <div className="min-w-0 flex-1">{link}</div> : link}
+      {leading || trailing ? <div className="min-w-0 flex-1">{link}</div> : link}
+      {trailing ? <div className="shrink-0 pt-2">{trailing}</div> : null}
     </article>
   );
 }

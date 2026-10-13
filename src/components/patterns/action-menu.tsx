@@ -20,6 +20,11 @@ const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), label, summary, [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
 
 interface ActionMenuProps<T extends string> {
+  /**
+   * Which trigger edge the panel lines up with on phones: "start" (default) for
+   * menus at the left of a header, "end" for menus at the right of a row.
+   */
+  align?: "start" | "end";
   items: readonly ActionMenuItem<T>[];
   label?: string;
   onSelect: (value: T, trigger: HTMLButtonElement) => void;
@@ -36,6 +41,7 @@ interface ActionMenuProps<T extends string> {
  * stay focusable so their reason is read, but they do nothing when activated.
  */
 export function ActionMenu<T extends string>({
+  align = "start",
   items,
   label = "Thêm hành động",
   onSelect,
@@ -167,6 +173,8 @@ export function ActionMenu<T extends string>({
         aria-expanded={isOpen}
         aria-haspopup="menu"
         aria-label={label}
+        // 44px on touch layouts, like the shared Pagination.
+        className="max-md:h-11 max-md:w-11"
         iconOnly
         onClick={() => setOpenFocus(isOpen ? null : getOpenFocus("first"))}
         onKeyDown={handleTriggerKeyDown}
@@ -180,7 +188,10 @@ export function ActionMenu<T extends string>({
       {isOpen ? (
         <div
           aria-label={label}
-          className="panel-rise absolute top-[calc(100%+8px)] max-md:left-0 md:right-0 z-40 w-72 rounded-lg border border-border-subtle bg-surface-raised p-1.5 shadow-[var(--elevation-2)]"
+          className={cn(
+            "panel-rise absolute top-[calc(100%+8px)] md:right-0 z-40 w-72 max-w-[calc(100vw-32px)] rounded-lg border border-border-subtle bg-surface-raised p-1.5 shadow-[var(--elevation-2)]",
+            align === "end" ? "max-md:right-0" : "max-md:left-0",
+          )}
           id={menuId}
           onKeyDown={handleMenuKeyDown}
           role="menu"

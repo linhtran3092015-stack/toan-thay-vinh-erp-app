@@ -19,6 +19,15 @@ import {
   type ClassStudentRef,
   type RosterEntry,
 } from "@/features/classes/detail/class-detail-models";
+import {
+  buildClassResultMatrix,
+  isClassEnrollmentStatus,
+  pickLatestEnrollments,
+  type ClassEnrollmentRow,
+  type ClassResultEntry,
+  type ClassResultMatrix,
+  type ClassStudentDebt,
+} from "@/features/classes/detail/class-roster-models";
 import type { SessionKind, SessionStatus } from "@/features/sessions/read-models";
 import { summarizeDirectoryDebt } from "@/features/students/student-directory-metrics";
 import { getVietnamToday } from "@/lib/datetime";
@@ -43,6 +52,8 @@ export interface ClassDetailWorkspacePermissions {
   canViewResults: boolean;
   canViewSessions: boolean;
   canViewStudents: boolean;
+  /** session_ledger.view: per-student session balances on the students tab. */
+  canViewLedger?: boolean;
 }
 
 export interface ClassDetailWorkspace {
@@ -57,6 +68,14 @@ export interface ClassDetailWorkspace {
   absenceStreaks: ClassDetailFeed<AbsenceStreak[]>;
   /** Open debt of the class's active students, across all their requests. */
   debt: ClassDetailFeed<ClassDebtSummary>;
+  /** Latest enrolment per student who was ever in the class (students.view). */
+  enrollments: ClassDetailFeed<ClassEnrollmentRow[]>;
+  /** Session balance per enrolled student, across all their classes (session_ledger.view). */
+  balances: ClassDetailFeed<Record<string, number>>;
+  /** Open debt per enrolled student, across all their requests (payments.view). */
+  studentDebts: ClassDetailFeed<Record<string, ClassStudentDebt>>;
+  /** Students × started sessions test scores (results.view + students.view). */
+  resultMatrix: ClassDetailFeed<ClassResultMatrix>;
 }
 
 const forbidden = { reason: "forbidden", status: "unavailable" } as const;
@@ -67,16 +86,20 @@ function unavailableWorkspace(permissions: ClassDetailWorkspacePermissions): Cla
   return {
     absenceStreaks: permissions.canViewSessions && permissions.canViewAttendance && permissions.canViewStudents ? failed : forbidden,
     attendance: permissions.canViewSessions && permissions.canViewAttendance ? failed : forbidden,
+    balances: permissions.canViewStudents && permissions.canViewLedger ? failed : forbidden,
     debt: permissions.canViewPayments ? failed : forbidden,
+    enrollments: permissions.canViewStudents ? failed : forbidden,
+    resultMatrix: permissions.canViewSessions && permissions.canViewResults && permissions.canViewStudents ? failed : forbidden,
     results: permissions.canViewSessions && permissions.canViewResults ? failed : forbidden,
     sessions: permissions.canViewSessions ? failed : forbidden,
+    studentDebts: permissions.canViewStudents && permissions.canViewPayments ? failed : forbidden,
     students: permissions.canViewStudents ? failed : forbidden,
   };
 }
 
-type SupabaseClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+export type SupabaseClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
-async function fetchPaged<T>(
+export async function fetchPaged<T>(
   load: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
 ): Promise<T[] | null> {
   const rows: T[] = [];
@@ -112,7 +135,7 @@ interface LinkWindow {
  * components, but only while a link covers the session date (the same window
  * per-session resolve_class_session_roster RPC applies).
  */
-async function getSessionClassIds(
+export async function getSessionClassIds(
   supabase: SupabaseClient,
   classId: string,
 ): Promise<{ classIds: string[]; windows: Map<string, LinkWindow[]> } | null> {
@@ -314,7 +337,7 @@ export function getLockedSessionRosters(lockedIds: ReadonlySet<string>, attendan
 }
 
 /** Runs one paged read per id chunk in parallel; `null` when any chunk fails. */
-async function fetchChunked<T>(ids: readonly string[], load: (chunkIds: string[]) => Promise<T[] | null>): Promise<T[] | null> {
+export async function fetchChunked<T>(ids: readonly string[], load: (chunkIds: string[]) => Promise<T[] | null>): Promise<T[] | null> {
   const pages = await Promise.all(chunk(ids, IN_FILTER_CHUNK_SIZE).map(load));
   return pages.some((page) => page === null) ? null : pages.flatMap((page) => page ?? []);
 }
@@ -332,17 +355,12 @@ async function loadAttendance(supabase: SupabaseClient, sessionIds: readonly str
   );
 }
 
-interface ResultEntry {
-  class_session_id: string;
-  student_id: string;
-}
-
-async function loadResults(supabase: SupabaseClient, sessionIds: readonly string[]): Promise<ResultEntry[] | null> {
+async function loadResults(supabase: SupabaseClient, sessionIds: readonly string[]): Promise<ClassResultEntry[] | null> {
   return fetchChunked(sessionIds, (ids) =>
-    fetchPaged<ResultEntry>((from, to) =>
+    fetchPaged<ClassResultEntry>((from, to) =>
       supabase
         .from("session_results")
-        .select("class_session_id, student_id")
+        .select("class_session_id, student_id, test_score")
         .in("class_session_id", ids)
         .order("id", { ascending: true })
         .range(from, to),
@@ -392,8 +410,120 @@ async function loadActiveStudents(
   return { ids, students };
 }
 
-async function loadDebt(supabase: SupabaseClient, studentIds: readonly string[]): Promise<ClassDebtSummary | null> {
-  if (studentIds.length === 0) return summarizeClassDebt({});
+type StudentRelation = { full_name: string; id: string; public_code: string | null };
+
+interface ClassEnrollmentQueryRow {
+  effective_from: string;
+  effective_to: string | null;
+  end_reason: string | null;
+  id: string;
+  registered_mode: string;
+  status: string;
+  student: StudentRelation | StudentRelation[] | null;
+  student_id: string;
+}
+
+/**
+ * Every enrolment ever made in the class, one row per student
+ * (pickLatestEnrollments). Shared with the tuition tab's loader.
+ */
+export async function loadClassEnrollments(supabase: SupabaseClient, classId: string): Promise<ClassEnrollmentRow[] | null> {
+  const rows = await fetchPaged<ClassEnrollmentQueryRow>((from, to) =>
+    supabase
+      .from("student_enrollments")
+      .select("id, student_id, status, effective_from, effective_to, registered_mode, end_reason, student:students ( id, full_name, public_code )")
+      .eq("class_id", classId)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+
+  if (!rows) return null;
+
+  // Only a badge depends on it: a failed read leaves reserved rows as reserved
+  // rather than failing every feed built on the roster (matrix, debts, tuition).
+  const resumedElsewhere =
+    (await loadResumedElsewhere(
+      supabase,
+      classId,
+      rows.filter((row) => row.status === "reserved").map((row) => row.id),
+    ).catch(() => null)) ?? new Set<string>();
+
+  return pickLatestEnrollments(
+    rows.flatMap((row) => {
+      const student = Array.isArray(row.student) ? row.student[0] ?? null : row.student;
+      // Unknown statuses are dropped rather than guessed.
+      if (!student || !isClassEnrollmentStatus(row.status)) return [];
+
+      return [
+        {
+          effectiveFrom: row.effective_from,
+          effectiveTo: row.effective_to,
+          endReason: row.end_reason,
+          enrollmentId: row.id,
+          fullName: student.full_name,
+          publicCode: student.public_code,
+          registeredMode: row.registered_mode === "online" ? "online" : "offline",
+          resumedElsewhere: resumedElsewhere.has(row.id),
+          status: row.status,
+          studentId: row.student_id,
+        },
+      ];
+    }),
+  );
+}
+
+/**
+ * Reserved enrolments a later enrolment in another class resumed:
+ * resume_student_enrollment inserts the successor (supersedes_enrollment_id)
+ * and leaves the reserved row unchanged. `null` = the read failed.
+ */
+async function loadResumedElsewhere(supabase: SupabaseClient, classId: string, reservedIds: readonly string[]): Promise<Set<string> | null> {
+  if (reservedIds.length === 0) return new Set();
+
+  const successors = await fetchChunked(reservedIds, (ids) =>
+    fetchPaged<{ class_id: string; supersedes_enrollment_id: string | null }>((from, to) =>
+      supabase
+        .from("student_enrollments")
+        .select("class_id, supersedes_enrollment_id")
+        .in("supersedes_enrollment_id", ids)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+  );
+
+  if (!successors) return null;
+
+  return new Set(
+    successors
+      .filter((row) => row.class_id !== classId && row.supersedes_enrollment_id)
+      .map((row) => row.supersedes_enrollment_id as string),
+  );
+}
+
+async function loadBalances(supabase: SupabaseClient, studentIds: readonly string[]): Promise<Record<string, number> | null> {
+  const rows = await fetchChunked(studentIds, (ids) =>
+    fetchPaged<{ balance_sessions: number | null; student_id: string | null }>((from, to) =>
+      supabase
+        .from("student_session_balances")
+        .select("student_id, balance_sessions")
+        .in("student_id", ids)
+        .order("student_id", { ascending: true })
+        .range(from, to),
+    ),
+  );
+
+  if (!rows) return null;
+
+  const balances: Record<string, number> = {};
+  for (const row of rows) {
+    if (row.student_id) balances[row.student_id] = Number(row.balance_sessions ?? 0);
+  }
+  return balances;
+}
+
+/** Open debt per student; `{}` without students. */
+async function loadDebt(supabase: SupabaseClient, studentIds: readonly string[]): Promise<Record<string, ClassStudentDebt> | null> {
+  if (studentIds.length === 0) return {};
 
   const rows = await fetchChunked(studentIds, (ids) =>
     fetchPaged<Parameters<typeof summarizeDirectoryDebt>[0][number]>((from, to) =>
@@ -407,19 +537,29 @@ async function loadDebt(supabase: SupabaseClient, studentIds: readonly string[])
     ),
   );
 
-  return rows ? summarizeClassDebt(summarizeDirectoryDebt(rows)) : null;
+  return rows ? summarizeDirectoryDebt(rows) : null;
 }
 
 type SessionsResult = NonNullable<Awaited<ReturnType<typeof loadSessions>>>;
 
-/** Fills the session-based feeds (sessions, attendance, results, streaks) of `workspace`. */
+interface SessionFeedReads {
+  /** `undefined` = not read (no permission); `null` = the read failed. */
+  attendance: AttendanceEntry[] | null | undefined;
+  results: ClassResultEntry[] | null | undefined;
+  rows: ClassSessionRow[];
+}
+
+/**
+ * Fills the session-based feeds (sessions, attendance, results, streaks) of
+ * `workspace` and hands back the raw reads the results matrix is built from.
+ */
 async function fillSessionFeeds(
   supabase: SupabaseClient,
   classId: string,
   permissions: ClassDetailWorkspacePermissions,
   sessionsResult: SessionsResult,
   workspace: ClassDetailWorkspace,
-): Promise<void> {
+): Promise<SessionFeedReads> {
   // Attendance, rosters and results matter for sessions that have started; an
   // overdue "scheduled" session has none and shows "—".
   const startedRows = sessionsResult.rows.filter((row) => row.status === "in_progress" || row.status === "completed");
@@ -521,6 +661,8 @@ async function fillSessionFeeds(
           }
         : failed;
   }
+
+  return { attendance, results, rows };
 }
 
 /**
@@ -543,9 +685,10 @@ export async function getClassDetailWorkspace(
   }
 
   try {
-    const [sessionsResult, studentsResult] = await Promise.all([
+    const [sessionsResult, studentsResult, enrollments] = await Promise.all([
       permissions.canViewSessions ? loadSessions(supabase, classId) : Promise.resolve(undefined),
       loadActiveStudents(supabase, classId, permissions.canViewStudents),
+      permissions.canViewStudents ? loadClassEnrollments(supabase, classId).catch(() => null) : Promise.resolve(undefined),
     ]);
 
     if (studentsResult === null) {
@@ -555,22 +698,70 @@ export async function getClassDetailWorkspace(
       workspace.students = { status: "ready", value: studentsResult.students };
     }
 
-    // Debt runs alongside the session reads; a throw there is a failed read.
+    if (permissions.canViewStudents) {
+      workspace.enrollments = enrollments ? { status: "ready", value: enrollments } : failed;
+      if (!enrollments) {
+        if (permissions.canViewLedger) workspace.balances = failed;
+        if (permissions.canViewPayments) workspace.studentDebts = failed;
+      }
+    }
+
+    // Debt covers active students for the overview and, on the students tab,
+    // everyone who was enrolled (a reserved student can still owe tuition).
+    const activeIds = studentsResult?.ids ?? [];
+    const enrolledIds = [...new Set([...activeIds, ...(enrollments ?? []).map((row) => row.studentId)])];
+
+    // Debt and balances run alongside the session reads; a throw there is a failed read.
+    // The students tab's debt only needs the roster, so it does not wait on the active read.
     const debt =
-      studentsResult && permissions.canViewPayments ? loadDebt(supabase, studentsResult.ids).catch(() => null) : undefined;
+      (studentsResult || enrollments) && permissions.canViewPayments ? loadDebt(supabase, enrolledIds).catch(() => null) : undefined;
+    const balances =
+      enrollments && permissions.canViewLedger ? loadBalances(supabase, enrolledIds).catch(() => null) : undefined;
+
+    let reads: SessionFeedReads | undefined;
 
     if (sessionsResult === null) {
       workspace.sessions = failed;
       if (permissions.canViewAttendance) workspace.attendance = failed;
       if (permissions.canViewResults) workspace.results = failed;
       if (permissions.canViewAttendance && permissions.canViewStudents) workspace.absenceStreaks = failed;
+      if (permissions.canViewResults && permissions.canViewStudents) workspace.resultMatrix = failed;
     } else if (sessionsResult !== undefined) {
-      await fillSessionFeeds(supabase, classId, permissions, sessionsResult, workspace);
+      reads = await fillSessionFeeds(supabase, classId, permissions, sessionsResult, workspace);
+    }
+
+    if (reads && permissions.canViewResults && permissions.canViewStudents) {
+      workspace.resultMatrix =
+        reads.results && workspace.students.status === "ready" && enrollments
+          ? {
+              status: "ready",
+              value: buildClassResultMatrix({
+                activeStudents: workspace.students.value,
+                // A failed attendance read leaves the matrix without "missing" cells, never with wrong ones.
+                attendance: reads.attendance ?? null,
+                enrollments,
+                results: reads.results,
+                sessions: reads.rows,
+              }),
+            }
+          : failed;
     }
 
     if (debt) {
       const value = await debt;
-      workspace.debt = value ? { status: "ready", value } : failed;
+      const activeSet = new Set(activeIds);
+      // Without the active read the overview's total is unknown (already marked failed above).
+      if (studentsResult) {
+        workspace.debt = value
+          ? { status: "ready", value: summarizeClassDebt(Object.fromEntries(Object.entries(value).filter(([id]) => activeSet.has(id)))) }
+          : failed;
+      }
+      if (permissions.canViewStudents && enrollments) workspace.studentDebts = value ? { status: "ready", value } : failed;
+    }
+
+    if (balances) {
+      const value = await balances;
+      workspace.balances = value ? { status: "ready", value } : failed;
     }
 
     return workspace;

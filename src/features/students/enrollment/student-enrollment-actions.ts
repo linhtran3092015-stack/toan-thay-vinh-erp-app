@@ -55,6 +55,7 @@ const enrollStudentSchema = z.object({
 
 const transferStudentSchema = z.object({
   effectiveFrom: isoDateSchema,
+  expectedEnrollmentId: uuidSchema.optional(),
   reason: reasonSchema,
   registeredMode: registeredModeSchema,
   studentId: uuidSchema,
@@ -62,6 +63,7 @@ const transferStudentSchema = z.object({
 });
 
 const reserveStudentSchema = z.object({
+  expectedEnrollmentId: uuidSchema.optional(),
   reason: reasonSchema,
   reservedFrom: isoDateSchema,
   studentId: uuidSchema,
@@ -336,6 +338,40 @@ export async function enrollStudentInClassAction(
   }
 }
 
+const STALE_ENROLLMENT_MESSAGE =
+  "Ghi danh của học sinh đã thay đổi (có thể vừa được chuyển lớp hoặc bảo lưu). Tải lại trang rồi thử lại.";
+
+/**
+ * The transfer and reserve RPCs act on the student's single active enrolment,
+ * whatever page the user looked at. When the caller names the enrolment it
+ * showed (a class roster can stay open a long time), a different active one is
+ * refused instead of moving or reserving the wrong class. This narrows the race
+ * to one round trip; closing it needs the RPCs to take the expected id.
+ */
+async function getStaleEnrollmentError(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  studentId: string,
+  expectedEnrollmentId: string | undefined,
+): Promise<string | null> {
+  if (!expectedEnrollmentId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("student_enrollments")
+    .select("id")
+    .eq("student_id", studentId)
+    .eq("status", "active")
+    .is("effective_to", null)
+    .maybeSingle();
+
+  if (error) {
+    return "Không kiểm tra được ghi danh hiện tại của học sinh. Vui lòng thử lại.";
+  }
+
+  return data?.id === expectedEnrollmentId ? null : STALE_ENROLLMENT_MESSAGE;
+}
+
 export async function transferStudentClassAction(
   input: TransferStudentInput,
 ): Promise<StudentEnrollmentActionState> {
@@ -361,6 +397,16 @@ export async function transferStudentClassAction(
   try {
     const supabase =
       await createSupabaseServerClient();
+
+    const staleError = await getStaleEnrollmentError(
+      supabase,
+      parsed.data.studentId,
+      parsed.data.expectedEnrollmentId,
+    );
+
+    if (staleError) {
+      return createErrorState(staleError);
+    }
 
     const { data, error } = await supabase.rpc(
       "transfer_student_class",
@@ -436,6 +482,16 @@ export async function reserveStudentEnrollmentAction(
   try {
     const supabase =
       await createSupabaseServerClient();
+
+    const staleError = await getStaleEnrollmentError(
+      supabase,
+      parsed.data.studentId,
+      parsed.data.expectedEnrollmentId,
+    );
+
+    if (staleError) {
+      return createErrorState(staleError);
+    }
 
     const { data, error } = await supabase.rpc(
       "reserve_student_enrollment",

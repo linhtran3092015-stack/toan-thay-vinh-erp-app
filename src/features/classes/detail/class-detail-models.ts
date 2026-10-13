@@ -33,9 +33,13 @@ export type ClassDetailFeedState = "ready" | "forbidden" | "failed";
 export const forbiddenClassDetailWorkspace: Readonly<ClassDetailWorkspace> = {
   absenceStreaks: { reason: "forbidden", status: "unavailable" },
   attendance: { reason: "forbidden", status: "unavailable" },
+  balances: { reason: "forbidden", status: "unavailable" },
   debt: { reason: "forbidden", status: "unavailable" },
+  enrollments: { reason: "forbidden", status: "unavailable" },
+  resultMatrix: { reason: "forbidden", status: "unavailable" },
   results: { reason: "forbidden", status: "unavailable" },
   sessions: { reason: "forbidden", status: "unavailable" },
+  studentDebts: { reason: "forbidden", status: "unavailable" },
   students: { reason: "forbidden", status: "unavailable" },
 };
 

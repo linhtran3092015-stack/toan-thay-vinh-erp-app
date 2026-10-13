@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ActionMenu } from "@/components/patterns/action-menu";
 import { ClassDetailPage, formatScheduleSummary } from "@/features/classes/class-detail-page";
 import type { ClassDetailWorkspace } from "@/features/classes/detail/class-detail-data";
-import { orderClassSessions, type ClassSessionRow } from "@/features/classes/detail/class-detail-models";
+import { forbiddenClassDetailWorkspace, orderClassSessions, type ClassSessionRow } from "@/features/classes/detail/class-detail-models";
 import { getClassStatusOperations } from "@/features/classes/management/class-status-actions";
 import type { ClassDetailReadModel, ClassScheduleReadModel } from "@/features/classes/read-models";
 
@@ -89,6 +89,7 @@ const sessionRows = orderClassSessions([
 
 function workspace(overrides: Partial<ClassDetailWorkspace> = {}): ClassDetailWorkspace {
   return {
+    ...forbiddenClassDetailWorkspace,
     absenceStreaks: { status: "ready", value: [] },
     attendance: { status: "ready", value: true },
     debt: { status: "ready", value: { outstandingVnd: 2_400_000, overdueStudentCount: 0, studentCount: 1 } },

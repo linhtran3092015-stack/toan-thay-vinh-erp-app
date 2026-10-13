@@ -655,7 +655,7 @@ describe("getClassDetailWorkspace", () => {
 
     const workspace = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
 
-    expect(calls.session_results).toContainEqual(["select", ["class_session_id, student_id"]]);
+    expect(calls.session_results).toContainEqual(["select", ["class_session_id, student_id, test_score"]]);
     expect(workspace.sessions.status).toBe("ready");
     if (workspace.sessions.status !== "ready") return;
     const byId = Object.fromEntries(workspace.sessions.value.rows.map((row) => [row.id, row]));
@@ -1002,5 +1002,282 @@ describe("getClassDetailWorkspace partial failures", () => {
     expect(workspace.sessions.status).toBe("ready");
     if (workspace.sessions.status !== "ready") return;
     expect(workspace.sessions.value.rows[0]).toMatchObject({ attendance: null, rosterCount: null });
+  });
+});
+
+describe("getClassDetailWorkspace roster feeds", () => {
+  const student = (id: string, fullName: string, publicCode: string) => ({ full_name: fullName, id, public_code: publicCode });
+  const enrollmentRow = (id: string, studentId: string, fullName: string, overrides: Record<string, unknown> = {}) => ({
+    effective_from: "2026-09-01",
+    effective_to: null,
+    end_reason: null,
+    id,
+    registered_mode: "offline",
+    status: "active",
+    student: student(studentId, fullName, `HS-${studentId}`),
+    student_id: studentId,
+    ...overrides,
+  });
+  /** The active-student read filters on status; the roster read returns every enrolment ever made. */
+  const enrollments = (all: unknown[], active: unknown[]): TableResult => (own) =>
+    own.some(([method, args]) => method === "eq" && args[0] === "status") ? { data: active, error: null } : { data: all, error: null };
+
+  // Value: protects=session balances are read (student_session_balances) only for viewers with session_ledger.view and a readable roster, and the enrolments feed gives one latest row per student, or is forbidden without students.view;
+  // fails_when=balances are queried without canViewLedger (or without students.view), the open enrolment of a student who also holds an older reserved one is replaced, or a viewer without students.view still gets the enrolments feed;
+  // why_new=step 5b part 2 added the enrolments, balances and studentDebts feeds to the loader;
+  // seam=none; no_claim=does not prove the student_session_balances view exposes balance_sessions to this role
+  it("reads balances only with session_ledger.view and groups enrolments per student", async () => {
+    const rows = [
+      enrollmentRow("e-a-old", "a", "An", { effective_from: "2026-08-01", effective_to: "2026-09-09", status: "reserved" }),
+      enrollmentRow("e-a", "a", "An", { effective_from: "2026-09-10" }),
+      enrollmentRow("e-b", "b", "Bảo", { effective_to: "2026-09-20", status: "reserved" }),
+    ];
+    const arrange = () =>
+      tables({
+        student_enrollments: enrollments(rows, [{ student: student("a", "An", "HS-a"), student_id: "a" }]),
+        student_session_balances: {
+          data: [
+            { balance_sessions: 5, student_id: "a" },
+            { balance_sessions: "-2", student_id: "b" },
+          ],
+          error: null,
+        },
+      });
+    const permissions = { canViewAttendance: false, canViewPayments: false, canViewResults: false, canViewSessions: false, canViewStudents: true };
+
+    let calls = arrange();
+    let workspace = await getClassDetailWorkspace("class-1", permissions);
+
+    expect(calls.student_session_balances).toBeUndefined();
+    expect(workspace.balances).toEqual({ reason: "forbidden", status: "unavailable" });
+    expect(workspace.enrollments.status).toBe("ready");
+    if (workspace.enrollments.status !== "ready") return;
+    expect(workspace.enrollments.value.map((row) => [row.studentId, row.enrollmentId, row.status])).toEqual([
+      ["a", "e-a", "active"],
+      ["b", "e-b", "reserved"],
+    ]);
+
+    calls = arrange();
+    workspace = await getClassDetailWorkspace("class-1", { ...permissions, canViewLedger: true });
+
+    expect(calls.student_session_balances).toContainEqual(["select", ["student_id, balance_sessions"]]);
+    expect(calls.student_session_balances).toContainEqual(["in", ["student_id", ["a", "b"]]]);
+    expect(workspace.balances).toEqual({ status: "ready", value: { a: 5, b: -2 } });
+
+    // Without students.view there is no roster to show balances for, whatever the ledger permission.
+    calls = arrange();
+    workspace = await getClassDetailWorkspace("class-1", { ...permissions, canViewLedger: true, canViewStudents: false });
+
+    expect(calls.student_session_balances).toBeUndefined();
+    expect(workspace.enrollments).toEqual({ reason: "forbidden", status: "unavailable" });
+    expect(workspace.balances).toEqual({ reason: "forbidden", status: "unavailable" });
+    expect(workspace.resultMatrix).toEqual({ reason: "forbidden", status: "unavailable" });
+  });
+
+  // Value: protects=the results matrix is built from the loader's own reads: a present student at a completed session with no result row gets a "missing" cell, an entered numeric-string score is parsed, and the count reaches the workspace;
+  // fails_when=test_score is not selected or not parsed, attendance is not handed to the matrix (no missing cells), or the matrix stays failed/forbidden with every permission;
+  // why_new=step 5b part 2 added resultMatrix to the workspace;
+  // seam=none; no_claim=does not prove which sessions the matrix should show beyond completed and in-progress ones
+  it("builds the results matrix with a missing cell for a present student lacking a result", async () => {
+    tables({
+      class_component_links: { data: [], error: null },
+      class_sessions: {
+        data: [sessionRow("s2", "2026-10-08", "completed"), sessionRow("s1", "2026-10-01", "completed"), sessionRow("s-next", "2026-10-20", "scheduled")],
+        error: null,
+      },
+      session_attendance: {
+        data: [
+          { attendance_status: "present", class_session_id: "s1", student_id: "a" },
+          { attendance_status: "present", class_session_id: "s2", student_id: "a" },
+          { attendance_status: "present", class_session_id: "s2", student_id: "b" },
+        ],
+        error: null,
+      },
+      session_results: {
+        data: [
+          { class_session_id: "s1", student_id: "a", test_score: "8.50" },
+          { class_session_id: "s2", student_id: "b", test_score: null },
+        ],
+        error: null,
+      },
+      student_enrollments: enrollments(
+        [enrollmentRow("e-a", "a", "An"), enrollmentRow("e-b", "b", "Bảo")],
+        [
+          { student: student("a", "An", "HS-a"), student_id: "a" },
+          { student: student("b", "Bảo", "HS-b"), student_id: "b" },
+        ],
+      ),
+    });
+    supabase.rpc.mockResolvedValue({
+      data: [
+        { enrollment_class_id: "class-1", student_id: "a" },
+        { enrollment_class_id: "class-1", student_id: "b" },
+      ],
+      error: null,
+    });
+
+    const workspace = await getClassDetailWorkspace("class-1", { ...allowed, canViewPayments: false });
+
+    expect(workspace.resultMatrix.status).toBe("ready");
+    if (workspace.resultMatrix.status !== "ready") return;
+    const matrix = workspace.resultMatrix.value;
+    expect(matrix.columns.map((column) => column.id)).toEqual(["s1", "s2"]);
+    expect(matrix.attendanceKnown).toBe(true);
+    expect(matrix.rows.map((row) => [row.student.fullName, row.cells])).toEqual([
+      ["An", [{ kind: "score", score: 8.5 }, { kind: "missing" }]],
+      ["Bảo", [null, { kind: "graded" }]],
+    ]);
+    expect(matrix.missingCount).toBe(1);
+  });
+
+  // Value: protects=the overview debt tile still counts only active students while the students tab's studentDebts covers everyone enrolled (a reserved student can owe), and a failed roster read fails studentDebts without hiding the overview debt;
+  // fails_when=the overview filter to active ids is dropped (reserved students' debt inflates the tile), studentDebts is limited to active students or never filled, or a failed roster read leaves studentDebts forbidden/ready;
+  // why_new=step 5b part 2 widened the debt read to every enrolled student and split it into two feeds; no test asserted studentDebts or the active-only overview;
+  // seam=none; no_claim=does not prove RLS on student_payment_requests or the overdue cutoff (created_at is recent)
+  it("keeps the overview debt to active students while studentDebts covers reserved ones", async () => {
+    const createdAt = new Date().toISOString();
+    const requests = {
+      data: [
+        { created_at: createdAt, expected_amount_vnd: "1000000", paid_amount_vnd: "0", status: "pending", student_id: "a" },
+        { created_at: createdAt, expected_amount_vnd: "500000", paid_amount_vnd: "200000", status: "partially_paid", student_id: "b" },
+      ],
+      error: null,
+    };
+    const rows = [enrollmentRow("e-a", "a", "An"), enrollmentRow("e-b", "b", "Bảo", { effective_to: "2026-09-20", status: "reserved" })];
+    const active = [{ student: student("a", "An", "HS-a"), student_id: "a" }];
+    const permissions = { canViewAttendance: false, canViewPayments: true, canViewResults: false, canViewSessions: false, canViewStudents: true };
+
+    const calls = tables({ student_enrollments: enrollments(rows, active), student_payment_requests: requests });
+    let workspace = await getClassDetailWorkspace("class-1", permissions);
+
+    expect(calls.student_payment_requests).toContainEqual(["in", ["student_id", ["a", "b"]]]);
+    expect(workspace.debt).toEqual({ status: "ready", value: { outstandingVnd: 1_000_000, overdueStudentCount: 0, studentCount: 1 } });
+    expect(workspace.studentDebts).toEqual({
+      status: "ready",
+      value: { a: { amountVnd: 1_000_000, overdue: false }, b: { amountVnd: 300_000, overdue: false } },
+    });
+
+    // The roster read fails: the tab's debt column fails, the overview tile keeps the active students' debt.
+    tables({
+      student_enrollments: (own) =>
+        own.some(([method, args]) => method === "eq" && args[0] === "status") ? { data: active, error: null } : { data: null, error: { message: "denied" } },
+      student_payment_requests: requests,
+    });
+    workspace = await getClassDetailWorkspace("class-1", permissions);
+
+    expect(workspace.enrollments).toEqual({ reason: "failed", status: "unavailable" });
+    expect(workspace.studentDebts).toEqual({ reason: "failed", status: "unavailable" });
+    expect(workspace.debt).toEqual({ status: "ready", value: { outstandingVnd: 1_000_000, overdueStudentCount: 0, studentCount: 1 } });
+  });
+
+  // Value: protects=a reserved enrolment that a later enrolment in ANOTHER class resumed is flagged resumedElsewhere (only reserved ids are looked up), a resumption in this class is not, and a failed successor read fails the enrolments feed instead of showing the student as still reserved;
+  // fails_when=the successor read is skipped or not filtered on supersedes_enrollment_id, a same-class resumption is flagged, the flag is not mapped onto the row, or a failed successor read leaves the feed ready;
+  // why_new=loadClassEnrollments gained the resumedElsewhere lookup in the pre-landing review fixes;
+  // seam=none; no_claim=does not prove RLS lets the viewer read the successor enrolment in the other class
+  it("flags a reserved enrolment resumed in another class and keeps the roster when that read fails", async () => {
+    const rows = [
+      enrollmentRow("e-a", "a", "An"),
+      enrollmentRow("e-b", "b", "Bảo", { effective_to: "2026-09-20", status: "reserved" }),
+      // Cúc reserved, then resumed into this same class.
+      enrollmentRow("e-c", "c", "Cúc", { effective_from: "2026-09-01", effective_to: "2026-09-20", status: "reserved" }),
+      enrollmentRow("e-c2", "c", "Cúc", { effective_from: "2026-10-01" }),
+    ];
+    const active = [{ student: student("a", "An", "HS-a"), student_id: "a" }, { student: student("c", "Cúc", "HS-c"), student_id: "c" }];
+    const successors = [
+      { class_id: "class-2", supersedes_enrollment_id: "e-b" },
+      { class_id: "class-1", supersedes_enrollment_id: "e-c" },
+    ];
+    const roster = (successorResult: Result): TableResult => (own) => {
+      if (own.some(([method, args]) => method === "in" && args[0] === "supersedes_enrollment_id")) return successorResult;
+      return own.some(([method, args]) => method === "eq" && args[0] === "status") ? { data: active, error: null } : { data: rows, error: null };
+    };
+    const permissions = { canViewAttendance: false, canViewPayments: false, canViewResults: false, canViewSessions: false, canViewStudents: true };
+
+    const calls = tables({ student_enrollments: roster({ data: successors, error: null }) });
+    let workspace = await getClassDetailWorkspace("class-1", permissions);
+
+    expect(calls.student_enrollments).toContainEqual(["in", ["supersedes_enrollment_id", ["e-b", "e-c"]]]);
+    expect(calls.student_enrollments).toContainEqual(["select", ["class_id, supersedes_enrollment_id"]]);
+    expect(workspace.enrollments.status).toBe("ready");
+    if (workspace.enrollments.status !== "ready") return;
+    expect(workspace.enrollments.value.map((row) => [row.enrollmentId, row.status, row.resumedElsewhere])).toEqual([
+      ["e-a", "active", false],
+      ["e-b", "reserved", true],
+      ["e-c2", "active", false],
+    ]);
+
+    tables({ student_enrollments: roster({ data: null, error: { message: "denied" } }) });
+    workspace = await getClassDetailWorkspace("class-1", permissions);
+
+    // Only the badge depends on the successor read: the roster stays ready, reserved rows stay reserved.
+    expect(workspace.enrollments.status).toBe("ready");
+    if (workspace.enrollments.status !== "ready") return;
+    expect(workspace.enrollments.value.find((row) => row.enrollmentId === "e-b")?.resumedElsewhere).toBe(false);
+    expect(workspace.students.status).toBe("ready");
+  });
+
+  // Value: protects=when only the active-students read fails, the students tab's debt column still loads from the roster (ready, or failed if the debt read fails), never "forbidden", while the overview debt tile stays failed;
+  // fails_when=the debt read is gated on the active read again (studentDebts stays forbidden and the column silently disappears), or the overview tile shows a total computed without knowing who is active;
+  // why_new=the review made the debt read start when either the active read or the roster read succeeded;
+  // seam=none; no_claim=does not prove which RLS failure makes the active read fail alone
+  it("loads studentDebts from the roster when only the active-students read fails", async () => {
+    const createdAt = new Date().toISOString();
+    const rows = [enrollmentRow("e-a", "a", "An"), enrollmentRow("e-b", "b", "Bảo", { effective_to: "2026-09-20", status: "transferred" })];
+    const roster: TableResult = (own) =>
+      own.some(([method, args]) => method === "eq" && args[0] === "status") ? { data: null, error: { message: "timeout" } } : { data: rows, error: null };
+    const permissions = { canViewAttendance: false, canViewPayments: true, canViewResults: false, canViewSessions: false, canViewStudents: true };
+
+    const calls = tables({
+      student_enrollments: roster,
+      student_payment_requests: {
+        data: [{ created_at: createdAt, expected_amount_vnd: "700000", paid_amount_vnd: "0", status: "pending", student_id: "b" }],
+        error: null,
+      },
+    });
+    let workspace = await getClassDetailWorkspace("class-1", permissions);
+
+    expect(calls.student_payment_requests).toContainEqual(["in", ["student_id", ["a", "b"]]]);
+    expect(workspace.students).toEqual({ reason: "failed", status: "unavailable" });
+    expect(workspace.debt).toEqual({ reason: "failed", status: "unavailable" });
+    expect(workspace.studentDebts).toEqual({ status: "ready", value: { b: { amountVnd: 700_000, overdue: false } } });
+
+    tables({ student_enrollments: roster, student_payment_requests: { data: null, error: { message: "denied" } } });
+    workspace = await getClassDetailWorkspace("class-1", permissions);
+
+    expect(workspace.studentDebts).toEqual({ reason: "failed", status: "unavailable" });
+    expect(workspace.debt).toEqual({ reason: "failed", status: "unavailable" });
+  });
+
+  // Value: protects=a failed sessions or results read marks the results matrix failed (the tab explains) for a viewer with results+students, and an enrolment with an unknown status is left off the roster;
+  // fails_when=the matrix stays forbidden (tab hidden) or turns ready with empty columns after a failed read, or an unexpected enrolment status reaches the roster (undefined badge);
+  // why_new=partial-failure tests predate resultMatrix and no loader test fed an unknown enrolment status;
+  // seam=none; no_claim=does not prove which statuses the database can hold
+  it("fails the results matrix on a failed sessions or results read and drops unknown enrolment statuses", async () => {
+    const roster = enrollments(
+      [enrollmentRow("e-a", "a", "An"), enrollmentRow("e-x", "x", "Xuân", { status: "archived" })],
+      [{ student: student("a", "An", "HS-a"), student_id: "a" }],
+    );
+    const permissions = { ...allowed, canViewPayments: false };
+
+    tables({ class_component_links: { data: [], error: null }, class_sessions: { data: null, error: { message: "denied" } }, student_enrollments: roster });
+    let workspace = await getClassDetailWorkspace("class-1", permissions);
+
+    expect(workspace.resultMatrix).toEqual({ reason: "failed", status: "unavailable" });
+    expect(workspace.enrollments.status).toBe("ready");
+    if (workspace.enrollments.status !== "ready") return;
+    expect(workspace.enrollments.value.map((row) => row.studentId)).toEqual(["a"]);
+
+    tables({
+      class_component_links: { data: [], error: null },
+      class_sessions: { data: [sessionRow("s1", "2026-10-08", "completed")], error: null },
+      session_attendance: { data: [], error: null },
+      session_results: { data: null, error: { message: "denied" } },
+      student_enrollments: roster,
+    });
+    supabase.rpc.mockResolvedValue({ data: [{ enrollment_class_id: "class-1", student_id: "a" }], error: null });
+    workspace = await getClassDetailWorkspace("class-1", permissions);
+
+    expect(workspace.sessions.status).toBe("ready");
+    expect(workspace.resultMatrix).toEqual({ reason: "failed", status: "unavailable" });
   });
 });

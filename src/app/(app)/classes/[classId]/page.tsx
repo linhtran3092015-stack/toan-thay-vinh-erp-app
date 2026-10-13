@@ -5,6 +5,10 @@ import { ClassDetailPage } from "@/features/classes/class-detail-page";
 import { getClassDirectoryQuery } from "@/features/classes/class-directory-url-state";
 import { getClassDetail } from "@/features/classes/data";
 import { getClassDetailWorkspace, getClassEnrollmentCandidates } from "@/features/classes/detail/class-detail-data";
+import { getClassTuitionPeriods, getClassTuitionView } from "@/features/classes/detail/class-tuition-data";
+import { CLASS_TUITION_PERMISSIONS, pickDefaultTuitionPeriod } from "@/features/classes/detail/class-tuition-models";
+import type { ClassDetailTuition } from "@/features/classes/class-detail-page";
+import { getTransferClassOptions } from "@/features/students/enrollment/student-enrollment-data";
 import { getVietnamTime, getVietnamToday } from "@/lib/datetime";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -76,13 +80,27 @@ export default async function ClassDetailRoute({
     canViewStudentCount && permissions.includes("students.manage_status");
 
   // The workspace does not depend on the class record: start it alongside.
+  const canViewPayments = permissions.includes("payments.view");
   const workspacePromise = getClassDetailWorkspace(classId, {
     canViewAttendance: canViewSessions && permissions.includes("attendance.view"),
-    canViewPayments: permissions.includes("payments.view"),
+    canViewLedger: permissions.includes("session_ledger.view"),
+    canViewPayments,
     canViewResults: canViewSessions && permissions.includes("results.view"),
     canViewSessions,
     canViewStudents: canViewStudentCount,
   });
+  const canTransferStudents = canViewStudentCount && permissions.includes("students.transfer_class");
+  const canReserveStudents = canViewStudentCount && permissions.includes("students.reserve");
+  const canViewTuition = CLASS_TUITION_PERMISSIONS.every((permission) => permissions.includes(permission));
+  // The tuition tab ships its default period; other periods load through an action.
+  const tuitionPromise: Promise<ClassDetailTuition | null | undefined> = canViewTuition
+    ? getClassTuitionPeriods().then(async (periods) => {
+        if (!periods) return null;
+        const period = pickDefaultTuitionPeriod(periods, getVietnamToday());
+        if (!period) return { initialPeriodId: "", initialView: null, periods };
+        return { initialPeriodId: period.id, initialView: await getClassTuitionView(classId, period, { canViewPayments }), periods };
+      })
+    : Promise.resolve(undefined);
 
   const detailResult = await getClassDetail(classId, {
     includeStudentCounts: canViewStudentCount,
@@ -108,10 +126,15 @@ export default async function ClassDetailRoute({
     );
   }
 
-  const [workspace, enrollmentCandidates] = await Promise.all([
+  const isActiveClass = detailResult.detail.status === "active";
+  const [workspace, enrollmentCandidates, tuition, transferClassOptions] = await Promise.all([
     workspacePromise,
-    canEnrollStudents && detailResult.detail.status === "active"
+    canEnrollStudents && isActiveClass
       ? getClassEnrollmentCandidates()
+      : Promise.resolve(undefined),
+    tuitionPromise,
+    canTransferStudents && isActiveClass
+      ? getTransferClassOptions(classId).catch(() => null)
       : Promise.resolve(undefined),
   ]);
   const initialTab = typeof resolvedSearchParams.tab === "string" ? resolvedSearchParams.tab : undefined;
@@ -122,6 +145,8 @@ export default async function ClassDetailRoute({
       canEditClass={canEditClass}
       canEnrollStudents={canEnrollStudents}
       canLockSessions={permissions.includes("sessions.lock")}
+      canReserveStudents={canReserveStudents}
+      canTransferStudents={canTransferStudents}
       canManageSchedule={canManageSchedule}
       canManageSessions={canManageSessions}
       canViewCare={permissions.includes("student_care.view")}
@@ -132,6 +157,8 @@ export default async function ClassDetailRoute({
       initialTab={initialTab}
       nowTime={getVietnamTime()}
       today={getVietnamToday()}
+      transferClassOptions={transferClassOptions}
+      tuition={tuition}
       workspace={workspace}
     />
   );

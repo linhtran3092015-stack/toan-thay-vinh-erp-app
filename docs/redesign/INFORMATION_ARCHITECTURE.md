@@ -45,7 +45,7 @@ Source of truth: `navigationGroups` in `src/config/navigation.ts` (Stumana redes
 ## Route-owned hierarchy
 
 - `/classes/academic-years` is a contextual class-domain route, not a global application switcher.
-- Student detail owns enrollment, transfer, reserve, and resume actions. Class detail also offers enrolment into that class through the same action and RPC (Owner-approved for the Stumana redesign step 5b (v0.8.0.0).)
+- Student detail owns enrollment, transfer, reserve, and resume actions. Class detail also offers enrolment into that class through the same action and RPC (Owner-approved for the Stumana redesign step 5b (v0.8.0.0).) Its Học sinh tab also offers transfer and reserve of a student's active enrolment in that class through the same actions and RPCs (Owner-approved for the Stumana redesign step 5b (v0.9.0.0).)
 - Class detail owns class status and schedule operations, and owner-only bulk cancel of the class's own not-yet-started sessions (Owner-approved for the Stumana redesign step 5b (v0.8.0.0).)
 - Session detail owns attendance, results, and lock operations.
 - Attendance remains inside Sessions. No new `/attendance` route is introduced; the currently unavailable navigation entry is not revived as a new information architecture destination.

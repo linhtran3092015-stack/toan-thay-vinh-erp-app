@@ -12,18 +12,30 @@ import { TabPanel, Tabs, type TabItem } from "@/components/ui/tabs";
 import type { ClassDetailWorkspace, ClassEnrollmentCandidate } from "@/features/classes/detail/class-detail-data";
 import { forbiddenClassDetailWorkspace, getClassDetailFeedState, summarizeClassSessions } from "@/features/classes/detail/class-detail-models";
 import { ClassEnrollDialog } from "@/features/classes/detail/components/class-enroll-dialog";
+import { getPaymentRemaining, type ClassTuitionPeriodOption, type ClassTuitionView } from "@/features/classes/detail/class-tuition-models";
 import { ClassOverviewTab } from "@/features/classes/detail/components/class-overview-tab";
+import { ClassResultsTab } from "@/features/classes/detail/components/class-results-tab";
 import { ClassScheduleSection, sortSchedules } from "@/features/classes/detail/components/class-schedule-section";
 import { ClassSessionsTab } from "@/features/classes/detail/components/class-sessions-tab";
+import { ClassStudentsTab } from "@/features/classes/detail/components/class-students-tab";
+import { ClassTuitionTab } from "@/features/classes/detail/components/class-tuition-tab";
 import type { ClassTargetStatus } from "@/features/classes/forms/class-action-types";
 import { useClassStatusOperations } from "@/features/classes/management/class-status-actions";
 import type { ClassDetailReadModel, ClassScheduleReadModel } from "@/features/classes/read-models";
+import type { StudentEnrollmentClassOption } from "@/features/students/enrollment/student-enrollment-ui-types";
 import { getVietnamTime, getVietnamToday } from "@/lib/datetime";
 import { formatLearningMode } from "@/lib/format";
 
-export type ClassDetailTab = "overview" | "sessions";
+export type ClassDetailTab = "overview" | "sessions" | "students" | "results" | "fees";
 
-const classDetailTabs: readonly ClassDetailTab[] = ["overview", "sessions"];
+const classDetailTabs: readonly ClassDetailTab[] = ["overview", "sessions", "students", "results", "fees"];
+
+/** The tuition tab's data; see ClassDetailPageProps.tuition. */
+export interface ClassDetailTuition {
+  initialPeriodId: string;
+  initialView: ClassTuitionView | null;
+  periods: ClassTuitionPeriodOption[];
+}
 
 function isClassDetailTab(value: unknown): value is ClassDetailTab {
   return typeof value === "string" && (classDetailTabs as readonly string[]).includes(value);
@@ -39,6 +51,10 @@ interface ClassDetailPageProps {
   /** students.manage_status: the enroll RPC's permission. */
   canEnrollStudents?: boolean;
   canLockSessions?: boolean;
+  /** students.reserve: "Bảo lưu" on the students tab. */
+  canReserveStudents?: boolean;
+  /** students.transfer_class: "Chuyển lớp" on the students tab. */
+  canTransferStudents?: boolean;
   canManageSchedule: boolean;
   /** sessions.manage: the batch-creation link. */
   canManageSessions?: boolean;
@@ -53,19 +69,29 @@ interface ClassDetailPageProps {
   nowTime?: string;
   /** YYYY-MM-DD in Vietnam time, computed on the server so both renders agree. */
   today?: string;
+  /** Transfer targets for the students tab: `null` = failed to load; `undefined` = not loaded. */
+  transferClassOptions?: StudentEnrollmentClassOption[] | null;
+  /**
+   * Tuition tab: `undefined` = hidden (no permission); `null` = the period list
+   * failed; `periods` empty = no period yet.
+   */
+  tuition?: ClassDetailTuition | null;
   workspace?: ClassDetailWorkspace;
 }
 
 /**
  * Class detail (design 03): header with one primary action ("Ghi danh học
- * sinh"), status changes in the "…" menu, and tabs for the overview and the
- * class's sessions. Students, results and tuition tabs follow in a later step.
+ * sinh"), status changes in the "…" menu, and tabs for the overview, the
+ * class's sessions, students, results and tuition. A tab the viewer may not
+ * read is hidden, not disabled (design 03).
  */
 export function ClassDetailPage({
   canBulkCancelSessions = false,
   canEditClass,
   canEnrollStudents = false,
   canLockSessions = false,
+  canReserveStudents = false,
+  canTransferStudents = false,
   canManageSchedule,
   canManageSessions = false,
   canViewCare = false,
@@ -76,6 +102,8 @@ export function ClassDetailPage({
   initialTab,
   nowTime,
   today,
+  transferClassOptions,
+  tuition,
   workspace = forbiddenClassDetailWorkspace,
 }: ClassDetailPageProps) {
   const tabsId = useId();
@@ -110,6 +138,25 @@ export function ClassDetailPage({
   if (workspace.sessions.status !== "unavailable" || workspace.sessions.reason === "failed") {
     const pending = summary ? summary.pendingLock + summary.overdue : 0;
     tabItems.push({ count: summary?.total, label: "Buổi học", pending: pending > 0 ? pending : undefined, value: "sessions" });
+  }
+
+  const isVisibleFeed = (feed: { status: string; reason?: string }) => feed.status === "ready" || feed.reason === "failed";
+
+  if (isVisibleFeed(workspace.enrollments)) {
+    const activeCount = workspace.enrollments.status === "ready" ? workspace.enrollments.value.filter((row) => row.status === "active").length : undefined;
+    tabItems.push({ count: activeCount, label: "Học sinh", value: "students" });
+  }
+
+  if (isVisibleFeed(workspace.resultMatrix)) {
+    const missing = workspace.resultMatrix.status === "ready" ? workspace.resultMatrix.value.missingCount : 0;
+    tabItems.push({ label: "Kết quả", pending: missing > 0 ? missing : undefined, value: "results" });
+  }
+
+  if (tuition !== undefined) {
+    const owing = tuition?.initialView?.paymentsVisible
+      ? tuition.initialView.rows.filter((row) => getPaymentRemaining(row.payment) > 0).length
+      : 0;
+    tabItems.push({ label: "Học phí", pending: owing > 0 ? owing : undefined, value: "fees" });
   }
 
   const [activeTab, setActiveTab] = useState<ClassDetailTab>(() =>
@@ -293,6 +340,63 @@ export function ClassDetailPage({
               />
             ) : (
               <ResultBanner description="Tải lại trang để thử lại." title="Chưa tải được buổi học của lớp" tone="warning" />
+            )}
+          </TabPanel>
+        ) : null}
+
+        {tabItems.some((item) => item.value === "students") ? (
+          <TabPanel activeValue={activeTab} tabsId={tabsId} value="students">
+            {workspace.enrollments.status === "ready" ? (
+              <ClassStudentsTab
+                balancesFeed={workspace.balances}
+                canReserve={canReserveStudents && detail.status === "active"}
+                canTransfer={canTransferStudents && detail.status === "active"}
+                classInfo={{
+                  code: detail.code,
+                  defaultLearningMode: detail.defaultLearningMode,
+                  grade: detail.grade,
+                  id: detail.id,
+                  level: detail.level,
+                  name: detail.name,
+                  status: detail.status,
+                }}
+                debtsFeed={workspace.studentDebts}
+                rows={workspace.enrollments.value}
+                today={resolvedToday}
+                transferClassOptions={transferClassOptions}
+              />
+            ) : (
+              <ResultBanner description="Tải lại trang để thử lại." title="Chưa tải được danh sách học sinh của lớp" tone="warning" />
+            )}
+          </TabPanel>
+        ) : null}
+
+        {tabItems.some((item) => item.value === "results") ? (
+          <TabPanel activeValue={activeTab} tabsId={tabsId} value="results">
+            {workspace.resultMatrix.status === "ready" ? (
+              <ClassResultsTab
+                matrix={workspace.resultMatrix.value}
+                truncated={workspace.sessions.status === "ready" && workspace.sessions.value.truncated}
+              />
+            ) : (
+              <ResultBanner description="Tải lại trang để thử lại." title="Chưa tải được kết quả học tập của lớp" tone="warning" />
+            )}
+          </TabPanel>
+        ) : null}
+
+        {tabItems.some((item) => item.value === "fees") ? (
+          <TabPanel activeValue={activeTab} tabsId={tabsId} value="fees">
+            {tuition === null ? (
+              <ResultBanner description="Tải lại trang để thử lại." title="Chưa tải được danh sách kỳ thu" tone="warning" />
+            ) : tuition && tuition.periods.length > 0 ? (
+              <ClassTuitionTab classId={detail.id} initialPeriodId={tuition.initialPeriodId} initialView={tuition.initialView} periods={tuition.periods} />
+            ) : (
+              <p className="rounded-lg border border-border-subtle bg-surface-base px-4 py-6 text-center text-secondary text-text-muted">
+                Chưa có kỳ thu học phí nào.{" "}
+                <Link className="font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus" href="/finance/tuition-periods">
+                  Mở Kỳ thu học phí
+                </Link>
+              </p>
             )}
           </TabPanel>
         ) : null}

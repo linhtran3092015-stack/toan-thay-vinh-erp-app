@@ -16,6 +16,8 @@ export interface EnrollStudentInput {
 
 export interface TransferStudentInput {
   effectiveFrom: string;
+  /** The active enrolment the user saw; the action refuses when it is no longer the active one. */
+  expectedEnrollmentId?: string;
   reason: string;
   registeredMode: StudentEnrollmentRegisteredMode;
   studentId: string;
@@ -23,6 +25,8 @@ export interface TransferStudentInput {
 }
 
 export interface ReserveStudentInput {
+  /** The active enrolment the user saw; the action refuses when it is no longer the active one. */
+  expectedEnrollmentId?: string;
   reason: string;
   reservedFrom: string;
   studentId: string;
