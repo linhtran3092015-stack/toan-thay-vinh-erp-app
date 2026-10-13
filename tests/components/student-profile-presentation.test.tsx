@@ -315,7 +315,7 @@ describe("Student profile interactions (design 05)", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Nguyễn Minh Anh" });
     await waitFor(() => expect(within(dialog).getByRole("alert")).toHaveTextContent("Lớp đã kín lịch bảo lưu."));
-    expect(enrollmentActions.reserveStudentEnrollmentAction).toHaveBeenCalledWith({ reason: "Gia đình đi xa 2 tháng", reservedFrom: "2026-10-13", studentId: "student-1" });
+    expect(enrollmentActions.reserveStudentEnrollmentAction).toHaveBeenCalledWith({ expectedEnrollmentId: "enr-1", reason: "Gia đình đi xa 2 tháng", reservedFrom: "2026-10-13", studentId: "student-1" });
     expect(router.refresh).not.toHaveBeenCalled();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Xác nhận bảo lưu" }));

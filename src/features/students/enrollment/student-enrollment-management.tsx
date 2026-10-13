@@ -69,6 +69,8 @@ const operationDescriptions: Record<
 
 export interface StudentEnrollmentOperationsOptions {
   model: StudentEnrollmentUiModel;
+  /** Called with the success message, for a page that shows it outside the hook (the class roster). */
+  onSuccess?: (message: string) => void;
   studentId: string;
   studentName: string;
 }
@@ -92,6 +94,7 @@ export interface StudentEnrollmentOperationsController {
  */
 export function useStudentEnrollmentOperations({
   model,
+  onSuccess,
   studentId,
   studentName,
 }: StudentEnrollmentOperationsOptions): StudentEnrollmentOperationsController {
@@ -157,6 +160,7 @@ export function useStudentEnrollmentOperations({
 
     try {
       const result = await runOperation({
+        expectedEnrollmentId: model.activeEnrollment?.id,
         operation: activeOperation,
         studentId,
         values,
@@ -167,6 +171,7 @@ export function useStudentEnrollmentOperations({
       if (result.status === "success") {
         setSuccessMessage(result.message);
         setActiveOperation(null);
+        onSuccess?.(result.message);
         router.refresh();
       }
     } finally {
@@ -528,10 +533,13 @@ function EnrollmentOperationDialog({
 }
 
 async function runOperation({
+  expectedEnrollmentId,
   operation,
   studentId,
   values,
 }: {
+  /** The active enrolment the dialog was opened for (transfer and reserve check it). */
+  expectedEnrollmentId?: string;
   operation: StudentEnrollmentOperation;
   studentId: string;
   values: EnrollmentDialogValues;
@@ -549,6 +557,7 @@ async function runOperation({
   if (operation === "transfer") {
     return transferStudentClassAction({
       effectiveFrom: values.effectiveDate,
+      expectedEnrollmentId,
       reason: values.reason,
       registeredMode: values.registeredMode,
       studentId,
@@ -558,6 +567,7 @@ async function runOperation({
 
   if (operation === "reserve") {
     return reserveStudentEnrollmentAction({
+      expectedEnrollmentId,
       reason: values.reason,
       reservedFrom: values.effectiveDate,
       studentId,

@@ -151,6 +151,23 @@ export async function getStudentEnrollmentUiModel(
   };
 }
 
+/**
+ * Active classes other than `excludeClassId`, as transfer targets: the class
+ * page's roster offers "Chuyển lớp" without a per-student read model. `null`
+ * when the class list failed to load.
+ */
+export async function getTransferClassOptions(excludeClassId: string): Promise<StudentEnrollmentClassOption[] | null> {
+  const classResult = await getClassDirectory({ includeStudentCounts: false });
+
+  if (!classResult.ok) {
+    return null;
+  }
+
+  return classResult.classes
+    .filter((classItem) => isActiveClass(classItem) && classItem.id !== excludeClassId)
+    .map(toClassOption);
+}
+
 function isReadyToResume(
   detail: StudentDetailReadModel,
 ): boolean {
