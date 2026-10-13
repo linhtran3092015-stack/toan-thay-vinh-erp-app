@@ -8,7 +8,7 @@ Deliver a substantially clearer, faster, and more consistent ERP experience with
 
 - Improve usability, scanability, and speed for frequent staff work.
 - Establish a coherent visual language and lower cognitive load.
-- Preserve existing routes, business logic, database behavior, Supabase integrations, permissions, RLS/RBAC, audit behavior, Server Action/RPC boundaries, and financial/session state machines.
+- Preserve existing routes, business logic, database behavior, Supabase integrations, permissions, RLS/RBAC, audit behavior, Server Action/RPC boundaries, and financial/session state machines. Owner-approved additions are recorded in WORKFLOW_CONTRACTS_A_E.md (v0.8.0.0: class-page bulk cancel and enrolment search).
 - Build frontend primitives that remain maintainable without becoming a generic application framework.
 - Release in small, independently reversible waves.
 
@@ -25,7 +25,7 @@ The redesign must preserve all of the following unless a separate, explicitly ap
 ## Explicit non-goals
 
 - Rebuild the ERP, redesign its domain model, or introduce a tenant/organization model.
-- Introduce server-side filtering or server-side pagination in this program.
+- Introduce server-side filtering or server-side pagination in this program. Approved exception: the class-page enrolment search (v0.8.0.0); see WORKFLOW_CONTRACTS_A_E.md, Enrollment lifecycle.
 - Add a central permission registry, central action registry, schema-driven mega-table, universal form engine, or third-party UI component library.
 - Add a global academic-year selector or imply a cross-module academic-year filter.
 - Add a new attendance route.

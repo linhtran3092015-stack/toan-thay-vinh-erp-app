@@ -4,6 +4,8 @@
 
 These workflow descriptions capture currently observed behavior. Presentation may change in later waves, but no workflow may gain, lose, or reinterpret a transition, permission check, RPC, validation rule, audit path, or error mapping.
 
+Owner-approved exceptions are recorded next to the workflow they change, each marked with its release: the client lock-readiness mirror (v0.7.0.0, Sessions), and class-page bulk cancel, class-page enrolment and server-side enrolment search (v0.8.0.0, Sessions and Students).
+
 ## Students
 
 ### Duplicate lookup, create, and update
@@ -24,6 +26,8 @@ These workflow descriptions capture currently observed behavior. Presentation ma
 | Resume | Existing reservation must satisfy the current resume rules. | `students.reserve` | `resumeStudentEnrollmentAction` / `resume_student_enrollment` | Do not allow resume outside current RPC eligibility. | Resume state, denied case, action result, revalidation. |
 
 The redesign does not define a new enrollment state graph. It must render the feature’s existing read model and action availability.
+
+Enrolment is also offered from the class page (`/classes/[classId]`, "Ghi danh học sinh"). It calls the same `enrollStudentInClassAction` / `enroll_student_in_class` with the class fixed; preconditions, conflicts and audit are unchanged. The page offers it to viewers with `students.view` and `students.manage_status`. Candidates are students without enrolment history; the dialog ships the first 500 and searches the rest through the Server Action `searchEnrollmentCandidatesAction` (same two permissions, 2–100 characters, read-only `students` query with escaped `ilike` on name and code). PostgREST `ilike` is accent-sensitive, so the dialog merges accentless local matches with the server results. Owner-approved for the Stumana redesign step 5b (v0.8.0.0).
 
 ## Classes
 
@@ -71,6 +75,7 @@ stateDiagram-v2
 - The current action conflict maps must continue to control timing, lifecycle, validation, and concurrency feedback.
 - Schedule-based session preview/materialization uses `dry_run_class_session_generation` and `materialize_class_sessions`. The action code authenticates but has no explicit TypeScript permission check; retain the current RPC/UI contract and do not invent one.
 - A migration-defined `reset_unlocked_class_session_before_start` corrective RPC is not an active A–E frontend workflow. Do not surface it as a new UI action.
+- Bulk cancel from the class page (`/classes/[classId]`, Buổi học tab) uses the Server Action `cancelClassSessionsAction`. It is owner-only: the action requires both `sessions.manage` and `classes.manage_schedule` (teaching assistants hold only the first). It accepts 1–40 distinct session ids of that class and a 3–500 character reason, and cancels only sessions of the class that are still `scheduled` with `locked_at` null. Each session is re-read just before its RPC, so one started since the page loaded is refused. Every eligible session goes through the same `cancel_class_session` RPC one at a time; a failure does not stop the rest, and the result reports each session. The class page is revalidated once, session routes only when something was cancelled. Select-all takes only upcoming sessions; an overdue session (past its date, never started) is ticked on its own and the confirmation warns that it may have been taught. The owner-only rule and the `in_progress` exclusion are enforced in the action, not yet in the database (TODOS). Owner-approved for the Stumana redesign step 5b (v0.8.0.0).
 
 ### Session regression checks
 
