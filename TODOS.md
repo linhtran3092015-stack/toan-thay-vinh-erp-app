@@ -672,6 +672,44 @@
 **Priority:** P2
 **Depends on:** None
 
+## Tài chính · SePay
+
+### Xác nhận hàng loạt gợi ý trên tab Cần xử lý
+
+**What:** Cân nhắc đưa nút "Xác nhận N dòng tin cậy cao" vào tab Cần xử lý nếu kế toán cần.
+
+**Why:** Bước 7 đợt 2 chỉ để nút này và panel đồng bộ lịch sử ở tab Tất cả giao dịch, theo thiết kế 7c.
+
+**Context:** `sepay-transactions-screen.tsx`, `sepay-allocation-suggestions.tsx`; cần chủ trung tâm xác nhận.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Tab theo trạng thái và số đếm toàn hàng đợi
+
+**What:** Đếm giao dịch theo match_status bằng truy vấn đếm để chip luôn có số, cả khi hàng đợi dài hơn một trang; cân nhắc tab "Khớp tự động hôm nay".
+
+**Why:** Chip trạng thái hiện chỉ xuất hiện khi cả hàng đợi nằm gọn một trang.
+
+**Context:** `getSepayTransactionsResult` trả `reviewCount` duy nhất.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Trạng thái webhook SePay và nhập sao kê thủ công
+
+**What:** Hiện thời điểm nhận webhook gần nhất (cảnh báo khi im lặng quá lâu) và luồng nhập sao kê thủ công như thiết kế 7c.
+
+**Why:** Không có dữ liệu sức khỏe webhook hay luồng nhập sao kê trong ERP.
+
+**Context:** Thiết kế `07-tai-chinh.dc.html` khung 7c.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
 ## Tài chính · Kỳ thu
 
 ### Học sinh học nhiều lớp trên trang kỳ thu
