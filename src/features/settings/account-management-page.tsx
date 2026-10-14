@@ -65,7 +65,7 @@ export function AccountManagementPage({
     <div className="grid min-w-0 gap-5">
       <header className="flex flex-col gap-3 border-b border-hairline pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-page-title font-bold text-ink">Tài khoản và vai trò</h2>
+          <h2 className="text-section-title font-semibold text-ink">Tài khoản và vai trò</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-muted">
             Owner thêm email được phép đăng nhập, chọn vai trò ban đầu và cập nhật vai trò hiệu lực của từng tài khoản.
           </p>
