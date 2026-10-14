@@ -87,7 +87,7 @@ export const staffPayrollEstimateSchema = z.object({
   issues: z.array(z.object({
     details: z.record(z.string(), z.unknown()).optional(),
     issueCode: z.string(),
-    staffId: z.string().uuid().optional(),
+    staffId: z.string().uuid().nullable().optional(),
   })).default([]),
   latestCompletedWorkAt: z.string().nullable().default(null),
   lines: z.array(staffEstimateLineSchema).default([]),
@@ -132,14 +132,15 @@ export const ownerPayrollEstimateSchema = z.object({
   approvedAt: z.string().nullable().optional(),
   asOf: z.string(),
   byPosition: z.array(ownerPositionSummarySchema).default([]),
-  calculatedAt: z.string(),
+  /** Absent from the approved branch of get_owner_payroll_estimate. */
+  calculatedAt: z.string().optional(),
   completeness: z.enum(["complete", "partial"]).default("complete"),
   finance: ownerFinanceSchema,
   financeAsOf: z.string().optional(),
   issues: z.array(z.object({
     details: z.record(z.string(), z.unknown()).optional(),
     issueCode: z.string(),
-    staffId: z.string().uuid().optional(),
+    staffId: z.string().uuid().nullable().optional(),
   })).default([]),
   latestCompletedWorkAt: z.string().nullable().default(null),
   month: z.string(),

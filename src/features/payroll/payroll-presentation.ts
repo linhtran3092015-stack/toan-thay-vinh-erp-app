@@ -91,11 +91,14 @@ export function formatDate(value: string): string {
 }
 
 export function formatDateTime(value: string): string {
+  // Fixed to Vietnam time: server components render on UTC hosts (Vercel), and
+  // client components must render the same text the server did.
   return new Intl.DateTimeFormat("vi-VN", {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
     month: "2-digit",
+    timeZone: "Asia/Ho_Chi_Minh",
     year: "numeric",
   }).format(new Date(value));
 }

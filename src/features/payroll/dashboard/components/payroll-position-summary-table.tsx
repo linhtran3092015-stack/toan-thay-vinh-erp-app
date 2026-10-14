@@ -29,7 +29,7 @@ export function PayrollPositionSummaryTable({ items }: { items: readonly Payroll
   };
 
   return (
-    <section className="overflow-hidden rounded-lg border border-border-subtle bg-surface-base" aria-labelledby="position-summary-title">
+    <section className="overflow-hidden rounded-lg border border-border-subtle bg-surface-base shadow-[var(--panel-shadow)]" aria-labelledby="position-summary-title">
       <div className="border-b border-border-subtle px-5 py-4">
         <h2 className="text-section-title font-semibold text-text-strong" id="position-summary-title">Tổng hợp theo vị trí</h2>
         <p className="mt-1 text-secondary text-text-muted">Chọn tiêu đề cột để sắp xếp.</p>
@@ -37,7 +37,7 @@ export function PayrollPositionSummaryTable({ items }: { items: readonly Payroll
       <div className="hidden overflow-x-auto sm:block">
         <table className="min-w-[900px] w-full text-table-body text-text-default">
           <caption className="sr-only">Tổng hợp chi phí lương theo vị trí</caption>
-          <thead className="bg-surface-sunken text-table-header">
+          <thead className="bg-table-header text-table-header text-text-muted">
             <tr>
               <SortableHeader activeKey={sortKey} direction={direction} label="Vị trí" onSort={changeSort} sortKey="positionName" />
               <SortableHeader activeKey={sortKey} direction={direction} label="Nhân sự" onSort={changeSort} sortKey="employeeCount" align="right" />

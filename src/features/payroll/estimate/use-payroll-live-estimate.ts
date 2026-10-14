@@ -9,6 +9,68 @@ import type {
 } from "@/features/payroll/estimate/types";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
+/**
+ * Where the live estimate comes from. Production uses the real `/api/payroll/*`
+ * endpoints plus the Supabase realtime channel; the /dev/payroll preview passes
+ * an inert transport (fixtures, no subscription) because it runs on localhost
+ * where .env.local may point at the production database.
+ */
+export interface PayrollEstimateTransport {
+  /** Loads one estimate payload; rejects when it cannot be loaded. */
+  load: (endpoint: string) => Promise<unknown>;
+  /** Subscribes to estimate revisions for the month; returns the unsubscribe. */
+  subscribe: (options: {
+    channelName: string;
+    month: string;
+    onChange: () => void;
+    onStatus: (status: string) => void;
+  }) => () => void;
+}
+
+export const livePayrollEstimateTransport: PayrollEstimateTransport = {
+  load: async (endpoint) => {
+    const res = await fetch(endpoint, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to fetch estimate: ${res.status}`);
+    }
+
+    return res.json();
+  },
+  subscribe: ({ channelName, month, onChange, onStatus }) => {
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            filter: `month=eq.${month}`,
+            schema: "public",
+            table: "payroll_live_revisions",
+          },
+          () => {
+            onChange();
+          },
+        )
+        .subscribe((status: string) => {
+          onStatus(status);
+        });
+
+      return () => {
+        void supabase.removeChannel(channel);
+      };
+    } catch {
+      // Supabase env not available (e.g. testing / offline)
+      return () => {};
+    }
+  },
+};
+
 interface UsePayrollLiveEstimateOptions<T> {
   initialData?: T | null;
   month: string;
@@ -19,6 +81,8 @@ interface UsePayrollLiveEstimateOptions<T> {
    * có giá trị = chủ trung tâm xem lương theo ngày của nhân sự đó.
    */
   staffId?: string | null;
+  /** Defaults to the real endpoints + realtime channel. Must be a stable reference. */
+  transport?: PayrollEstimateTransport;
 }
 
 export function buildEstimateEndpoint({
@@ -48,6 +112,7 @@ export function usePayrollLiveEstimate<
   positionCode,
   scope,
   staffId = null,
+  transport = livePayrollEstimateTransport,
 }: UsePayrollLiveEstimateOptions<T>) {
   const [data, setData] = useState<T | null>(initialData);
   const [isLoading, setIsLoading] = useState<boolean>(() => !initialData);
@@ -60,17 +125,7 @@ export function usePayrollLiveEstimate<
 
     try {
       const endpoint = buildEstimateEndpoint({ month, positionCode, scope, staffId });
-
-      const res = await fetch(endpoint, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" },
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch estimate: ${res.status}`);
-      }
-
-      const json = (await res.json()) as T;
+      const json = (await transport.load(endpoint)) as T;
       setData(json);
       setConnectionState("connected");
       setLastRefreshedAt(new Date());
@@ -94,17 +149,7 @@ export function usePayrollLiveEstimate<
 
       try {
         const endpoint = buildEstimateEndpoint({ month, positionCode, scope, staffId });
-
-        const res = await fetch(endpoint, {
-          cache: "no-store",
-          headers: { "Cache-Control": "no-cache" },
-        });
-
-        if (!res.ok) {
-          throw new Error(`Failed to fetch estimate: ${res.status}`);
-        }
-
-        const json = (await res.json()) as T;
+        const json = (await transport.load(endpoint)) as T;
         setData(json);
         setConnectionState("connected");
         setLastRefreshedAt(new Date());
@@ -125,37 +170,18 @@ export function usePayrollLiveEstimate<
       }, 400);
     };
 
-    let supabase: ReturnType<typeof getSupabaseBrowserClient> | null = null;
-    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
-
-    try {
-      supabase = getSupabaseBrowserClient();
-      const channelName = `payroll_live_${scope}_${month}_${positionCode ?? "all"}_${staffId ?? "me"}`;
-
-      channel = supabase
-        .channel(channelName)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            filter: `month=eq.${month}`,
-            schema: "public",
-            table: "payroll_live_revisions",
-          },
-          () => {
-            scheduleReload();
-          },
-        )
-        .subscribe((status: string) => {
-          if (status === "SUBSCRIBED") {
-            setConnectionState("connected");
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            setConnectionState("reconnecting");
-          }
-        });
-    } catch {
-      // Supabase env not available (e.g. testing / offline)
-    }
+    const unsubscribe = transport.subscribe({
+      channelName: `payroll_live_${scope}_${month}_${positionCode ?? "all"}_${staffId ?? "me"}`,
+      month,
+      onChange: scheduleReload,
+      onStatus: (status) => {
+        if (status === "SUBSCRIBED") {
+          setConnectionState("connected");
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          setConnectionState("reconnecting");
+        }
+      },
+    });
 
     // Always fetch fresh estimate on mount / parameter change
     void runFetch();
@@ -190,11 +216,10 @@ export function usePayrollLiveEstimate<
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("online", handleOnline);
-      if (channel && supabase) {
-        void supabase.removeChannel(channel);
-      }
+      window.removeEventListener("offline", handleOffline);
+      unsubscribe();
     };
-  }, [month, positionCode, scope, staffId]);
+  }, [month, positionCode, scope, staffId, transport]);
 
   return {
     connectionState,
