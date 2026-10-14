@@ -1,11 +1,13 @@
 begin;
 
-select plan(27);
+select plan(28);
 
 -- Orders resolve Nguồn from the student's current acquisition source first,
 -- then the receipt's CRM accrual, then the student's CRM case. All receipts
 -- are bank-dated 2026-11-05 (settlement period 1); every acquisition source is
--- assigned "now", i.e. after the bank date, like the 2026-10-12 import.
+-- assigned explicitly on 2026-11-19/20, after the bank date, like the
+-- 2026-10-12 import that post-dates earlier receipts. Fixed timestamps keep
+-- this true regardless of the wall clock.
 
 insert into auth.users (
   id,
@@ -104,12 +106,12 @@ insert into public.student_acquisition_source_assignments (
 select fixture.student_id::uuid, lead_source.id, 'Orders source fixture', '91000000-0000-0000-0000-000000000001', fixture.assigned_at, fixture.is_current
 from (
   values
-    ('94000000-0000-0000-0000-000000000001', 'mma_zalo', now() - interval '1 hour', false),
-    ('94000000-0000-0000-0000-000000000001', 'sandbox_partner', now(), true),
-    ('94000000-0000-0000-0000-000000000002', 'mma_zalo', now(), true),
-    ('94000000-0000-0000-0000-000000000003', 'direct_walkin', now(), true),
-    ('94000000-0000-0000-0000-000000000004', 'mma_zalo', now(), true),
-    ('94000000-0000-0000-0000-000000000007', 'orders_source_sb_f1', now(), true)
+    ('94000000-0000-0000-0000-000000000001', 'mma_zalo', timestamptz '2026-11-19 00:00:00+00', false),
+    ('94000000-0000-0000-0000-000000000001', 'sandbox_partner', timestamptz '2026-11-20 00:00:00+00', true),
+    ('94000000-0000-0000-0000-000000000002', 'mma_zalo', timestamptz '2026-11-20 00:00:00+00', true),
+    ('94000000-0000-0000-0000-000000000003', 'direct_walkin', timestamptz '2026-11-20 00:00:00+00', true),
+    ('94000000-0000-0000-0000-000000000004', 'mma_zalo', timestamptz '2026-11-20 00:00:00+00', true),
+    ('94000000-0000-0000-0000-000000000007', 'orders_source_sb_f1', timestamptz '2026-11-20 00:00:00+00', true)
 ) as fixture(student_id, source_code, assigned_at, is_current)
 join public.crm_lead_sources as lead_source
   on lead_source.code = fixture.source_code;
@@ -301,6 +303,25 @@ select is(
   (select pg_catalog.count(*) from orders_source_rows),
   7::bigint,
   'every November fixture receipt is an order'
+);
+
+-- Guards the core regression: no "assigned before the bank date" filter.
+select is(
+  (
+    select pg_catalog.count(*)
+    from orders_source_rows as order_row
+    join public.student_acquisition_source_assignments as assignment
+      on assignment.student_id = (order_row.order_json ->> 'studentId')::uuid
+      and assignment.is_current
+      and assignment.assigned_at > (order_row.order_json ->> 'transactionAt')::timestamptz
+    where order_row.order_json ->> 'leadSourceCode' is not distinct from (
+      select lead_source.code
+      from public.crm_lead_sources as lead_source
+      where lead_source.id = assignment.lead_source_id
+    )
+  ),
+  5::bigint,
+  'a source assigned after the bank date still applies to the earlier order'
 );
 
 -- S1: current assignment wins over the superseded one; no sale without CRM.
