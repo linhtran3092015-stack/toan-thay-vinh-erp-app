@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  useEffect,
+  useLayoutEffect,
   useRef,
   type ReactNode,
   type RefObject,
@@ -46,7 +46,10 @@ export function Dialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
+  // Layout effect: its cleanup returns focus in the same commit that removes
+  // the dialog, so focus never sits on <body> after the dialog is gone. A
+  // passive cleanup can run later than that commit.
+  useLayoutEffect(() => {
     if (!isOpen) {
       return;
     }
