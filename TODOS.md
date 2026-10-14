@@ -1192,11 +1192,11 @@
 
 ### Banner kết quả trên trang công việc không hiện vòng focus
 
-**What:** Bỏ `outline-none` hoặc dùng `focus-visible:outline-solid` cho khung banner nhận focus sau nhận việc / hoàn thành / ngoại lệ.
+**What:** Bỏ `outline-none` hoặc dùng `focus-visible:outline-solid` cho khung banner nhận focus sau nhận việc / hoàn thành / ngoại lệ. Thêm vòng focus chuẩn (2px `--border-focus`) cho ba link mới trên trang công việc: "Xem công việc liên quan" trong dòng thời gian và hai link phiếu Coaching.
 
-**Why:** Trong Tailwind v4, `outline-none` đặt `--tw-outline-style: none` còn `focus-visible:outline-2` chỉ đọc biến đó, nên vòng focus không bao giờ hiện. Người dùng bàn phím không thấy focus đang ở đâu.
+**Why:** Trong Tailwind v4, `outline-none` đặt `--tw-outline-style: none` còn `focus-visible:outline-2` chỉ đọc biến đó, nên vòng focus không bao giờ hiện. Người dùng bàn phím không thấy focus đang ở đâu. Ba link kia rơi về vòng focus mặc định của trình duyệt, khác mọi link khác trong cùng file.
 
-**Context:** `src/features/student-care/components/care-detail-view.tsx:140`.
+**Context:** `src/features/student-care/components/care-detail-view.tsx:140`, `care-detail-sections.tsx:381,401,414`.
 
 **Effort:** S
 **Priority:** P2
@@ -1262,13 +1262,25 @@
 **Priority:** P2
 **Depends on:** None
 
+### Thẻ Chăm sóc trên trang chủ trộn "học viên" và "học sinh"
+
+**What:** Chốt chữ cho thẻ Chăm sóc trên trang chủ: tiêu đề "Chăm sóc học viên" đang nằm trên dải bộ tự sinh mới ghi "học sinh". Đổi tiêu đề (và link) sang "học sinh" hoặc giữ chữ cũ cho thẻ này; sửa chú thích alias `CareHealth` (thẻ hồ sơ học sinh không dùng nó).
+
+**Why:** Alias `CareHealth` đưa dải mới vào thẻ trang chủ, nên một thẻ dùng hai từ khác nhau cho cùng đối tượng. Quyết định đổi chữ của bước 11a chỉ áp cho hai màn hình chăm sóc, nên cần chủ sản phẩm chốt.
+
+**Context:** `src/features/student-care/components.tsx:6-7`, `src/features/student-care/dashboard-card.tsx:11`, `src/app/(app)/page.tsx:75`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
 ### Khóa thử lại (request_id) phía trình duyệt
 
-**What:** (1) Trả mã lỗi từ `mutateCare` (hoặc thêm test quét nguồn) thay vì nhận STALE_VERSION bằng tiền tố câu tiếng Việt. (2) Mỗi dòng học sinh render hai lần (bảng và thẻ) nên hai bản giữ hai khóa riêng: dùng chung khóa theo học sinh. (3) Khóa không gồm `version` nên một lệnh cố ý giống hệt sau một lần "chưa rõ kết quả" sẽ bị coi là gửi lại. (4) Mở lại hộp thoại chưa điền lại giá trị đã gõ. (5) Thông báo STALE có thể gây hiểu nhầm sau chính lần ghi của mình.
+**What:** (1) Trả mã lỗi từ `mutateCare` (hoặc thêm test quét nguồn) thay vì nhận STALE_VERSION bằng tiền tố câu tiếng Việt. (2) Mỗi dòng học sinh render hai lần (bảng và thẻ) nên hai bản giữ hai khóa riêng: dùng chung khóa theo học sinh. (3) Khóa không gồm `version` nên một lệnh cố ý giống hệt sau một lần "chưa rõ kết quả" sẽ bị coi là gửi lại. (4) Mở lại hộp thoại chưa điền lại giá trị đã gõ. (5) Thông báo STALE có thể gây hiểu nhầm sau chính lần ghi của mình. (6) Sau một lần lưu liên hệ "chưa rõ kết quả" trên trang công việc, nếu lần tự làm mới 60 giây tiếp theo cũng lỗi (cùng đợt Supabase sập), trang thay bằng ErrorState, xóa nội dung đã gõ và khóa thử lại; gõ lại và lưu sẽ là yêu cầu mới, có thể ghi trùng.
 
 **Why:** Các lỗi biên hiếm của cơ chế chống ghi trùng; đổi câu thông báo trong `actions.ts` hiện sẽ âm thầm làm hỏng quy tắc thử lại.
 
-**Context:** `care-action-form.tsx:31,133`, `care-students-table.tsx:162`, `care-dialog-action.tsx`, `src/features/student-care/actions.ts:9`.
+**Context:** `care-action-form.tsx:31,114,133`, `src/features/student-care/refresh.tsx`, `care-students-table.tsx:162`, `care-dialog-action.tsx`, `src/features/student-care/actions.ts:9`.
 
 **Effort:** M
 **Priority:** P3
@@ -1276,7 +1288,7 @@
 
 ### Hiệu năng và bố cục hàng đợi
 
-**What:** Dòng được render hai lần (bảng + danh sách thẻ) kèm hộp thoại theo dòng; hai tab phân công gọi lại `get_student_care_dashboard` với search/page của danh sách học sinh rồi bỏ kết quả; thanh lọc dùng ngưỡng 1042px nên ở màn 1280–1345px bị thu thành nút "Bộ lọc"; kiểm lại bố cục banner kết quả ở đầu trang và vị trí thẻ "Hoàn thành công việc" (13b đặt ở cột chính); search debounce có thể đua với một điều hướng tab/trang đang chạy.
+**What:** Dòng được render hai lần (bảng + danh sách thẻ) kèm hộp thoại theo dòng; hai tab phân công gọi lại `get_student_care_dashboard` với search/page của danh sách học sinh rồi bỏ kết quả; thanh lọc dùng ngưỡng 1042px nên ở màn 1280–1345px bị thu thành nút "Bộ lọc"; kiểm lại bố cục banner kết quả ở đầu trang và vị trí thẻ "Hoàn thành công việc" (13b đặt ở cột chính); search debounce có thể đua với một điều hướng tab/trang đang chạy. Bảng học sinh là server component nên mọi trường của hộp thoại theo dòng (cả danh sách người được giao) đi vào payload RSC; nếu khung vượt ngưỡng 1042px khi một hộp thoại theo dòng đang mở, bản dòng chứa hộp thoại bị ẩn theo.
 
 **Why:** Chi phí render và RPC thừa; bố cục lệch design ở vài độ rộng.
 
@@ -1300,11 +1312,11 @@
 
 ### Test còn thiếu cho chăm sóc học sinh
 
-**What:** Test cho hai nhánh chặn của `/student-care/[taskId]` (lỗi tải quyền, thiếu `student_care.view`); test nửa còn lại của quyết định focus (form trên trang không kéo focus về); thông báo trang vượt cuối ở tab học sinh; sửa nhãn "REGRESSION (red at HEAD)" của 3 test vì file chưa tồn tại ở base.
+**What:** Test cho hai nhánh chặn của `/student-care/[taskId]` (lỗi tải quyền, thiếu `student_care.view`); test nửa còn lại của quyết định focus (form trên trang không kéo focus về); thông báo trang vượt cuối ở tab học sinh; payload của lệnh `configure` (bật/tạm dừng cả trung tâm) và `claim` (dòng hàng đợi và đầu trang); "Xóa lọc (n)" hủy search đang chờ debounce và giữ tab; ba nhánh thẻ bằng chứng (không đọc được, không có bằng chứng, cảnh báo `evidence_current=false` trên trang công việc); test "không ghi" của `/dev/student-care` mới gửi 4/11 đường ghi qua stub; nhánh `previousFocusRef` của `Dialog` khi không truyền `returnFocusRef`; sửa nhãn "REGRESSION (red at HEAD)" của 3 test vì file chưa tồn tại ở base.
 
 **Why:** Các nhánh này chưa có test nào giữ; nhãn hồi quy hiện không đúng sự thật.
 
-**Context:** `src/app/(app)/student-care/[taskId]/page.tsx:54`, `care-action-form.tsx:114`, `tests/components/student-care-redesign.test.tsx:342,538,890`, `tests/components/student-care-routes.test.tsx`.
+**Context:** `src/app/(app)/student-care/[taskId]/page.tsx:15-16`, `care-action-form.tsx:114`, `care-queue-view.tsx:75`, `care-queue-filters.tsx:143`, `care-detail-sections.tsx:60`, `tests/components/dev-student-care-preview.test.tsx`, `src/components/ui/dialog.tsx:58`, `tests/components/dialog-focus-return.test.tsx`, `tests/components/student-care-redesign.test.tsx:342,538,890`, `tests/components/student-care-routes.test.tsx`.
 
 **Effort:** S
 **Priority:** P3

@@ -4,7 +4,7 @@ All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
 ## [0.16.0.0] - 2026-10-15
 
-Chăm sóc học sinh dựng lại theo phong cách Stumana (bước 11a): hàng đợi công việc chăm sóc và trang chi tiết công việc. Mỗi dòng chỉ có một nút, mỗi trang chỉ một nút chính, và bấm thử lại sau lỗi mạng không tạo bản ghi trùng.
+Chăm sóc học sinh dựng lại theo phong cách Stumana (bước 11a): hàng đợi công việc chăm sóc và trang chi tiết công việc. Mỗi dòng của hàng đợi chỉ có một nút, trang công việc chỉ có một nút chính, và bấm thử lại sau lỗi mạng không tạo bản ghi trùng.
 
 ### Added
 - **Đầu trang `/student-care`** ghi "Tháng MM/YYYY · n cảnh báo đang mở · n chưa giao · n quá hạn · Coaching tháng a/b hoàn thành". Người có quyền cấu hình có nút "Cấu hình bộ tự sinh", mở hộp thoại bật/tạm dừng bộ tự sinh.
@@ -17,18 +17,20 @@ Chăm sóc học sinh dựng lại theo phong cách Stumana (bước 11a): hàng
 - Thẻ **Bằng chứng** dạng bảng Ngày / Buổi (link tới buổi học) / Điểm danh / Điểm, với huy hiệu "hiện hành" hoặc "bằng chứng đã thay đổi".
 - Form **Ghi nhận liên hệ** chọn Kênh, Người nhận, Kết quả liên hệ bằng nút bấm (dùng được bằng bàn phím, lựa chọn có dấu tích), cùng các ô Điểm mạnh, Khó khăn, Kế hoạch, Kết quả, Ghi chú và Hẹn liên hệ tiếp.
 - Thẻ **Hoàn thành công việc**: chọn lần trao đổi và ghi kết luận. "Ghi nhận hoàn thành" chỉ bật khi đã có ít nhất một lần "đã trao đổi thực chất", và ghi rõ lý do khi chưa bật. Cạnh đó là "Tạo / gắn phiếu Coaching…", "Đổi lịch hẹn…" và "Ngoại lệ · hủy task…" (bắt buộc ghi lý do; ngoại lệ không tính là Coaching hoàn thành).
-- **Dòng thời gian** của công việc (mới nhất ở trên) và danh sách phiếu Coaching liên quan.
+- **Dòng thời gian** chăm sóc của học sinh (tối đa 200 sự kiện gần nhất, mới nhất ở trên, kèm link tới công việc liên quan) và danh sách phiếu Coaching liên quan.
 - Trang xem trước `/dev/student-care?view=list|detail&state=normal|stale|paused|empty|error&role=handler|manager|owner` (trả 404 trên production, mọi nút đều không ghi dữ liệu).
 
 ### Changed
 - Mọi thao tác ghi (nhận, giao, liên hệ, hoàn thành, ngoại lệ, tạo theo dõi riêng, cấu hình) chỉ hiện với người có quyền xử lý chăm sóc học sinh, khớp với kiểm tra phía máy chủ. Việc chưa ai nhận không cho ghi liên hệ, hoàn thành hay ngoại lệ; trang ghi rõ cần nhận hoặc giao việc trước.
 - Ô tìm kiếm cập nhật sau 300 ms hoặc khi nhấn Enter, không mất chữ khi gõ nhanh và không kéo bạn về tab cũ. Ô tháng chỉ áp dụng khi đã nhập đủ tháng và năm.
-- Hộp thoại không đóng được khi đang lưu. Lỗi hoặc kết quả chưa chắc chắn vẫn hiện dưới nút mở hộp thoại, kể cả sau khi đóng rồi mở lại. Kết quả nhận việc, hoàn thành và ngoại lệ hiện ngay dưới đầu trang.
+- Hộp thoại không đóng được khi đang lưu. Lỗi hoặc kết quả chưa chắc chắn vẫn hiện dưới nút mở hộp thoại, kể cả sau khi đóng rồi mở lại. Trên trang công việc, kết quả nhận việc, hoàn thành và ngoại lệ hiện ngay dưới đầu trang.
 - Lưu xong không còn tải lại trang lần thứ hai: phản hồi của máy chủ đã mang theo giao diện mới.
 - Hai màn hình này dùng chữ "học sinh" thay cho "học viên".
+- Thẻ Chăm sóc trên trang chủ dùng dải trạng thái bộ tự sinh mới (tiêu đề thẻ vẫn ghi "học viên").
 
 ### Fixed
-- Bấm thử lại sau lỗi mạng hoặc kết quả chưa rõ luôn gửi lại đúng yêu cầu cũ, kể cả khi trang vừa tự làm mới, nên không tạo trùng lần liên hệ, phiếu Coaching hay việc theo dõi riêng. Chỉ khi máy chủ báo công việc đã bị người khác cập nhật thì lần gửi sau mới là yêu cầu mới.
+- Bấm thử lại với đúng nội dung đã nhập sau lỗi mạng hoặc kết quả chưa rõ sẽ gửi lại yêu cầu cũ, kể cả khi trang vừa tự làm mới, nên không tạo trùng lần liên hệ, phiếu Coaching hay việc theo dõi riêng. Chỉ khi máy chủ báo công việc đã bị người khác cập nhật thì lần gửi sau mới là yêu cầu mới.
+- Đóng bất kỳ hộp thoại nào trong ứng dụng giờ trả focus về nút đã mở nó ngay khi hộp thoại biến mất, không còn khoảnh khắc focus rơi về trang; người dùng bàn phím và trình đọc màn hình không bị mất vị trí.
 
 ## [0.15.0.1] - 2026-10-15
 
