@@ -58,7 +58,7 @@ export function PayrollByPositionDonut({
   }, []);
 
   return (
-    <section className="rounded-lg border border-border-subtle bg-surface-base p-5" aria-labelledby="payroll-position-donut-title">
+    <section className="rounded-lg border border-border-subtle bg-surface-base p-5 shadow-[var(--panel-shadow)]" aria-labelledby="payroll-position-donut-title">
       <div id="payroll-position-donut-title">
         <SectionHeading
           description="Tỷ trọng chi phí thực trả theo vị trí trong kỳ."
@@ -121,7 +121,7 @@ export function PayrollByPositionDonut({
 export function PayrollByPositionBars({ items }: { items: readonly PayrollDashboardPositionSummary[] }) {
   const maximum = Math.max(0, ...items.map((item) => item.totalPayroll));
   return (
-    <section className="rounded-lg border border-border-subtle bg-surface-base p-5" aria-labelledby="payroll-position-bars-title">
+    <section className="rounded-lg border border-border-subtle bg-surface-base p-5 shadow-[var(--panel-shadow)]" aria-labelledby="payroll-position-bars-title">
       <div id="payroll-position-bars-title">
         <SectionHeading description="Sắp xếp giảm dần theo số tiền trung tâm thực trả." title="Chi phí lương theo vị trí" />
       </div>
@@ -161,7 +161,7 @@ export function PayrollTrendChart({
   const areaPoints = `${left},${bottom} ${points} ${right},${bottom}`;
 
   return (
-    <section className="rounded-lg border border-border-subtle bg-surface-base p-5" aria-labelledby="payroll-trend-title">
+    <section className="rounded-lg border border-border-subtle bg-surface-base p-5 shadow-[var(--panel-shadow)]" aria-labelledby="payroll-trend-title">
       <div id="payroll-trend-title">
         <SectionHeading description="Sáu tháng kết thúc tại kỳ đang chọn, dùng cùng bộ lọc vị trí." title="Xu hướng quỹ lương" />
       </div>
@@ -204,7 +204,7 @@ export function PayrollCompositionChart({
   const gross = earnings.reduce((sum, item) => sum + item.amountVnd, 0);
   const deductionTotal = deductions.reduce((sum, item) => sum + item.amountVnd, 0);
   return (
-    <section className="rounded-lg border border-border-subtle bg-surface-base p-5" aria-labelledby="payroll-composition-title">
+    <section className="rounded-lg border border-border-subtle bg-surface-base p-5 shadow-[var(--panel-shadow)]" aria-labelledby="payroll-composition-title">
       <div id="payroll-composition-title">
         <SectionHeading description="Các dòng lương đã được Payroll Engine ghi nhận trong kỳ." title="Cơ cấu các khoản chi" />
       </div>

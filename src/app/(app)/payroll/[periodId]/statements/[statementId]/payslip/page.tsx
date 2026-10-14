@@ -48,7 +48,7 @@ export default async function PayslipPageRoute({ params }: PayslipPageProps) {
   const pdfDownloadUrl = `/payroll/${periodId}/statements/${statementId}/payslip/pdf`;
 
   return (
-    <div className="min-h-screen bg-slate-100/50 print:bg-white">
+    <div className="min-h-screen bg-surface-canvas print:bg-white">
       <PayslipToolbar pdfDownloadUrl={pdfDownloadUrl} />
       <main className="p-4 print:p-0 sm:p-6">
         <PayslipDocument data={result.data} />

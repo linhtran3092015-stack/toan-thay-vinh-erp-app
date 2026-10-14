@@ -1,10 +1,11 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Clock, RefreshCw } from "lucide-react";
+import { AlertCircle, Clock, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { PayrollDailyBreakdownTable } from "@/features/payroll/estimate/components/payroll-daily-breakdown-table";
+import { formatClockTime, getNotInPayReason, getPendingVerificationSummary, getShiftPayBadge, getShiftPayContext, getShiftPayState } from "@/features/payroll/estimate/daily-breakdown";
 import { usePayrollLiveEstimate } from "@/features/payroll/estimate/use-payroll-live-estimate";
 import type { StaffPayrollEstimate } from "@/features/payroll/estimate/types";
 import {
@@ -79,7 +80,10 @@ export function StaffLiveEstimateCard({
 
   const { completeness, latestCompletedWorkAt, lines, openShifts, recentShifts, statement, status } = estimate;
   const isApproved = status === "approved";
-  const pendingCount = statement?.pendingVerificationCount ?? 0;
+  // Shifts actually counted provisionally (same count as the ledger banner).
+  const pendingCount = getPendingVerificationSummary(estimate).count;
+  // Same pay state and labels as the daily ledger, so one shift never reads two ways.
+  const shiftPayContext = getShiftPayContext(estimate);
 
   // Group line categories
   const baseSalaryLines = lines.filter((l) => l.lineType === "base_offline" || l.lineType === "base_online");
@@ -321,33 +325,35 @@ export function StaffLiveEstimateCard({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-subtle">
-                    {recentShifts.map((shift) => (
-                      <tr key={shift.id}>
-                        <td className="py-2 font-medium text-text-default">
-                          {formatDate(shift.workDate)}
-                          {shift.checkInAt && shift.checkOutAt ? (
-                            <span className="ml-1 text-text-muted">
-                              ({shift.checkInAt.slice(11, 16)}–{shift.checkOutAt.slice(11, 16)})
-                            </span>
-                          ) : null}
-                        </td>
-                        <td className="py-2 text-text-muted">
-                          {shift.workMode === "online" ? "Online (50%)" : "Offline"}
-                        </td>
-                        <td className="py-2">
-                          {shift.isPendingVerification ? (
-                            <Badge tone="warning">Chờ xác minh · đã tính tạm</Badge>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-success">
-                              <CheckCircle2 className="h-3.5 w-3.5" /> Đã xác minh
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2 text-right font-medium tabular-nums text-text-strong">
-                          {formatWorkMinutes(shift.workedMinutes)}
-                        </td>
-                      </tr>
-                    ))}
+                    {recentShifts.map((shift) => {
+                      // Recent shifts are completed time entries.
+                      const payState = getShiftPayState({ ...shift, status: "checked_out" }, shiftPayContext);
+                      const payBadge = getShiftPayBadge(payState, {
+                        isApproved,
+                        notInPayReason: payState === "not_in_pay" ? getNotInPayReason(shift, shiftPayContext) : null,
+                      });
+                      return (
+                        <tr key={shift.id}>
+                          <td className="py-2 font-medium text-text-default">
+                            {formatDate(shift.workDate)}
+                            {shift.checkInAt && shift.checkOutAt ? (
+                              <span className="ml-1 text-text-muted">
+                                ({formatClockTime(shift.checkInAt)}–{formatClockTime(shift.checkOutAt)})
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="py-2 text-text-muted">
+                            {shift.workMode === "online" ? "Online (50%)" : "Offline"}
+                          </td>
+                          <td className="py-2">
+                            <Badge tone={payBadge.tone}>{payBadge.label}</Badge>
+                          </td>
+                          <td className="py-2 text-right font-medium tabular-nums text-text-strong">
+                            {formatWorkMinutes(shift.workedMinutes)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

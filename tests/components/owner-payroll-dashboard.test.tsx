@@ -69,7 +69,7 @@ describe("Owner payroll dashboard presentation", () => {
   it("renders executive KPIs, all requested charts, insights, tables and dynamic filters", () => {
     render(<OwnerPayrollDashboardPage dashboard={dashboard()} />);
 
-    expect(screen.getByRole("heading", { name: "Tổng quan quỹ lương" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Quỹ lương tháng 08/2026" })).toBeInTheDocument();
     expect(screen.getByLabelText("Chỉ số quỹ lương chính")).toHaveTextContent("12.000.000 ₫");
     expect(screen.getByRole("img", { name: /Biểu đồ cơ cấu quỹ lương/ })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Biểu đồ thanh chi phí lương theo vị trí" })).toBeInTheDocument();

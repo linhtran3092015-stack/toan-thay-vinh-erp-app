@@ -105,6 +105,45 @@ describe("payroll-live-estimate: schemas and data contracts", () => {
   });
 
   describe("ownerPayrollEstimateSchema", () => {
+    // Value: protects=the owner estimate for an approved month (get_owner_payroll_estimate approved branch, which sends approvedAt but no calculatedAt) still parses, so /payroll/dashboard shows the approved figures instead of the load error; fails_when=calculatedAt becomes required again; why_new=adversarial review found every approved month failed validation; seam=none; no_claim=payload shape copied from migration 20260918160000 by hand, not fetched live
+    // Value: protects=an owner estimate whose issues include a centre-level issue with "staffId": null (e.g. missing_recruiter on a new-enrollment order) still parses, so the live payroll section loads; fails_when=issue staffId is optional but not nullable again; why_new=adversarial review: one such order made the whole owner estimate fail validation; seam=none; no_claim=payload shape from migration 20260929154500 (detected_issues → issues) copied by hand
+    it("accepts a centre-level issue with a null staffId", () => {
+      const result = ownerPayrollEstimateSchema.safeParse({
+        asOf: "2026-10-14T03:00:00Z",
+        calculatedAt: "2026-10-14T03:00:00Z",
+        finance: { status: "restricted" },
+        issues: [{ details: { source: "order" }, issueCode: "missing_recruiter", staffId: null }],
+        month: "2026-10-01",
+        status: "estimated",
+        summary: { advanceDeductionsVnd: 0, payableVnd: 0, pendingVerificationCount: 0, staffCount: 0, totalDeductionsVnd: 0, totalEarningsVnd: 0 },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("parses the approved-month payload, which has no calculatedAt", () => {
+      const approved = {
+        approvedAt: "2026-10-05T03:00:00Z",
+        asOf: "2026-10-14T03:00:00Z",
+        completeness: "complete" as const,
+        finance: { status: "restricted" as const },
+        month: "2026-09-01",
+        payrollPeriodId: "11111111-1111-4111-8111-111111111111",
+        status: "approved" as const,
+        statements: [],
+        summary: {
+          advanceDeductionsVnd: 0,
+          payableVnd: 0,
+          pendingVerificationCount: 0,
+          staffCount: 0,
+          totalDeductionsVnd: 0,
+          totalEarningsVnd: 0,
+        },
+      };
+      const result = ownerPayrollEstimateSchema.safeParse(approved);
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.calculatedAt).toBeUndefined();
+    });
+
     it("successfully parses valid owner payroll estimate with tuition net ratio", () => {
       const sample = {
         asOf: "2026-09-18T10:00:00Z",

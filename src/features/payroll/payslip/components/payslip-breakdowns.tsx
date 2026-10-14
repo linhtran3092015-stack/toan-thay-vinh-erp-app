@@ -18,20 +18,20 @@ export function PayslipBreakdowns({
     <div className="grid gap-4 md:grid-cols-2">
       {/* Work Hours Breakdown */}
       {hasWorkHours ? (
-        <div className="rounded-xl border border-border-subtle bg-surface-base p-3.5 shadow-xs">
-          <div className="flex items-center gap-1.5 border-b border-border-subtle pb-2 text-xs font-bold text-action-primary">
-            <Clock aria-hidden="true" className="h-4 w-4 text-action-primary" />
+        <div className="rounded-lg border border-border-subtle bg-surface-base p-3.5">
+          <div className="flex items-center gap-1.5 border-b border-border-row pb-2 text-caption font-semibold tracking-[0.02em] text-text-muted">
+            <Clock aria-hidden="true" className="h-4 w-4" />
             <span>CHI TIẾT CÔNG & GIỜ LÀM</span>
           </div>
-          <ul className="mt-2.5 space-y-2 text-xs">
+          <ul className="mt-2.5 space-y-2 text-caption">
             {breakdowns.workHours.map((wh) => (
               <li
-                className="flex items-center justify-between rounded-lg bg-surface-raised p-2 text-text-default"
+                className="flex items-center justify-between rounded-md bg-surface-sunken p-2 text-text-default"
                 key={wh.modeLabel}
               >
                 <div>
                   <p className="font-semibold text-text-strong">{wh.modeLabel}</p>
-                  <p className="text-[11px] text-text-muted">
+                  <p className="text-caption text-text-muted">
                     {wh.workHoursFormatted} × {wh.dailyRateFormatted}
                     {wh.factorText ? ` (${wh.factorText})` : ""}
                   </p>
@@ -47,12 +47,12 @@ export function PayslipBreakdowns({
 
       {/* Grading Breakdown */}
       {hasGrading && breakdowns.grading ? (
-        <div className="rounded-xl border border-border-subtle bg-surface-base p-3.5 shadow-xs">
-          <div className="flex items-center gap-1.5 border-b border-border-subtle pb-2 text-xs font-bold text-action-primary">
-            <Award aria-hidden="true" className="h-4 w-4 text-action-primary" />
+        <div className="rounded-lg border border-border-subtle bg-surface-base p-3.5">
+          <div className="flex items-center gap-1.5 border-b border-border-row pb-2 text-caption font-semibold tracking-[0.02em] text-text-muted">
+            <Award aria-hidden="true" className="h-4 w-4" />
             <span>CHI TIẾT CHẤM BÀI</span>
           </div>
-          <div className="mt-2.5 rounded-lg bg-surface-raised p-2.5 text-xs">
+          <div className="mt-2.5 rounded-md bg-surface-sunken p-2.5 text-caption">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-text-strong">
                 {new Intl.NumberFormat("vi-VN").format(breakdowns.grading.creditsCount)} phiếu chấm
@@ -61,11 +61,11 @@ export function PayslipBreakdowns({
                 {breakdowns.grading.subtotalFormatted}
               </span>
             </div>
-            <p className="mt-1 text-[11px] text-text-muted">
+            <p className="mt-1 text-caption text-text-muted">
               Công thức: {breakdowns.grading.explanation}
             </p>
             {breakdowns.grading.poolAmountFormatted ? (
-              <p className="mt-0.5 text-[11px] text-text-muted">
+              <p className="mt-0.5 text-caption text-text-muted">
                 Quỹ chấm bài tháng: {breakdowns.grading.poolAmountFormatted}
               </p>
             ) : null}
@@ -75,13 +75,13 @@ export function PayslipBreakdowns({
 
       {/* Commission Breakdown */}
       {hasCommissions ? (
-        <div className="rounded-xl border border-border-subtle bg-surface-base p-3.5 shadow-xs md:col-span-2">
-          <div className="flex items-center gap-1.5 border-b border-border-subtle pb-2 text-xs font-bold text-action-primary">
-            <TrendingUp aria-hidden="true" className="h-4 w-4 text-action-primary" />
+        <div className="rounded-lg border border-border-subtle bg-surface-base p-3.5 md:col-span-2">
+          <div className="flex items-center gap-1.5 border-b border-border-row pb-2 text-caption font-semibold tracking-[0.02em] text-text-muted">
+            <TrendingUp aria-hidden="true" className="h-4 w-4" />
             <span>CHI TIẾT THƯỞNG DOANH THU & HOA HỒNG</span>
           </div>
           <div className="mt-2.5 overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-caption">
               <thead>
                 <tr className="border-b border-border-subtle text-text-muted">
                   <th className="pb-1.5 text-left font-semibold">Khối / Hạng mục</th>
@@ -90,7 +90,7 @@ export function PayslipBreakdowns({
                   <th className="pb-1.5 text-right font-semibold">Thành tiền</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border-row">
                 {breakdowns.commissions.map((c, idx) => (
                   <tr key={`${c.gradeLabel}-${idx}`}>
                     <td className="py-2 text-text-strong font-medium">

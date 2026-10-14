@@ -93,6 +93,54 @@ describe("StaffLiveEstimateCard Component", () => {
     expect(retryBtn).toBeInTheDocument();
     expect(screen.getByText(/chưa tải được dữ liệu lương tạm tính/i)).toBeInTheDocument();
   });
+
+  // Value: protects="Xem nguồn công gần nhất" reads each shift's pay state with the same helper and labels as the daily ledger: an unverified shift with no time_entry pay line is "Chưa tính · chưa xác minh" (never "đã tính tạm"), and a shift with a linked base line is "Đã xác minh";
+  // fails_when=the recent-shifts list again labels every unverified shift "Chờ xác minh · đã tính tạm" from isPendingVerification alone, so one shift reads "đã tính tạm" there and "Chưa tính" in the ledger;
+  // why_new=review pass 3 (fix 3): the list used its own label outside the ledger's pay-state logic;
+  // seam=fetch stubbed to never resolve so the card keeps the initial estimate; no_claim=does not cover the realtime refresh
+  // Also protects=shift times in Vietnam time, and the card's "đã tính vào số tạm tính" banner counts only shifts with a provisional pay line; fails_when=the list slices UTC ISO strings again, or the banner uses the raw statement count while the list says "Chưa tính".
+  it("labels recent shifts with the ledger's pay state", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
+    try {
+      const unpaidId = "a0000000-0000-4000-8000-000000000011";
+      const paidId = "a0000000-0000-4000-8000-000000000012";
+      const user = userEvent.setup();
+      render(
+        <StaffLiveEstimateCard
+          initialEstimate={{
+            ...mockStaffEstimate,
+            lines: [{ ...mockStaffEstimate.lines[0], sourceId: paidId, sourceKind: "time_entry", workDate: "2026-09-17" }],
+            // The RPC counts every pending entry, including one with no pay line.
+            statement: mockStaffEstimate.statement ? { ...mockStaffEstimate.statement, pendingVerificationCount: 1 } : null,
+            shifts: [
+              { checkInAt: "2026-09-18T08:00:00Z", checkOutAt: "2026-09-18T11:00:00Z", id: unpaidId, isPendingVerification: true, status: "checked_out", workDate: "2026-09-18", workedMinutes: 180, workMode: "offline" },
+            ],
+            recentShifts: [
+              { ...mockStaffEstimate.recentShifts[0], id: unpaidId, isPendingVerification: true, workDate: "2026-09-18" },
+              { ...mockStaffEstimate.recentShifts[0], id: paidId, isPendingVerification: false, workDate: "2026-09-17" },
+            ],
+          }}
+          month="2026-09-01"
+          today="2026-09-18"
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: /Xem nguồn công gần nhất/ }));
+      const recent = screen.getByRole("columnheader", { name: "Trạng thái xác minh" }).closest("table") as HTMLElement;
+      const rows = within(recent).getAllByRole("row").slice(1);
+      expect(rows[0]).toHaveTextContent("Chưa tính · chưa xác minh");
+      expect(rows[1]).toHaveTextContent("Đã xác minh");
+      expect(recent).not.toHaveTextContent(/tính tạm/);
+      // Shift times read in Vietnam time (08:00Z = 15:00), not the UTC slice of the ISO string.
+      expect(rows[0]).toHaveTextContent("(15:00–");
+      expect(rows[0]).not.toHaveTextContent("(08:00–");
+      // The pending banner counts only shifts actually in provisional pay (none here).
+      expect(screen.queryByText(/đã tính vào số tạm tính/)).not.toBeInTheDocument();
+    } finally {
+      cleanup();
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe("OwnerLiveEstimateOverview Component", () => {
@@ -400,5 +448,49 @@ describe("Owner daily estimate dialog", () => {
 
     await user.click(within(dialog).getByRole("button", { name: "Đóng bảng lương theo ngày" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  // Value: protects=when the staff estimate endpoint refuses (403/500) the owner's daily dialog leaves the skeleton for an in-dialog error with Thử lại, and the retry loads the ledger;
+  // fails_when=the dialog's loading/error/ready derivation regresses (stuck skeleton or ledger with no data), the non-ok response is treated as data, or Thử lại stops re-fetching;
+  // why_new=the dialog was rebuilt on StaffPayrollLedger; existing tests cover only its success path and the presentational error state;
+  // seam=none (real default transport; global fetch mocked); no_claim=does not prove the API's permission check (route tests own the 403)
+  it("shows an in-dialog error with a working retry when the staff estimate cannot be loaded", async () => {
+    let staffStatus = 403;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/payroll/staff-estimate")) {
+        return Promise.resolve(
+          staffStatus === 200
+            ? new Response(JSON.stringify(staffEstimate), { headers: { "Content-Type": "application/json" }, status: 200 })
+            : new Response("forbidden", { status: staffStatus }),
+        );
+      }
+      return Promise.resolve(new Response(JSON.stringify(ownerEstimate), { headers: { "Content-Type": "application/json" }, status: 200 }));
+    });
+    // Stubbed (not assigned) so the mock and the console spy never leak into later tests.
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const user = userEvent.setup();
+      render(<OwnerLiveEstimateOverview initialEstimate={ownerEstimate} month="2026-10-01" today="2026-10-10" />);
+
+      await user.click(screen.getByRole("button", { name: "Xem lương theo ngày của Trợ lý hai" }));
+      const dialog = await screen.findByRole("dialog");
+
+      expect(await within(dialog).findByText("Chưa tải được lương theo ngày của nhân sự")).toBeInTheDocument();
+      expect(within(dialog).queryByText("Đang tải lương theo ngày")).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole("table")).not.toBeInTheDocument();
+
+      staffStatus = 200;
+      await user.click(within(dialog).getByRole("button", { name: /Thử lại/ }));
+
+      expect(await within(dialog).findByTestId("daily-row-2026-10-02")).toBeInTheDocument();
+      expect(within(dialog).queryByText("Chưa tải được lương theo ngày của nhân sự")).not.toBeInTheDocument();
+    } finally {
+      cleanup();
+      vi.unstubAllGlobals();
+      consoleError.mockRestore();
+    }
   });
 });

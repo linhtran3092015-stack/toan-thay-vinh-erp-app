@@ -11,6 +11,10 @@ function formatSignatureDate(payDate: string): string {
   return `Hà Nội, ngày ${day} tháng ${month} năm ${year}`;
 }
 
+/**
+ * Notes and the recipient signature. Reconciler and approver names are not
+ * loaded for the payslip, so only the recipient block is shown.
+ */
 export function PayslipNotesFooter({
   employee,
   period,
@@ -21,13 +25,11 @@ export function PayslipNotesFooter({
   const isFeedbackClosed = Boolean(period.feedbackClosedAt);
 
   return (
-    <footer className="mt-4 space-y-6 pt-2">
-      {/* Notes & Signature */}
-      <div className="grid gap-6 sm:grid-cols-2">
-        {/* Notes Left */}
-        <div className="space-y-2 text-xs text-text-default">
-          <p className="font-bold text-text-strong uppercase">Ghi Chú</p>
-          <ul className="list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-text-muted">
+    <footer className="grid gap-5 border-t border-border-row pt-4 text-caption text-text-muted">
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <p className="font-semibold uppercase tracking-[0.02em] text-text-default">Ghi chú</p>
+          <ul className="list-disc space-y-1 pl-4 leading-relaxed">
             <li>
               Phiếu lương này được lập tự động từ hệ thống ERP Trung tâm Toán Thầy Vinh.
             </li>
@@ -39,29 +41,17 @@ export function PayslipNotesFooter({
           </ul>
         </div>
 
-        {/* Signature Right */}
-        <div className="flex flex-col items-center justify-between text-center sm:items-end sm:text-right">
-          <p className="text-xs italic text-text-muted">
-            {formatSignatureDate(period.payDate)}
-          </p>
-          <div className="mt-2 text-xs text-text-default">
-            <p className="font-bold text-text-strong">Người nhận lương</p>
-            <p className="text-[11px] italic text-text-muted">
-              (Ký, ghi rõ họ tên)
-            </p>
-          </div>
-          <div className="mt-12 text-sm font-bold text-text-strong">
-            {employee.displayName}
-          </div>
+        <div className="flex flex-col items-start sm:items-end sm:text-right">
+          <p className="italic">{formatSignatureDate(period.payDate)}</p>
+          <p className="mt-2 font-semibold text-text-strong">Người nhận lương</p>
+          <p className="italic">(Ký, ghi rõ họ tên)</p>
+          <p className="mt-10 text-secondary font-semibold text-text-strong">{employee.displayName}</p>
         </div>
       </div>
 
-      {/* Brand Footer */}
-      <div className="border-t border-border-subtle pt-3 text-center text-[11px] text-text-muted">
-        <p className="font-semibold text-text-default">
-          TRUNG TÂM TOÁN THẦY VINH · ERP VẬN HÀNH
-        </p>
-      </div>
+      <p className="text-center font-semibold text-text-default">
+        TRUNG TÂM TOÁN THẦY VINH · ERP VẬN HÀNH
+      </p>
     </footer>
   );
 }

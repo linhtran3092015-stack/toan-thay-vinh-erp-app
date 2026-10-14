@@ -1,19 +1,40 @@
 "use client";
 
-import { AlertTriangle, CalendarDays, DollarSign, Percent, RefreshCw, TrendingUp, Users } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
+import {
+  DataTableFrame,
+  TableCell,
+  TableHeaderCell,
+  TableRow,
+  TableState,
+} from "@/components/patterns/data-table-frame";
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
+import { Button, getButtonClassName } from "@/components/ui/button";
+import { getPayrollPositionName } from "@/features/payroll/dashboard/aggregate";
+import { PayrollFiguresStrip } from "@/features/payroll/dashboard/components/payroll-figures-strip";
+import { formatDashboardMonth, formatVnd } from "@/features/payroll/dashboard/format";
+import {
+  buildLiveEstimateFigures,
+  buildOwnerStaffRows,
+  countStaffWithoutPayrollPosition,
+  type OwnerStaffRow,
+} from "@/features/payroll/dashboard/overview-model";
+import { getCurrentPayrollMonth } from "@/features/payroll/dashboard/url-state";
 import {
   StaffDailyEstimateDialog,
   type StaffDailyEstimateTarget,
 } from "@/features/payroll/estimate/components/staff-daily-estimate-dialog";
-import { usePayrollLiveEstimate } from "@/features/payroll/estimate/use-payroll-live-estimate";
 import type { OwnerPayrollEstimate } from "@/features/payroll/estimate/types";
-import { formatCompactVnd, formatDashboardMonth, formatVnd } from "@/features/payroll/dashboard/format";
-import { getCurrentPayrollMonth } from "@/features/payroll/dashboard/url-state";
-import { formatDateTime } from "@/features/payroll/payroll-presentation";
-import { payrollPositionLabels } from "@/features/staff/payroll-profile-types";
+import {
+  type PayrollEstimateTransport,
+  usePayrollLiveEstimate,
+} from "@/features/payroll/estimate/use-payroll-live-estimate";
+import { formatDateTime, formatWorkMinutes } from "@/features/payroll/payroll-presentation";
+import { cn } from "@/lib/utils";
 
 interface OwnerLiveEstimateOverviewProps {
   initialEstimate?: OwnerPayrollEstimate | null;
@@ -21,18 +42,24 @@ interface OwnerLiveEstimateOverviewProps {
   positionCode?: string | null;
   /** Ghi đè "hôm nay" (YYYY-MM-DD) cho bảng lương theo ngày; dùng trong kiểm thử. */
   today?: string;
+  /** Defaults to the real `/api/payroll/*` endpoints + realtime channel. */
+  transport?: PayrollEstimateTransport;
 }
 
-const positionNames: Record<string, string> = {
-  ...payrollPositionLabels,
-  __unassigned__: "Chưa phân vị trí",
-};
+/** Mobile (<md): each staff row stacks into a card; every value keeps an inline label. */
+const stackedRowClassName =
+  "max-md:grid max-md:h-auto max-md:grid-cols-2 max-md:gap-x-3 max-md:gap-y-1.5 max-md:border-t max-md:border-border-row max-md:px-4 max-md:py-3 max-md:first:border-t-0 max-md:[&>td]:border-t-0! max-md:[&>td]:px-0!";
+
+function MobileLabel({ children }: { children: string }) {
+  return <span className="block text-caption text-text-muted md:hidden">{children}</span>;
+}
 
 export function OwnerLiveEstimateOverview({
   initialEstimate,
   month,
   positionCode,
   today,
+  transport,
 }: OwnerLiveEstimateOverviewProps) {
   const { connectionState, data, hasAttemptedFetch, isLoading, refetch } =
     usePayrollLiveEstimate<OwnerPayrollEstimate>({
@@ -40,6 +67,7 @@ export function OwnerLiveEstimateOverview({
       month,
       positionCode,
       scope: "owner",
+      transport,
     });
 
   // Nhân sự đang được mở bảng lương theo ngày (hộp thoại realtime)
@@ -51,310 +79,220 @@ export function OwnerLiveEstimateOverview({
   if (!estimate) {
     if (!hasAttemptedFetch || isLoading) {
       return (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div className="h-28 animate-pulse rounded-lg border border-border-subtle bg-surface-base p-4" key={i} />
-          ))}
+        <div aria-hidden="true" className="grid gap-4 motion-safe:animate-pulse">
+          <div className="h-[76px] rounded-lg border border-border-subtle bg-surface-base" />
+          <div className="h-64 rounded-lg border border-border-subtle bg-surface-base" />
         </div>
       );
     }
 
     return (
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface-base p-4 sm:p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface-base p-4 shadow-[var(--panel-shadow)] sm:p-5">
         <div>
           <p className="text-body font-semibold text-text-strong">Chưa tải được tổng quan lương tạm tính</p>
           <p className="mt-1 text-secondary text-text-muted">Không thể kết nối dữ liệu ước tính quỹ lương. Vui lòng thử lại.</p>
         </div>
-        <button
-          className="inline-flex items-center gap-2 rounded-md border border-border-subtle bg-surface-base px-3 py-1.5 text-secondary font-medium text-text-default hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-          onClick={() => void refetch()}
-          type="button"
-        >
-          <RefreshCw className="h-4 w-4" />
+        <Button className="max-md:h-11" onClick={() => void refetch()} size="sm" type="button" variant="secondary">
+          <RefreshCw aria-hidden="true" className="h-4 w-4" />
           Thử lại
-        </button>
+        </Button>
       </div>
     );
   }
 
-  const { byPosition, completeness, finance, issues, latestCompletedWorkAt, status, summary } = estimate;
+  const { byPosition, completeness, issues, latestCompletedWorkAt, status, summary } = estimate;
   const isApproved = status === "approved";
-  const pendingCount = summary.pendingVerificationCount ?? 0;
+  // Approved pay excludes unverified work: no "nằm trong số tạm tính" banner.
+  const pendingCount = isApproved ? 0 : summary.pendingVerificationCount ?? 0;
+  const figures = buildLiveEstimateFigures(estimate, { positionFiltered: Boolean(positionCode) });
+  const staffRows = buildOwnerStaffRows(estimate);
+  const staffWithoutPositionCount = countStaffWithoutPayrollPosition(estimate, { positionCode });
+  // byPosition is not position-filtered: keep only the selected position so rows add up to the filtered total.
+  const positionRows = positionCode ? byPosition.filter((row) => row.positionCode === positionCode) : byPosition;
+  const hasRatioFigure = figures.some((figure) => figure.key === "ratio");
+  const currentMonth = getCurrentPayrollMonth();
+
+  const openDaily = (row: OwnerStaffRow) => {
+    setDailyTarget({
+      positionLabel: row.positionLabel,
+      staffDisplayName: row.staffDisplayName,
+      staffEmployeeCode: row.staffEmployeeCode,
+      staffId: row.staffId,
+    });
+    setIsDailyOpen(true);
+  };
 
   return (
-    <div className="grid min-w-0 gap-5">
-      {/* Live Estimate Header & Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface-base px-4 py-3 sm:px-5">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="text-label font-bold uppercase tracking-wider text-action-link">
+    <div className="grid min-w-0 gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-caption text-text-muted">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-label font-semibold text-text-strong">
             {isApproved ? "Số liệu đã chốt" : "Tính đến hiện tại"}
           </span>
-          {isApproved ? (
-            <Badge tone="success">Lương đã duyệt</Badge>
-          ) : (
-            <Badge tone="info">Lương tạm tính</Badge>
-          )}
-
           {completeness === "partial" ? (
             <Badge tone="warning">Chưa tính đủ dữ liệu ({issues.length} cảnh báo)</Badge>
           ) : null}
-
-          {connectionState === "stale" ? (
-            <Badge tone="warning">Chưa cập nhật</Badge>
-          ) : null}
+          {connectionState === "stale" ? <Badge tone="warning">Chưa cập nhật</Badge> : null}
         </div>
-
-        <div className="flex items-center gap-3 text-caption text-text-muted">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>
             {isApproved
               ? `Chốt: ${estimate.approvedAt ? formatDateTime(estimate.approvedAt) : "Đã duyệt"}`
-              : `Dữ liệu tính lúc: ${formatDateTime(estimate.calculatedAt)}`}
+              : `Dữ liệu tính lúc: ${formatDateTime(estimate.calculatedAt ?? estimate.asOf)}`}
           </span>
-          <span>
-            {isApproved
-              ? null
-              : latestCompletedWorkAt
-                ? `Ca gần nhất: ${formatDateTime(latestCompletedWorkAt)}`
-                : "Chưa có ca hoàn tất"}
-          </span>
-          <button
+          {isApproved ? null : (
+            <span>{latestCompletedWorkAt ? `Ca gần nhất: ${formatDateTime(latestCompletedWorkAt)}` : "Chưa có ca hoàn tất"}</span>
+          )}
+          <Button
             aria-label="Làm mới tổng quan lương tạm tính"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border-subtle bg-surface-base text-text-default hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
+            className="max-md:h-11 max-md:w-11"
             disabled={isLoading}
+            iconOnly
             onClick={() => void refetch()}
+            size="sm"
             type="button"
+            variant="secondary"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
+            <RefreshCw aria-hidden="true" className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
+          </Button>
         </div>
       </div>
 
-      {/* Notice when viewing past month with 0 live estimate */}
-      {month.slice(0, 7) !== getCurrentPayrollMonth().slice(0, 7) && summary.payableVnd === 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface-base p-4 text-secondary text-text-default shadow-sm">
-          <p>
-            Bạn đang xem <strong>{formatDashboardMonth(month)}</strong> (kỳ chưa có dữ liệu chấm công thời gian thực).
-          </p>
-          <a
-            className="inline-flex items-center font-semibold text-action-link hover:underline"
-            href={`/payroll/dashboard?month=${getCurrentPayrollMonth().slice(0, 7)}`}
-          >
-            Chuyển sang {formatDashboardMonth(getCurrentPayrollMonth())} (Tháng hiện tại) →
-          </a>
-        </div>
+      {/* Viewing a past month with no live estimate: point back to the current month. */}
+      {month.slice(0, 7) !== currentMonth.slice(0, 7) && staffRows.length === 0 && summary.totalEarningsVnd === 0 ? (
+        <ResultBanner
+          action={
+            <Link
+              className="inline-flex items-center text-action-link! max-md:min-h-11"
+              href={`/payroll/dashboard?month=${currentMonth.slice(0, 7)}${positionCode ? `&position=${encodeURIComponent(positionCode)}` : ""}`}
+            >
+              Chuyển sang {formatDashboardMonth(currentMonth)} (Tháng hiện tại) →
+            </Link>
+          }
+          description="Kỳ này chưa có dữ liệu chấm công thời gian thực."
+          title={`Bạn đang xem ${formatDashboardMonth(month)}.`}
+          tone="info"
+        />
       ) : null}
 
-      {/* 4 Main KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* KPI 1: Tổng thu nhập phát sinh */}
-        <div className="rounded-lg border border-border-subtle bg-surface-base p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-caption font-medium text-text-muted">Tổng thu nhập</span>
-            <TrendingUp className="h-4 w-4 text-text-muted" />
-          </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-text-strong tabular-nums sm:text-3xl">
-            {formatVnd(summary.totalEarningsVnd)}
-          </p>
-          <p className="mt-1 text-caption text-text-muted">Trước các khoản khấu trừ</p>
-        </div>
+      <PayrollFiguresStrip figures={figures} label="Số liệu lương tạm tính" />
 
-        {/* KPI 2: Tổng lương tạm tính phải trả */}
-        <div className="rounded-lg border border-border-subtle bg-surface-base p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-caption font-medium text-text-muted">Lương tạm tính phải trả</span>
-            <DollarSign className="h-4 w-4 text-action-link" />
-          </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-action-link tabular-nums sm:text-3xl">
-            {formatVnd(summary.payableVnd)}
-          </p>
-          <p className="mt-1 text-caption text-text-muted">
-            Khấu trừ: {formatVnd(summary.totalDeductionsVnd)} (Tạm ứng: {formatVnd(summary.advanceDeductionsVnd)})
-          </p>
-        </div>
-
-        {/* KPI 3: Học phí thực thu sau hoàn */}
-        <div className="rounded-lg border border-border-subtle bg-surface-base p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-caption font-medium text-text-muted">Thực thu sau hoàn</span>
-            <Users className="h-4 w-4 text-text-muted" />
-          </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-text-strong tabular-nums sm:text-3xl">
-            {finance.status === "restricted"
-              ? "Giới hạn quyền"
-              : formatVnd(finance.tuitionNetVnd ?? 0)}
-          </p>
-          <p className="mt-1 text-caption text-text-muted">
-            {finance.status === "restricted"
-              ? "Cần quyền finance.view"
-              : `Thu: ${formatCompactVnd(finance.tuitionReceivedVnd ?? 0)} · Hoàn: ${formatCompactVnd(finance.tuitionRefundedVnd ?? 0)}`}
-          </p>
-        </div>
-
-        {/* KPI 4: Tỷ lệ lương phải trả / thực thu */}
-        <div className="rounded-lg border border-border-subtle bg-surface-base p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-caption font-medium text-text-muted">Lương phải trả / Thực thu</span>
-            <Percent className="h-4 w-4 text-text-muted" />
-          </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-text-strong tabular-nums sm:text-3xl">
-            {finance.status === "restricted" || (finance.tuitionNetVnd ?? 0) <= 0 || finance.payrollRatioPercent === null || finance.payrollRatioPercent === undefined
-              ? "Không áp dụng"
-              : `${finance.payrollRatioPercent}%`}
-          </p>
-          <p className="mt-1 text-caption text-text-muted">
-            {positionCode
-              ? "Lương vị trí / Thực thu toàn trung tâm"
-              : "Trên học phí thực thu trong kỳ"}
-          </p>
-        </div>
-      </div>
-
-      {/* Pending verification notice */}
       {pendingCount > 0 ? (
-        <div className="flex items-start gap-3 rounded-lg border border-warning-border bg-warning-bg p-3.5 text-secondary text-warning">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-          <div>
-            <p className="font-semibold">
-              Có {pendingCount} ca làm việc đang chờ xác minh công nằm trong số tạm tính.
-            </p>
-            <p className="mt-0.5 text-caption text-text-default">
-              Các khoản thưởng theo kết quả tháng (quỹ chấm bài, ngưỡng doanh thu) có thể tăng hoặc giảm khi dữ liệu phát sinh thêm.
-            </p>
-          </div>
+        <ResultBanner
+          description="Các khoản thưởng theo kết quả tháng (quỹ chấm bài, ngưỡng doanh thu) có thể tăng hoặc giảm khi dữ liệu phát sinh thêm."
+          title={`Có ${pendingCount} ca làm việc đang chờ xác minh công nằm trong số tạm tính.`}
+          tone="warning"
+        />
+      ) : null}
+
+      <section aria-labelledby="live-by-staff-heading" className="grid min-w-0 gap-2">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <h2 className="text-body font-semibold text-text-strong" id="live-by-staff-heading">Theo nhân sự</h2>
+          <span className="text-secondary text-text-muted">· {staffRows.length} người</span>
+          <span className="w-full text-caption text-text-muted sm:ml-auto sm:w-auto">Mở một nhân sự để xem lương theo từng ngày (cập nhật thời gian thực).</span>
         </div>
-      ) : null}
+        <DataTableFrame
+          body={staffRows.map((row) => <StaffRow isApproved={isApproved} key={row.staffId} onOpen={() => openDaily(row)} row={row} />)}
+          caption={`${isApproved ? "Lương đã duyệt" : "Lương tạm tính"} theo nhân sự · ${formatDashboardMonth(month)}`}
+          empty={
+            <TableState>
+              <p className="text-body font-semibold text-text-strong">Chưa có nhân sự phát sinh lương tạm tính</p>
+              <p className="text-secondary text-text-muted">Bảng sẽ cập nhật khi có ca chấm công kết thúc trong {formatDashboardMonth(month).toLowerCase()}.</p>
+            </TableState>
+          }
+          footer={
+            staffRows.length > 0 || staffWithoutPositionCount > 0 ? (
+              <div className="grid w-full gap-2">
+                {staffRows.length > 0 ? (
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                    {/* Counts the visible rows: staff with activity or a blocking issue. */}
+                    <span className="font-semibold text-text-strong">Tổng {staffRows.length} nhân sự</span>
+                    <span className="flex flex-wrap gap-x-4 gap-y-1 tabular-nums">
+                      <span>Thu nhập {formatVnd(summary.totalEarningsVnd)}</span>
+                      <span>Khấu trừ {summary.totalDeductionsVnd > 0 ? `−${formatVnd(summary.totalDeductionsVnd)}` : formatVnd(0)}</span>
+                      <span className="font-semibold text-text-strong">{isApproved ? "Phải trả" : "Tạm tính"} {formatVnd(summary.payableVnd)}</span>
+                    </span>
+                  </div>
+                ) : null}
+                {staffWithoutPositionCount > 0 ? (
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-warning" data-testid="staff-without-position">
+                    <span>
+                      {staffWithoutPositionCount} nhân sự có chấm công nhưng chưa có vị trí tính lương nên chưa tính được.
+                    </span>
+                    <Link className="inline-flex items-center font-medium text-action-link! hover:underline max-md:min-h-11" href="/staff">
+                      Cập nhật vị trí
+                    </Link>
+                  </p>
+                ) : null}
+              </div>
+            ) : undefined
+          }
+          header={
+            <tr className="max-md:hidden">
+              <TableHeaderCell>Nhân sự</TableHeaderCell>
+              <TableHeaderCell>Vị trí</TableHeaderCell>
+              <TableHeaderCell numeric>Giờ công</TableHeaderCell>
+              <TableHeaderCell numeric>Chờ xác minh</TableHeaderCell>
+              <TableHeaderCell numeric>Thu nhập</TableHeaderCell>
+              <TableHeaderCell numeric>Khấu trừ</TableHeaderCell>
+              <TableHeaderCell numeric>{isApproved ? "Phải trả" : "Tạm tính"}</TableHeaderCell>
+              <TableHeaderCell><span className="sr-only">Thao tác</span></TableHeaderCell>
+            </tr>
+          }
+          status={staffRows.length > 0 ? "ready" : "empty"}
+          tableClassName="md:min-w-[980px] max-md:block max-md:[&>tbody]:block"
+        />
+      </section>
 
-      {/* Breakdown by Position Table */}
-      {byPosition.length > 0 ? (
-        <section aria-labelledby="live-by-position-heading" className="rounded-lg border border-border-subtle bg-surface-base p-4 sm:p-5 shadow-sm">
-          <h3 className="text-section-title font-semibold text-text-strong" id="live-by-position-heading">
+      {positionRows.length > 0 ? (
+        <section aria-labelledby="live-by-position-heading" className="grid min-w-0 gap-2">
+          <h2 className="text-body font-semibold text-text-strong" id="live-by-position-heading">
             Tạm tính theo vị trí ({formatDashboardMonth(month)})
-          </h3>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-left text-secondary">
-              <thead>
-                <tr className="border-b border-border-subtle text-caption font-semibold text-text-muted">
-                  <th className="pb-2">Vị trí</th>
-                  <th className="pb-2 text-center">Nhân sự</th>
-                  <th className="pb-2 text-right">Thu nhập</th>
-                  <th className="pb-2 text-right">Khấu trừ</th>
-                  <th className="pb-2 text-right">Tạm tính phải trả</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle">
-                {byPosition.map((row) => (
-                  <tr key={row.positionCode}>
-                    <td className="py-2.5 font-medium text-text-strong">
-                      {positionNames[row.positionCode] ?? row.positionCode}
-                    </td>
-                    <td className="py-2.5 text-center text-text-muted tabular-nums">
-                      {row.staffCount}
-                    </td>
-                    <td className="py-2.5 text-right tabular-nums text-text-default">
-                      {formatVnd(row.totalEarningsVnd)}
-                    </td>
-                    <td className="py-2.5 text-right tabular-nums text-warning">
-                      {row.totalDeductionsVnd > 0 ? `−${formatVnd(row.totalDeductionsVnd)}` : "0 ₫"}
-                    </td>
-                    <td className="py-2.5 text-right font-semibold tabular-nums text-action-link">
-                      {formatVnd(row.payableVnd)}
-                    </td>
-                  </tr>
+          </h2>
+          <DataTableFrame
+            body={
+              <>
+                {positionRows.map((row) => (
+                  <TableRow key={row.positionCode}>
+                    <TableCell className="font-medium text-text-strong">{getPayrollPositionName(row.positionCode)}</TableCell>
+                    <TableCell numeric>{row.staffCount}</TableCell>
+                    <TableCell numeric>{formatVnd(row.totalEarningsVnd)}</TableCell>
+                    <TableCell className={row.totalDeductionsVnd > 0 ? "text-danger" : "text-text-subtle"} numeric>
+                      {row.totalDeductionsVnd > 0 ? `−${formatVnd(row.totalDeductionsVnd)}` : formatVnd(0)}
+                    </TableCell>
+                    <TableCell className="font-semibold text-text-strong" numeric>{formatVnd(row.payableVnd)}</TableCell>
+                  </TableRow>
                 ))}
-                <tr className="border-t-2 border-border-strong font-bold text-text-strong">
-                  <td className="py-3">Tổng cộng</td>
-                  <td className="py-3 text-center tabular-nums">{summary.staffCount}</td>
-                  <td className="py-3 text-right tabular-nums">{formatVnd(summary.totalEarningsVnd)}</td>
-                  <td className="py-3 text-right tabular-nums text-warning">
-                    {summary.totalDeductionsVnd > 0 ? `−${formatVnd(summary.totalDeductionsVnd)}` : "0 ₫"}
-                  </td>
-                  <td className="py-3 text-right tabular-nums text-action-link">{formatVnd(summary.payableVnd)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-3 text-caption text-text-muted">
-            *Tỷ lệ trên phục vụ đối chiếu lương phải trả với thực thu; không biểu thị lợi nhuận hoặc số dư tiền mặt. Khi lọc theo một vị trí, mẫu số vẫn là thực thu toàn trung tâm.
-          </p>
-        </section>
-      ) : null}
-
-      {/* Breakdown by Staff Table */}
-      {estimate.statements.length > 0 && estimate.statements.some((s) => s.payableVnd > 0 || s.workedMinutes > 0) ? (
-        <section aria-labelledby="live-by-staff-heading" className="rounded-lg border border-border-subtle bg-surface-base p-4 sm:p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-section-title font-semibold text-text-strong" id="live-by-staff-heading">
-                Chi tiết nhân sự tạm tính ({formatDashboardMonth(month)})
-              </h3>
-              <p className="mt-0.5 text-caption text-text-muted">Ấn vào tên nhân sự để xem lương theo từng ngày (cập nhật thời gian thực).</p>
-            </div>
-            <span className="text-caption text-text-muted">
-              {estimate.statements.filter((s) => s.payableVnd > 0 || s.workedMinutes > 0).length} nhân sự phát sinh
-            </span>
-          </div>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-left text-secondary">
-              <thead>
-                <tr className="border-b border-border-subtle text-caption font-semibold text-text-muted">
-                  <th className="pb-2">Nhân sự</th>
-                  <th className="pb-2">Vị trí</th>
-                  <th className="pb-2 text-right">Giờ làm</th>
-                  <th className="pb-2 text-right">Thu nhập</th>
-                  <th className="pb-2 text-right">Khấu trừ</th>
-                  <th className="pb-2 text-right">Lương tạm tính</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle">
-                {estimate.statements
-                  .filter((s) => s.payableVnd > 0 || s.workedMinutes > 0)
-                  .sort((a, b) => b.payableVnd - a.payableVnd)
-                  .map((row) => (
-                    <tr key={row.staffId}>
-                      <td className="py-2.5 font-medium text-text-strong">
-                        <button
-                          aria-label={`Xem lương theo ngày của ${row.staffDisplayName}`}
-                          className="inline-flex items-center gap-1.5 rounded-sm text-left hover:text-action-link hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-                          onClick={() => {
-                            setDailyTarget({
-                              positionLabel: positionNames[row.positionCode ?? "__unassigned__"] ?? row.positionCode,
-                              staffDisplayName: row.staffDisplayName,
-                              staffEmployeeCode: row.staffEmployeeCode,
-                              staffId: row.staffId,
-                            });
-                            setIsDailyOpen(true);
-                          }}
-                          type="button"
-                        >
-                          <span>{row.staffDisplayName}</span>
-                          <CalendarDays aria-hidden="true" className="h-3.5 w-3.5 text-text-muted" />
-                        </button>
-                        {row.staffEmployeeCode ? (
-                          <span className="ml-1.5 font-mono text-caption text-text-muted">
-                            ({row.staffEmployeeCode})
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="py-2.5 text-text-muted">
-                        {positionNames[row.positionCode ?? "__unassigned__"] ?? row.positionCode}
-                      </td>
-                      <td className="py-2.5 text-right tabular-nums text-text-default">
-                        {row.workHours}h {row.workedMinutes % 60}p
-                      </td>
-                      <td className="py-2.5 text-right tabular-nums text-text-default">
-                        {formatVnd(row.totalEarningsVnd)}
-                      </td>
-                      <td className="py-2.5 text-right tabular-nums text-warning">
-                        {row.totalDeductionsVnd > 0 ? `−${formatVnd(row.totalDeductionsVnd)}` : "0 ₫"}
-                      </td>
-                      <td className="py-2.5 text-right font-semibold tabular-nums text-action-link">
-                        {formatVnd(row.payableVnd)}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+                <TableRow className="bg-surface-sunken font-semibold text-text-strong">
+                  <TableCell>Tổng cộng</TableCell>
+                  <TableCell numeric>{summary.staffCount}</TableCell>
+                  <TableCell numeric>{formatVnd(summary.totalEarningsVnd)}</TableCell>
+                  <TableCell className={summary.totalDeductionsVnd > 0 ? "text-danger" : "text-text-subtle"} numeric>
+                    {summary.totalDeductionsVnd > 0 ? `−${formatVnd(summary.totalDeductionsVnd)}` : formatVnd(0)}
+                  </TableCell>
+                  <TableCell numeric>{formatVnd(summary.payableVnd)}</TableCell>
+                </TableRow>
+              </>
+            }
+            caption={`Tạm tính theo vị trí · ${formatDashboardMonth(month)}`}
+            footer={
+              hasRatioFigure ? (
+                <span className="text-caption">
+                  *Tỷ lệ lương / thực thu phục vụ đối chiếu lương phải trả với thực thu; không biểu thị lợi nhuận hoặc số dư tiền mặt. Khi lọc theo một vị trí, mẫu số vẫn là thực thu toàn trung tâm.
+                </span>
+              ) : undefined
+            }
+            header={
+              <tr>
+                <TableHeaderCell>Vị trí</TableHeaderCell>
+                <TableHeaderCell numeric>Nhân sự</TableHeaderCell>
+                <TableHeaderCell numeric>Thu nhập</TableHeaderCell>
+                <TableHeaderCell numeric>Khấu trừ</TableHeaderCell>
+                <TableHeaderCell numeric>Tạm tính phải trả</TableHeaderCell>
+              </tr>
+            }
+            tableClassName="min-w-[600px]"
+          />
         </section>
       ) : null}
 
@@ -364,7 +302,78 @@ export function OwnerLiveEstimateOverview({
         onClose={() => setIsDailyOpen(false)}
         target={dailyTarget}
         today={today}
+        transport={transport}
       />
     </div>
+  );
+}
+
+function StaffRow({ isApproved, onOpen, row }: { isApproved: boolean; onOpen: () => void; row: OwnerStaffRow }) {
+  const blocked = row.blockedReason !== null;
+  // Nothing calculated yet: show "Chưa tính được", never a 0 amount.
+  const uncalculated = blocked && !row.hasCalculatedAmounts;
+  const muted = <span className="text-text-subtle">—</span>;
+
+  return (
+    <TableRow className={stackedRowClassName}>
+      <TableCell className="max-md:col-span-2">
+        <span className="font-semibold text-text-strong">{row.staffDisplayName}</span>
+        {row.staffEmployeeCode ? <span className="ml-1.5 text-caption text-text-muted">{row.staffEmployeeCode}</span> : null}
+        {blocked && !uncalculated ? (
+          <span className="mt-1 block">
+            <Badge tone="warning">Chưa đủ dữ liệu · {row.blockedReason}</Badge>
+          </span>
+        ) : null}
+      </TableCell>
+      <TableCell className={cn("text-secondary max-md:col-span-2", row.positionCode ? undefined : "text-warning")}>
+        <MobileLabel>Vị trí</MobileLabel>
+        {row.positionLabel}
+      </TableCell>
+      <TableCell numeric className="max-md:text-left!">
+        <MobileLabel>Giờ công</MobileLabel>
+        {row.workedMinutes > 0 ? formatWorkMinutes(row.workedMinutes) : muted}
+      </TableCell>
+      <TableCell numeric className={cn("max-md:text-left!", row.pendingVerificationCount > 0 && "text-warning")}>
+        <MobileLabel>Chờ xác minh</MobileLabel>
+        {row.pendingVerificationCount > 0 ? `${row.pendingVerificationCount} ca` : muted}
+      </TableCell>
+      <TableCell numeric className="max-md:text-left!">
+        <MobileLabel>Thu nhập</MobileLabel>
+        {uncalculated ? muted : formatVnd(row.totalEarningsVnd)}
+      </TableCell>
+      <TableCell numeric className="max-md:text-left!">
+        <MobileLabel>Khấu trừ</MobileLabel>
+        {uncalculated ? muted : row.totalDeductionsVnd > 0 ? (
+          <>
+            <span className="text-danger">−{formatVnd(row.totalDeductionsVnd)}</span>
+            {row.advanceDeductionsVnd > 0 ? (
+              <span className="block text-caption text-text-muted">gồm tạm ứng {formatVnd(row.advanceDeductionsVnd)}</span>
+            ) : null}
+          </>
+        ) : muted}
+      </TableCell>
+      <TableCell numeric className="max-md:col-span-2 max-md:text-left!">
+        <MobileLabel>{isApproved ? "Phải trả" : "Tạm tính"}</MobileLabel>
+        {uncalculated ? (
+          <>
+            <span className="font-semibold text-warning">Chưa tính được</span>
+            <span className="block text-caption text-text-muted">{row.blockedReason}</span>
+          </>
+        ) : (
+          <span className="font-semibold text-text-strong">{formatVnd(row.payableVnd)}</span>
+        )}
+      </TableCell>
+      <TableCell className="text-right max-md:col-span-2">
+        {/* Visible "Xem" starts the accessible name (label in name). */}
+        <button
+          aria-label={`Xem lương theo ngày của ${row.staffDisplayName}`}
+          className={getButtonClassName({ className: "max-md:h-11 max-md:w-full", size: "sm", variant: "secondary" })}
+          onClick={onOpen}
+          type="button"
+        >
+          Xem
+        </button>
+      </TableCell>
+    </TableRow>
   );
 }

@@ -34,6 +34,7 @@ export default async function OwnerPayrollDashboardRoute({ searchParams }: Owner
 
   return (
     <OwnerPayrollDashboardPage
+      canApprove={permissionResult.permissions.includes("payroll.owner_approve")}
       dashboard={dashboardResult.data}
       initialOwnerEstimate={estimateResult.ok ? estimateResult.data : null}
     />

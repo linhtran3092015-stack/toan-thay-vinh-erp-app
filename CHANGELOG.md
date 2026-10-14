@@ -2,6 +2,30 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.13.0.0] - 2026-10-14
+
+Bảng lương dựng lại theo phong cách Stumana (bước 8): Dashboard lương mở đầu bằng quỹ lương của tháng, sổ lương theo ngày cho biết từng ca đã được tính tiền hay chưa và vì sao, phiếu lương gọn theo thẻ thiết kế.
+
+### Added
+- **Đầu trang `/payroll/dashboard`** ghi "Quỹ lương tháng MM/YYYY" kèm trạng thái kỳ (kỳ đang chờ duyệt hoặc đã duyệt được ưu tiên). Người có quyền duyệt lương thấy một nút chính duy nhất "Xem kỳ … chờ duyệt".
+- **Dải số liệu mỏng** dưới đầu trang thay cho các thẻ lớn: tổng thu nhập, khấu trừ, lương phải trả (tạm tính hoặc đã duyệt), số ca chờ xác minh, và thực thu sau hoàn cùng tỷ lệ lương trên thực thu khi có quyền xem tài chính.
+- **Bảng "Theo nhân sự"**: dòng thiếu dữ liệu vẫn hiện số tiền, kèm nhãn "Chưa đủ dữ liệu · lý do"; chỉ ghi "Chưa tính được" khi thật sự không có tiền. Tháng đã duyệt ghi "Phải trả".
+- Dòng nhắc "N nhân sự có chấm công nhưng chưa có vị trí lương" kèm liên kết tới trang nhân sự (ẩn khi đang lọc theo vị trí).
+- **Sổ lương theo ngày** ghi trạng thái tiền của từng ca: "Chờ xác minh (tính tạm)", "Chưa tính · chưa xác minh" hoặc "Chưa tính · thiếu đơn giá". Banner đầu sổ đếm đúng số ca đang tính tạm. Tháng đã duyệt không bao giờ bị suy ra là ca "không có trong lương".
+- Trang xem trước `/dev/payroll?view=dashboard|ledger|payslip&role=owner|accountant|staff&state=normal|empty|errors` (trả 404 trên production, không gọi API hay ghi dữ liệu).
+
+### Changed
+- Các biểu đồ và bảng phân tích cũ chuyển xuống mục "Phân tích" phía dưới Dashboard lương.
+- Phiếu lương trình bày lại theo thẻ thiết kế; các khối chưa có dữ liệu (mã phiếu, thuế TNCN, Zalo, người duyệt) được bỏ thay vì để trống.
+- Giờ trên phiếu lương và thẻ tạm tính của nhân sự luôn theo giờ Việt Nam, không phụ thuộc múi giờ máy chủ.
+
+### Fixed
+- Khối tạm tính lương của chủ trung tâm không còn báo lỗi tải ở tháng đã duyệt (dữ liệu tháng đã duyệt không có giờ tính).
+- Khối tạm tính không còn báo lỗi tải khi có cảnh báo không gắn với nhân sự cụ thể (ví dụ thiếu người tuyển sinh).
+
+### Lưu ý triển khai
+- Không có migration.
+
 ## [0.12.0.0] - 2026-10-14
 
 Đối soát SePay dựng lại theo phong cách Stumana (bước 7, đợt 2): giao dịch cần xử lý nằm trong một hàng đợi, bấm vào là thấy chi tiết và thao tác ngay bên cạnh.
