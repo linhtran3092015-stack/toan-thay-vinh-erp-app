@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const router = {
@@ -223,13 +223,23 @@ function mockExecutiveDashboard(overrides?: Partial<RoleAwareDashboardReadModel>
 }
 
 describe("Executive Dashboard UI & Business Logic", () => {
-  it("renders header greeting with user name and period selector", () => {
+  it("renders the analytics section header with the period selector under the home dashboard", () => {
     const dashboard = mockExecutiveDashboard();
-    render(<DashboardPage dashboard={dashboard} userDisplayName="Thầy Vinh" />);
+    render(<DashboardPage dashboard={dashboard} />);
 
-    expect(screen.getByText("Chào mừng, Thầy Vinh 👋")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Phân tích" })).toBeInTheDocument();
+    expect(screen.queryByText(/Chào mừng/)).not.toBeInTheDocument();
     expect(screen.getByText("Xuất báo cáo")).toBeInTheDocument();
     expect(screen.getByText("Tháng 8/2026")).toBeInTheDocument();
+  });
+
+  it("navigates the month picker on the given route", () => {
+    router.push.mockClear();
+    render(<DashboardPage dashboard={mockExecutiveDashboard()} hrefBase="/dev/dashboard?role=owner" />);
+
+    fireEvent.change(screen.getByLabelText("Chọn kỳ xem báo cáo"), { target: { value: "2026-07" } });
+
+    expect(router.push).toHaveBeenCalledWith("/dev/dashboard?role=owner&month=2026-07");
   });
 
   it("renders 5 top executive KPIs with numbers and trend indicators", () => {
@@ -248,24 +258,12 @@ describe("Executive Dashboard UI & Business Logic", () => {
     expect(screen.getAllByText("320,5 triệu").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders attention center with action items", () => {
+  it("does not repeat the attention list, which moved into the home dashboard's work list", () => {
     const dashboard = mockExecutiveDashboard();
     render(<DashboardPage dashboard={dashboard} />);
 
-    expect(screen.getByText("Trung tâm cần chú ý")).toBeInTheDocument();
-    expect(screen.getByText("2 việc cần xử lý")).toBeInTheDocument();
-    expect(screen.getByText("2 kỳ bảng lương đang chờ duyệt")).toBeInTheDocument();
-    expect(screen.getByText("5 khoản học phí quá hạn")).toBeInTheDocument();
-  });
-
-  it("renders attention center safe state when no items need action", () => {
-    const dashboard = mockExecutiveDashboard({
-      attention: { data: [], status: "ready" },
-    });
-    render(<DashboardPage dashboard={dashboard} />);
-
-    expect(screen.getByText("Tất cả ổn định")).toBeInTheDocument();
-    expect(screen.getByText("Không có vấn đề quan trọng cần xử lý")).toBeInTheDocument();
+    expect(screen.queryByText("Trung tâm cần chú ý")).not.toBeInTheDocument();
+    expect(screen.queryByText("2 kỳ bảng lương đang chờ duyệt")).not.toBeInTheDocument();
   });
 
   it("renders 12-month revenue trend chart and composition donut", () => {
@@ -325,5 +323,26 @@ describe("Executive Dashboard UI & Business Logic", () => {
     // Non-restricted sections like admissions and student status remain visible
     expect(screen.getByText("Tình hình tuyển sinh & Phễu chuyển đổi")).toBeInTheDocument();
     expect(screen.getByText("Tình hình học sinh")).toBeInTheDocument();
+  });
+
+  it("renders nothing when every analytics section is hidden", () => {
+    const hidden = { status: "hidden" } as const;
+    const { container } = render(
+      <DashboardPage
+        dashboard={mockExecutiveDashboard({
+          admissionsFunnel: hidden,
+          kpis: hidden,
+          operationalHighlights: hidden,
+          payrollSummary: hidden,
+          receivablesAging: hidden,
+          revenueComposition: hidden,
+          revenueTrend: hidden,
+          studentStatus: hidden,
+          topClasses: hidden,
+        })}
+      />,
+    );
+
+    expect(container).toBeEmptyDOMElement();
   });
 });

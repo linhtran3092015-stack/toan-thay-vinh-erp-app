@@ -245,8 +245,10 @@ export interface AttendanceEntry {
   student_enrollment_id?: string | null;
 }
 
+export const ABSENCE_STATUSES = ["excused_absence", "unexcused_absence"] as const;
+
 export function isAbsenceStatus(status: string): boolean {
-  return status === "excused_absence" || status === "unexcused_absence";
+  return (ABSENCE_STATUSES as readonly string[]).includes(status);
 }
 
 /** Statuses lock_class_session_internal accepts as recorded: present or an absence. */

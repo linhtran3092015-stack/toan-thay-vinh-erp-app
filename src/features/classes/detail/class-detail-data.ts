@@ -297,7 +297,7 @@ const ROSTER_CONCURRENCY = 8;
  * leaves that session unresolved: it lands in `failedIds`, the rest still count
  * (owner decision D18).
  */
-async function loadOpenRosters(
+export async function loadOpenRosters(
   supabase: SupabaseClient,
   sessionIds: readonly string[],
 ): Promise<{ entries: Array<RosterEntry & { enrollment_class_id: string }>; failedIds: Set<string> }> {

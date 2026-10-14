@@ -2,6 +2,32 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.10.0.0] - 2026-10-14
+
+Trang chủ dựng lại theo phong cách Stumana (bước 6): mở app là thấy ngay hôm nay có gì, việc gì còn tồn và ai cần làm gì, theo đúng quyền của từng người.
+
+### Added
+- **Hai bố cục theo quyền**: ai có quyền tài chính, thanh toán, SePay, kỳ thu, bảng lương, trạng thái học sinh hoặc xếp lịch thấy bố cục "Tổng quan" của trung tâm; những người còn lại (thường là trợ giảng) thấy "Hôm nay của bạn".
+- **Tổng quan trung tâm**: dải 4 số (buổi học hôm nay, buổi quá giờ chưa xong điểm danh, công nợ quá 30 ngày, giao dịch SePay chưa khớp), buổi học tiếp theo, lịch hôm nay, tiến độ kỳ thu học phí (phải thu, đã thu, quá hạn, hạn thu) và số liệu tuần này (học sinh đang học, hồ sơ mới, bảo lưu, chuyên cần, lead mới).
+- **"Cần bạn xử lý" / "Việc của bạn"**: mỗi việc một dòng, một đường dẫn tới đúng trang xử lý, và chỉ hiện khi người xem làm được việc đó (kế toán chỉ thấy việc tài chính). Gồm buổi chưa bắt đầu, buổi đang dở chưa hoàn thành, buổi thiếu điểm danh, buổi đã điểm danh đủ chờ khóa, buổi thiếu kết quả, SePay chưa khớp, công nợ quá hạn, kỳ lương và tạm ứng chờ duyệt, điều chỉnh công, phiếu coaching ưu tiên cao, xung đột nhập bảng lương, lịch hẹn CRM và việc chăm sóc quá hạn. Chỉ báo "Không có việc tồn" khi mọi nguồn đều tải được.
+- **Hôm nay của bạn** (trợ giảng): một nút chính duy nhất, "Điểm danh buổi này" khi buổi đang diễn ra hoặc "Bắt đầu buổi học" khi đã đến giờ và bạn có quyền bắt đầu; lịch hôm nay của trung tâm; tháng này của bạn (số ca, giờ công, ca có GPS, điều chỉnh chờ duyệt).
+- **Dải chấm công** ở cả hai bố cục: chưa vào ca, đang trong ca, hoặc đã ra ca hôm nay, kèm nút chấm công. Thẻ lương tạm tính vẫn hiện cho ai có quyền xem lương.
+- Khối nào không có quyền thì ẩn; khối nào tải lỗi thì giữ khung, ghi rõ "Chưa tải được" và có nút "Thử lại", không hiện số 0 giả. Lỗi phần phân tích không làm hỏng các khối phía trên.
+- Trang xem trước `/dev/dashboard?role=owner|accountant|ta&state=normal|empty|errors` (trả 404 trên production).
+
+### Changed
+- Biểu đồ và số liệu cũ của trang chủ chuyển xuống mục "Phân tích" ở cuối trang; đổi tháng xem có chữ báo đang tải.
+- Tháng xem trên đường dẫn (`?month=`) không hợp lệ thì dùng tháng hiện tại thay vì báo lỗi.
+- Nút dạng đường dẫn màu chính hoặc màu đỏ (ví dụ "Tạo lớp mới", "Thêm học sinh") giờ luôn hiện chữ trắng hoặc đỏ đúng màu, trước đây bị chữ tối trên nền xanh.
+
+### Removed
+- Khung "Hôm nay" và "Trung tâm cần chú ý" cũ của trang chủ (nội dung đã gộp vào danh sách việc). Số thông báo chưa đọc vẫn ở chuông trên thanh trên cùng.
+
+### Lưu ý triển khai
+- Không có migration.
+- Trang chủ gọi kiểm tra sĩ số cho từng buổi hôm nay (tối đa 40, chạy 8 buổi một lúc) và đọc hàng đợi buổi chờ khóa mỗi lần tải; sẽ tối ưu bằng RPC tổng hợp sau.
+- Trong dữ liệu khởi tạo chỉ chủ trung tâm có quyền xem lớp (`classes.view`); người không có quyền này sẽ thấy các khối buổi học báo "Chưa tải được". Cần kiểm tra quyền trợ giảng trên production.
+
 ## [0.9.0.0] - 2026-10-14
 
 Trang chi tiết lớp có đủ 3 tab còn lại theo phong cách Stumana (bước 5b, đợt 2): xem học sinh của lớp, bảng điểm theo buổi và học phí theo kỳ thu ngay trên trang lớp.
