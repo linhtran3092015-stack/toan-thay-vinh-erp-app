@@ -11,6 +11,7 @@ import type {
   StudentStatusDistribution,
 } from "@/features/dashboard/read-models";
 import type { SessionStatus } from "@/features/sessions/read-models";
+import { isTuitionRequestInForce } from "@/features/tuition/period-summary";
 import type { AttendanceVerificationPolicy, TimekeepingMonthlyEntry } from "@/features/timekeeping/types";
 import { addDays, formatDateTime, formatTime, formatWeekdayDate } from "@/lib/datetime";
 import { formatVnd } from "@/lib/format";
@@ -823,7 +824,8 @@ export interface TuitionRequestState {
 
 /**
  * Collection progress of a locked period from its current items' payment
- * requests. Cancelled requests are left out; paid is capped at expected so an
+ * requests. Only requests in force count (cancelled, expired and unknown
+ * statuses are left out, the same rule as the tuition period pages); paid is capped at expected so an
  * overpayment never shows as more than collected in full.
  */
 export function computeTuitionProgress(
@@ -836,7 +838,7 @@ export function computeTuitionProgress(
   let requestCount = 0;
 
   for (const request of requests) {
-    if (request.status === "cancelled" || request.expectedVnd <= 0) continue;
+    if (!isTuitionRequestInForce(request.status) || request.expectedVnd <= 0) continue;
     requestCount += 1;
     payableVnd += request.expectedVnd;
     collectedVnd += Math.min(Math.max(request.paidVnd, 0), request.expectedVnd);

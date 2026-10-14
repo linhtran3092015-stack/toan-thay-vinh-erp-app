@@ -1,5 +1,5 @@
 // Value: protects=the home dashboard picks its layout from permission codes, lists work only for viewers who can act on it (an accountant sees finance items only), counts the summary strip from the right feeds, and says "Không có việc tồn" only when every permitted source loaded;
-// fails_when=a TA gets the centre layout, payroll approval reaches a viewer without payroll.owner_approve, a failed source is shown as "no backlog", a forbidden source becomes a failure, tuition progress counts cancelled requests or overdue before the due date, or missing results count absent students;
+// fails_when=a TA gets the centre layout, payroll approval reaches a viewer without payroll.owner_approve, a failed source is shown as "no backlog", a forbidden source becomes a failure, tuition progress counts cancelled or expired requests or overdue before the due date, or missing results count absent students;
 //   also when an approval item reaches a viewer without the executive RPC's read permission (payroll.view, advances.view, coaching.view), the work count drops rows hidden by the personal 4-row cap or loses its "+" floor, a TA's not-completed or not-started row is worded wrongly, or tuition shares stop summing to 100;
 // why_new=home-models is new pure logic shared by the route, the dev preview and the components;
 // seam=none (pure functions); no_claim=does not prove the loader's queries or that the RPC counts are correct
@@ -523,9 +523,11 @@ describe("tuition progress", () => {
     { expectedVnd: 1_000_000, paidVnd: 250_000, status: "partially_paid" },
     { expectedVnd: 1_000_000, paidVnd: 0, status: "pending" },
     { expectedVnd: 9_000_000, paidVnd: 0, status: "cancelled" },
+    // Same rule as the tuition period pages (isTuitionRequestInForce): an expired request is not payable.
+    { expectedVnd: 7_000_000, paidVnd: 0, status: "expired" },
   ];
 
-  it("leaves cancelled requests out, caps overpayment and keeps the rest not due before the due date", () => {
+  it("leaves cancelled and expired requests out, caps overpayment and keeps the rest not due before the due date", () => {
     const progress = computeTuitionProgress(period, requests, "2026-10-12");
 
     expect(progress).toMatchObject({ collectedVnd: 2_250_000, notDueVnd: 1_750_000, overdueVnd: 0, payableVnd: 4_000_000, requestCount: 4 });
