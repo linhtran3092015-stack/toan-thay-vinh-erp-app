@@ -3,7 +3,25 @@ import { describe, expect, it } from "vitest";
 import {
   formatFinanceDateTime,
   getFinanceOrderCostPresentation,
+  getFinanceOrderSourceLabel,
 } from "@/features/finance/finance-order-presentation";
+
+describe("Finance Order source label", () => {
+  it("joins the partner group and the lead source name", () => {
+    expect(getFinanceOrderSourceLabel({ leadSourceName: "Đối tác Sandbox", sourceLabel: "SB" }))
+      .toBe("SB · Đối tác Sandbox");
+    expect(getFinanceOrderSourceLabel({ leadSourceName: null, sourceLabel: "MMA" })).toBe("MMA");
+  });
+
+  it("names a known source outside MMA/SB instead of calling it unknown", () => {
+    expect(getFinanceOrderSourceLabel({ leadSourceName: "Đến trực tiếp trung tâm", sourceLabel: null }))
+      .toBe("Đến trực tiếp trung tâm");
+  });
+
+  it("falls back to unknown only when no source resolved", () => {
+    expect(getFinanceOrderSourceLabel({ leadSourceName: null, sourceLabel: null })).toBe("Chưa xác định");
+  });
+});
 
 describe("Finance Order cost presentation", () => {
   it("formats transaction timestamps in the fixed business timezone for deterministic hydration", () => {

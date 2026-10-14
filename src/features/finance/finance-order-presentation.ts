@@ -15,8 +15,11 @@ export function getFinanceOrderTypePresentation(
   }
 }
 
-export function getFinanceOrderSourceLabel(order: FinanceOrderReadModel): string {
-  if (!order.sourceLabel) return "Chưa xác định";
+export function getFinanceOrderSourceLabel(
+  order: Pick<FinanceOrderReadModel, "leadSourceName" | "sourceLabel">,
+): string {
+  // A known source outside MMA/SB (walk-in, referral…) is named, not "unknown".
+  if (!order.sourceLabel) return order.leadSourceName ?? "Chưa xác định";
   return order.leadSourceName
     ? `${order.sourceLabel} · ${order.leadSourceName}`
     : order.sourceLabel;
