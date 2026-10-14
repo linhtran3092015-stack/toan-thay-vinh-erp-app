@@ -2,6 +2,28 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.14.0.0] - 2026-10-14
+
+Cài đặt hệ thống dựng lại theo phong cách Stumana (bước 9): mục lục bên trái, thanh lưu luôn nằm ở đáy trang, và ma trận phân quyền xem được mọi vai trò cùng lúc.
+
+### Added
+- **Mục lục cài đặt bên trái** gồm Tổng quan, Chung, Thương hiệu & giao diện, Trang web công khai, Người dùng, Phân quyền, Nhật ký. Mục nào người xem không có quyền thì ẩn hẳn. Trên điện thoại mục lục thành một hàng cuộn ngang và tự cuộn tới mục đang mở.
+- **Thanh lưu ở đáy trang** cho Chung, Thương hiệu và Trang web: ghi rõ "Chưa có thay đổi" hoặc "n thay đổi chưa lưu" kèm tên các ô đã sửa, nút Hủy (trả về giá trị đã lưu) và nút Lưu. Lưu lỗi thì báo ngay trên thanh và giữ nguyên những gì đã nhập. Người chỉ có quyền xem không thấy thanh này.
+- **Hỏi trước khi rời trang** khi còn thay đổi chưa lưu: bấm mục lục hoặc link trong Cài đặt sẽ hiện "Thay đổi chưa lưu sẽ mất"; đóng tab hoặc tải lại cũng được trình duyệt hỏi, kể cả khi đang lưu.
+- **Ma trận phân quyền** (màn hình rộng): mỗi hàng là một quyền, mỗi cột là một vai trò, nhóm theo chức năng. Tick nhiều ô ở nhiều vai trò rồi lưu một lần; ô đã sửa có nền vàng và dấu chấm. Khi lưu phải nhập lý do, hệ thống lưu lần lượt từng vai trò và báo rõ vai trò nào lưu lỗi (phần sửa của vai trò đó được giữ để thử lại). Cột Owner luôn khóa. Đang lưu mà bấm chuyển trang thì hiện "Đang lưu phân quyền" để chọn ở lại hoặc vẫn rời trang.
+- **Xem trước giao diện ERP** ở trang Thương hiệu: đổi màu nhấn hoặc bo góc là thấy ngay trên khung xem trước, chưa áp vào cả ứng dụng cho tới khi lưu.
+- Trang xem trước `/dev/settings?view=general|branding|website|permissions&role=owner|manager|viewer&state=normal|dirty|error` (trả 404 trên production, không ghi dữ liệu).
+
+### Changed
+- Trang Thương hiệu chia thành các khối Nhận diện, Giao diện ERP, Màu website và Giao diện của riêng anh. "Màu nhấn" chọn bằng thẻ màu (6 màu đang có), "Bo góc" chọn Chuẩn hoặc Mềm. Ô chọn màu website và màu cá nhân hiện rõ lựa chọn đang dùng.
+- Trang Chung chia khối Thông tin trung tâm, Coaching, Buổi học, Tin nhắn phụ huynh (Zalo). Người chỉ có quyền xem thấy nhãn tiếng Việt thay cho mã cài đặt, kèm lý do vì sao không sửa được.
+- Nút "Ngừng công khai" website xác nhận bằng nút viền đỏ thay vì nút đỏ đặc.
+- Tải danh sách nick ZaloCRM bị lỗi kết nối thì báo lỗi ngay dưới ô chọn, không làm mất những gì đang nhập trong trang.
+
+### Lưu ý triển khai
+- Không có migration, không đổi quyền hay RPC.
+- Thiết kế có Tên viết tắt (mã học sinh), Tên hiển thị trên QR SePay, chọn Sáng/Tối cho cả trung tâm, bo góc 3 mức, nút Thêm vai trò và cảnh báo "N người sẽ mất quyền"; ERP chưa có dữ liệu hoặc luồng cho những phần này nên chưa làm.
+
 ## [0.13.0.0] - 2026-10-14
 
 Bảng lương dựng lại theo phong cách Stumana (bước 8): Dashboard lương mở đầu bằng quỹ lương của tháng, sổ lương theo ngày cho biết từng ca đã được tính tiền hay chưa và vì sao, phiếu lương gọn theo thẻ thiết kế.

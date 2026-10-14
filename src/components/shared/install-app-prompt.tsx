@@ -114,10 +114,11 @@ export function InstallAppPrompt() {
     }
   };
 
+  // A settings StickySaveBar publishes --save-bar-h: the prompt sits above it, not half under it.
   return (
     <div
       aria-label="Cài ứng dụng"
-      className="fixed inset-x-3 bottom-[calc(var(--safe-area-bottom)+12px)] z-40 mx-auto flex max-w-md items-start gap-3 rounded-lg border border-border-subtle bg-surface-raised p-3 text-sm text-text-strong shadow-[var(--elevation-2)] md:left-auto md:right-4"
+      className="fixed inset-x-3 bottom-[calc(var(--save-bar-h,0px)+var(--safe-area-bottom)+12px)] z-40 mx-auto flex max-w-md items-start gap-3 rounded-lg border border-border-subtle bg-surface-raised p-3 text-sm text-text-strong shadow-[var(--elevation-2)] md:left-auto md:right-4"
       role="dialog"
     >
       <div className="min-w-0 flex-1">
