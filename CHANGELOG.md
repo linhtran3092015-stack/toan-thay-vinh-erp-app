@@ -2,6 +2,35 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.15.0.0] - 2026-10-14
+
+CRM tuyển sinh dựng lại theo phong cách Stumana (bước 10): danh sách lead có chip đếm theo trạng thái, trang lead có vòng đời bên phải và chỉ một nút chính tùy trạng thái.
+
+### Added
+- **Đầu trang `/crm`** ghi "Tháng MM/YYYY · N lead mới · M chờ xác nhận nhập học". Nút chính duy nhất "Thêm lead" chỉ hiện với người có quyền sửa CRM.
+- **Chip trạng thái có số đếm** (Tất cả và 6 trạng thái). Số đếm theo các bộ lọc khác nhưng bỏ qua bộ lọc trạng thái, nên bấm chip nào cũng biết trước sẽ ra bao nhiêu lead. Đếm lỗi thì ẩn chip, không hiện số sai.
+- **Huy hiệu trạng thái kèm chi tiết** trong danh sách: "Đang quan tâm · N ngày", "Đã đặt học thử · ngày học thử gần nhất", "Đã nhập học · ngày", "Đã dừng · lý do" (lý do dài bị cắt, rê chuột xem đủ).
+- **Vòng đời lead** ở cột phải trang lead: Đang quan tâm → Đã đặt học thử → Đã học thử → Chờ xác nhận nhập học → Đã nhập học, có ngày cho từng bước; lead đã dừng có thêm bước "Đã dừng" kèm ngày và lý do. Lead tạo trước khi hệ thống ghi ngày đổi trạng thái thì không hiện ngày đoán.
+- Khối "Dự kiến nhập học" (học phí, ưu đãi, ngày bắt đầu) và "Lịch sử phân công" ghi rõ ai chuyển cho ai, cách phân công và lý do.
+- Trang xem trước `/dev/crm?view=list|detail&state=normal|empty|errors|converted|dropped&role=sale|leader|owner` (trả 404 trên production, mọi nút đều không ghi dữ liệu).
+
+### Changed
+- Trang lead chỉ có một nút chính: "Xác nhận chuyển đổi" khi lead đang chờ xác nhận và người xem đủ cả quyền xác nhận học sinh chính thức lẫn quyền kế toán; nếu không thì "Chuyển chờ xác nhận nhập học"; khi không chuyển đổi được, trang ghi rõ lý do bằng lời.
+- Checklist nhập học trên trang lead ghi đúng thực tế: 10 mục được xác nhận cùng lúc trong hộp thoại "Xác nhận chuyển đổi", và chỉ lead đã nhập học mới hiện 10/10 kèm người hoàn tất.
+- Lead đã dừng ghi ngày dừng và lý do ngay đầu trang; người không có quyền sửa được báo cần quyền gì để mở lại.
+- Danh sách lead hiện dạng bảng trên màn hình máy tính 1440px. Đường dẫn vào lead và nút quay lại giữ nguyên bộ lọc đang dùng.
+- Tên sale bị ẩn vì quyền xem nhân sự giờ ghi "Sale khác (không xem được tên)" thay vì nhầm thành "Chưa phân công".
+- Ô tìm kiếm ghi rõ tìm được theo tên học sinh, phụ huynh, SĐT và mã lead.
+
+### Fixed
+- Hộp thoại xác nhận chuyển đổi không còn cho chọn "Hybrid", vì hệ thống chỉ nhận Online hoặc Offline và sẽ báo lỗi khi lưu.
+- Tìm kiếm có dấu phẩy hoặc ngoặc, hay đường dẫn có trạng thái, khối, sale không hợp lệ không còn làm trang báo lỗi hoặc hiện bộ lọc ảo.
+- Trình đọc màn hình đọc lại số lead "Hiển thị n / total lead" (hoặc thông báo rỗng, lỗi) mỗi khi đổi bộ lọc.
+
+### Lưu ý triển khai
+- Không có migration, không đổi quyền, route hay RPC.
+- Thiết kế có tick từng mục checklist kèm người và giờ, nút Nhận lead, Sửa thông tin, Xuất CSV, Nhắc kế toán, tỉ lệ chuyển đổi, giới hạn sale chỉ thấy lead của mình, giờ và phòng học thử; ERP chưa có dữ liệu hoặc luồng cho những phần này nên chưa làm.
+
 ## [0.14.0.0] - 2026-10-14
 
 Cài đặt hệ thống dựng lại theo phong cách Stumana (bước 9): mục lục bên trái, thanh lưu luôn nằm ở đáy trang, và ma trận phân quyền xem được mọi vai trò cùng lúc.

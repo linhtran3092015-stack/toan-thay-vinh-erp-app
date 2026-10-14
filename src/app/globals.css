@@ -597,7 +597,10 @@ body::before {
 }
 
 /* CRM remains server-filtered, but its dense directory still follows usable
-   operational width rather than a viewport/device label. */
+   operational width rather than a viewport/device label. 1042px covers the
+   table's 1030px min width + the frame border, like Students: the table shows
+   at a 1440 desktop (≈1152px work area) and on a 1366 laptop beside the
+   240px sidebar. */
 .crm-directory {
   container-type: inline-size;
 }
@@ -612,8 +615,15 @@ body::before {
   display: grid;
 }
 
-@container (min-width: 1200px) {
-  .crm-filter-bar,
+.crm-filter-trigger-row {
+  justify-items: start;
+}
+
+@container (min-width: 1042px) {
+  .crm-filter-bar {
+    display: grid;
+  }
+
   .crm-directory-table {
     display: block;
   }
@@ -621,10 +631,6 @@ body::before {
   .crm-directory-record-list,
   .crm-filter-trigger-row {
     display: none;
-  }
-
-  .crm-filter-fields {
-    grid-template-columns: minmax(230px, 1.5fr) repeat(4, minmax(130px, 1fr)) auto;
   }
 }
 

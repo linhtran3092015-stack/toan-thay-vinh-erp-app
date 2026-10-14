@@ -1066,6 +1066,116 @@
 **Priority:** P3
 **Depends on:** None
 
+## CRM
+
+### Xác minh ngày áp migration phase 2b cho mốc ngày đổi trạng thái
+
+**What:** Kiểm (chỉ đọc) ngày migration `20261013100000_phase2b_crm_closed_loop` được áp trên production (bảng `supabase_migrations.schema_migrations` hoặc giá trị `status_changed_at` lặp nhiều nhất trong `crm_cases`), rồi chỉnh `CRM_STATUS_TRACKING_SINCE` nếu cần.
+
+**Why:** Cột `status_changed_at` có `default now()` và không backfill, nên lead cũ mang giờ áp migration. Trang coi giá trị là "không rõ" khi lead tạo và đổi trạng thái trước 14/10 mà hai mốc khác nhau. Nếu migration được áp từ 14/10 trở đi, lead cũ sẽ hiện "· N ngày" và ngày nhập học sai.
+
+**Context:** `src/features/crm/crm-presentation.ts` (`getTrustedStatusChangedAt`). Máy dev không phân giải được host Supabase nên chưa kiểm được.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Đặt lịch học thử kéo lead "Chờ xác nhận nhập học" lùi trạng thái
+
+**What:** Ẩn "Đặt lịch học thử" khi lead đã ở "Chờ xác nhận nhập học" (hoặc cho RPC từ chối), và để `book_crm_trial_session` cập nhật `status_changed_at`.
+
+**Why:** RPC đặt `status = 'trial_booked'` mà không kiểm trạng thái hiện tại; một cú bấm đưa lead đang chờ nhập học về "Đã đặt học thử" trong khi hồ sơ học sinh tạm vẫn còn. Có từ trước bước 10.
+
+**Context:** `supabase/migrations/20260726153000_crm_workflows.sql:332`, `getCrmDetailActions` (`bookTrial`). Sửa RPC cần migration.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Lỗi tải học thử / lịch sử / checklist bị nuốt trên trang lead
+
+**What:** Trả cờ lỗi theo từng phần từ `getCrmCaseDetail` và hiện dòng báo lỗi thay vì vẽ từ mảng rỗng.
+
+**Why:** Truy vấn học thử lỗi thì vòng đời ghi hai bước học thử là "không qua bước này" và checklist ghi "Chưa khởi tạo", là khẳng định sai.
+
+**Context:** `src/features/crm/data.ts` (`getCrmCaseDetail`).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Vòng đời: bước "Chờ xác nhận nhập học" và ngày học thử của lead quay vòng
+
+**What:** (1) Quyết định cách hiện bước "Chờ xác nhận nhập học" cho lead chuyển đổi thẳng từ trạng thái trước (chưa có cột ghi lại bước này). (2) Bước học thử hiện tại lấy ngày từ lần đặt/ghi kết quả mới nhất thay vì lần đầu.
+
+**Why:** RPC chuyển đổi nhận mọi trạng thái mở, nên lead cũ hiện bước chờ là "đã xong"; lead lỡ học thử rồi đặt lại vẫn ghi ngày lần đặt đầu.
+
+**Context:** `src/features/crm/crm-presentation.ts` (`deriveCrmLifecycle`). Cần owner chọn cách hiện cho (1).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Bộ lọc nguồn cũ và ký tự đại diện trong tìm kiếm
+
+**What:** Chỉ tính `?source=` là đang lọc khi mã nằm trong danh sách nguồn đang hoạt động; thoát `%` và `_`, bỏ `*` trong từ khóa tìm kiếm.
+
+**Why:** Bookmark có nguồn đã tắt làm danh sách bị lọc (thường rỗng) trong khi ô chọn ghi "Tất cả"; tìm "_" hoặc "%" khớp mọi lead nhưng vẫn hiện là đang lọc.
+
+**Context:** `src/features/crm/components/crm-filters.tsx`, `src/features/crm/crm-directory-url-state.ts` (`sanitizeCrmSearchTerm`).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Trang lead: nút cỡ nhỏ trên điện thoại và hàng nút đầu trang ở 768–900px
+
+**What:** Nút "Đánh dấu Đã dừng…", "Mở lại", "Đặt lịch học thử", "Ghi kết quả", "Lưu ghi chú" dùng cỡ md (≥40px) trên điện thoại; hàng nút đầu trang được xuống dòng dưới tiêu đề tới mốc lg.
+
+**Why:** Cỡ sm (32px) dưới mức chạm 44px trong DESIGN.md; ở 768–900px nhóm nút `shrink-0` chiếm gần hết bề ngang. Có từ trước, chưa sửa ở bước 10.
+
+**Context:** `src/features/crm/components/crm-detail-view.tsx`, `crm-case-status-dialog.tsx` (`triggerSize`).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Thống nhất từ ngữ CRM
+
+**What:** Chọn một từ cho mỗi khái niệm ("học sinh" thay "học viên", viết thường "lead" giữa câu) trên trang lead, hộp thoại và danh sách; cập nhật test có khẳng định nhãn.
+
+**Why:** Trang đang lẫn "học viên"/"học sinh" và "Lead"/"lead".
+
+**Context:** `src/features/crm/components/*`, test trong `tests/components/crm-*`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Hiệu năng trang CRM
+
+**What:** Debounce ô tìm kiếm (~300ms); lọc embed `crm_trial_bookings` chỉ lấy buổi "scheduled"; chạy song song các truy vấn con của `getCrmCaseDetail` và truy vấn lớp đang mở ở trang lead.
+
+**Why:** Mỗi lần tải `/crm` gửi 11 truy vấn song song, và gõ mỗi ký tự lại tải lại; trang lead chạy 5–6 truy vấn nối tiếp.
+
+**Context:** `src/features/crm/data.ts`, `src/features/crm/components/crm-filters.tsx`, `src/app/(app)/crm/[caseId]/page.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Dọn nhỏ sau bước 10
+
+**What:** Đưa `getInitials` vào `src/lib`; gộp bảng nhãn trạng thái (`crmStatusLabels` và `crmStatusMeta`); dùng chung bộ định dạng dd/mm; cân nhắc đưa `ProfilePanel`/`MetaList` vào `components/patterns` (đã có 2 nơi dùng); cho `CrmTable` nhận gốc đường dẫn để preview `/dev/crm` không mở trang `/crm/<id>` thật; cắt chuỗi theo ký tự đầy đủ (`Array.from`) cho lý do dừng và từ khóa tìm kiếm; hiện đủ lý do dừng cho trình đọc màn hình trong danh sách (hiện chỉ có ở `title`).
+
+**Why:** Gợi ý của review, không ảnh hưởng hành vi hiện tại.
+
+**Context:** `src/features/crm/**`, `src/app/dev/crm/crm-preview.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
 ## Completed
 
 ### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp

@@ -1,7 +1,18 @@
+import { getVietnamToday } from "@/lib/datetime";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+import { isCrmSaleOwnerId, sanitizeCrmSearchTerm } from "./crm-directory-url-state";
+import {
+  CRM_CASE_STATUSES,
+  CRM_HIDDEN_NEW_SALE_OWNER_NAME,
+  getCrmSaleOwnerName,
+  getNextScheduledTrialDate,
+} from "./crm-presentation";
 import type {
   CrmCaseDetailReadModel,
+  CrmDirectoryOverview,
   CrmLeadItemReadModel,
+  CrmStatusCounts,
   LeadSourceOption,
   SaleOwnerOption,
 } from "./read-models";
@@ -15,8 +26,22 @@ export interface CrmDirectoryFilters {
 }
 
 export interface CrmDirectoryResult {
+  /** True when the directory query failed (distinguishes an error from an empty result). */
+  failed?: boolean;
   items: CrmLeadItemReadModel[];
   totalCount: number;
+}
+
+function getCrmSearchFilter(search: string): string | null {
+  const cleaned = sanitizeCrmSearchTerm(search);
+  if (!cleaned) return null;
+  const term = `%${cleaned}%`;
+  return `full_name.ilike.${term},public_code.ilike.${term},guardian_phone.ilike.${term},guardian_full_name.ilike.${term}`;
+}
+
+/** Sale filter as a profile id; anything else (a hand-edited URL) is ignored rather than failing the query. */
+function getCrmSaleOwnerFilter(saleOwnerId: string | null | undefined): string | null {
+  return isCrmSaleOwnerId(saleOwnerId) ? saleOwnerId : null;
 }
 
 export async function getCrmLeadDirectory(
@@ -41,11 +66,14 @@ export async function getCrmLeadDirectory(
       guardian_phone,
       guardian_full_name,
       status,
+      status_changed_at,
+      drop_reason,
       created_at,
       sale_owner_id,
       student_id,
       ${leadSourceRelation},
-      sale_owner:profiles!crm_cases_sale_owner_id_fkey(display_name)
+      sale_owner:profiles!crm_cases_sale_owner_id_fkey(display_name),
+      trial_bookings:crm_trial_bookings(trial_date, status)
     `,
       { count: "exact" },
     );
@@ -58,19 +86,18 @@ export async function getCrmLeadDirectory(
     query = query.eq("expected_grade", filters.expectedGrade);
   }
 
-  if (filters.saleOwnerId) {
-    query = query.eq("sale_owner_id", filters.saleOwnerId);
+  const saleOwnerId = getCrmSaleOwnerFilter(filters.saleOwnerId);
+  if (saleOwnerId) {
+    query = query.eq("sale_owner_id", saleOwnerId);
   }
 
   if (filters.leadSourceCode) {
     query = query.eq("lead_source.code", filters.leadSourceCode);
   }
 
-  if (filters.search) {
-    const term = `%${filters.search.trim()}%`;
-    query = query.or(
-      `full_name.ilike.${term},public_code.ilike.${term},guardian_phone.ilike.${term},guardian_full_name.ilike.${term}`,
-    );
+  const searchFilter = filters.search ? getCrmSearchFilter(filters.search) : null;
+  if (searchFilter) {
+    query = query.or(searchFilter);
   }
 
   query = query.order("created_at", { ascending: false }).limit(100);
@@ -78,7 +105,7 @@ export async function getCrmLeadDirectory(
   const { data, count, error } = await query;
 
   if (error || !data) {
-    return { items: [], totalCount: 0 };
+    return { failed: true, items: [], totalCount: 0 };
   }
 
   const items: CrmLeadItemReadModel[] = data.map((row) => ({
@@ -94,12 +121,78 @@ export async function getCrmLeadDirectory(
     leadSourceName: (row.lead_source as unknown as { name: string } | null)?.name ?? "Không xác định",
     publicCode: row.public_code,
     saleOwnerId: row.sale_owner_id,
-    saleOwnerName: (row.sale_owner as unknown as { display_name: string } | null)?.display_name ?? "Chưa phân công",
+    saleOwnerName: getCrmSaleOwnerName(row.sale_owner_id, (row.sale_owner as unknown as { display_name: string } | null)?.display_name),
     status: row.status as CrmLeadItemReadModel["status"],
+    statusChangedAt: row.status_changed_at ?? null,
+    dropReason: row.drop_reason ?? null,
+    nextTrialDate: getNextScheduledTrialDate(row.trial_bookings as { status: string | null; trial_date: string | null }[] | null | undefined),
     studentId: row.student_id,
   }));
 
   return { items, totalCount: count ?? items.length };
+}
+
+/**
+ * Lead counts per status for the quick filter chips. They respect every
+ * directory filter except the status itself, so each chip says how many
+ * leads choosing it would show. One head-count query per status (no rows
+ * transferred); `null` when any count fails, so the chips never show a
+ * partial picture.
+ */
+export async function getCrmStatusCounts(
+  filters: Omit<CrmDirectoryFilters, "status"> = {},
+): Promise<CrmStatusCounts | null> {
+  const supabase = await createSupabaseServerClient();
+  const columns: string = filters.leadSourceCode
+    ? "id, lead_source:crm_lead_sources!inner(code)"
+    : "id";
+
+  const saleOwnerId = getCrmSaleOwnerFilter(filters.saleOwnerId);
+  const searchFilter = filters.search ? getCrmSearchFilter(filters.search) : null;
+
+  const counts = await Promise.all(
+    CRM_CASE_STATUSES.map(async (status) => {
+      let query = supabase
+        .from("crm_cases")
+        .select(columns, { count: "exact", head: true })
+        .eq("status", status);
+
+      if (filters.expectedGrade) query = query.eq("expected_grade", filters.expectedGrade);
+      if (saleOwnerId) query = query.eq("sale_owner_id", saleOwnerId);
+      if (filters.leadSourceCode) query = query.eq("lead_source.code", filters.leadSourceCode);
+      if (searchFilter) query = query.or(searchFilter);
+
+      const { count, error } = await query;
+      return error || count === null ? null : count;
+    }),
+  );
+
+  if (counts.some((count) => count === null)) return null;
+
+  return Object.fromEntries(
+    CRM_CASE_STATUSES.map((status, index) => [status, counts[index] as number]),
+  ) as CrmStatusCounts;
+}
+
+/**
+ * Header context of the lead list: leads created this Vietnam month and leads
+ * waiting for enrollment confirmation, centre-wide (not narrowed by filters).
+ */
+export async function getCrmDirectoryOverview(now: Date = new Date()): Promise<CrmDirectoryOverview> {
+  const supabase = await createSupabaseServerClient();
+  const [year, month] = getVietnamToday(now).split("-");
+  const monthStart = `${year}-${month}-01T00:00:00+07:00`;
+
+  const [newLeads, pending] = await Promise.all([
+    supabase.from("crm_cases").select("id", { count: "exact", head: true }).gte("created_at", monthStart),
+    supabase.from("crm_cases").select("id", { count: "exact", head: true }).eq("status", "pending_enrollment_confirmation"),
+  ]);
+
+  return {
+    monthLabel: `${month}/${year}`,
+    newLeadsThisMonth: newLeads.error ? null : newLeads.count ?? null,
+    pendingConfirmation: pending.error ? null : pending.count ?? null,
+  };
 }
 
 export async function getCrmCaseDetail(
@@ -139,6 +232,7 @@ export async function getCrmCaseDetail(
       assignment_method,
       reason,
       created_at,
+      previous_sale_owner_id,
       prev_sale:profiles!crm_lead_assignment_history_previous_sale_owner_id_fkey(display_name),
       new_sale:profiles!crm_lead_assignment_history_new_sale_owner_id_fkey(display_name),
       assigner:profiles!crm_lead_assignment_history_assigned_by_fkey(display_name)
@@ -168,7 +262,8 @@ export async function getCrmCaseDetail(
       assignmentMethod: h.assignment_method,
       createdAt: h.created_at,
       id: h.id,
-      newSaleOwnerName: (h.new_sale as unknown as { display_name: string } | null)?.display_name ?? "Chưa rõ",
+      newSaleOwnerName: (h.new_sale as unknown as { display_name: string } | null)?.display_name ?? CRM_HIDDEN_NEW_SALE_OWNER_NAME,
+      previousSaleOwnerId: h.previous_sale_owner_id ?? null,
       previousSaleOwnerName: (h.prev_sale as unknown as { display_name: string } | null)?.display_name ?? null,
       reason: h.reason,
     })),
@@ -223,14 +318,16 @@ export async function getCrmCaseDetail(
     provinceCity: caseRow.province_city,
     publicCode: caseRow.public_code,
     saleOwnerId: caseRow.sale_owner_id,
-    saleOwnerName: (caseRow.sale_owner as unknown as { display_name: string } | null)?.display_name ?? "Chưa phân công",
+    saleOwnerName: getCrmSaleOwnerName(caseRow.sale_owner_id, (caseRow.sale_owner as unknown as { display_name: string } | null)?.display_name),
     status: caseRow.status as CrmCaseDetailReadModel["status"],
+    statusChangedAt: caseRow.status_changed_at ?? null,
     studentId: caseRow.student_id,
     trialBookings: (trialRows ?? []).map((t) => ({
       classSessionId: t.class_session_id,
       createdAt: t.created_at,
       id: t.id,
       learningMode: t.learning_mode,
+      resultRecordedAt: t.result_recorded_at ?? null,
       saleNotes: t.sale_notes,
       status: t.status,
       teacherFeedback: t.teacher_feedback,

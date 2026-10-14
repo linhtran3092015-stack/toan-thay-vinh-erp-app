@@ -7,6 +7,8 @@ import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { changeCaseStatusAction } from "@/features/crm/actions/crm-actions";
+import type { ButtonSize, ButtonVariant } from "@/components/ui/button";
+import type { CrmActionOverrides } from "@/features/crm/crm-action-overrides";
 import type { CrmActionResultState } from "@/features/crm/forms/crm-action-types";
 
 type TargetStatus = "pending_enrollment_confirmation" | "dropped" | "interested";
@@ -41,7 +43,23 @@ const copy: Record<TargetStatus, { button: string; confirm: string; description:
 const textareaClassName =
   "min-h-24 rounded-md border border-border-subtle bg-field-bg p-3 text-body text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring";
 
-export function CrmCaseStatusDialog({ crmCaseId, targetStatus }: { crmCaseId: string; targetStatus: TargetStatus }) {
+export function CrmCaseStatusDialog({
+  action = changeCaseStatusAction,
+  crmCaseId,
+  targetStatus,
+  triggerLabel,
+  triggerSize = "sm",
+  triggerVariant,
+}: {
+  action?: CrmActionOverrides["changeCaseStatus"];
+  crmCaseId: string;
+  targetStatus: TargetStatus;
+  /** Page-specific trigger wording; the dialog copy stays the same. */
+  triggerLabel?: string;
+  triggerSize?: ButtonSize;
+  /** Overrides the default trigger style (primary / danger / outline by target). */
+  triggerVariant?: ButtonVariant;
+}) {
   const router = useRouter();
   const titleId = useId();
   const descriptionId = useId();
@@ -62,7 +80,7 @@ export function CrmCaseStatusDialog({ crmCaseId, targetStatus }: { crmCaseId: st
     if (isPending) return;
     setState(null);
     startTransition(async () => {
-      const outcome = await changeCaseStatusAction({ crmCaseId, reason, targetStatus });
+      const outcome = await action({ crmCaseId, reason, targetStatus });
       setState(outcome);
       if (outcome.status === "success") {
         setIsOpen(false);
@@ -74,8 +92,8 @@ export function CrmCaseStatusDialog({ crmCaseId, targetStatus }: { crmCaseId: st
 
   return (
     <>
-      <Button onClick={() => { setState(null); setIsOpen(true); }} ref={triggerRef} size="sm" variant={text.variant === "primary" ? "primary" : text.variant === "danger" ? "danger" : "outline"}>
-        {text.button}
+      <Button onClick={() => { setState(null); setIsOpen(true); }} ref={triggerRef} size={triggerSize} variant={triggerVariant ?? (text.variant === "primary" ? "primary" : text.variant === "danger" ? "danger" : "outline")}>
+        {triggerLabel ?? text.button}
       </Button>
       <Dialog ariaDescribedBy={descriptionId} ariaLabelledBy={titleId} className="max-w-md" isOpen={isOpen} onClose={close} returnFocusRef={triggerRef}>
         <div className="grid gap-5 p-5 sm:p-6">

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { addCaseNoteAction, completeFollowUpAction } from "@/features/crm/actions/crm-actions";
+import type { CrmActionOverrides } from "@/features/crm/crm-action-overrides";
 import type { CrmActionResultState } from "@/features/crm/forms/crm-action-types";
 import type { CrmCaseNoteReadModel } from "@/features/crm/read-models";
 
@@ -18,17 +19,21 @@ const textareaClassName =
 
 /** Working notes with optional follow-up dates; overdue follow-ups are highlighted. */
 export function CrmCaseNotesPanel({
+  actions,
   canUpdate,
   crmCaseId,
   notes,
   todayIso,
 }: {
+  actions?: Pick<CrmActionOverrides, "addCaseNote" | "completeFollowUp">;
   canUpdate: boolean;
   crmCaseId: string;
   notes: CrmCaseNoteReadModel[];
   todayIso: string;
 }) {
   const router = useRouter();
+  const addCaseNote = actions?.addCaseNote ?? addCaseNoteAction;
+  const completeFollowUp = actions?.completeFollowUp ?? completeFollowUpAction;
   const noteId = useId();
   const [note, setNote] = useState("");
   const [followUpAt, setFollowUpAt] = useState("");
@@ -41,7 +46,7 @@ export function CrmCaseNotesPanel({
     if (isPending) return;
     setState(null);
     startTransition(async () => {
-      const outcome = await addCaseNoteAction({ crmCaseId, followUpAt: followUpAt || null, note });
+      const outcome = await addCaseNote({ crmCaseId, followUpAt: followUpAt || null, note });
       setState(outcome);
       if (outcome.status === "success") {
         setNote("");
@@ -55,7 +60,7 @@ export function CrmCaseNotesPanel({
     if (isPending) return;
     setState(null);
     startTransition(async () => {
-      const outcome = await completeFollowUpAction({ crmCaseId, noteId: id });
+      const outcome = await completeFollowUp({ crmCaseId, noteId: id });
       setState(outcome);
       if (outcome.status === "success") router.refresh();
     });
@@ -91,7 +96,7 @@ export function CrmCaseNotesPanel({
                 <label className="text-label font-medium text-text-muted" htmlFor={`${noteId}-follow`}>Hẹn theo dõi (không bắt buộc)</label>
                 <input className={fieldClassName} disabled={isPending} id={`${noteId}-follow`} min={todayIso} onChange={(event) => setFollowUpAt(event.target.value)} type="date" value={followUpAt} />
               </div>
-              <Button disabled={isPending || note.trim().length < 2} size="sm" type="submit">{isPending ? "Đang lưu…" : "Lưu ghi chú"}</Button>
+              <Button disabled={isPending || note.trim().length < 2} size="sm" type="submit" variant="secondary">{isPending ? "Đang lưu…" : "Lưu ghi chú"}</Button>
             </div>
             <p className="text-caption text-text-muted">Hẹn theo dõi đến hạn sẽ được nhắc trong Thông báo vào mỗi sáng cho sale phụ trách.</p>
           </form>
