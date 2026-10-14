@@ -2,6 +2,16 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.15.0.1] - 2026-10-15
+
+### Fixed
+- **Đơn hàng** (Tài chính → Đơn hàng) giờ nhận nguồn của học sinh để áp đúng cơ chế đối tác. Trước đây cột "Sale · Nguồn" chỉ đọc nguồn từ hoa hồng của ca CRM đã chuyển đổi, nên học sinh nhập hàng loạt ngày 12/10 (có nguồn trên hồ sơ nhưng không có ca CRM) đều hiện "Chưa xác định" và chi phí vận hành "Chưa cấu hình". Nguồn được lấy lần lượt từ: nguồn hiện tại trên hồ sơ học sinh → hoa hồng CRM của khoản thu → ca CRM của học sinh. Sale vẫn chỉ lấy từ CRM. Với dữ liệu tháng 10/2026: 19 đơn tái phí SB được tính 20% học phí, 6 đơn MMA tính 0 VND, 1 đơn chưa có nguồn vẫn ghi "Chưa xác định".
+- Nguồn đã biết nhưng không thuộc MMA/SB (ví dụ "Đến trực tiếp trung tâm") được ghi đúng tên thay vì "Chưa xác định"; vẫn "Chưa cấu hình" chi phí vận hành.
+- Cột lớp của đơn không còn trống khi học sinh chuyển khoản trước ngày vào lớp: hiện lớp có hiệu lực vào ngày chuyển khoản, nếu chưa có thì lớp đầu tiên bắt đầu sau ngày đó.
+
+### Lưu ý triển khai
+- Cần chạy migration `20261014100000_finance_orders_student_acquisition_source.sql` (`supabase db push --linked`); hàm giữ nguyên chữ ký và hợp đồng JSON nên bản web cũ và mới đều chạy được với hàm mới.
+
 ## [0.15.0.0] - 2026-10-14
 
 CRM tuyển sinh dựng lại theo phong cách Stumana (bước 10): danh sách lead có chip đếm theo trạng thái, trang lead có vòng đời bên phải và chỉ một nút chính tùy trạng thái.
