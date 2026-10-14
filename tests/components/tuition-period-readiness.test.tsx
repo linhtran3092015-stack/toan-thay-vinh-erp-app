@@ -1,6 +1,8 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TuitionPeriodDirectory } from "@/features/tuition/tuition-period-directory";
+// The lock panel refreshes the route after a network error, so it needs an app router.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/features/tuition/actions", () => ({ createTuitionPeriodAction: vi.fn(), lockTuitionPeriodAction: vi.fn() }));
 afterEach(cleanup);
 const period = { id: "period", name: "Khóa mới", startsOn: "2026-08-22", endsOn: "2026-11-06", dueOn: null, status: "draft" as const };

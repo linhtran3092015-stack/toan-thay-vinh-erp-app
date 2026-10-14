@@ -7,6 +7,8 @@ export interface TuitionPeriodListItem {
   name: string;
   startsOn: string;
   status: "draft" | "locked";
+  /** When the period was locked (and its payment requests created); absent on drafts. */
+  lockedAt?: string | null;
 }
 
 export interface TuitionPreviewRow {
@@ -40,18 +42,20 @@ interface TuitionPreviewDbRow {
   unit_price_vnd: number | null;
 }
 
-export async function getTuitionPeriods(): Promise<TuitionPeriodListItem[]> {
+/** Every period, newest first; `null` when the read failed (the list shows an error, not "no periods"). */
+export async function loadTuitionPeriods(): Promise<TuitionPeriodListItem[] | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("tuition_collection_periods")
-    .select("id, name, starts_on, ends_on, due_on, status")
+    .select("id, name, starts_on, ends_on, due_on, status, locked_at")
     .order("starts_on", { ascending: false });
 
-  if (error) return [];
+  if (error) return null;
   return (data ?? []).map((row) => ({
     dueOn: row.due_on,
     endsOn: row.ends_on,
     id: row.id,
+    lockedAt: row.locked_at ?? null,
     name: row.name,
     startsOn: row.starts_on,
     status: row.status === "locked" ? "locked" : "draft",
@@ -161,6 +165,3 @@ export async function getTuitionPeriodSystemBlockers(period: TuitionPeriodListIt
   if (!accountError && (accountCount ?? 0) > 1) blockers.push({ code: "AMBIGUOUS_RENEWAL_RECEIVING_ACCOUNT", message: "Có nhiều tài khoản nhận học phí tái phí cùng hiệu lực." });
   return blockers;
 }
-
-export interface TuitionLockedItem { amountVnd:number; className:string; id:string; payableSessions:number; studentName:string; studentGrade:number; studentId:string; status:string; transferCode:string|null; }
-export async function getTuitionLockedItems(periodId:string):Promise<TuitionLockedItem[]>{const s=await createSupabaseServerClient();const {data,error}=await s.from("tuition_collection_items").select("id,payable_amount_vnd,payable_sessions,status,student_id,student_snapshot,payment_contract_snapshot").eq("period_id",periodId).order("created_at");if(error)return [];return (data??[]).map(x=>{const st=x.student_snapshot as {full_name?:string;current_grade?:number;class_name?:string}; const p=x.payment_contract_snapshot as {transfer_code?:string}; return {id:x.id,amountVnd:Number(x.payable_amount_vnd),payableSessions:x.payable_sessions,studentId:x.student_id,studentName:st.full_name??"Học viên",studentGrade:st.current_grade??0,className:st.class_name??"Lớp snapshot",status:x.status,transferCode:p.transfer_code??null}})}

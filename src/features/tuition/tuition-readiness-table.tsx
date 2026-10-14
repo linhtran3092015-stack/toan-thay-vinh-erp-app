@@ -2,6 +2,7 @@
 
 import { useId, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { getButtonClassName } from "@/components/ui/button";
 import { setTuitionPeriodRatesAction, setTuitionPeriodSourcesAction } from "./actions";
 import { tuitionBlockerLabels } from "./readiness";
 import { downloadTuitionRateExcel, downloadTuitionSourceExcel } from "./tuition-template-browser";
@@ -22,6 +23,9 @@ export interface TuitionReadinessTableProps {
   labels: Record<string, string>;
   studentDetails?: Record<string, TuitionStudentDetail>;
   leadSources?: TuitionLeadSourceItem[];
+  /** Defaults to the real server actions; the /dev preview passes inert stubs. */
+  setRatesAction?: typeof setTuitionPeriodRatesAction;
+  setSourcesAction?: typeof setTuitionPeriodSourcesAction;
 }
 
 export function TuitionReadinessTable({
@@ -32,6 +36,8 @@ export function TuitionReadinessTable({
   labels,
   studentDetails = {},
   leadSources = [],
+  setRatesAction = setTuitionPeriodRatesAction,
+  setSourcesAction = setTuitionPeriodSourcesAction,
 }: TuitionReadinessTableProps) {
   const [selectedRateIds, setSelectedRateIds] = useState<string[]>([]);
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
@@ -246,7 +252,7 @@ export function TuitionReadinessTable({
               try {
                 const unitPrice = Number(form.get("unitPrice"));
                 const reason = String(form.get("reason") ?? "").trim();
-                const result = await setTuitionPeriodRatesAction({
+                const result = await setRatesAction({
                   periodId,
                   studentIds: selectedRateIds,
                   unitPriceVnd: unitPrice,
@@ -329,7 +335,7 @@ export function TuitionReadinessTable({
               />
             </label>
             <button
-              className="min-h-10 self-end rounded-md bg-action-primary px-4 font-semibold text-text-on-primary hover:opacity-90 disabled:opacity-50"
+              className={getButtonClassName({ className: "self-end max-md:h-11", variant: "secondary" })}
               disabled={pending || selectedRateIds.length === 0}
               type="submit"
             >
@@ -348,7 +354,7 @@ export function TuitionReadinessTable({
               try {
                 const leadSourceId = String(form.get("leadSourceId"));
                 const reason = String(form.get("reason") ?? "").trim();
-                const result = await setTuitionPeriodSourcesAction({
+                const result = await setSourcesAction({
                   periodId,
                   studentIds: selectedSourceIds,
                   leadSourceId,
@@ -428,7 +434,7 @@ export function TuitionReadinessTable({
               />
             </label>
             <button
-              className="min-h-10 self-end rounded-md bg-action-primary px-4 font-semibold text-text-on-primary hover:opacity-90 disabled:opacity-50"
+              className={getButtonClassName({ className: "self-end max-md:h-11", variant: "secondary" })}
               disabled={pending || selectedSourceIds.length === 0}
               type="submit"
             >
