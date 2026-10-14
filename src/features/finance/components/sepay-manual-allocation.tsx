@@ -7,6 +7,9 @@ import { Dialog } from "@/components/ui/dialog";
 import { allocateSepayTuitionAction, getAllocationDetailsAction, searchAllocationStudentsAction } from "../manual-allocation-actions";
 import { manualAllocationSchema, type AllocationDetail, type AllocationStudent } from "../manual-allocation-schema";
 import type { SepayTransactionReadModel } from "../read-models";
+import type { SepayActionOverrides } from "../sepay-action-overrides";
+
+type AllocationActions = Pick<SepayActionOverrides, "allocate" | "getAllocationDetails" | "searchAllocationStudents">;
 
 const money = (n: number) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(n);
 const inputClass = "h-11 w-full rounded-md border border-border-subtle bg-surface-base px-3 text-control disabled:bg-disabled-bg";
@@ -15,25 +18,49 @@ export function canManuallyAllocate(transaction: SepayTransactionReadModel): boo
   return transaction.transferType === "in" && ["unmatched", "amount_mismatch", "account_purpose_mismatch"].includes(transaction.matchStatus);
 }
 
-export function SepayManualAllocation({ transaction, canAllocate = false }: { transaction: SepayTransactionReadModel; canAllocate?: boolean }) {
+export function SepayManualAllocation({ transaction, canAllocate = false, actions, onOpenDialog }: {
+  transaction: SepayTransactionReadModel;
+  canAllocate?: boolean;
+  actions?: AllocationActions;
+  /**
+   * Shared-dialog mode: the caller renders one SepayManualAllocationDialog for
+   * the whole screen (outside breakpoint-hidden containers), so this renders
+   * only the trigger.
+   */
+  onOpenDialog?: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
+}) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const hasDetails = transaction.matchStatus === "split_allocated";
   if (!hasDetails && (!canAllocate || !canManuallyAllocate(transaction))) return null;
   return <>
-    <Button ref={trigger} size="sm" variant="secondary" onClick={() => setOpen(true)} aria-haspopup="dialog">
+    <Button ref={trigger} size="sm" variant="secondary" onClick={() => { if (onOpenDialog) onOpenDialog(transaction, trigger.current); else setOpen(true); }} aria-haspopup="dialog">
       {hasDetails ? "Xem phân bổ" : "Phân bổ học phí"}
     </Button>
-    {open ? <AllocationDialog key={transaction.id} titleId={titleId} transaction={transaction} readOnly={hasDetails} onClose={() => setOpen(false)} trigger={trigger} /> : null}
+    {!onOpenDialog && open ? <AllocationDialog actions={actions} key={transaction.id} titleId={titleId} transaction={transaction} readOnly={hasDetails} onClose={() => setOpen(false)} trigger={trigger} /> : null}
   </>;
 }
 
-function AllocationDialog({ titleId, transaction, readOnly, onClose, trigger }: {
-  titleId: string; transaction: SepayTransactionReadModel; readOnly: boolean; onClose: () => void;
-  trigger: React.RefObject<HTMLButtonElement | null>;
+/** The allocation dialog for shared-dialog callers (see SepayManualAllocation onOpenDialog). */
+export function SepayManualAllocationDialog({ actions, onClose, returnFocusRef, transaction }: {
+  actions?: AllocationActions;
+  onClose: () => void;
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
+  transaction: SepayTransactionReadModel;
+}) {
+  const titleId = useId();
+  const fallbackRef = useRef<HTMLElement | null>(null);
+  return <AllocationDialog actions={actions} key={transaction.id} titleId={titleId} transaction={transaction} readOnly={transaction.matchStatus === "split_allocated"} onClose={onClose} trigger={returnFocusRef ?? fallbackRef} />;
+}
+
+function AllocationDialog({ actions, titleId, transaction, readOnly, onClose, trigger }: {
+  actions?: AllocationActions; titleId: string; transaction: SepayTransactionReadModel; readOnly: boolean; onClose: () => void;
+  trigger: React.RefObject<HTMLElement | null>;
 }) {
   const router = useRouter();
+  const allocate = actions?.allocate ?? allocateSepayTuitionAction;
+  const searchStudents = actions?.searchAllocationStudents ?? searchAllocationStudentsAction;
   const [query, setQuery] = useState("");
   const [students, setStudents] = useState<AllocationStudent[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
@@ -60,7 +87,7 @@ function AllocationDialog({ titleId, transaction, readOnly, onClose, trigger }: 
     if (busy || query.trim().length < 2) return;
     setBusy(true); setError(""); setStudents([]); setMessage("");
     try {
-      const result = await searchAllocationStudentsAction(query);
+      const result = await searchStudents(query);
       if (result.ok) { setStudents(result.data); setMessage(result.data.length ? `Tìm thấy ${result.data.length} học sinh. Chọn đúng mã học sinh và phụ huynh.` : "Không tìm thấy học sinh đang học có phụ huynh chính. Thử tên, mã học sinh hoặc số điện thoại khác."); }
       else setError(result.message);
     } catch { setError("Không tải được học sinh. Vui lòng thử lại."); }
@@ -70,7 +97,7 @@ function AllocationDialog({ titleId, transaction, readOnly, onClose, trigger }: 
     if (submitting.current || !valid || !review) return;
     submitting.current = true; setBusy(true); setError("");
     try {
-      const result = await allocateSepayTuitionAction(payload);
+      const result = await allocate(payload);
       if (result.ok) { router.refresh(); onClose(); }
       else { setError(result.message); setReview(false); }
     } catch { setError("Chưa xác nhận được kết quả. Vui lòng tải lại giao dịch trước khi thử lại."); }
@@ -85,7 +112,7 @@ function AllocationDialog({ titleId, transaction, readOnly, onClose, trigger }: 
         <p className="break-all">Mã giao dịch: {transaction.bankTransactionId}</p>
         <p className="mt-1 break-words">{transaction.transferContent}</p>
       </div>
-      {readOnly ? <AllocationDetails transactionId={transaction.id} /> : transaction.accountPurpose === "unknown" ?
+      {readOnly ? <AllocationDetails loadDetails={actions?.getAllocationDetails} transactionId={transaction.id} /> : transaction.accountPurpose === "unknown" ?
         <p role="alert">Cần xác định tài khoản nhận Tuyển mới/Tái phí trước khi phân bổ học phí.</p> : <>
         <p className="text-secondary text-text-muted">Phân bổ toàn bộ số tiền cho một hoặc nhiều học sinh. Nếu đã có yêu cầu thanh toán, hãy chọn yêu cầu đó để hoàn tất công nợ. Số buổi được ghi nhận theo ngày chuyển tiền.</p>
         {!review ? <>
@@ -145,23 +172,23 @@ function AllocationDialog({ titleId, transaction, readOnly, onClose, trigger }: 
   </Dialog>;
 }
 
-function AllocationDetails({ transactionId }: { transactionId: string }) {
+function AllocationDetails({ loadDetails = getAllocationDetailsAction, transactionId }: { loadDetails?: typeof getAllocationDetailsAction; transactionId: string }) {
   const [details, setDetails] = useState<AllocationDetail[] | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
   useEffect(() => {
     let active = true;
-    getAllocationDetailsAction(transactionId).then((result) => {
+    loadDetails(transactionId).then((result) => {
       if (!active) return;
       if (result.ok) setDetails(result.data); else setError(result.message);
     }).catch(() => { if (active) setError("Không tải được chi tiết phân bổ."); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
-  }, [transactionId]);
+  }, [loadDetails, transactionId]);
   async function load() {
     setBusy(true); setError("");
     try {
-      const result = await getAllocationDetailsAction(transactionId);
+      const result = await loadDetails(transactionId);
       if (result.ok) setDetails(result.data); else setError(result.message);
     } catch { setError("Không tải được chi tiết phân bổ."); }
     finally { setBusy(false); }

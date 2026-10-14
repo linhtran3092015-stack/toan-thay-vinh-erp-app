@@ -7,6 +7,7 @@ import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import type { SepayTransactionReadModel } from "@/features/finance/read-models";
+import type { SepayActionOverrides } from "@/features/finance/sepay-action-overrides";
 import { reverseSepayAllocationAction } from "@/features/finance/sepay-allocation-reversal-actions";
 
 const inputClassName =
@@ -22,11 +23,15 @@ export function isSepayTransactionReversible(transaction: SepayTransactionReadMo
 }
 
 export function SepayAllocationReversalDialog({
+  actions,
   transaction,
 }: {
+  /** Replacement for the reversal server action (dev preview only). */
+  actions?: Pick<SepayActionOverrides, "reverseAllocation">;
   transaction: SepayTransactionReadModel;
 }) {
   const router = useRouter();
+  const reverseAllocation = actions?.reverseAllocation ?? reverseSepayAllocationAction;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
   const titleId = useId();
@@ -57,7 +62,7 @@ export function SepayAllocationReversalDialog({
     if (isPending) return;
     setError(null);
     startTransition(async () => {
-      const result = await reverseSepayAllocationAction({ reason, transactionId: transaction.id });
+      const result = await reverseAllocation({ reason, transactionId: transaction.id });
       if (result.ok) {
         setSuccess(result.message);
         router.refresh();

@@ -14,18 +14,19 @@ export type { SepayReconciliationCandidateView };
 export { isSepayTransactionReconcilable };
 
 export interface SepayReconciliationActionsProps {
-  candidates: SepayReconciliationCandidateView[];
+  /** Only used by the trigger's own dialog (no onOpenDialog). */
+  candidates?: SepayReconciliationCandidateView[];
   defaultOpen?: boolean;
   onOpenDialog?: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
   transaction: SepayTransactionReadModel;
 }
 
 /**
- * Reconciliation action trigger for SePay transactions.
- * Replaces the in-row expanding form with a clean dialog trigger button.
+ * Reconciliation trigger for one SePay transaction. Pass `onOpenDialog` to
+ * open a dialog the caller renders once; otherwise the trigger renders its own.
  */
 export function SepayReconciliationActions({
-  candidates,
+  candidates = [],
   defaultOpen = false,
   onOpenDialog,
   transaction,
@@ -58,7 +59,8 @@ export function SepayReconciliationActions({
         Đối soát
       </Button>
 
-      {/* When running standalone (e.g. in isolated component tests without history wrapper) */}
+      {/* Without onOpenDialog the trigger owns its dialog. SepayTransactionHistory and
+          SepayReviewWorkspace pass onOpenDialog and render one shared dialog instead. */}
       {!onOpenDialog ? (
         <SepayReconciliationDialog
           candidates={candidates}

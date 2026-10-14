@@ -59,8 +59,8 @@ export interface SepayTransactionReadModel {
 export interface SepayTransactionsPageReadModel {
   page: number;
   pageSize: number;
-  /** Inbound transfers still waiting for reconciliation, regardless of filters. */
-  reviewCount: number;
+  /** Inbound transfers still waiting for reconciliation, regardless of filters; null when the count failed. */
+  reviewCount: number | null;
   total: number;
   transactions: SepayTransactionReadModel[];
 }

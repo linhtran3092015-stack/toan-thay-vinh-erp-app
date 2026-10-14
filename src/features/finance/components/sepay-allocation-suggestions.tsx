@@ -10,6 +10,7 @@ import type {
   AllocationSuggestionCandidate,
 } from "@/features/finance/allocation-suggestions-data";
 import { allocateSepayTuitionAction } from "@/features/finance/manual-allocation-actions";
+import type { SepayActionOverrides } from "@/features/finance/sepay-action-overrides";
 
 const DEFAULT_REASON = "Khớp theo nội dung chuyển khoản (gợi ý tự động, kế toán xác nhận)";
 
@@ -38,6 +39,8 @@ function formatDate(value: string): string {
 
 interface RowState {
   candidateId: string;
+  /** Detail layout: the second confirmation step is open for this row. */
+  confirming: boolean;
   error: string | null;
   sessions: string;
   status: "idle" | "pending" | "done";
@@ -47,6 +50,7 @@ function initialRowState(suggestion: AllocationSuggestion): RowState {
   const best = suggestion.candidates[0];
   return {
     candidateId: best?.studentId ?? "",
+    confirming: false,
     error: null,
     sessions: best?.suggestedSessions ? String(best.suggestedSessions) : "",
     status: "idle",
@@ -54,12 +58,33 @@ function initialRowState(suggestion: AllocationSuggestion): RowState {
 }
 
 export function SepayAllocationSuggestions({
+  actions,
+  confirmDisabledReason = null,
+  layout = "panel",
+  onPendingChange,
   suggestions,
 }: {
+  /** Replacement for the allocation server action (dev preview only). */
+  actions?: Pick<SepayActionOverrides, "allocate">;
+  /** Detail layout: confirming is blocked (e.g. the row was selected automatically); shown as text. */
+  confirmDisabledReason?: string | null;
+  /** Detail layout: reports an allocation in flight so the caller can hold the selection. */
+  onPendingChange?: (pending: boolean) => void;
+  /**
+   * `panel`: every pending suggestion with the bulk confirm (Tất cả giao dịch).
+   * `detail`: the selected transaction's suggestion inside the review detail
+   * pane; no bulk confirm, so its row confirm stays the pane's one primary.
+   */
+  layout?: "detail" | "panel";
   suggestions: readonly AllocationSuggestion[];
 }) {
   const router = useRouter();
+  const allocate = actions?.allocate ?? allocateSepayTuitionAction;
+  const isDetail = layout === "detail";
   const reasonId = useId();
+  const titleId = useId();
+  // Unique per instance: the review workspace can show the same suggestion in the detail pane and on a phone card.
+  const sessionsIdPrefix = useId();
   const [reason, setReason] = useState(DEFAULT_REASON);
   const [rows, setRows] = useState<Record<string, RowState>>(() =>
     Object.fromEntries(suggestions.map((s) => [s.transactionId, initialRowState(s)])),
@@ -81,34 +106,49 @@ export function SepayAllocationSuggestions({
     }));
   };
 
-  const confirmOne = async (suggestion: AllocationSuggestion): Promise<boolean> => {
+  const validateRow = (suggestion: AllocationSuggestion) => {
     const row = rows[suggestion.transactionId];
     const candidate = suggestion.candidates.find((c) => c.studentId === row?.candidateId);
     const sessions = Number(row?.sessions);
 
     if (!candidate) {
       updateRow(suggestion.transactionId, { error: "Chọn học sinh trước khi xác nhận." });
-      return false;
+      return null;
     }
     if (!Number.isInteger(sessions) || sessions < 1) {
       updateRow(suggestion.transactionId, { error: "Nhập số buổi cộng cho học sinh (số nguyên ≥ 1)." });
-      return false;
+      return null;
     }
+    return { candidate, sessions };
+  };
 
-    updateRow(suggestion.transactionId, { error: null, status: "pending" });
-    const result = await allocateSepayTuitionAction({
-      allocations: [
-        {
-          amountVnd: suggestion.amountVnd,
-          bonusSessions: 0,
-          paymentRequestId: candidate.pendingRequestId,
-          sessions,
-          studentId: candidate.studentId,
-        },
-      ],
-      reason,
-      transactionId: suggestion.transactionId,
-    });
+  const confirmOne = async (suggestion: AllocationSuggestion): Promise<boolean> => {
+    const valid = validateRow(suggestion);
+    if (!valid) return false;
+    const { candidate, sessions } = valid;
+
+    updateRow(suggestion.transactionId, { confirming: false, error: null, status: "pending" });
+    onPendingChange?.(true);
+    let result: Awaited<ReturnType<typeof allocate>>;
+    try {
+      result = await allocate({
+        allocations: [
+          {
+            amountVnd: suggestion.amountVnd,
+            bonusSessions: 0,
+            paymentRequestId: candidate.pendingRequestId,
+            sessions,
+            studentId: candidate.studentId,
+          },
+        ],
+        reason,
+        transactionId: suggestion.transactionId,
+      });
+    } catch {
+      result = { message: "Chưa xác nhận được kết quả. Vui lòng tải lại giao dịch trước khi thử lại.", ok: false };
+    } finally {
+      onPendingChange?.(false);
+    }
 
     if (!result.ok) {
       updateRow(suggestion.transactionId, { error: result.message, status: "idle" });
@@ -144,27 +184,35 @@ export function SepayAllocationSuggestions({
 
   return (
     <section
-      aria-labelledby="sepay-suggestions-title"
+      aria-labelledby={titleId}
       className="rounded-lg border border-border-subtle bg-surface-base p-4 shadow-card sm:p-5"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-section-title font-semibold text-text-strong" id="sepay-suggestions-title">
-            Gợi ý khớp giao dịch chưa phân bổ
+          <h2 className="text-section-title font-semibold text-text-strong" id={titleId}>
+            {isDetail ? "Gợi ý khớp" : "Gợi ý khớp giao dịch chưa phân bổ"}
           </h2>
           <p className="mt-1 text-secondary text-text-muted">
-            Hệ thống đọc nội dung chuyển khoản và tìm học sinh theo tên, năm sinh, mã học sinh hoặc số điện thoại phụ huynh.
-            Kế toán kiểm tra, sửa số buổi nếu cần rồi xác nhận từng dòng. {pending.length} giao dịch đang chờ.
+            {isDetail ? (
+              "Học sinh có thể là người chuyển, tìm theo tên, năm sinh, mã học sinh hoặc số điện thoại phụ huynh trong nội dung chuyển khoản. Kiểm tra, sửa số buổi nếu cần rồi xác nhận."
+            ) : (
+              <>
+                Hệ thống đọc nội dung chuyển khoản và tìm học sinh theo tên, năm sinh, mã học sinh hoặc số điện thoại phụ huynh.
+                Kế toán kiểm tra, sửa số buổi nếu cần rồi xác nhận từng dòng. {pending.length} giao dịch đang chờ.
+              </>
+            )}
           </p>
         </div>
-        <Button
-          disabled={highConfidenceReady.length === 0 || isBulkPending}
-          isLoading={isBulkPending}
-          onClick={confirmHighConfidence}
-          type="button"
-        >
-          Xác nhận {highConfidenceReady.length} dòng tin cậy cao
-        </Button>
+        {isDetail ? null : (
+          <Button
+            disabled={highConfidenceReady.length === 0 || isBulkPending}
+            isLoading={isBulkPending}
+            onClick={confirmHighConfidence}
+            type="button"
+          >
+            Xác nhận {highConfidenceReady.length} dòng tin cậy cao
+          </Button>
+        )}
       </div>
 
       <div className="mt-4">
@@ -186,23 +234,47 @@ export function SepayAllocationSuggestions({
         </p>
       ) : null}
 
+      {isDetail && confirmDisabledReason ? (
+        <p className="mt-3 text-secondary text-text-muted">{confirmDisabledReason}</p>
+      ) : null}
+
       <ul className="mt-4 divide-y divide-border-subtle">
-        {pending.map((suggestion) => {
+        {/* Detail keeps a confirmed row as a result line until the refreshed queue drops it. */}
+        {(isDetail ? suggestions : pending).map((suggestion) => {
           const row = rows[suggestion.transactionId];
           const candidate = suggestion.candidates.find((c) => c.studentId === row?.candidateId);
           const isRowPending = row?.status === "pending";
-          return (
-            <li className="grid gap-3 py-4 lg:grid-cols-[150px_minmax(0,1fr)_minmax(0,1fr)_120px_auto] lg:items-start" key={suggestion.transactionId}>
-              <div>
-                <p className="text-label font-semibold text-text-strong tabular-nums">{formatVnd(suggestion.amountVnd)}</p>
-                <p className="text-caption text-text-muted">
-                  {formatDate(suggestion.transactionAt)} · {suggestion.accountPurpose === "renewal" ? "Gia hạn" : "Tuyển mới"}
+          if (row?.status === "done") {
+            return (
+              <li className="py-4" key={suggestion.transactionId}>
+                <p className="rounded-md border border-success-border bg-success-bg px-3 py-2 text-secondary text-success-ink" role="status">
+                  Đã phân bổ {formatVnd(suggestion.amountVnd)} cho {candidate?.studentName ?? "học sinh đã chọn"}.
                 </p>
-              </div>
+              </li>
+            );
+          }
+          return (
+            <li
+              className={isDetail
+                ? "grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_120px_auto] sm:items-start"
+                : "grid gap-3 py-4 lg:grid-cols-[150px_minmax(0,1fr)_minmax(0,1fr)_120px_auto] lg:items-start"}
+              key={suggestion.transactionId}
+            >
+              {/* The detail pane already shows amount, time and transfer content above. */}
+              {isDetail ? null : (
+                <>
+                  <div>
+                    <p className="text-label font-semibold text-text-strong tabular-nums">{formatVnd(suggestion.amountVnd)}</p>
+                    <p className="text-caption text-text-muted">
+                      {formatDate(suggestion.transactionAt)} · {suggestion.accountPurpose === "renewal" ? "Gia hạn" : "Tuyển mới"}
+                    </p>
+                  </div>
 
-              <p className="break-words text-secondary text-text-default" title={suggestion.transferContent}>
-                {suggestion.transferContent || "(không có nội dung)"}
-              </p>
+                  <p className="break-words text-secondary text-text-default" title={suggestion.transferContent}>
+                    {suggestion.transferContent || "(không có nội dung)"}
+                  </p>
+                </>
+              )}
 
               <div className="min-w-0">
                 {suggestion.candidates.length > 1 ? (
@@ -214,6 +286,7 @@ export function SepayAllocationSuggestions({
                       const next = suggestion.candidates.find((c) => c.studentId === event.target.value);
                       updateRow(suggestion.transactionId, {
                         candidateId: event.target.value,
+                        confirming: false,
                         sessions: next?.suggestedSessions ? String(next.suggestedSessions) : "",
                       });
                     }}
@@ -241,16 +314,16 @@ export function SepayAllocationSuggestions({
               </div>
 
               <div>
-                <label className="sr-only" htmlFor={`sessions-${suggestion.transactionId}`}>
+                <label className="sr-only" htmlFor={`${sessionsIdPrefix}-${suggestion.transactionId}`}>
                   Số buổi cộng
                 </label>
                 <input
                   className={inputClassName}
                   disabled={isRowPending}
-                  id={`sessions-${suggestion.transactionId}`}
+                  id={`${sessionsIdPrefix}-${suggestion.transactionId}`}
                   inputMode="numeric"
                   min={1}
-                  onChange={(event) => updateRow(suggestion.transactionId, { sessions: event.target.value })}
+                  onChange={(event) => updateRow(suggestion.transactionId, { confirming: false, sessions: event.target.value })}
                   placeholder="Số buổi"
                   type="number"
                   value={row?.sessions ?? ""}
@@ -259,16 +332,23 @@ export function SepayAllocationSuggestions({
 
               <div className="flex flex-col gap-1">
                 <Button
-                  disabled={isBulkPending}
+                  aria-expanded={isDetail ? Boolean(row?.confirming) : undefined}
+                  disabled={isBulkPending || (isDetail && (Boolean(row?.confirming) || Boolean(confirmDisabledReason)))}
                   isLoading={isRowPending}
                   onClick={() => {
+                    if (isDetail) {
+                      // Two steps in the detail pane: the first click only opens the confirmation,
+                      // so a repeated click in the same spot can never write.
+                      if (validateRow(suggestion)) updateRow(suggestion.transactionId, { confirming: true, error: null });
+                      return;
+                    }
                     void confirmOne(suggestion).then((ok) => {
                       if (ok) router.refresh();
                     });
                   }}
                   size="sm"
                   type="button"
-                  variant={candidate?.confidence === "high" ? "primary" : "secondary"}
+                  variant={candidate?.confidence === "high" && !row?.confirming ? "primary" : "secondary"}
                 >
                   Xác nhận
                 </Button>
@@ -278,6 +358,38 @@ export function SepayAllocationSuggestions({
                   </p>
                 ) : null}
               </div>
+
+              {isDetail && row?.confirming && candidate && !confirmDisabledReason ? (
+                <div className="grid gap-2 rounded-md border border-border-strong bg-surface-sunken p-3 sm:col-span-3">
+                  <p className="text-secondary text-text-default">
+                    Ghi nhận {formatVnd(suggestion.amountVnd)} cho {candidate.studentName} ({candidate.studentCode}), cộng {row.sessions} buổi.
+                    Hệ thống tạo khoản thu và đơn hàng cho giao dịch này.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      isLoading={isRowPending}
+                      onClick={() => {
+                        void confirmOne(suggestion).then((ok) => {
+                          if (ok) router.refresh();
+                        });
+                      }}
+                      size="sm"
+                      type="button"
+                    >
+                      Ghi nhận cho {candidate.studentName}
+                    </Button>
+                    <Button
+                      disabled={isRowPending}
+                      onClick={() => updateRow(suggestion.transactionId, { confirming: false })}
+                      size="sm"
+                      type="button"
+                      variant="secondary"
+                    >
+                      Hủy
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </li>
           );
         })}

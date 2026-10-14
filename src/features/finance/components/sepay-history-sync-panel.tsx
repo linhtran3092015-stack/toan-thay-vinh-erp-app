@@ -9,6 +9,7 @@ import {
   syncSepayHistoryAction,
   type SepayHistorySyncActionResult,
 } from "@/features/finance/sepay-history-sync-actions";
+import type { SepayActionOverrides } from "@/features/finance/sepay-action-overrides";
 
 const vietnamDateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   dateStyle: "short",
@@ -43,6 +44,8 @@ export interface SepaySyncRunView {
 }
 
 interface SepayHistorySyncPanelProps {
+  /** Replacements for the history sync server actions (dev preview only). */
+  actions?: Pick<SepayActionOverrides, "previewHistorySync" | "syncHistory">;
   accounts: SepaySyncAccountView[];
   defaultDateFrom: string;
   defaultDateTo: string;
@@ -50,6 +53,7 @@ interface SepayHistorySyncPanelProps {
 }
 
 export function SepayHistorySyncPanel({
+  actions,
   accounts,
   defaultDateFrom,
   defaultDateTo,
@@ -68,6 +72,8 @@ export function SepayHistorySyncPanel({
   const [syncSessionId, setSyncSessionId] = useState<string | null>(null);
   const [finishedSessionIds, setFinishedSessionIds] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
+  const previewHistorySync = actions?.previewHistorySync ?? previewSepayHistorySyncAction;
+  const syncHistory = actions?.syncHistory ?? syncSepayHistoryAction;
 
   function clearPreview(): void {
     setPreview(null);
@@ -93,7 +99,7 @@ export function SepayHistorySyncPanel({
             Nhập giao dịch cũ ở chế độ chờ đối soát. Bước này không tự ghi học phí và không tạo đơn hàng.
           </p>
         </div>
-        <Link className="text-control font-semibold text-action-primary hover:underline" href="/finance/receiving-accounts">
+        <Link className="text-control font-semibold text-action-link! hover:underline" href="/finance/receiving-accounts">
           Thiết lập tài khoản nhận
         </Link>
       </div>
@@ -152,7 +158,7 @@ export function SepayHistorySyncPanel({
             setResult(null);
             setPreview(null);
             try {
-              setPreview(await previewSepayHistorySyncAction(input));
+              setPreview(await previewHistorySync(input));
             } catch {
               setPreview({ ok: false, message: "Không thể kết nối để xem trước. Vui lòng thử lại." });
             }
@@ -175,11 +181,11 @@ export function SepayHistorySyncPanel({
             const sessionId = syncSessionId ?? resumableRun?.syncSessionId ?? globalThis.crypto.randomUUID();
             setSyncSessionId(sessionId);
             try {
-            let syncResult = await syncSepayHistoryAction({ ...input, syncSessionId: sessionId });
+            let syncResult = await syncHistory({ ...input, syncSessionId: sessionId });
             let requestsMade = 1;
             const maximumRequests = selectedIds.length * 10 + 2;
             while (syncResult.ok && syncResult.continuationRequired && requestsMade < maximumRequests) {
-              syncResult = await syncSepayHistoryAction({ ...input, syncSessionId: sessionId });
+              syncResult = await syncHistory({ ...input, syncSessionId: sessionId });
               requestsMade += 1;
             }
             if (syncResult.ok && syncResult.continuationRequired) {
