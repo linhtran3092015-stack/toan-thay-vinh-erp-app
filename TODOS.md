@@ -622,6 +622,18 @@
 **Priority:** P2
 **Depends on:** None
 
+### Cảnh báo "N người sẽ mất quyền" trên ma trận phân quyền
+
+**What:** Khi bỏ tick một quyền của vai trò trên `/settings/permissions`, hiện cảnh báo warning "N người sẽ mất quyền X khi lưu" trong hộp thoại lý do (thiết kế 9b).
+
+**Why:** Thu hồi quyền ảnh hưởng ngay từ lần tải trang kế tiếp của mọi người giữ vai trò đó; Owner hiện không thấy số người bị ảnh hưởng trước khi lưu.
+
+**Context:** Bước 9 của redesign bỏ khối này vì trang chưa đọc danh bạ nhân sự. Cần đọc `user_role_assignments` (hoặc `getStaffDirectory({ includeRoles: true })`, cần `staff.view`) và tính người mất quyền theo hợp các vai trò (một người còn vai trò khác có quyền đó thì không mất).
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
 ## Dọn code
 
 ### Gói rút gọn code sau redesign
@@ -989,6 +1001,68 @@
 **Context:** `src/features/payroll/estimate/use-payroll-live-estimate.ts` (transport mặc định). Có từ trước bước 8.
 
 **Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+## Cài đặt
+
+### Lưu phân quyền nhiều vai trò: ghi đè và lưu dở
+
+**What:** Thêm RPC lưu theo lô (một giao dịch cho mọi vai trò, có kiểm phiên bản) thay cho việc gọi `set_role_permissions` lần lượt từng vai trò; tạm thời có thể ép tải lại quyền ngay trước khi mở hộp thoại lý do, và lưu vai trò chỉ thêm quyền trước vai trò chỉ bớt quyền.
+
+**Why:** `set_role_permissions` thay cả danh sách quyền và không kiểm phiên bản, nên một bản nháp mở lâu có thể ghi đè thay đổi của Owner khác. Lưu lần lượt không có rollback: chuyển một quyền từ vai trò A sang B mà B lưu lỗi thì không vai trò nào giữ quyền đó cho tới khi thử lại (banner có nêu tên vai trò lỗi). Một lần lưu lỗi sau khi người dùng đã rời trang thì trang không báo được.
+
+**Context:** `src/features/settings/permission-matrix-page.tsx` (`saveAll`), `supabase/migrations/20260802223000_settings_account_rbac_management.sql`. Cần migration.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Quyền đã tắt làm vai trò không lưu được
+
+**What:** Lọc `role_permissions` theo quyền đang hoạt động khi đọc ma trận (`src/features/settings/data.ts`) hoặc cho RPC bỏ qua quyền đã tắt; số "n quyền" trên thẻ vai trò cũng chỉ đếm quyền đang hoạt động.
+
+**Why:** Trang gửi cả danh sách quyền đã cấp, kể cả quyền đã tắt; RPC kiểm quyền đang hoạt động nên mọi lần lưu vai trò đó đều lỗi mà người dùng không gỡ được (quyền đã tắt bị ẩn).
+
+**Context:** Hiện chưa xảy ra trên dữ liệu thật (chưa tắt quyền nào). Kèm theo: đọc `role_permissions` chưa phân trang, sẽ cắt ở 1000 dòng.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Cài đặt Chung chưa lấy lại giá trị từ máy chủ
+
+**What:** Sau khi lưu, dùng giá trị máy chủ trả về (đã trim) làm mốc; khi trang tải lại mà form không có thay đổi thì nhận giá trị mới (giống trình sửa Thương hiệu). Chuẩn hóa xuống dòng cho ô một dòng (bỏ `\n`, `\r` đơn) khi so sánh.
+
+**Why:** Hủy hiện trả về bản lưu cục bộ, thay đổi từ nơi khác không hiện ra và lần lưu sau ghi đè; giá trị lưu có ký tự xuống dòng trong ô một dòng làm form luôn báo "1 thay đổi chưa lưu".
+
+**Context:** `src/features/settings/system-settings-form.tsx` (`saved`, `lf`). Kèm: sửa form trong lúc đang lưu rồi rời trang thì giá trị mới nằm trên route ẩn nhưng không được tính là thay đổi; form chưa khóa ô trong lúc lưu.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Ma trận phân quyền: các điểm nhỏ còn lại
+
+**What:** Xóa banner lỗi khi bản nháp của vai trò lỗi đã được bỏ tay; bỏ bản nháp của vai trò vừa bị tắt (`pruneDraft` theo vai trò đang hoạt động); hộp thoại "Đang lưu phân quyền" đổi nội dung khi lần lưu kết thúc trong lúc hộp thoại đang mở; bấm lại mục lục đang mở không hỏi bỏ thay đổi; chỉ nhận dữ liệu tải lại có phiên bản mới hơn (trình sửa website và ma trận).
+
+**Why:** Mỗi điểm hiếm gặp nhưng làm người dùng hiểu sai trạng thái lưu.
+
+**Context:** `permission-matrix-page.tsx`, `settings/components/leave-guard.tsx`, `settings-toc.tsx`, `website/editor.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Giao diện cài đặt: phần còn lại sau bước 9
+
+**What:** Dựng lại chế độ Trang web công khai (còn dùng `brand-panel`/`brand-field` cũ) bằng `SettingsCard`; gộp `LeaveConfirmDialog` với `UnsavedChangesDialog` của form học sinh; tối ưu render lưới phân quyền (memo hàng, `useDeferredValue` cho ô tìm) và trình sửa (bỏ `JSON.stringify` mỗi phím gõ); dùng `ui/field` cho `TextInputField`/`TextAreaField` và ô lý do; tìm quyền gập "đ" thành "d"; dấu thay đổi từng ô trong danh sách vai trò trên điện thoại; chip màu cá nhân theo dõi thay đổi từ tab khác; `--save-bar-h` khi có hai thanh lưu.
+
+**Why:** Nợ giao diện và hiệu năng được hoãn trong review bước 9.
+
+**Context:** `src/features/website/editor.tsx`, `appearance.tsx`, `src/features/settings/**`, `src/components/patterns/sticky-save-bar.tsx`.
+
+**Effort:** M
 **Priority:** P3
 **Depends on:** None
 
