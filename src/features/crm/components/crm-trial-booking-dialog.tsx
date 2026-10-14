@@ -7,12 +7,13 @@ import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { bookTrialAction } from "@/features/crm/actions/crm-actions";
+import type { CrmActionOverrides } from "@/features/crm/crm-action-overrides";
 import type { CrmActionResultState } from "@/features/crm/forms/crm-action-types";
 
-interface CrmTrialBookingDialogProps { crmCaseId: string; }
+interface CrmTrialBookingDialogProps { action?: CrmActionOverrides["bookTrial"]; crmCaseId: string; }
 const fieldClassName = "h-10 w-full rounded-md border border-border-subtle bg-field-bg px-3 text-body text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring";
 
-export function CrmTrialBookingDialog({ crmCaseId }: CrmTrialBookingDialogProps) {
+export function CrmTrialBookingDialog({ action = bookTrialAction, crmCaseId }: CrmTrialBookingDialogProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [trialDate, setTrialDate] = useState("");
@@ -27,13 +28,13 @@ export function CrmTrialBookingDialog({ crmCaseId }: CrmTrialBookingDialogProps)
     if (isPending) return;
     setActionState(null);
     startTransition(async () => {
-      const result = await bookTrialAction({ crmCaseId, learningMode, saleNotes, trialDate });
+      const result = await action({ crmCaseId, learningMode, saleNotes, trialDate });
       setActionState(result);
       if (result.status === "success") { setIsOpen(false); setTrialDate(""); setSaleNotes(""); router.refresh(); }
     });
   };
   return <>
-    <Button onClick={() => { setActionState(null); setIsOpen(true); }} ref={triggerRef} size="sm" variant="outline">Đặt lịch học thử</Button>
+    <Button onClick={() => { setActionState(null); setIsOpen(true); }} ref={triggerRef} size="sm" variant="secondary">Đặt lịch học thử</Button>
     <Dialog ariaDescribedBy="crm-trial-dialog-description" ariaLabelledBy="crm-trial-dialog-title" className="max-w-md" isOpen={isOpen} onClose={close} returnFocusRef={triggerRef}>
       <div className="grid gap-5 p-5 sm:p-6"><div><h2 className="text-section-title font-semibold text-text-strong" id="crm-trial-dialog-title">Đặt lịch học thử</h2><p className="mt-1 text-secondary text-text-muted" id="crm-trial-dialog-description">Lịch học thử không ảnh hưởng tới bảng điểm danh chính thức của lớp.</p></div>
         {actionState?.status === "error" ? <ResultBanner title={actionState.message} tone="error" /> : null}

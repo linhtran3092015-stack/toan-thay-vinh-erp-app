@@ -7,6 +7,7 @@ import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { recordTrialResultAction } from "@/features/crm/actions/crm-actions";
+import type { CrmActionOverrides } from "@/features/crm/crm-action-overrides";
 import type { CrmActionResultState } from "@/features/crm/forms/crm-action-types";
 
 type TrialResult = "attended" | "no_show" | "cancelled";
@@ -18,10 +19,12 @@ const textareaClassName =
 
 /** Records attended / no-show / cancelled for a scheduled trial booking. */
 export function CrmTrialResultDialog({
+  action = recordTrialResultAction,
   bookingId,
   crmCaseId,
   trialDateLabel,
 }: {
+  action?: CrmActionOverrides["recordTrialResult"];
   bookingId: string;
   crmCaseId: string;
   trialDateLabel: string;
@@ -45,7 +48,7 @@ export function CrmTrialResultDialog({
     if (isPending) return;
     setState(null);
     startTransition(async () => {
-      const outcome = await recordTrialResultAction({ bookingId, crmCaseId, result, saleNotes, teacherFeedback });
+      const outcome = await action({ bookingId, crmCaseId, result, saleNotes, teacherFeedback });
       setState(outcome);
       if (outcome.status === "success") {
         setIsOpen(false);

@@ -7,13 +7,14 @@ import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { transferLeadAction } from "@/features/crm/actions/crm-actions";
+import type { CrmActionOverrides } from "@/features/crm/crm-action-overrides";
 import type { CrmActionResultState } from "@/features/crm/forms/crm-action-types";
 import type { SaleOwnerOption } from "@/features/crm/read-models";
 
-interface CrmLeadTransferDialogProps { crmCaseId: string; currentSaleOwnerId: string | null; saleOwners: SaleOwnerOption[]; }
+interface CrmLeadTransferDialogProps { action?: CrmActionOverrides["transferLead"]; crmCaseId: string; currentSaleOwnerId: string | null; saleOwners: SaleOwnerOption[]; }
 const fieldClassName = "h-10 w-full rounded-md border border-border-subtle bg-field-bg px-3 text-body text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring";
 
-export function CrmLeadTransferDialog({ crmCaseId, currentSaleOwnerId, saleOwners }: CrmLeadTransferDialogProps) {
+export function CrmLeadTransferDialog({ action = transferLeadAction, crmCaseId, currentSaleOwnerId, saleOwners }: CrmLeadTransferDialogProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [newSaleOwnerId, setNewSaleOwnerId] = useState("");
@@ -28,14 +29,14 @@ export function CrmLeadTransferDialog({ crmCaseId, currentSaleOwnerId, saleOwner
     if (isPending) return;
     setActionState(null);
     startTransition(async () => {
-      const result = await transferLeadAction({ crmCaseId, newSaleOwnerId, reason });
+      const result = await action({ crmCaseId, newSaleOwnerId, reason });
       setActionState(result);
       if (result.status === "success") { setIsOpen(false); setReason(""); setNewSaleOwnerId(""); router.refresh(); }
     });
   };
   const eligibleOwners = saleOwners.filter((sale) => sale.id !== currentSaleOwnerId);
   return <>
-    <Button onClick={() => { setActionState(null); setIsOpen(true); }} ref={triggerRef} size="sm" variant="outline">Chuyển giao Lead</Button>
+    <Button onClick={() => { setActionState(null); setIsOpen(true); }} ref={triggerRef} variant="secondary">Chuyển giao Lead</Button>
     <Dialog ariaDescribedBy="crm-transfer-dialog-description" ariaLabelledBy="crm-transfer-dialog-title" className="max-w-md" isOpen={isOpen} onClose={close} returnFocusRef={triggerRef}>
       <div className="grid gap-5 p-5 sm:p-6"><div><h2 className="text-section-title font-semibold text-text-strong" id="crm-transfer-dialog-title">Xác nhận chuyển giao Lead</h2><p className="mt-1 text-secondary text-text-muted" id="crm-transfer-dialog-description">Lịch sử chuyển giao lead sẽ được lưu vết theo quy trình hiện có.</p></div>
         {actionState?.status === "error" ? <ResultBanner title={actionState.message} tone="error" /> : null}

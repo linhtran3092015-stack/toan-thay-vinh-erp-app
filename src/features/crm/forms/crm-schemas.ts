@@ -68,7 +68,8 @@ export const convertStudentSchema = z.object({
   classId: z.string().uuid("Vui lòng chọn lớp học chính thức."),
   crmCaseId: z.string().uuid("Mã case CRM không hợp lệ."),
   officialStartDate: z.string().min(1, "Vui lòng chọn ngày học chính thức."),
-  registeredMode: z.enum(["online", "offline", "hybrid"]),
+  // convert_crm_case_to_official_student raises REGISTERED_MODE_INVALID for anything else.
+  registeredMode: z.enum(["online", "offline"]),
 });
 
 export const recordTrialResultSchema = z.object({
