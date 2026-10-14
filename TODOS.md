@@ -672,6 +672,68 @@
 **Priority:** P2
 **Depends on:** None
 
+## Tài chính · Kỳ thu
+
+### Học sinh học nhiều lớp trên trang kỳ thu
+
+**What:** Hiện đủ các lớp của học sinh trên dòng phiếu (từ dòng phiếu theo buổi) hoặc ghi rõ "lớp chính"; bộ lọc theo lớp tính cả lớp thứ hai.
+
+**Why:** Lúc khóa kỳ chỉ lưu tên lớp đầu tiên theo ngày học; lọc theo lớp bỏ sót học sinh ở lớp kia và tổng còn lại theo lớp bị thiếu.
+
+**Context:** `tuition-period-detail.tsx`; `lock_tuition_collection_period` gom tên lớp bằng array_agg theo session_date.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Gộp số liệu danh sách kỳ thu
+
+**What:** Tính tổng phải thu / đã thu / còn lại theo kỳ bằng một truy vấn tổng hợp (RPC hoặc view) thay vì đọc mọi phiếu của mọi kỳ đã khóa.
+
+**Why:** Số truy vấn và số dòng tăng theo số kỳ (khoảng 12 kỳ mỗi năm).
+
+**Context:** `getTuitionPeriodSummaries` trong `src/features/tuition/period-summary-data.ts`; cần migration.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Thứ tự phân trang khi đọc phiếu kỳ thu
+
+**What:** Sắp xếp theo `created_at, id` hoặc đọc lại phiếu bị phát hành lại trong lúc phân trang.
+
+**Why:** Phát hành lại đúng lúc đang đọc kỳ trên 1000 phiếu có thể làm dòng hiện "Đã hủy/hết hạn" thay vì phiếu thay thế (tạm thời).
+
+**Context:** `loadPeriodItems` trong `period-summary-data.ts`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Dùng chung phần dựng trang kỳ thu cho preview
+
+**What:** Tách view kỳ đã khóa / kỳ nháp thành component client-safe dùng chung cho trang thật và `/dev/tuition`.
+
+**Why:** Preview đang chép lại cách trang dựng stepper và số liệu, dễ lệch khi trang đổi.
+
+**Context:** `src/app/dev/tuition/tuition-preview.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Hai lần render sau khi khóa kỳ trên trang chi tiết
+
+**What:** Hiện thông báo khóa thành công mà không cần `router.replace(?locked=1)` sau `revalidatePath`.
+
+**Why:** Khóa kỳ làm trang render phía server hai lần (đọc lại toàn bộ phiếu).
+
+**Context:** `TuitionPeriodPageLockPanel`; một lần mỗi kỳ nên chấp nhận được.
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** None
+
 ## Trang chủ
 
 ### Kiểm tra quyền `classes.view` của trợ giảng trên production

@@ -2,6 +2,29 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.11.0.0] - 2026-10-14
+
+Kỳ thu học phí dựng lại theo phong cách Stumana (bước 7, đợt 1): danh sách kỳ thu có số tiền từng kỳ, trang chi tiết kỳ có thanh tiến trình 4 bước và bảng phiếu lọc theo trạng thái thanh toán.
+
+### Added
+- **Danh sách kỳ thu** (`/finance/tuition-periods`) dạng bảng (thẻ trên điện thoại): hạn thu, số học sinh, phải thu, đã thu, còn lại và trạng thái của từng kỳ. Ngoài "Nháp" và "Đã khóa", mỗi kỳ có thêm mô tả: "thu N%", "Quá hạn · N HS", "Hoàn tất" (chỉ khi đã thu được tiền), "Không còn yêu cầu hiệu lực", hoặc "Chưa rõ N yêu cầu" khi có phiếu chưa đọc được yêu cầu thanh toán. Số còn nợ sau hạn ghi chữ "quá hạn", không chỉ tô màu.
+- **Tạo kỳ thu trong hộp thoại**; khi máy chủ báo lỗi, các ô vừa nhập vẫn được giữ. Nút "Mẫu thông báo" chỉ hiện với người được sửa mẫu phiếu.
+- **Trang chi tiết kỳ** có thanh 4 bước: Nháp, Khóa kỳ (tạo yêu cầu thanh toán), Phiếu học phí, Thu & đối soát. Kỳ đã khóa có dải số liệu (phải thu, đã thu, còn lại, quá hạn), chip lọc theo đúng nhãn thanh toán (Đã thanh toán, Thanh toán một phần, Chờ thanh toán, Đã hủy/hết hạn), bộ lọc theo lớp và bảng phiếu có liên kết tới từng phiếu. Nút chính "Đối soát giao dịch SePay" chỉ hiện khi còn tiền phải thu và người xem có quyền SePay.
+- **Khóa kỳ** nằm trong khung kiểm tra điều kiện: nêu rõ điều kiện nào chưa đạt và vì sao nút bị khóa. Sau khi khóa thành công, thông báo hiện ngay cạnh chỗ bấm và không lặp lại khi tải lại trang.
+- Người không có quyền xem thanh toán vẫn thấy số phải thu theo phiếu; cột đã thu và còn lại hiện "—" kèm lý do.
+- Trang xem trước `/dev/tuition?view=list|draft|locked&role=owner|accountant&state=normal|empty|errors|ready` (trả 404 trên production, không ghi dữ liệu).
+
+### Changed
+- Dashboard trang chủ tính tiến độ kỳ thu theo cùng quy tắc với trang kỳ thu: bỏ cả yêu cầu đã hủy lẫn đã hết hạn.
+- In phiếu học phí chỉ lấy phiếu hiện hành; học sinh có phiếu phát hành lại không còn in kèm phiếu cũ và QR cũ.
+- Hai nút "Lưu …" hàng loạt trong bảng chuẩn bị kỳ nháp là nút phụ; nút chính duy nhất của trang nháp là khóa kỳ.
+- Lỗi tải kỳ thu hiện thành lỗi, không còn thành "Không tìm thấy kỳ thu" hay "Chưa có học sinh".
+
+### Lưu ý triển khai
+- Không có migration.
+- Danh sách kỳ thu đọc phiếu và yêu cầu thanh toán của mọi kỳ đã khóa mỗi lần mở trang; sẽ gộp bằng truy vấn tổng hợp khi số kỳ tăng.
+- Học sinh học nhiều lớp chỉ hiện tên lớp đầu tiên (theo dữ liệu chốt khi khóa kỳ); lọc theo lớp có thể bỏ sót em đó ở lớp thứ hai.
+
 ## [0.10.0.0] - 2026-10-14
 
 Trang chủ dựng lại theo phong cách Stumana (bước 6): mở app là thấy ngay hôm nay có gì, việc gì còn tồn và ai cần làm gì, theo đúng quyền của từng người.
