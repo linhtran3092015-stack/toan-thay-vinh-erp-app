@@ -3,17 +3,24 @@ import { PayslipEmployeeCard } from "@/features/payroll/payslip/components/paysl
 import { PayslipHeader } from "@/features/payroll/payslip/components/payslip-header";
 import { PayslipLineTables } from "@/features/payroll/payslip/components/payslip-line-tables";
 import { PayslipNotesFooter } from "@/features/payroll/payslip/components/payslip-notes-footer";
-import { PayslipSummaryCard } from "@/features/payroll/payslip/components/payslip-summary-card";
-import { PayslipSummaryFormula } from "@/features/payroll/payslip/components/payslip-summary-formula";
 import type { PayslipDocumentData } from "@/features/payroll/payslip/types";
 
+/**
+ * Payslip card (design 8b): header, employee/period/masked bank, earnings,
+ * deductions, "Thực nhận" with the amount in words, calculation evidence, then
+ * notes and the recipient signature. Dropped for lack of data: payslip code,
+ * personal income tax line, paid-transfer line, reconciler/approver names and
+ * the Zalo send action.
+ */
 export function PayslipDocument({ data }: { data: PayslipDocumentData }) {
   const isDraft = data.period.status === "draft";
+  const hasBreakdowns =
+    data.breakdowns.workHours.length > 0 || data.breakdowns.grading !== null || data.breakdowns.commissions.length > 0;
 
   return (
     <article
       aria-label={`Phiếu lương ${data.employee.displayName} - ${data.period.periodMonthFormatted}`}
-      className="relative mx-auto my-6 max-w-[210mm] overflow-hidden rounded-2xl border border-border-subtle bg-surface-base p-6 shadow-sm print:my-0 print:max-w-none print:rounded-none print:border-none print:p-0 print:shadow-none sm:p-8"
+      className="relative mx-auto max-w-[210mm] overflow-hidden rounded-lg border border-border-subtle bg-surface-base p-5 shadow-[var(--panel-shadow)] print:my-0 print:max-w-none print:rounded-none print:border-none print:p-0 print:shadow-none sm:p-8"
     >
       {/* Draft Watermark */}
       {isDraft ? (
@@ -27,30 +34,28 @@ export function PayslipDocument({ data }: { data: PayslipDocumentData }) {
         </div>
       ) : null}
 
-      <div className="relative z-10 space-y-6">
-        {/* Header */}
+      <div className="relative z-10 grid gap-5">
         <PayslipHeader period={data.period} />
 
-        {/* Top 2 Cards: Employee Info & Income Overview */}
-        <div className="grid gap-5 md:grid-cols-2">
-          <PayslipEmployeeCard employee={data.employee} />
-          <PayslipSummaryCard totals={data.totals} />
-        </div>
+        <PayslipEmployeeCard employee={data.employee} period={data.period} />
 
-        {/* Tables: Earnings & Deductions */}
         <PayslipLineTables
           deductions={data.deductions}
           earnings={data.earnings}
           totals={data.totals}
         />
 
-        {/* Extra Breakdowns (Only rendered if present) */}
-        <details className="rounded-xl border border-border-subtle p-4 print:hidden"><summary className="cursor-pointer font-semibold text-action-primary">Xem căn cứ tính công, chấm bài & hoa hồng</summary><div className="mt-4"><PayslipBreakdowns breakdowns={data.breakdowns} /></div></details>
+        {hasBreakdowns ? (
+          <details className="rounded-lg border border-border-subtle px-4 py-3 print:hidden">
+            <summary className="flex min-h-11 cursor-pointer items-center text-secondary font-semibold text-text-strong">
+              Xem căn cứ tính công, chấm bài & hoa hồng
+            </summary>
+            <div className="mt-3">
+              <PayslipBreakdowns breakdowns={data.breakdowns} />
+            </div>
+          </details>
+        ) : null}
 
-        {/* Highlight Equation Formula Bar */}
-        <PayslipSummaryFormula totals={data.totals} />
-
-        {/* Notes & Footer */}
         <PayslipNotesFooter
           employee={data.employee}
           period={data.period}

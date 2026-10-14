@@ -1,50 +1,59 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { ArrowLeft, Download, Printer } from "lucide-react";
 import Link from "next/link";
 
+import { Button, getButtonClassName } from "@/components/ui/button";
+
 export function PayslipToolbar({
   pdfDownloadUrl,
+  pdfUnavailableReason,
 }: {
   pdfDownloadUrl: string;
+  /** When set, the PDF action is disabled and this reason is shown under it. */
+  pdfUnavailableReason?: string;
 }) {
   const handlePrint = () => {
     window.print();
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle bg-surface-base px-4 py-3 print:hidden sm:px-6">
-      {/* Back button */}
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border-subtle bg-surface-base px-4 py-3 print:hidden sm:px-6">
       <Link
-        className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-text-default hover:bg-surface-raised active:bg-interactive-pressed"
+        className={getButtonClassName({ className: "max-md:h-11", size: "sm", variant: "ghost" })}
         href="/payroll"
       >
         <ArrowLeft aria-hidden="true" className="h-4 w-4" />
         <span>Quay lại bảng lương</span>
       </Link>
 
-      {/* Action buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-start gap-2">
         <Button
-          className="whitespace-nowrap active:bg-interactive-pressed"
+          className="max-md:h-11"
           onClick={handlePrint}
           size="sm"
           type="button"
-          variant="outline"
+          variant="secondary"
         >
           <Printer aria-hidden="true" className="h-4 w-4" />
           <span>In phiếu lương</span>
         </Button>
 
-        <a
-          className="inline-flex items-center gap-1.5 rounded-md bg-action-primary px-3 py-2 text-xs font-semibold text-white shadow-xs hover:bg-action-primary-hover active:bg-interactive-pressed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-          download
-          href={pdfDownloadUrl}
-        >
-          <Download aria-hidden="true" className="h-4 w-4" />
-          <span>Xuất PDF</span>
-        </a>
+        {pdfUnavailableReason ? (
+          <Button className="max-md:h-11" disabled disabledReason={pdfUnavailableReason} size="sm" type="button" variant="primary">
+            <Download aria-hidden="true" className="h-4 w-4" />
+            <span>Xuất PDF</span>
+          </Button>
+        ) : (
+          <a
+            className={getButtonClassName({ className: "max-md:h-11", size: "sm", variant: "primary" })}
+            download
+            href={pdfDownloadUrl}
+          >
+            <Download aria-hidden="true" className="h-4 w-4" />
+            <span>Xuất PDF</span>
+          </a>
+        )}
       </div>
     </div>
   );
