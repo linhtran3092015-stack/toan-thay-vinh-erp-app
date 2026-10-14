@@ -10,6 +10,22 @@ import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
 
 describe("shared presentation states", () => {
+  // Value: protects=the success tone of EmptyState (used for "Tất cả giao dịch đã khớp") paints its icon tile in the success family while the title still carries the meaning, and the default tone stays primary-soft;
+  // fails_when=tone is ignored, success reuses the primary tile, or the default tone changes for existing empty states;
+  // why_new=step 7 part 2 added the tone prop and only titles were asserted; seam=classes stand in for colour (jsdom has no CSS); no_claim=contrast of the success tokens
+  it("paints the success tone on the icon tile and keeps the default tone primary", () => {
+    const { container, rerender, unmount } = render(<EmptyState description="Không còn giao dịch." title="Tất cả giao dịch đã khớp" tone="success" />);
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.firstElementChild).toHaveClass("bg-success-bg", "text-success");
+    expect(root.firstElementChild).not.toHaveClass("bg-action-primary-soft");
+    expect(screen.getByRole("heading", { name: "Tất cả giao dịch đã khớp" })).toBeVisible();
+
+    rerender(<EmptyState description="Chưa có học viên." title="Danh sách trống" />);
+    expect(root.firstElementChild).toHaveClass("bg-action-primary-soft", "text-action-primary");
+    expect(root.firstElementChild).not.toHaveClass("bg-success-bg");
+    unmount();
+  });
+
   it("renders loading, empty, error, permission, and result feedback with accessible text", () => {
     const { rerender } = render(<LoadingState title="Đang tải học viên" />);
     expect(screen.getByRole("status")).toHaveTextContent("Đang tải học viên");
