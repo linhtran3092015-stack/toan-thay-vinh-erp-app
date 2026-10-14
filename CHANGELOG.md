@@ -2,6 +2,34 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.16.0.0] - 2026-10-15
+
+Chăm sóc học sinh dựng lại theo phong cách Stumana (bước 11a): hàng đợi công việc chăm sóc và trang chi tiết công việc. Mỗi dòng chỉ có một nút, mỗi trang chỉ một nút chính, và bấm thử lại sau lỗi mạng không tạo bản ghi trùng.
+
+### Added
+- **Đầu trang `/student-care`** ghi "Tháng MM/YYYY · n cảnh báo đang mở · n chưa giao · n quá hạn · Coaching tháng a/b hoàn thành". Người có quyền cấu hình có nút "Cấu hình bộ tự sinh", mở hộp thoại bật/tạm dừng bộ tự sinh.
+- **Dải trạng thái bộ tự sinh**: đang bật hay tạm dừng, lần chạy thành công gần nhất kèm "n phút trước", "hàng đợi n (m đang thử lại)", lần đối soát và lỗi gần nhất. Khi bộ sinh chậm, lỗi hoặc tạm dừng, dải đổi màu và ghi bằng chữ rằng "không có cảnh báo" chưa có nghĩa là học sinh ổn.
+- **Ba tab**: Công việc · Phân công lâu dài · Theo dõi riêng.
+- **Chip lọc nhanh** trên tab Công việc: Tất cả · Cảnh báo sớm · Coaching tháng · Theo dõi tiếp · Chưa giao · Quá hạn · Của tôi. Chip chỉ hiện số khi bảng tổng hợp có số đó; chip số 0 vẫn bấm được vì số đếm theo tháng có thể trễ.
+- **Bảng công việc**: Học sinh (mã · tình trạng học) · Dấu hiệu kèm bằng chứng (ngày vắng, điểm "5,5 · 4,0") · Phát hiện · Hạn liên hệ (ghi "Quá hạn n giờ/ngày" bằng chữ) · Người xử lý · Trạng thái. Mỗi dòng đúng một nút: "Nhận việc" khi việc chưa ai nhận và bạn có quyền xử lý, còn lại là "Mở". Trên điện thoại bảng thành danh sách thẻ với cùng một nút.
+- Chân bảng ghi "a–b trong N task" kèm phân trang. Mở một trang vượt quá trang cuối sẽ báo "Trang này không còn công việc" kèm link về trang 1, thay vì báo hàng đợi trống.
+- **Trang chi tiết công việc** `/student-care/[id]`: tiêu đề là tên học sinh và dấu hiệu, có huy hiệu trạng thái và dòng ngữ cảnh (loại việc · ngày phát hiện · người xử lý kèm "nhận …" hoặc "được giao …" · hạn liên hệ · phiên bản). Có nút "Giao cho người khác", link "Hồ sơ học sinh", và nút chính "Nhận việc" khi bạn nhận được việc này.
+- Thẻ **Bằng chứng** dạng bảng Ngày / Buổi (link tới buổi học) / Điểm danh / Điểm, với huy hiệu "hiện hành" hoặc "bằng chứng đã thay đổi".
+- Form **Ghi nhận liên hệ** chọn Kênh, Người nhận, Kết quả liên hệ bằng nút bấm (dùng được bằng bàn phím, lựa chọn có dấu tích), cùng các ô Điểm mạnh, Khó khăn, Kế hoạch, Kết quả, Ghi chú và Hẹn liên hệ tiếp.
+- Thẻ **Hoàn thành công việc**: chọn lần trao đổi và ghi kết luận. "Ghi nhận hoàn thành" chỉ bật khi đã có ít nhất một lần "đã trao đổi thực chất", và ghi rõ lý do khi chưa bật. Cạnh đó là "Tạo / gắn phiếu Coaching…", "Đổi lịch hẹn…" và "Ngoại lệ · hủy task…" (bắt buộc ghi lý do; ngoại lệ không tính là Coaching hoàn thành).
+- **Dòng thời gian** của công việc (mới nhất ở trên) và danh sách phiếu Coaching liên quan.
+- Trang xem trước `/dev/student-care?view=list|detail&state=normal|stale|paused|empty|error&role=handler|manager|owner` (trả 404 trên production, mọi nút đều không ghi dữ liệu).
+
+### Changed
+- Mọi thao tác ghi (nhận, giao, liên hệ, hoàn thành, ngoại lệ, tạo theo dõi riêng, cấu hình) chỉ hiện với người có quyền xử lý chăm sóc học sinh, khớp với kiểm tra phía máy chủ. Việc chưa ai nhận không cho ghi liên hệ, hoàn thành hay ngoại lệ; trang ghi rõ cần nhận hoặc giao việc trước.
+- Ô tìm kiếm cập nhật sau 300 ms hoặc khi nhấn Enter, không mất chữ khi gõ nhanh và không kéo bạn về tab cũ. Ô tháng chỉ áp dụng khi đã nhập đủ tháng và năm.
+- Hộp thoại không đóng được khi đang lưu. Lỗi hoặc kết quả chưa chắc chắn vẫn hiện dưới nút mở hộp thoại, kể cả sau khi đóng rồi mở lại. Kết quả nhận việc, hoàn thành và ngoại lệ hiện ngay dưới đầu trang.
+- Lưu xong không còn tải lại trang lần thứ hai: phản hồi của máy chủ đã mang theo giao diện mới.
+- Hai màn hình này dùng chữ "học sinh" thay cho "học viên".
+
+### Fixed
+- Bấm thử lại sau lỗi mạng hoặc kết quả chưa rõ luôn gửi lại đúng yêu cầu cũ, kể cả khi trang vừa tự làm mới, nên không tạo trùng lần liên hệ, phiếu Coaching hay việc theo dõi riêng. Chỉ khi máy chủ báo công việc đã bị người khác cập nhật thì lần gửi sau mới là yêu cầu mới.
+
 ## [0.15.0.1] - 2026-10-15
 
 ### Fixed

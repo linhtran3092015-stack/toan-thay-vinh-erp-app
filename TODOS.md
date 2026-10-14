@@ -1176,6 +1176,140 @@
 **Priority:** P3
 **Depends on:** None
 
+## Chăm sóc học sinh
+
+### "Nhận việc" trên hàng đợi không báo kết quả và làm mất focus
+
+**What:** Giữ kết quả nhận việc thành công của hàng đợi ở ngoài dòng (banner trạng thái dưới đầu trang `/student-care`, có thể focus), hoặc chuyển focus sang link "Mở" mới của dòng. Sửa luôn chú thích "the result stays right under the button" trong `CareActionForm`.
+
+**Why:** Nhận việc thành công thì dòng render lại với link "Mở", form nhận việc và dòng `role=status` biến mất, focus rơi về `body`. Người dùng bàn phím và trình đọc màn hình không biết đã nhận được chưa; khi đang lọc "Chưa giao", dòng biến mất hẳn mà không có xác nhận nào. Trang chi tiết đã xử lý đúng trường hợp này (banner dưới đầu trang).
+
+**Context:** `src/features/student-care/components/care-task-table.tsx:128` (RowAction, `trailing` ở dòng 208), `care-queue-view.tsx`, mẫu cần theo: `care-detail-view.tsx` (`keepSuccess`). Phát hiện ở review ràng buộc bước 11a (đã xác minh).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Banner kết quả trên trang công việc không hiện vòng focus
+
+**What:** Bỏ `outline-none` hoặc dùng `focus-visible:outline-solid` cho khung banner nhận focus sau nhận việc / hoàn thành / ngoại lệ.
+
+**Why:** Trong Tailwind v4, `outline-none` đặt `--tw-outline-style: none` còn `focus-visible:outline-2` chỉ đọc biến đó, nên vòng focus không bao giờ hiện. Người dùng bàn phím không thấy focus đang ở đâu.
+
+**Context:** `src/features/student-care/components/care-detail-view.tsx:140`.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Danh sách thẻ trên điện thoại: nút 32px và kết quả nhận việc làm hẹp thẻ
+
+**What:** Dưới danh sách thẻ dùng `Pagination variant="standalone"` (44px trên điện thoại) và cho nút "Nhận việc" chiều cao chạm 44px; đưa form nhận việc ra khỏi khe `trailing` (hoặc giới hạn độ rộng dòng kết quả) để thông báo lỗi không ép thẻ bên cạnh về gần 0.
+
+**Why:** DESIGN.md yêu cầu vùng chạm 44px trên điện thoại; hiện nút Trước/số trang/Sau và "Nhận việc" đều 32px. Khe `trailing` là cột `shrink-0`, nên một thông báo từ chối dài làm thẻ học sinh co lại.
+
+**Context:** `care-task-table.tsx:88,130,208`, `care-students-table.tsx:95`, `care-queue-nav.tsx:68` (CarePager luôn `variant="frame"`), `src/components/patterns/pagination.tsx`.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Màu huy hiệu và dải bộ tự sinh lệch design 13a
+
+**What:** Theo markup 13a: "Đang theo dõi" dùng tone info (như "Đang xử lý"), "Chưa giao" dùng warning (kèm nền ấm cho dòng quá hạn chưa giao), "bằng chứng đã thay đổi" dùng neutral, dải bộ tự sinh khỏe dùng nền success. Quyết định lại tone của bộ tự sinh "tạm dừng" (hiện là danger, DESIGN.md dành danger cho lỗi). Tên học sinh trong hai bảng dùng `text-text-strong!` vì `a { color: inherit }` không lớp trong globals.css thắng utility.
+
+**Why:** Mọi việc theo dõi định kỳ đang mang huy hiệu cảnh báo màu cam; việc chưa giao lại xám như "Chưa bắt đầu" nên không nổi bật; tên học sinh hiện màu chữ thường thay vì chữ đậm nhất. Chú thích trong code còn ghi sai là theo 13a.
+
+**Context:** `src/features/student-care/student-care-presentation.ts:38` (`careStatusTones`, test `tests/unit/student-care-presentation.test.ts:69` đang khóa tone cũ), `care-task-table.tsx:123,157`, `care-students-table.tsx`, `generator-status-bar.tsx:56`. Design: `13-cham-soc-va-coaching.dc.html` frame 13a.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Dải bộ tự sinh được đọc lại mỗi phút
+
+**What:** Chỉ để tiêu đề và câu "chưa có nghĩa là học sinh ổn" trong vùng `role=alert`; đưa giờ chạy gần nhất ra ngoài vùng live (hoặc `aria-hidden` như thời gian tương đối).
+
+**Why:** Worker chạy mỗi phút và cập nhật `last_success_at`, nên giờ hiển thị đổi mỗi phút và trình đọc màn hình đọc lại cả cảnh báo mỗi lần làm mới, dù thời gian tương đối đã được ẩn.
+
+**Context:** `src/features/student-care/components/generator-status-bar.tsx:89`; cron `run_student_care_worker` (`* * * * *`).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Số đếm trên chip và đầu trang không khớp danh sách
+
+**What:** Chip "Cảnh báo sớm" đếm cảnh báo đang mở nhưng khi bấm lại lọc mọi trạng thái: hoặc lọc thêm trạng thái đang mở, hoặc ghi "n đang mở". Đầu trang đặt "Tháng MM/YYYY" trước mọi con số dù chỉ Coaching tháng phụ thuộc tháng: tách phần theo tháng ra.
+
+**Why:** Người dùng bấm chip thấy nhiều dòng hơn con số, và đọc nhầm số cảnh báo/chưa giao/quá hạn là của tháng đang chọn.
+
+**Context:** `care-queue-filters.tsx:240` (`applyCareChip`), `care-queue-view.tsx:45`, `get_student_care_dashboard` (`supabase/migrations/20260917101000_student_care_workflows.sql`, khoảng dòng 174-180). Cần chốt với chủ sản phẩm.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Chữ trên trang công việc: nhãn dòng thời gian và lý do chỉ xem
+
+**What:** Đổi nhãn payload trong dòng thời gian "Tiến bộ:"/"Hướng hỗ trợ:" thành "Điểm mạnh:"/"Kế hoạch:" cho khớp form mới; sửa câu lý do chỉ xem bị lặp "phụ trách" khi người phụ trách không còn trong danh sách được giao.
+
+**Why:** Cùng một giá trị mang hai tên trên cùng một trang; câu lý do đọc thành "… phụ trách phụ trách".
+
+**Context:** `care-detail-sections.tsx:315` (`payloadLabels`), `care-detail-view.tsx:95`.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Khóa thử lại (request_id) phía trình duyệt
+
+**What:** (1) Trả mã lỗi từ `mutateCare` (hoặc thêm test quét nguồn) thay vì nhận STALE_VERSION bằng tiền tố câu tiếng Việt. (2) Mỗi dòng học sinh render hai lần (bảng và thẻ) nên hai bản giữ hai khóa riêng: dùng chung khóa theo học sinh. (3) Khóa không gồm `version` nên một lệnh cố ý giống hệt sau một lần "chưa rõ kết quả" sẽ bị coi là gửi lại. (4) Mở lại hộp thoại chưa điền lại giá trị đã gõ. (5) Thông báo STALE có thể gây hiểu nhầm sau chính lần ghi của mình.
+
+**Why:** Các lỗi biên hiếm của cơ chế chống ghi trùng; đổi câu thông báo trong `actions.ts` hiện sẽ âm thầm làm hỏng quy tắc thử lại.
+
+**Context:** `care-action-form.tsx:31,133`, `care-students-table.tsx:162`, `care-dialog-action.tsx`, `src/features/student-care/actions.ts:9`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Hiệu năng và bố cục hàng đợi
+
+**What:** Dòng được render hai lần (bảng + danh sách thẻ) kèm hộp thoại theo dòng; hai tab phân công gọi lại `get_student_care_dashboard` với search/page của danh sách học sinh rồi bỏ kết quả; thanh lọc dùng ngưỡng 1042px nên ở màn 1280–1345px bị thu thành nút "Bộ lọc"; kiểm lại bố cục banner kết quả ở đầu trang và vị trí thẻ "Hoàn thành công việc" (13b đặt ở cột chính); search debounce có thể đua với một điều hướng tab/trang đang chạy.
+
+**Why:** Chi phí render và RPC thừa; bố cục lệch design ở vài độ rộng.
+
+**Context:** `care-task-table.tsx`, `care-students-table.tsx`, `src/app/(app)/student-care/page.tsx:26`, `src/app/globals.css:660`, `care-detail-view.tsx:166`, `care-queue-filters.tsx`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Dọn code chăm sóc học sinh
+
+**What:** Gộp CSS trùng với khối `.crm-directory`; dùng `ui/field`, `ui/card` thay `CareCard`; chung helper URL với CRM và `URLSearchParams.get()` thay `toCareRouteSearchParams`; gộp wrapper record-list; bỏ `Partial` thừa ở `GeneratorInput`, re-export `GeneratorStatusBar` không ai dùng trong `components.tsx`, `careTime` không còn caller trong `models.ts`; `formatCareClock` dùng `toVietnamDate` của `src/lib/datetime.ts`; bỏ test trùng `dev-student-care-preview.test.tsx:69`.
+
+**Why:** Gợi ý review (advisory), không đổi hành vi.
+
+**Context:** `src/features/student-care/**`, `src/app/globals.css`, `src/features/crm/crm-directory-url-state.ts`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Test còn thiếu cho chăm sóc học sinh
+
+**What:** Test cho hai nhánh chặn của `/student-care/[taskId]` (lỗi tải quyền, thiếu `student_care.view`); test nửa còn lại của quyết định focus (form trên trang không kéo focus về); thông báo trang vượt cuối ở tab học sinh; sửa nhãn "REGRESSION (red at HEAD)" của 3 test vì file chưa tồn tại ở base.
+
+**Why:** Các nhánh này chưa có test nào giữ; nhãn hồi quy hiện không đúng sự thật.
+
+**Context:** `src/app/(app)/student-care/[taskId]/page.tsx:54`, `care-action-form.tsx:114`, `tests/components/student-care-redesign.test.tsx:342,538,890`, `tests/components/student-care-routes.test.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
 ## Completed
 
 ### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp
