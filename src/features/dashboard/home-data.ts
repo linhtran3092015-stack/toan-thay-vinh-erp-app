@@ -16,7 +16,7 @@ import {
   type AttendanceEntry,
   type RosterEntry,
 } from "@/features/classes/detail/class-detail-models";
-import { resolveReissueChains } from "@/features/classes/detail/class-tuition-data";
+import { resolveReissueChains } from "@/features/tuition/reissue-chains";
 import { getCachedCurrentAuthUser } from "@/features/auth/current-user";
 import {
   computeTuitionProgress,
@@ -426,7 +426,7 @@ async function loadTuitionProgress(supabase: SupabaseClient, today: string): Pro
   if (!items) return failedFeed;
 
   // A reissued item replaces the original: only the current one carries the live request.
-  const requests = resolveReissueChains(items.map((item) => ({ ...item, lines: null }))).flatMap(({ current }) => {
+  const requests = resolveReissueChains(items).flatMap(({ current }) => {
     const request = Array.isArray(current.payment_request) ? current.payment_request[0] ?? null : current.payment_request ?? null;
     return request ? [{ expectedVnd: Number(request.expected_amount_vnd), paidVnd: Number(request.paid_amount_vnd), status: request.status }] : [];
   });
