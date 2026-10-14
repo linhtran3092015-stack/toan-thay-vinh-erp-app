@@ -906,6 +906,92 @@
 **Priority:** P3
 **Depends on:** None
 
+## Bảng lương
+
+### Số liệu đầu trang Dashboard lương lệch với số tạm tính trực tiếp
+
+**What:** Lấy tiêu đề, nhãn trạng thái và dải số liệu từ cùng một nguồn với khối tạm tính trực tiếp (hoặc ghi rõ thời điểm chụp số liệu).
+
+**Why:** Đầu trang dùng snapshot máy chủ lúc tải trang, còn khối tạm tính tự làm mới mỗi 30 giây; sau vài lần làm mới hai chỗ có thể khác nhau.
+
+**Context:** `src/features/payroll/dashboard/overview-model.ts`, `owner-live-estimate-overview.tsx`. Cùng nhóm: hai lần làm mới chồng nhau có thể ghi đè kết quả mới bằng kết quả cũ (`use-payroll-live-estimate.ts`, đã có từ trước bước 8).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Số ca chờ xác minh ở Dashboard khác ở sổ lương theo ngày
+
+**What:** Thống nhất cách đếm ca chờ xác minh giữa RPC tổng hợp của chủ trung tâm và sổ lương từng nhân sự; đọc ca và dòng lương trong cùng một truy vấn để không bị lệch thời điểm.
+
+**Why:** Dashboard đếm bằng SQL, sổ lương đếm từ danh sách ca phía client; ca và dòng lương còn được đọc ở hai thời điểm khác nhau.
+
+**Context:** `get_owner_payroll_estimate`, `build_staff_payroll_estimate` (supabase/migrations), `src/features/payroll/estimate/daily-breakdown.ts`. Cần migration.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Tháng đã duyệt: các trường hợp sổ lương hiển thị chưa khớp phiếu
+
+**What:** Xử lý các trường hợp: tháng đã duyệt nhưng không có phiếu lương thì đang rơi về tạm tính; phút công đã chốt khác phút của ca hiện tại; kỳ cũ có dòng lương không gắn id ca nên ca chuyển sang chờ xác minh sau khi duyệt bị ghi "Chưa tính · chưa xác minh".
+
+**Why:** Người xem có thể thấy nhãn hoặc số phút không khớp số tiền đã chốt trên phiếu.
+
+**Context:** `daily-breakdown.ts` (nhánh `approved`, khoảng dòng 160), RPC ước tính lương. Một phần cần SQL.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Phút "đã tính tiền" và "công ghi nhận" chưa khớp phút đã trả
+
+**What:** Cộng phút của dòng lương công không đến từ ca chấm công (ví dụ dữ liệu chấm công nhập từ Excel) vào phút đã tính tiền; hoặc để RPC trả về số phút đã trả.
+
+**Why:** Những ngày có dòng lương từ dữ liệu nhập vẫn hiện tiền nhưng ghi "Chưa có phút công", và đầu sổ đếm thiếu phút đã tính tiền.
+
+**Context:** `daily-breakdown.ts` (cộng phút từ ca, cộng tiền từ mọi dòng công), `payroll-daily-breakdown-table.tsx`. Ngày chỉ có ca online còn hiện đơn giá "—".
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Phiếu lương: các điểm hiển thị còn lại
+
+**What:** "Thực nhận" âm nhưng số bằng chữ ghi "Không đồng chẵn"; loader tài khoản ngân hàng nuốt lỗi; `avatar_url` vẫn được truy vấn nhưng không dùng.
+
+**Why:** Số bằng chữ sai dấu dễ gây hiểu nhầm; lỗi tải tài khoản bị giấu thành "chưa có tài khoản".
+
+**Context:** `src/features/payroll/payslip/*`. Cả ba có từ trước bước 8.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Dashboard lương: các điểm giao diện còn lại
+
+**What:** Nút chính dẫn về `/payroll` thay vì mở đúng kỳ chờ duyệt; "Tổng cộng" bảng theo vị trí đếm nhân sự khác bảng nhân sự; tiêu đề "Phân tích" bọc các `h2` (cấp tiêu đề); số trong dải số liệu 28px (đang theo token DESIGN.md); người không có `finance.view` không thấy lý do vì sao dải số liệu thiếu "Thực thu sau hoàn"; chuyển sang tháng hiện tại bằng điều hướng client nên vẫn thấy số tháng cũ (rỗng) cho tới khi tải xong.
+
+**Why:** Mỗi điểm nhỏ, nhưng cộng lại làm Dashboard lương kém rõ ràng.
+
+**Context:** `overview-model.ts`, `payroll-position-summary-table.tsx`, `payroll-dashboard-page.tsx`, `owner-live-estimate-overview.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Realtime lương báo "đã kết nối" khi đăng ký kênh thất bại
+
+**What:** Thêm hậu tố riêng mỗi lần mount vào tên kênh realtime và báo `CHANNEL_ERROR` trong nhánh `catch`.
+
+**Why:** Mở lại nhanh hộp thoại của cùng nhân sự (hoặc StrictMode khi dev) có thể khiến đăng ký kênh ném lỗi; lỗi bị nuốt và huy hiệu vẫn ghi đã kết nối. Làm mới 30 giây che bớt vấn đề.
+
+**Context:** `src/features/payroll/estimate/use-payroll-live-estimate.ts` (transport mặc định). Có từ trước bước 8.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
 ## Completed
 
 ### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp
