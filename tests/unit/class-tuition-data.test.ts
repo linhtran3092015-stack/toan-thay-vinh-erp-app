@@ -15,9 +15,9 @@ import {
   getClassTuitionPeriod,
   getClassTuitionPeriods,
   getClassTuitionView,
-  resolveReissueChains,
 } from "@/features/classes/detail/class-tuition-data";
 import type { ClassTuitionPeriodOption } from "@/features/classes/detail/class-tuition-models";
+import { resolveReissueChains } from "@/features/tuition/reissue-chains";
 
 type Result = { data: unknown; error: unknown };
 type Call = [string, unknown[]];
