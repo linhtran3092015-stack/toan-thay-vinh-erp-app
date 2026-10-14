@@ -20,6 +20,7 @@ import {
   searchSepayReconciliationCandidatesAction,
 } from "@/features/finance/sepay-reconciliation-actions";
 import type { SepayTransactionReadModel } from "@/features/finance/read-models";
+import type { SepayActionOverrides } from "@/features/finance/sepay-action-overrides";
 import {
   getSepayAccountPurposePresentation,
   getSepayMatchPresentation,
@@ -42,7 +43,14 @@ export function isSepayTransactionReconcilable(
   );
 }
 
+export type SepayReconciliationActionOverrides = Pick<
+  SepayActionOverrides,
+  "matchHistorical" | "resolveHistorical" | "searchReconciliationCandidates"
+>;
+
 export interface SepayReconciliationDialogProps {
+  /** Replacements for the reconciliation server actions (dev preview only). */
+  actions?: SepayReconciliationActionOverrides;
   candidates?: SepayReconciliationCandidateView[];
   isOpen: boolean;
   onClose: () => void;
@@ -82,6 +90,7 @@ function getSourceLabel(source: SepayTransactionReadModel["ingestionSource"]): s
 }
 
 export function SepayReconciliationDialog({
+  actions,
   candidates = [],
   isOpen,
   onClose,
@@ -105,6 +114,7 @@ export function SepayReconciliationDialog({
       returnFocusRef={returnFocusRef}
     >
       <SepayReconciliationDialogContent
+        actions={actions}
         candidates={candidates}
         descriptionId={descriptionId}
         key={transaction.id}
@@ -117,6 +127,7 @@ export function SepayReconciliationDialog({
 }
 
 interface DialogContentProps {
+  actions?: SepayReconciliationActionOverrides;
   candidates: SepayReconciliationCandidateView[];
   descriptionId: string;
   onClose: () => void;
@@ -127,6 +138,7 @@ interface DialogContentProps {
 type ReconciliationActionType = "already_accounted" | "ignored" | "match" | null;
 
 function SepayReconciliationDialogContent({
+  actions,
   candidates,
   descriptionId,
   onClose,
@@ -134,6 +146,9 @@ function SepayReconciliationDialogContent({
   transaction,
 }: DialogContentProps) {
   const router = useRouter();
+  const matchHistorical = actions?.matchHistorical ?? matchSepayHistoricalTransactionAction;
+  const resolveHistorical = actions?.resolveHistorical ?? resolveSepayHistoricalTransactionAction;
+  const searchCandidates = actions?.searchReconciliationCandidates ?? searchSepayReconciliationCandidatesAction;
   const [isPending, startTransition] = useTransition();
   const [isSearching, startSearchTransition] = useTransition();
   const [activeAction, setActiveAction] = useState<ReconciliationActionType>(null);
@@ -222,7 +237,7 @@ function SepayReconciliationDialogContent({
 
     startSearchTransition(async () => {
       try {
-        const result = await searchSepayReconciliationCandidatesAction({
+        const result = await searchCandidates({
           query,
           transactionId: transaction.id,
         });
@@ -487,7 +502,7 @@ function SepayReconciliationDialogContent({
               isLoading={isPending && activeAction === "match"}
               onClick={() => {
                 if (!confirmPaymentMatch()) return;
-                executeAction("match", () => matchSepayHistoricalTransactionAction({
+                executeAction("match", () => matchHistorical({
                   paymentRequestId,
                   reason,
                   transactionId: transaction.id,
@@ -504,7 +519,7 @@ function SepayReconciliationDialogContent({
             isLoading={isPending && activeAction === "already_accounted"}
             onClick={() => {
               if (!confirmTerminalResolution("Đánh dấu đã hạch toán trước đây cho")) return;
-              executeAction("already_accounted", () => resolveSepayHistoricalTransactionAction({
+              executeAction("already_accounted", () => resolveHistorical({
                 reason,
                 resolution: "already_accounted",
                 transactionId: transaction.id,
@@ -521,7 +536,7 @@ function SepayReconciliationDialogContent({
             isLoading={isPending && activeAction === "ignored"}
             onClick={() => {
               if (!confirmTerminalResolution("Bỏ qua")) return;
-              executeAction("ignored", () => resolveSepayHistoricalTransactionAction({
+              executeAction("ignored", () => resolveHistorical({
                 reason,
                 resolution: "ignored",
                 transactionId: transaction.id,

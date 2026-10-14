@@ -1,29 +1,25 @@
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getSepayAllocationSuggestionsResult } from "@/features/finance/allocation-suggestions-data";
-import { SepayAllocationSuggestions } from "@/features/finance/components/sepay-allocation-suggestions";
-import { SepayTransactionHistory } from "@/features/finance/components/sepay-transaction-history";
 import { SepayHistorySyncPanel, type SepaySyncAccountView, type SepaySyncRunView } from "@/features/finance/components/sepay-history-sync-panel";
+import { SepayTransactionsScreen, type SepayReceivingAccountSummary } from "@/features/finance/components/sepay-transactions-screen";
 import { getSepayReconciliationCandidatesResult, getSepayTransactionsResult } from "@/features/finance/data";
 import type { SepayReconciliationCandidateReadModel } from "@/features/finance/read-models";
+import { getSepayScreenAccess } from "@/features/finance/sepay-access";
 import { parseSepayAccountPurposeFilter, parseSepayQueueFilter } from "@/features/finance/sepay-transaction-url-state";
+import { addDays, getVietnamToday } from "@/lib/datetime";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface SepayTransactionsPageProps {
-  searchParams: Promise<{ accountPurpose?: string | string[]; page?: string | string[]; queue?: string | string[] }>;
-}
-
-function getVietnamDate(offsetDays = 0): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: "Asia/Ho_Chi_Minh",
-    year: "numeric",
-  }).formatToParts(new Date(Date.now() + offsetDays * 86_400_000));
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${value.year}-${value.month}-${value.day}`;
+  searchParams: Promise<{
+    accountPurpose?: string | string[];
+    page?: string | string[];
+    queue?: string | string[];
+    // `status` (match-status chip) and `tx` (selection) are read client-side by
+    // SepayReviewWorkspace through useSearchParams; the loader does not use them.
+  }>;
 }
 
 export default async function SepayTransactionsPage({ searchParams }: SepayTransactionsPageProps) {
@@ -52,10 +48,7 @@ export default async function SepayTransactionsPage({ searchParams }: SepayTrans
   const queueFilter = parseSepayQueueFilter(params.queue);
   const requestedPage = typeof params.page === "string" ? Number(params.page) : 1;
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-  const canSyncHistory = permissionResult.permissions.includes("sepay.sync_history.manage");
-  const canReconcile = canSyncHistory
-    || permissionResult.permissions.includes("sepay.allocate")
-    || permissionResult.permissions.includes("payments.manage");
+  const { canAllocate, canReconcile, canReverse, canSyncHistory } = getSepayScreenAccess(permissionResult.permissions);
 
   const transactionsResult = await getSepayTransactionsResult(accountPurposeFilter, page, queueFilter);
   if (!transactionsResult.ok) {
@@ -66,8 +59,6 @@ export default async function SepayTransactionsPage({ searchParams }: SepayTrans
       />
     );
   }
-  const canAllocate = permissionResult.permissions.includes("sepay.allocate")
-    || permissionResult.permissions.includes("payments.manage");
   const [candidatesResult, suggestionsResult] = await Promise.all([
     canReconcile
       ? getSepayReconciliationCandidatesResult(transactionsResult.data.transactions)
@@ -76,42 +67,29 @@ export default async function SepayTransactionsPage({ searchParams }: SepayTrans
       ? getSepayAllocationSuggestionsResult()
       : Promise.resolve({ data: [], ok: true as const }),
   ]);
-  const suggestionsPanel = canAllocate ? (
-    suggestionsResult.ok ? (
-      <SepayAllocationSuggestions suggestions={suggestionsResult.data} />
-    ) : (
-      <ErrorState
-        description={suggestionsResult.error}
-        title="Không tải được gợi ý khớp giao dịch"
-      />
-    )
-  ) : null;
-
   let syncPanel = null;
+  let receivingAccounts: SepayReceivingAccountSummary[] | null = null;
   if (canSyncHistory) {
     const supabase = await createSupabaseServerClient();
-    const [{ data: accountRows, error: accountError }, { data: runRows, error: runError }] = await Promise.all([
+    // The receiving accounts feed the header on both tabs; the sync runs only feed the
+    // history sync panel, which lives on "Tất cả giao dịch".
+    const showSyncPanel = queueFilter !== "review";
+    const [{ data: accountRows, error: accountError }, runsResult] = await Promise.all([
       supabase
         .from("sepay_receiving_account_versions")
         .select("id,purpose,bank_code,account_number,effective_from,effective_to,sepay_bank_account_id")
         .eq("status", "active")
         .order("purpose")
         .order("effective_from", { ascending: false }),
-      supabase
-        .from("sepay_sync_runs")
-        .select("id,sync_session_id,account_version_id,date_from,date_to,status,total_seen,recorded_count,duplicate_count,manual_review_count,pages_processed,error_code,started_at")
-        .order("started_at", { ascending: false })
-        .limit(10),
+      showSyncPanel
+        ? supabase
+            .from("sepay_sync_runs")
+            .select("id,sync_session_id,account_version_id,date_from,date_to,status,total_seen,recorded_count,duplicate_count,manual_review_count,pages_processed,error_code,started_at")
+            .order("started_at", { ascending: false })
+            .limit(10)
+        : Promise.resolve({ data: [], error: null }),
     ]);
-    if (accountError || runError) {
-      syncPanel = (
-        <ErrorState
-          title="Không tải được cấu hình đồng bộ SePay"
-          description="Chưa tải được tài khoản nhận hoặc tiến độ đồng bộ. Vui lòng tải lại trang trước khi nhập lịch sử."
-        />
-      );
-    } else {
-    const accounts: SepaySyncAccountView[] = (accountRows ?? []).flatMap((account) => (
+    const accounts: SepaySyncAccountView[] = accountError ? [] : (accountRows ?? []).flatMap((account) => (
       account.purpose === "new_enrollment" || account.purpose === "renewal"
         ? [{
             accountNumber: account.account_number,
@@ -124,57 +102,75 @@ export default async function SepayTransactionsPage({ searchParams }: SepayTrans
           }]
         : []
     ));
-    const recentRuns: SepaySyncRunView[] = (runRows ?? []).flatMap((run) => (
-      run.status === "running" || run.status === "completed" || run.status === "failed"
-        ? [{
-            accountVersionId: run.account_version_id,
-            dateFrom: run.date_from,
-            dateTo: run.date_to,
-            duplicateCount: run.duplicate_count,
-            errorCode: run.error_code,
-            id: run.id,
-            manualReviewCount: run.manual_review_count,
-            pagesProcessed: run.pages_processed,
-            recordedCount: run.recorded_count,
-            startedAt: run.started_at,
-            status: run.status,
-            syncSessionId: run.sync_session_id,
-            totalSeen: run.total_seen,
-          }]
-        : []
-    ));
-    const yesterday = getVietnamDate(-1);
-    syncPanel = (
-      <SepayHistorySyncPanel
-        accounts={accounts}
-        defaultDateFrom={`${yesterday.slice(0, 8)}01`}
-        defaultDateTo={yesterday}
-        recentRuns={recentRuns}
-      />
-    );
+    if (!accountError) {
+      const today = getVietnamToday();
+      // Header context: the version in force today for each purpose (rows are newest first).
+      receivingAccounts = (["new_enrollment", "renewal"] as const).flatMap((purpose) => {
+        const current = accounts.find((account) => (
+          account.purpose === purpose
+          && account.effectiveFrom <= today
+          && (account.effectiveTo === null || account.effectiveTo >= today)
+        ));
+        return current ? [{ accountNumber: current.accountNumber, bankCode: current.bankCode, purpose }] : [];
+      });
+    }
+    if (showSyncPanel) {
+      if (accountError || runsResult.error) {
+        syncPanel = (
+          <ErrorState
+            title="Không tải được cấu hình đồng bộ SePay"
+            description="Chưa tải được tài khoản nhận hoặc tiến độ đồng bộ. Vui lòng tải lại trang trước khi nhập lịch sử."
+          />
+        );
+      } else {
+        const recentRuns: SepaySyncRunView[] = (runsResult.data ?? []).flatMap((run) => (
+          run.status === "running" || run.status === "completed" || run.status === "failed"
+            ? [{
+                accountVersionId: run.account_version_id,
+                dateFrom: run.date_from,
+                dateTo: run.date_to,
+                duplicateCount: run.duplicate_count,
+                errorCode: run.error_code,
+                id: run.id,
+                manualReviewCount: run.manual_review_count,
+                pagesProcessed: run.pages_processed,
+                recordedCount: run.recorded_count,
+                startedAt: run.started_at,
+                status: run.status,
+                syncSessionId: run.sync_session_id,
+                totalSeen: run.total_seen,
+              }]
+            : []
+        ));
+        const yesterday = addDays(getVietnamToday(), -1);
+        syncPanel = (
+          <SepayHistorySyncPanel
+            accounts={accounts}
+            defaultDateFrom={`${yesterday.slice(0, 8)}01`}
+            defaultDateTo={yesterday}
+            recentRuns={recentRuns}
+          />
+        );
+      }
     }
   }
 
   return (
-    <SepayTransactionHistory
+    <SepayTransactionsScreen
       accountPurposeFilter={accountPurposeFilter}
       candidates={candidatesResult.ok ? candidatesResult.data : []}
       canAllocate={canAllocate}
       canReconcile={canReconcile && candidatesResult.ok}
-      canReverse={permissionResult.permissions.includes("payments.manage")}
-      managementPanel={
-        suggestionsPanel || syncPanel ? (
-          <div className="grid gap-4">
-            {suggestionsPanel}
-            {syncPanel}
-          </div>
-        ) : null
-      }
+      canReverse={canReverse}
+      canSyncHistory={canSyncHistory}
       page={transactionsResult.data.page}
       pageSize={transactionsResult.data.pageSize}
       queueFilter={queueFilter}
-      reviewCount={transactionsResult.data.reviewCount}
+      receivingAccounts={receivingAccounts}
       reconciliationError={canReconcile && !candidatesResult.ok}
+      reviewCount={transactionsResult.data.reviewCount}
+      suggestions={canAllocate ? suggestionsResult : null}
+      syncPanel={syncPanel}
       total={transactionsResult.data.total}
       transactions={transactionsResult.data.transactions}
     />

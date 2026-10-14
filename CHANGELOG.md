@@ -2,6 +2,29 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.12.0.0] - 2026-10-14
+
+Đối soát SePay dựng lại theo phong cách Stumana (bước 7, đợt 2): giao dịch cần xử lý nằm trong một hàng đợi, bấm vào là thấy chi tiết và thao tác ngay bên cạnh.
+
+### Added
+- **Tab "Cần xử lý" và "Tất cả giao dịch"** trên `/finance/sepay`. "Cần xử lý" có số việc tồn và chip lọc theo trạng thái (Chưa khớp, Sai số tiền, Sai tài khoản nhận, Trùng nhận diện). Chip chỉ hiện khi cả hàng đợi nằm gọn một trang, nên số đếm luôn đúng.
+- **Hàng đợi và chi tiết** trên màn hình rộng: danh sách giao dịch bên trái (số tiền, giờ, nội dung chuyển khoản, trạng thái); bên phải là chi tiết giao dịch đang chọn, gợi ý khớp của chính giao dịch đó, và nút "Phân bổ học phí" / "Đối soát" dùng chung hộp thoại cũ. Giao dịch đang chọn và chip đang lọc được giữ trên địa chỉ trang. Xử lý xong một giao dịch thì trang báo rõ và chuyển sang giao dịch kế tiếp.
+- **Trên điện thoại**, mỗi thẻ giao dịch có sẵn nút thao tác và gợi ý khớp ("Có gợi ý: …") để xác nhận ngay.
+- Hàng đợi trống thì báo "Tất cả giao dịch đã khớp"; khi chỉ một tài khoản nhận hết việc, hoặc trang hiện tại trống mà hàng đợi vẫn còn, thì báo trung tính và có liên kết quay lại.
+- Giao dịch trùng nhận diện chưa đối soát được ở đây thì ghi lý do và việc cần làm, thay cho "Không cần thao tác". Người chỉ có quyền xem thấy lý do thay vì nút bị ẩn.
+- Đầu trang ghi tài khoản nhận đang hiệu lực hôm nay và giờ giao dịch mới nhất (khi có dữ liệu).
+- Trang xem trước `/dev/sepay?tab=review|all&role=owner|accountant&state=normal|empty|errors` (trả 404 trên production, mọi thao tác ghi là giả).
+
+### Changed
+- Giờ giao dịch trong bảng SePay luôn theo giờ Việt Nam, không phụ thuộc múi giờ của máy.
+- Chip lọc tài khoản nhận đang chọn dùng nền nhạt (không còn chữ tối trên nền xanh) và cao 44px trên điện thoại.
+- Xác nhận hàng loạt gợi ý tin cậy cao và panel đồng bộ lịch sử chỉ nằm ở tab "Tất cả giao dịch".
+- Mở `/finance/sepay` không kèm tham số vẫn ra danh sách đầy đủ như trước; liên kết `?queue=review` mở hàng đợi.
+
+### Lưu ý triển khai
+- Không có migration.
+- Thiết kế có các tab "Lệch số tiền", "Khớp tự động hôm nay", "Bỏ qua / hoàn tiền", trạng thái webhook, "Nhập sao kê thủ công" và bảng phân bổ ngay trong trang; ERP chưa có dữ liệu hoặc luồng cho những phần này nên chưa làm (trạng thái lệch được gộp thành chip trong "Cần xử lý").
+
 ## [0.11.0.0] - 2026-10-14
 
 Kỳ thu học phí dựng lại theo phong cách Stumana (bước 7, đợt 1): danh sách kỳ thu có số tiền từng kỳ, trang chi tiết kỳ có thanh tiến trình 4 bước và bảng phiếu lọc theo trạng thái thanh toán.

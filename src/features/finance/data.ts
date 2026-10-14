@@ -329,6 +329,8 @@ export async function getSepayTransactionsResult(
         { count: "exact" },
       )
       .order("transaction_at", { ascending: false })
+      // Stable tiebreaker: transfers in the same second keep their page across reloads.
+      .order("id", { ascending: false })
       .range(from, from + pageSize - 1);
 
     if (accountPurpose) {
@@ -346,8 +348,29 @@ export async function getSepayTransactionsResult(
         .in("match_status", [...SEPAY_REVIEW_MATCH_STATUSES])
         .eq("transfer_type", "in"),
     ]);
+    // A failed count is unknown, not zero: the screen hides the badge instead of showing 0.
+    const reviewCount = reviewResult.error ? null : (reviewResult.count ?? 0);
 
     if (error) {
+      // PGRST103: the offset is past the last row (a stale ?page= after the list shrank).
+      // Return an empty page with the real total so the screen can offer page 1.
+      if (error.code === "PGRST103") {
+        let countQuery = supabase
+          .from("sepay_transactions")
+          .select("id", { count: "exact", head: true });
+        if (accountPurpose) {
+          countQuery = countQuery.eq("account_purpose", accountPurpose);
+        }
+        if (queue === "review") {
+          countQuery = countQuery.in("match_status", [...SEPAY_REVIEW_MATCH_STATUSES]).eq("transfer_type", "in");
+        }
+        const countResult = await countQuery;
+        if (countResult.error) return { ok: false };
+        return {
+          data: { page: safePage, pageSize, reviewCount, total: countResult.count ?? 0, transactions: [] },
+          ok: true,
+        };
+      }
       return { ok: false };
     }
 
@@ -355,7 +378,7 @@ export async function getSepayTransactionsResult(
       data: {
         page: safePage,
         pageSize,
-        reviewCount: reviewResult.error ? 0 : (reviewResult.count ?? 0),
+        reviewCount,
         total: count ?? 0,
         transactions: (data ?? []).map((transaction) => toSepayTransactionReadModel(transaction)),
       },

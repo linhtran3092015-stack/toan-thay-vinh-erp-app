@@ -67,6 +67,14 @@ describe("SePay transaction history presentation", () => {
     expect(getSepayAccountPurposePresentation("unknown")).toEqual({ label: "Chưa xác định", tone: "warning" });
   });
 
+  // Value: protects=transaction times in the history table and card read in Vietnam time whatever the server or browser time zone;
+  // fails_when=the history formatter loses its Asia/Ho_Chi_Minh pin (UTC servers would print 03:00);
+  // why_new=review round 2 (the formatter was unpinned before); seam=none; no_claim=other SePay surfaces
+  it("shows transaction times in Vietnam time in the table and the card", () => {
+    render(<SepayTransactionHistory transactions={[transaction]} />);
+    expect(screen.getAllByText("10:00 10/08/2026")).toHaveLength(2);
+  });
+
   it("keeps the bank amount neutral and transfer content fully available as plain text", () => {
     render(<SepayTransactionHistory transactions={[transaction]} />);
 
@@ -110,6 +118,19 @@ describe("SePay transaction history presentation", () => {
     expect(container.querySelector(".sepay-transaction-directory-record-list")).not.toBeNull();
     expect(globals).toMatch(/\.sepay-transaction-operational-work-area\s*\{\s*container-type: inline-size/);
     expect(globals).toMatch(/@container \(min-width: 1120px\)[\s\S]*\.sepay-transaction-directory-table/);
+  });
+
+  // Value: protects=a stale ?page= past the last row on Tất cả giao dịch (the loader's PGRST103 fallback returns an empty page with the real total) says the page is empty and links to page 1, instead of claiming no transaction was ever recorded;
+  // fails_when=the history shows "Chưa có giao dịch SePay" while total > 0, or the way back loses accountPurpose;
+  // why_new=focused review of the adversarial fixes; seam=none; no_claim=the loader fallback (tests/unit/sepay-transactions-data.test.ts)
+  it("shows a stale-page panel with a way back to page 1 when only this page is empty", () => {
+    render(<SepayTransactionHistory accountPurposeFilter="renewal" page={3} total={60} transactions={[]} />);
+
+    expect(screen.getByRole("heading", { name: "Trang này không còn giao dịch." })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Về trang 1" })).toHaveAttribute("href", "/finance/sepay?accountPurpose=renewal");
+    expect(screen.queryByText("Chưa có giao dịch SePay")).not.toBeInTheDocument();
+    expect(screen.queryByText("Chưa có giao dịch SePay nào được ghi nhận.")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Trang trước" })).toHaveAttribute("href", "/finance/sepay?accountPurpose=renewal&page=2");
   });
 
   it("keeps the feature-owned empty state without creating controls", () => {

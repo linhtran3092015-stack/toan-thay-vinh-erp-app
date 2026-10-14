@@ -4,12 +4,15 @@ import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 
 import { DataTableFrame } from "@/components/patterns/data-table-frame";
-import { PageHeader } from "@/components/patterns/page-header";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { getButtonClassName } from "@/components/ui/button";
 import { getSepayDirectoryQuery, type SepayAccountPurposeFilter, type SepayQueueFilter } from "@/features/finance/sepay-transaction-url-state";
 import type { SepayTransactionReadModel } from "@/features/finance/read-models";
+import type { SepayActionOverrides } from "@/features/finance/sepay-action-overrides";
+import { formatDateTime } from "@/lib/datetime";
+import { formatVnd } from "@/lib/format";
 import { SepayReconciliationActions, type SepayReconciliationCandidateView } from "@/features/finance/components/sepay-reconciliation-actions";
 import { SepayAllocationReversalDialog } from "@/features/finance/components/sepay-allocation-reversal-dialog";
 import { SepayManualAllocation } from "@/features/finance/components/sepay-manual-allocation";
@@ -17,6 +20,8 @@ import { SepayReconciliationDialog } from "@/features/finance/components/sepay-r
 
 interface SepayTransactionHistoryProps {
   accountPurposeFilter?: SepayAccountPurposeFilter;
+  /** Replacements for every server action reachable from the list (dev preview only). */
+  actions?: SepayActionOverrides;
   canAllocate?: boolean;
   canReconcile?: boolean;
   /** payments.manage: may undo a matched or allocated transaction. */
@@ -25,11 +30,7 @@ interface SepayTransactionHistoryProps {
   managementPanel?: ReactNode;
   page?: number;
   pageSize?: number;
-  /** "review" narrows the list to inbound transfers that still need a decision. */
-  queueFilter?: SepayQueueFilter;
   reconciliationError?: boolean;
-  /** Count of transfers needing a decision, independent of the current filters. */
-  reviewCount?: number;
   total?: number;
   transactions: SepayTransactionReadModel[];
 }
@@ -80,9 +81,14 @@ export function getSepayMatchPresentation(
   }
 }
 
-/** Paginated SePay transaction history with permission-gated reconciliation. */
+/**
+ * "Tất cả giao dịch": paginated SePay transaction history with
+ * permission-gated reconciliation. The page header and the Cần xử lý /
+ * Tất cả giao dịch tabs live in SepayTransactionsScreen.
+ */
 export function SepayTransactionHistory({
   accountPurposeFilter = "",
+  actions,
   canAllocate = false,
   canReconcile = false,
   canReverse = false,
@@ -90,9 +96,7 @@ export function SepayTransactionHistory({
   managementPanel,
   page = 1,
   pageSize = 50,
-  queueFilter = "",
   reconciliationError = false,
-  reviewCount = 0,
   transactions,
   total = transactions.length,
 }: SepayTransactionHistoryProps) {
@@ -113,12 +117,6 @@ export function SepayTransactionHistory({
 
   return (
     <div className="grid min-w-0 gap-5">
-      <PageHeader title="Giao dịch SePay">
-        <p className="mt-1 text-secondary text-text-muted">
-          Lịch sử giao dịch ngân hàng được SePay ghi nhận.
-        </p>
-      </PageHeader>
-
       {managementPanel}
 
       {reconciliationError ? (
@@ -131,18 +129,7 @@ export function SepayTransactionHistory({
         aria-labelledby="sepay-transaction-result-context"
         className="sepay-transaction-operational-work-area grid min-w-0 gap-4"
       >
-        <nav aria-label="Hàng đợi đối soát" className="flex flex-wrap gap-2">
-          <SepayQueueLink active={queueFilter === ""} href={`/finance/sepay${getSepayDirectoryQuery(accountPurposeFilter, "")}`}>Tất cả giao dịch</SepayQueueLink>
-          <SepayQueueLink active={queueFilter === "review"} href={`/finance/sepay${getSepayDirectoryQuery(accountPurposeFilter, "review")}`} tone="warning">
-            Cần đối soát{reviewCount > 0 ? ` (${reviewCount})` : ""}
-          </SepayQueueLink>
-        </nav>
-        <nav aria-label="Lọc mục đích tài khoản nhận" className="flex flex-wrap gap-2">
-          <SepayPurposeFilterLink active={accountPurposeFilter === ""} purpose="" queue={queueFilter}>Tất cả tài khoản</SepayPurposeFilterLink>
-          <SepayPurposeFilterLink active={accountPurposeFilter === "new_enrollment"} purpose="new_enrollment" queue={queueFilter}>Tuyển mới</SepayPurposeFilterLink>
-          <SepayPurposeFilterLink active={accountPurposeFilter === "renewal"} purpose="renewal" queue={queueFilter}>Tái phí</SepayPurposeFilterLink>
-          <SepayPurposeFilterLink active={accountPurposeFilter === "unknown"} purpose="unknown" queue={queueFilter}>Chưa xác định</SepayPurposeFilterLink>
-        </nav>
+        <SepayPurposeFilterNav purpose={accountPurposeFilter} queue="" />
         <p
           aria-live="polite"
           className="text-secondary text-text-muted"
@@ -151,26 +138,41 @@ export function SepayTransactionHistory({
           Hiển thị {transactions.length} trong tổng số {total} giao dịch.
         </p>
 
-        {transactions.length === 0 ? (
+        {transactions.length === 0 && total > 0 ? (
+          // A stale ?page= past the last row (the loader returns an empty page with the real total).
+          <div className="grid gap-3 rounded-lg border border-border-subtle bg-surface-base p-4">
+            <h2 className="text-control font-semibold text-text-strong">Trang này không còn giao dịch.</h2>
+            <p className="text-secondary text-text-muted">Danh sách có {total} giao dịch; trang này nằm sau trang cuối.</p>
+            <div>
+              <Link
+                className={getButtonClassName({ size: "lg", variant: "secondary" })}
+                href={`/finance/sepay${getSepayDirectoryQuery(accountPurposeFilter, "")}`}
+              >
+                Về trang 1
+              </Link>
+            </div>
+          </div>
+        ) : transactions.length === 0 ? (
           <EmptyState
             description="Chưa có giao dịch SePay nào được ghi nhận."
             title="Chưa có giao dịch SePay"
           />
         ) : (
           <SepayTransactionTable
+            actions={actions}
             canAllocate={canAllocate}
             canReconcile={canReconcile}
             canReverse={canReverse}
-            candidates={candidates}
             onOpenReconciliation={handleOpenReconciliation}
             transactions={transactions}
           />
         )}
-        <SepayPagination accountPurposeFilter={accountPurposeFilter} page={page} pageSize={pageSize} queue={queueFilter} total={total} />
+        <SepayPagination accountPurposeFilter={accountPurposeFilter} page={page} pageSize={pageSize} queue="" total={total} />
       </section>
 
       {canReconcile ? (
         <SepayReconciliationDialog
+          actions={actions}
           candidates={candidates}
           isOpen={reconcilingTransaction !== null}
           onClose={handleCloseReconciliation}
@@ -183,13 +185,13 @@ export function SepayTransactionHistory({
 }
 
 function SepayTransactionTable({
+  actions,
   canAllocate,
   canReconcile,
   canReverse,
-  candidates,
   onOpenReconciliation,
   transactions,
-}: Pick<SepayTransactionHistoryProps, "canAllocate" | "canReconcile" | "canReverse" | "candidates" | "transactions"> & {
+}: Pick<SepayTransactionHistoryProps, "actions" | "canAllocate" | "canReconcile" | "canReverse" | "transactions"> & {
   onOpenReconciliation: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
 }) {
   return (
@@ -197,10 +199,10 @@ function SepayTransactionTable({
       <DataTableFrame
         body={transactions.map((transaction) => (
           <SepayTransactionTableRow
+            actions={actions}
             canAllocate={canAllocate}
             canReconcile={canReconcile}
             canReverse={canReverse}
-            candidates={candidates}
             key={transaction.id}
             onOpenReconciliation={onOpenReconciliation}
             transaction={transaction}
@@ -230,10 +232,10 @@ function SepayTransactionTable({
       >
         {transactions.map((transaction) => (
           <SepayTransactionRecord
+            actions={actions}
             canAllocate={canAllocate}
             canReconcile={canReconcile}
             canReverse={canReverse}
-            candidates={candidates}
             key={transaction.id}
             onOpenReconciliation={onOpenReconciliation}
             transaction={transaction}
@@ -245,17 +247,17 @@ function SepayTransactionTable({
 }
 
 function SepayTransactionTableRow({
+  actions,
   canAllocate,
   canReconcile,
   canReverse,
-  candidates,
   onOpenReconciliation,
   transaction,
 }: {
+  actions?: SepayActionOverrides;
   canAllocate?: boolean;
   canReconcile?: boolean;
   canReverse?: boolean;
-  candidates?: SepayReconciliationCandidateView[];
   onOpenReconciliation: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
   transaction: SepayTransactionReadModel;
 }) {
@@ -263,7 +265,7 @@ function SepayTransactionTableRow({
     <tr className="hover:bg-[var(--table-row-hover)]">
       <TableCell className="w-[142px] font-mono text-caption font-semibold text-text-muted">
         {transaction.bankTransactionId}
-        <span className="mt-1 block font-sans font-normal text-text-muted">{getSourceLabel(transaction.ingestionSource)}</span>
+        <span className="mt-1 block font-sans font-normal text-text-muted">{getSepaySourceLabel(transaction.ingestionSource)}</span>
         {transaction.referenceNumber ? <span className="mt-1 block break-all font-sans font-normal">Ref: {transaction.referenceNumber}</span> : null}
       </TableCell>
       <TableCell className="w-[132px] tabular-nums text-secondary text-text-muted">
@@ -280,7 +282,7 @@ function SepayTransactionTableRow({
         {transaction.transferContent}
       </TableCell>
       <TableCell className="w-[134px] text-right tabular-nums font-semibold text-text-strong">
-        {formatCurrency(transaction.amountVnd)}
+        {formatVnd(transaction.amountVnd)}
       </TableCell>
       <TableCell className="w-[180px]">
         <SepayMatchBadge status={transaction.matchStatus} />
@@ -290,11 +292,10 @@ function SepayTransactionTableRow({
       </TableCell>
       <TableCell className="w-[160px]">
         <div className="flex flex-col items-start gap-2">
-          <SepayManualAllocation canAllocate={canAllocate} transaction={transaction} />
-          {canReverse ? <SepayAllocationReversalDialog transaction={transaction} /> : null}
+          <SepayManualAllocation actions={actions} canAllocate={canAllocate} transaction={transaction} />
+          {canReverse ? <SepayAllocationReversalDialog actions={actions} transaction={transaction} /> : null}
           {canReconcile ? (
             <SepayReconciliationActions
-              candidates={candidates ?? []}
               onOpenDialog={onOpenReconciliation}
               transaction={transaction}
             />
@@ -306,17 +307,17 @@ function SepayTransactionTableRow({
 }
 
 function SepayTransactionRecord({
+  actions,
   canAllocate,
   canReconcile,
   canReverse,
-  candidates,
   onOpenReconciliation,
   transaction,
 }: {
+  actions?: SepayActionOverrides;
   canAllocate?: boolean;
   canReconcile?: boolean;
   canReverse?: boolean;
-  candidates?: SepayReconciliationCandidateView[];
   onOpenReconciliation: (transaction: SepayTransactionReadModel, trigger: HTMLElement | null) => void;
   transaction: SepayTransactionReadModel;
 }) {
@@ -327,7 +328,7 @@ function SepayTransactionRecord({
     >
       <div className="flex items-start justify-between gap-3">
         <p className="tabular-nums text-body font-semibold text-text-strong">
-          {formatCurrency(transaction.amountVnd)}
+          {formatVnd(transaction.amountVnd)}
         </p>
         <SepayMatchBadge status={transaction.matchStatus} />
       </div>
@@ -335,7 +336,7 @@ function SepayTransactionRecord({
         <p className="font-mono text-caption font-semibold text-text-default">
           {transaction.bankTransactionId}
         </p>
-        <p>Nguồn: {getSourceLabel(transaction.ingestionSource)}{transaction.referenceNumber ? ` · Ref: ${transaction.referenceNumber}` : ""}</p>
+        <p>Nguồn: {getSepaySourceLabel(transaction.ingestionSource)}{transaction.referenceNumber ? ` · Ref: ${transaction.referenceNumber}` : ""}</p>
         <p className="tabular-nums text-caption">
           {formatDateTime(transaction.transactionAt)}
         </p>
@@ -352,11 +353,10 @@ function SepayTransactionRecord({
           <SepayReference transaction={transaction} />
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-2">
-          <SepayManualAllocation canAllocate={canAllocate} transaction={transaction} />
-          {canReverse ? <SepayAllocationReversalDialog transaction={transaction} /> : null}
+          <SepayManualAllocation actions={actions} canAllocate={canAllocate} transaction={transaction} />
+          {canReverse ? <SepayAllocationReversalDialog actions={actions} transaction={transaction} /> : null}
           {canReconcile ? (
             <SepayReconciliationActions
-              candidates={candidates ?? []}
               onOpenDialog={onOpenReconciliation}
               transaction={transaction}
             />
@@ -367,7 +367,7 @@ function SepayTransactionRecord({
   );
 }
 
-function getSourceLabel(source: SepayTransactionReadModel["ingestionSource"]): string {
+export function getSepaySourceLabel(source: SepayTransactionReadModel["ingestionSource"]): string {
   switch (source) {
     case "api_v2": return "Lịch sử API";
     case "reconciled": return "Webhook + API";
@@ -375,7 +375,7 @@ function getSourceLabel(source: SepayTransactionReadModel["ingestionSource"]): s
   }
 }
 
-function SepayPagination({
+export function SepayPagination({
   accountPurposeFilter,
   page,
   pageSize,
@@ -395,9 +395,27 @@ function SepayPagination({
 
   return (
     <nav aria-label="Phân trang giao dịch SePay" className="flex items-center justify-end gap-2">
-      {page > 1 ? <Link className="rounded-md border border-border-subtle px-3 py-2 text-control font-semibold" href={href(page - 1)}>Trang trước</Link> : null}
+      {page > 1 ? <Link className="inline-flex min-h-11 items-center rounded-md border border-border-subtle px-3 py-2 text-control font-semibold sm:min-h-0" href={href(page - 1)}>Trang trước</Link> : null}
       <span className="text-secondary text-text-muted">Trang {page}/{pageCount}</span>
-      {page < pageCount ? <Link className="rounded-md border border-border-subtle px-3 py-2 text-control font-semibold" href={href(page + 1)}>Trang sau</Link> : null}
+      {page < pageCount ? <Link className="inline-flex min-h-11 items-center rounded-md border border-border-subtle px-3 py-2 text-control font-semibold sm:min-h-0" href={href(page + 1)}>Trang sau</Link> : null}
+    </nav>
+  );
+}
+
+/** Receiving-account purpose filter; keeps the current tab (queue). */
+export function SepayPurposeFilterNav({
+  purpose,
+  queue,
+}: {
+  purpose: SepayAccountPurposeFilter;
+  queue: SepayQueueFilter;
+}) {
+  return (
+    <nav aria-label="Lọc mục đích tài khoản nhận" className="flex flex-wrap gap-2">
+      <SepayPurposeFilterLink active={purpose === ""} purpose="" queue={queue}>Tất cả tài khoản</SepayPurposeFilterLink>
+      <SepayPurposeFilterLink active={purpose === "new_enrollment"} purpose="new_enrollment" queue={queue}>Tuyển mới</SepayPurposeFilterLink>
+      <SepayPurposeFilterLink active={purpose === "renewal"} purpose="renewal" queue={queue}>Tái phí</SepayPurposeFilterLink>
+      <SepayPurposeFilterLink active={purpose === "unknown"} purpose="unknown" queue={queue}>Chưa xác định</SepayPurposeFilterLink>
     </nav>
   );
 }
@@ -416,7 +434,9 @@ function SepayPurposeFilterLink({
   return (
     <Link
       aria-current={active ? "page" : undefined}
-      className={`inline-flex h-9 items-center rounded-md border px-3 text-control font-semibold transition-colors ${active ? "border-action-primary bg-action-primary text-text-on-primary" : "border-border-subtle bg-surface-base text-text-muted hover:bg-interactive-hover hover:text-text-strong"}`}
+      // Soft active chip (HANDOFF §2): the page keeps one filled primary. Text colours are
+      // important because the unlayered global `a { color: inherit }` beats utilities on links.
+      className={`inline-flex min-h-11 items-center rounded-md border px-3 text-control font-semibold transition-colors sm:h-9 sm:min-h-9 ${active ? "border-action-primary bg-action-primary-soft text-action-primary!" : "border-border-subtle bg-surface-base text-text-muted! hover:bg-interactive-hover hover:text-text-strong!"}`}
       href={`/finance/sepay${getSepayDirectoryQuery(purpose, queue)}`}
     >
       {children}
@@ -424,32 +444,7 @@ function SepayPurposeFilterLink({
   );
 }
 
-function SepayQueueLink({
-  active,
-  children,
-  href,
-  tone = "neutral",
-}: {
-  active: boolean;
-  children: ReactNode;
-  href: string;
-  tone?: "neutral" | "warning";
-}) {
-  const activeClassName = tone === "warning"
-    ? "border-warning-border bg-warning-bg text-warning"
-    : "border-action-primary bg-action-primary text-text-on-primary";
-  return (
-    <Link
-      aria-current={active ? "page" : undefined}
-      className={`inline-flex h-9 items-center rounded-md border px-3 text-control font-semibold transition-colors ${active ? activeClassName : "border-border-subtle bg-surface-base text-text-muted hover:bg-interactive-hover hover:text-text-strong"}`}
-      href={href}
-    >
-      {children}
-    </Link>
-  );
-}
-
-function SepayMatchBadge({
+export function SepayMatchBadge({
   status,
 }: {
   status: SepayTransactionReadModel["matchStatus"];
@@ -459,7 +454,7 @@ function SepayMatchBadge({
   return <Badge tone={presentation.tone}>{presentation.label}</Badge>;
 }
 
-function SepayAccountPurposeBadge({
+export function SepayAccountPurposeBadge({
   purpose,
 }: {
   purpose: SepayTransactionReadModel["accountPurpose"];
@@ -468,7 +463,7 @@ function SepayAccountPurposeBadge({
   return <Badge tone={presentation.tone}>{presentation.label}</Badge>;
 }
 
-function SepayReference({
+export function SepayReference({
   transaction,
 }: {
   transaction: SepayTransactionReadModel;
@@ -512,28 +507,4 @@ function TableCell({
   className?: string;
 }) {
   return <td className={`h-14 px-3 align-middle text-table-body ${className}`}>{children}</td>;
-}
-
-const currencyFormatter = new Intl.NumberFormat("vi-VN", {
-  currency: "VND",
-  maximumFractionDigits: 0,
-  style: "currency",
-});
-
-const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-
-function formatCurrency(value: number): string {
-  return currencyFormatter.format(value);
-}
-
-function formatDateTime(value: string): string {
-  const timestamp = new Date(value);
-
-  return Number.isNaN(timestamp.getTime()) ? value : dateTimeFormatter.format(timestamp);
 }
