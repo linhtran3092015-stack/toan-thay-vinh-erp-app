@@ -32,9 +32,10 @@ export function Pagination({
   total,
   variant = "standalone",
 }: PaginationProps) {
+  // A page past the last one (rangeEnd 0 of a non-empty total) shows no rows: "0 trong N".
   const summary = (
     <p className="text-secondary text-text-muted">
-      {rangeStart}–{rangeEnd} trong {total} {itemLabel}
+      {rangeEnd === 0 && total > 0 ? "0" : `${rangeStart}–${rangeEnd}`} trong {total} {itemLabel}
       {summarySuffix ? ` · ${summarySuffix}` : ""}
     </p>
   );

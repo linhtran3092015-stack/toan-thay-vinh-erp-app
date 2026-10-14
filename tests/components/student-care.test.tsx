@@ -22,6 +22,16 @@ describe("student care UI",()=>{
   fireEvent.click(screen.getByRole("button",{name:"Nhận xử lý"}));
   await waitFor(()=>expect(mocks.mutate).toHaveBeenCalledTimes(2));
   expect(mocks.mutate.mock.calls[0][0].request_id).toEqual(mocks.mutate.mock.calls[1][0].request_id);
-  await waitFor(()=>expect(mocks.refresh).toHaveBeenCalledOnce());
+  await screen.findByText("Đã lưu");
+  // mutateCare calls revalidatePath, so the action response already re-renders the route (Next 16 server-actions guide): no second refresh.
+  expect(mocks.refresh).not.toHaveBeenCalled();
+ });
+ it("refreshes the route itself only after an injected action succeeds",async()=>{
+  const action=vi.fn().mockResolvedValue({ok:true,message:"Đã lưu"});
+  render(<CareActionForm action={action} base={{op:"claim",task_id:"22222222-2222-4222-8222-222222222222",version:1}} label="Nhận xử lý"/>);
+  fireEvent.click(screen.getByRole("button",{name:"Nhận xử lý"}));
+  await screen.findByText("Đã lưu");
+  expect(mocks.mutate).not.toHaveBeenCalled();
+  expect(mocks.refresh).toHaveBeenCalledOnce();
  });
 });

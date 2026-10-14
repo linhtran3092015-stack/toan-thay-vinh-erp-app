@@ -18,8 +18,8 @@
 2. Áp ba migration theo thứ tự `20260917100000`, `20260917101000`, `20260917102000`. Các migration tạo bảng, quyền, RPC, trigger và lịch chạy; mặc định tự động **tắt**.
 3. Triển khai ứng dụng có các trang chăm sóc. Quyền mới được cấp cho owner và assistant_manager; làm mới phiên/quyền nếu tài khoản đang mở ứng dụng.
 4. Kiểm tra `pg_cron` đã bật và có đúng một job tên `student-care-worker`, lịch mỗi phút, câu lệnh `select public.run_student_care_worker();`. Nếu extension không tồn tại, migration chỉ cảnh báo, cần bật extension và đăng ký job trước bước 6. Không sửa cron chấm công.
-5. Vào **Chăm sóc học viên → Phân công lâu dài**, phân công cho trợ lý. Danh sách phân trang và tổng đếm từ DB, không giới hạn ở 500 học viên. Chủ trung tâm xử lý riêng học viên vào sát cuối tháng theo tình huống thực tế; ngoại lệ không tính vào tỷ lệ hoàn thành.
-6. Chủ trung tâm mở **Vận hành chăm sóc tự động → Bật chăm sóc tự động**. Job tạo nghĩa vụ tháng và đánh giá theo lô 100 học viên. Khi khởi tạo xong gửi một thông báo tổng hợp cho nhân sự đủ quyền; không gửi dồn từng cảnh báo lịch sử. SLA tính từ lúc tạo công việc, không từ ngày học trong quá khứ.
+5. Vào **Chăm sóc học sinh → Phân công lâu dài**, phân công cho trợ lý. Danh sách phân trang và tổng đếm từ DB, không giới hạn ở 500 học viên. Chủ trung tâm xử lý riêng học viên vào sát cuối tháng theo tình huống thực tế; ngoại lệ không tính vào tỷ lệ hoàn thành.
+6. Chủ trung tâm mở **Cấu hình bộ tự sinh** ở đầu trang Chăm sóc học sinh và bấm **Bật chăm sóc tự động**. Job tạo nghĩa vụ tháng và đánh giá theo lô 100 học viên. Khi khởi tạo xong gửi một thông báo tổng hợp cho nhân sự đủ quyền; không gửi dồn từng cảnh báo lịch sử. SLA tính từ lúc tạo công việc, không từ ngày học trong quá khứ.
 7. Chờ hàng đợi về 0 và heartbeat dưới 5 phút. Nếu có bản ghi lỗi, màn hình hiển thị số lượng cần thử lại. Kiểm tra trực tiếp bằng chứng với điểm danh/điểm số trước khi dùng để điều hành.
 8. UAT staging bằng hai tài khoản trợ lý và tài khoản chủ trung tâm: nhận đồng thời, gọi chưa được, liên hệ thành công, tạo Coaching, hoàn thành tháng, mở thông báo, phân trang, đổi người phụ trách, dữ liệu được sửa. Kiểm tra desktop/mobile và quyền thực tế. Sau đó phát hành cùng phiên bản lên production theo quy trình của dự án.
 
@@ -36,13 +36,13 @@ Giai đoạn đối chiếu dữ liệu trước bật có thể dùng truy vấ
 
 ## Tạm dừng / khôi phục
 
-Chủ trung tâm bấm **Tạm dừng tự động**. Job không sinh hoặc gửi thêm, nhưng vẫn xử lý tay công việc có sẵn. Nếu cần dừng cả lịch chạy, chỉ unschedule job `student-care-worker`. Giữ bảng, lịch sử, phân công và thông báo; không DROP dữ liệu. Sửa tiến bằng migration mới. Bật lại không gửi lại thông báo khởi tạo, tiếp tục hàng đợi và đối soát.
+Chủ trung tâm mở **Cấu hình bộ tự sinh** và bấm **Tạm dừng tự động**. Job không sinh hoặc gửi thêm, nhưng vẫn xử lý tay công việc có sẵn. Nếu cần dừng cả lịch chạy, chỉ unschedule job `student-care-worker`. Giữ bảng, lịch sử, phân công và thông báo; không DROP dữ liệu. Sửa tiến bằng migration mới. Bật lại không gửi lại thông báo khởi tạo, tiếp tục hàng đợi và đối soát.
 
 ## Kiểm thử cục bộ
 
 - `node scripts/test-student-care-db.mjs`: PostgreSQL thật, cụm tạm qua UNIX socket, tự xóa sau chạy; cần `PG_BINDIR` nếu PostgreSQL không ở đường dẫn Homebrew14/Linux16 đã hỗ trợ. Không kết nối production. Sử dụng fixture học viên/lớp/RBAC và migration Coaching/thông báo thật; không thay thế chạy toàn bộ migration trên staging.
 - `npm run typecheck`, `npm run lint`, `npm run build`.
-- `node node_modules/vitest/vitest.mjs run tests/unit/student-care.test.ts tests/components/student-care.test.tsx tests/unit/navigation.test.ts tests/components/authenticated-app-shell-loading.test.tsx`.
+- `node node_modules/vitest/vitest.mjs run tests/unit/student-care.test.ts tests/unit/student-care-presentation.test.ts tests/components/student-care.test.tsx tests/components/student-care-redesign.test.tsx tests/components/student-care-routes.test.tsx tests/components/dev-student-care-preview.test.tsx tests/unit/navigation.test.ts tests/components/authenticated-app-shell-loading.test.tsx`.
 
 Hồi quy DB gồm điều kiện nghỉ/điểm, sửa điểm, tháng lịch, cập nhật cảnh báo, phân quyền RPC/bảng, nhận đồng thời, idempotency, liên kết Coaching thật, hoàn thành có bằng chứng, một liên hệ/một tháng, giữ lịch hẹn, nhắc/escalation chống trùng, nhân sự ngừng hoạt động và 506 học viên.
 
