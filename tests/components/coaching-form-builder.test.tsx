@@ -973,9 +973,7 @@ describe("CoachingFormBuilder rejected actions", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(COACHING_CONNECTION_ERROR_MESSAGE);
     expect(screen.getByText("v2 · Đang xuất bản")).toBeInTheDocument();
     expect(titleInput(1)).toHaveValue("Con tên gì?");
-    // The alert renders before the action's transition settles; under load the
-    // button is still busy for a moment, so wait for it rather than sample once.
-    await waitFor(() => expect(screen.getByRole("button", { name: "Tạo bản nháp phiên bản mới" })).toBeEnabled());
+    expect(screen.getByRole("button", { name: "Tạo bản nháp phiên bản mới" })).toBeEnabled();
   });
 });
 
