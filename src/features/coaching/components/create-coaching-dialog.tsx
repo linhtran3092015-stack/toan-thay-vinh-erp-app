@@ -15,6 +15,7 @@ import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { createCoachingRecordAction } from "@/features/coaching/actions/coaching-actions";
+import { coachingPriorityOptions } from "@/features/coaching/coaching-presentation";
 import {
   initialCoachingManagementActionState,
   type CoachingManagementActionState,
@@ -226,9 +227,11 @@ export function CreateCoachingDialog({
                   }
                   value={priority}
                 >
-                  <option value="low">Thấp</option>
-                  <option value="medium">Trung bình</option>
-                  <option value="high">Cao</option>
+                  {coachingPriorityOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </SelectField>
 

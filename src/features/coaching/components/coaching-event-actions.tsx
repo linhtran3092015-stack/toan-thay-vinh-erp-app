@@ -18,12 +18,16 @@ import {
   addCoachingNoteAction,
   advanceCoachingStatusAction,
 } from "@/features/coaching/actions/coaching-actions";
+import type { CoachingActionOverrides } from "@/features/coaching/coaching-action-overrides";
+import { COACHING_CONNECTION_ERROR_MESSAGE } from "@/features/coaching/coaching-presentation";
 import {
   initialCoachingManagementActionState,
   type CoachingManagementActionState,
 } from "@/features/coaching/forms/coaching-action-types";
 
 interface CoachingEventActionsProps {
+  /** Inert stubs in the /dev preview; the real page passes nothing. */
+  actions?: Pick<CoachingActionOverrides, "addCoachingNote" | "advanceCoachingStatus">;
   coachingRecordId: string;
   currentStatus: string;
 }
@@ -31,12 +35,24 @@ interface CoachingEventActionsProps {
 type DialogMode = "close" | "note" | "start";
 
 const textAreaClassName =
-  "min-h-28 w-full resize-y rounded-md border border-hairline bg-white px-3 py-3 text-sm text-ink outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring/20 disabled:cursor-not-allowed disabled:bg-canvas";
+  "min-h-28 w-full resize-y rounded-md border border-border-strong bg-surface-base px-3 py-3 text-body text-text-strong outline-hidden transition-colors hover:border-border-strong-hover focus-visible:border-border-focus focus-visible:ring-[3px] focus-visible:ring-focus-ring aria-[invalid=true]:border-danger disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
 
+/**
+ * Header actions of the Coaching record (design 13c). One primary per state:
+ * "Bắt đầu xử lý" while open, "Đóng phiếu" while in progress (closing is
+ * where the outcome is recorded, the design's "Ghi kết quả"), and the
+ * secondary "Thêm ghi chú". Any other status (closed or unknown) renders
+ * nothing. A call that never reaches the server keeps the dialog open with
+ * what was typed and the connection message in its banner. Labels and
+ * dialogs are pinned by the consequential-dialog tests.
+ */
 export function CoachingEventActions({
+  actions,
   coachingRecordId,
   currentStatus,
 }: CoachingEventActionsProps) {
+  const addNote = actions?.addCoachingNote ?? addCoachingNoteAction;
+  const advanceStatus = actions?.advanceCoachingStatus ?? advanceCoachingStatusAction;
   const router = useRouter();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
@@ -85,15 +101,22 @@ export function CoachingEventActions({
 
     setActionState(initialCoachingManagementActionState);
     startTransition(async () => {
-      const result =
-        dialogMode === "note"
-          ? await addCoachingNoteAction({ coachingRecordId, note })
-          : await advanceCoachingStatusAction({
-              coachingRecordId,
-              note,
-              outcome,
-              targetStatus: dialogMode === "start" ? "in_progress" : "closed",
-            });
+      let result: CoachingManagementActionState;
+      try {
+        result =
+          dialogMode === "note"
+            ? await addNote({ coachingRecordId, note })
+            : await advanceStatus({
+                coachingRecordId,
+                note,
+                outcome,
+                targetStatus: dialogMode === "start" ? "in_progress" : "closed",
+              });
+      } catch {
+        // A rejected call (deploy skew, offline, a non-RSC 5xx) must not reach the error
+        // boundary: the dialog stays open with the typed note/outcome and shows the banner.
+        result = { message: COACHING_CONNECTION_ERROR_MESSAGE, status: "error" };
+      }
 
       setActionState(result);
 
@@ -111,35 +134,31 @@ export function CoachingEventActions({
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        <Button
-          className="min-h-11"
-          onClick={(event) => openDialog("note", event.currentTarget)}
-          size="lg"
-          type="button"
-          variant="outline"
-        >
-          Thêm ghi chú
-        </Button>
         {currentStatus === "open" ? (
           <Button
-            className="min-h-11"
+            className="max-md:h-11"
             onClick={(event) => openDialog("start", event.currentTarget)}
-            size="lg"
             type="button"
           >
             Bắt đầu xử lý
           </Button>
         ) : (
           <Button
-            className="min-h-11"
+            className="max-md:h-11"
             onClick={(event) => openDialog("close", event.currentTarget)}
-            size="lg"
             type="button"
-            variant="secondary"
           >
             Đóng phiếu
           </Button>
         )}
+        <Button
+          className="max-md:h-11"
+          onClick={(event) => openDialog("note", event.currentTarget)}
+          type="button"
+          variant="secondary"
+        >
+          Thêm ghi chú
+        </Button>
       </div>
 
       <Dialog
@@ -197,10 +216,21 @@ export function CoachingEventActions({
             ) : null}
 
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button className="min-h-11" disabled={isInteractionLocked} onClick={closeDialog} size="lg" type="button" variant="ghost">
+              <Button
+                className="max-md:h-11"
+                disabled={isInteractionLocked}
+                onClick={closeDialog}
+                type="button"
+                variant="ghost"
+              >
                 Hủy
               </Button>
-              <Button className="min-h-11" disabled={isInteractionLocked} isLoading={isInteractionLocked} size="lg" type="submit">
+              <Button
+                className="max-md:h-11"
+                disabled={isInteractionLocked}
+                isLoading={isInteractionLocked}
+                type="submit"
+              >
                 {isInteractionLocked ? "Đang lưu…" : dialogMode ? getSubmitLabel(dialogMode) : "Lưu"}
               </Button>
             </div>
@@ -228,12 +258,18 @@ function TextAreaField({
   const errorId = `${id}-error`;
   return (
     <div className="grid gap-1.5">
-      <label className="text-label text-text-default" htmlFor={id}>{label}</label>
+      <label className="text-label font-medium text-text-strong" htmlFor={id}>
+        {label}
+      </label>
       {cloneElement(children, {
         "aria-describedby": error ? errorId : undefined,
         "aria-invalid": Boolean(error),
       })}
-      {error ? <p className="text-caption font-medium text-danger" id={errorId}>{error}</p> : null}
+      {error ? (
+        <p className="text-caption font-medium text-danger" id={errorId}>
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -244,7 +280,7 @@ function getDialogDescription(mode: DialogMode): string {
   }
 
   if (mode === "close") {
-    return "Ghi nhận kết quả trước khi yêu cầu hệ thống đóng phiếu Coaching.";
+    return "Ghi nhận kết quả trước khi yêu cầu hệ thống đóng phiếu Coaching. Phiếu đã đóng không nhận thêm ghi chú.";
   }
 
   return "Ghi chú được bổ sung vào lịch sử phiếu Coaching.";
