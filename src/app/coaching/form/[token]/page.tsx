@@ -1,12 +1,57 @@
+import type { Metadata } from "next";
+
 import { PublicCoachingForm } from "@/features/coaching/components/public-coaching-form";
+import {
+  getStudentGivenName,
+  PUBLIC_FORM_UNAVAILABLE_STATE,
+  PublicCoachingFormState,
+} from "@/features/coaching/components/public-coaching-form-shell";
 import type { PublicCoachingQuestion } from "@/features/coaching/forms/coaching-form-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+// Opened without a session and it names the child: keep every token URL out of search indexes.
+export const metadata: Metadata = {
+  robots: { follow: false, index: false },
+};
+
 export default async function PublicCoachingFormPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params; const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.rpc("get_public_coaching_form", { p_token: token }); const row = data?.[0]; const state = row?.state ?? "invalid";
-  if (state !== "active" || !row) return <PublicState state={state} />;
-  const questions: PublicCoachingQuestion[] = data.filter((item) => item.question_id).map((item) => ({ configuration: (item.configuration ?? {}) as Record<string, unknown>, description: item.question_description, id: item.question_id!, required: item.is_required ?? false, title: item.question_title!, type: item.question_type as PublicCoachingQuestion["type"] }));
-  return <PublicCoachingForm token={token} title={row.form_title!} instructions={row.instructions} questions={questions} />;
+  const { token } = await params;
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("get_public_coaching_form", { p_token: token });
+  if (error) {
+    // A failed read says nothing about the link: offer a reload, not the final "invalid" screen.
+    return (
+      <PublicCoachingFormState
+        reloadHref={`/coaching/form/${encodeURIComponent(token)}`}
+        state={PUBLIC_FORM_UNAVAILABLE_STATE}
+      />
+    );
+  }
+  const row = data?.[0];
+  const state = row?.state ?? "invalid";
+
+  if (state !== "active" || !row) {
+    return <PublicCoachingFormState state={state} />;
+  }
+
+  const questions: PublicCoachingQuestion[] = data
+    .filter((item) => item.question_id)
+    .map((item) => ({
+      configuration: (item.configuration ?? {}) as Record<string, unknown>,
+      description: item.question_description,
+      id: item.question_id!,
+      required: item.is_required ?? false,
+      title: item.question_title!,
+      type: item.question_type as PublicCoachingQuestion["type"],
+    }));
+
+  return (
+    <PublicCoachingForm
+      instructions={row.instructions}
+      questions={questions}
+      studentName={getStudentGivenName(row.student_name)}
+      title={row.form_title!}
+      token={token}
+    />
+  );
 }
-function PublicState({ state }: { state: string }) { const message = state === "submitted" ? "Phiếu này đã được gửi." : state === "expired" ? "Liên kết đã hết hạn." : state === "revoked" ? "Liên kết không còn hiệu lực." : "Liên kết không hợp lệ."; return <main className="mx-auto min-h-screen max-w-xl bg-canvas px-4 py-12"><section className="rounded-xl border border-hairline bg-surface-1 p-6 shadow-card"><h1 className="text-xl font-bold text-ink">{message}</h1></section></main>; }
