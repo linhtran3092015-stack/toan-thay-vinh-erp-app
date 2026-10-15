@@ -1,184 +1,282 @@
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
-import {
-  CoachingPriorityBadge,
-  CoachingStatusBadge,
-} from "@/features/coaching/coaching-list-page";
-import { CoachingEventActions } from "@/features/coaching/components/coaching-event-actions";
+import { PageHeader } from "@/components/patterns/page-header";
+import { Badge } from "@/components/ui/badge";
+import type { CoachingActionOverrides } from "@/features/coaching/coaching-action-overrides";
 import type {
-  CoachingRecordDashboardEntry,
-  CoachingRecordEvent,
-} from "@/features/coaching/read-models";
+  CoachingFormSummary,
+  CoachingPublicLinkSummary,
+  CoachingRecordResponseSummary,
+} from "@/features/coaching/coaching-form-data";
+import { CoachingStatusBadge } from "@/features/coaching/coaching-list-page";
+import {
+  buildCoachingTimeline,
+  coachingEventLabels,
+  formatCoachingDate,
+  formatCoachingDateTime,
+  formatCoachingReviewDate,
+  formatCoachingShortDateTime,
+  getCoachingPriorityPresentation,
+  summarizeCoachingReason,
+  type CoachingTimelineEntry,
+} from "@/features/coaching/coaching-presentation";
+import { CoachingEventActions } from "@/features/coaching/components/coaching-event-actions";
 import { CoachingPublicLinkPanel } from "@/features/coaching/components/coaching-public-link-panel";
-import type { CoachingFormSummary, CoachingPublicLinkSummary, CoachingRecordResponseSummary } from "@/features/coaching/coaching-form-data";
+import type { CoachingRecordDashboardEntry, CoachingRecordEvent } from "@/features/coaching/read-models";
 
 interface CoachingDetailPageProps {
+  /** Inert stubs in the /dev preview; the real page passes nothing. */
+  actions?: CoachingActionOverrides;
   canManage: boolean;
-  events: readonly CoachingRecordEvent[];
-  record: CoachingRecordDashboardEntry;
-  forms?: CoachingFormSummary[];
-  responses?: CoachingRecordResponseSummary[];
-  links?: CoachingPublicLinkSummary[];
   canManageLinks?: boolean;
+  /** coaching_forms.view, for the link panel's version picker; defaults to true for callers that predate it. */
+  canViewForms?: boolean;
+  /**
+   * Whether the viewer may open responses (coaching_responses.view); the list
+   * is only loaded with it. Fails closed: callers that omit it show no card.
+   */
+  canViewResponses?: boolean;
   defaultPublicLinkExpiryDays?: number;
+  events: readonly CoachingRecordEvent[];
+  forms?: CoachingFormSummary[];
+  /** The permitted forms loader failed: the panel says so instead of asking to publish a form. */
+  formsUnavailable?: boolean;
+  links?: CoachingPublicLinkSummary[];
+  /** The permitted links loader failed: the panel says so instead of reading as "no link yet". */
+  linksUnavailable?: boolean;
+  /** Back link target; defaults to the Coaching list. */
+  listHref?: string;
+  record: CoachingRecordDashboardEntry;
+  responses?: CoachingRecordResponseSummary[];
+  /** The permitted responses loader failed: the card says so instead of showing the empty line. */
+  responsesUnavailable?: boolean;
 }
 
-const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-
-const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-
-const eventLabels: Record<CoachingRecordEvent["eventType"], string> = {
-  note_added: "Ghi chú",
-  opened: "Mở phiếu",
-  outcome_recorded: "Ghi nhận kết quả",
-  status_changed: "Cập nhật trạng thái",
-};
-
+/**
+ * /coaching/[coachingId] (design 13c, left canvas). Header with the campaign
+ * and student, priority and status badges, a context line (code, opened,
+ * owner, review date, first line of the reason) and the state's actions
+ * (only with coaching.manage and only while open or in progress, so closed
+ * or unknown states get no empty actions slot). Below,
+ * two columns from lg: public links and responses on the left, the event
+ * timeline (newest first) and the full "Lý do theo dõi" on the right.
+ */
 export function CoachingDetailPage({
+  actions,
   canManage,
-  events,
-  record,
-  forms = [],
-  responses = [],
-  links = [],
   canManageLinks = false,
+  canViewForms = true,
+  canViewResponses = false,
   defaultPublicLinkExpiryDays = 7,
+  events,
+  forms = [],
+  formsUnavailable = false,
+  links = [],
+  linksUnavailable = false,
+  listHref = "/coaching",
+  record,
+  responses = [],
+  responsesUnavailable = false,
 }: CoachingDetailPageProps) {
+  const priority = getCoachingPriorityPresentation(record.priority);
+  const openedYear = formatCoachingDate(record.openedAt).slice(-4);
+  const reasonSummary = summarizeCoachingReason(record.reason);
+  const context = [
+    record.studentPublicCode,
+    `mở ${formatCoachingDate(record.openedAt)}`,
+    `phụ trách ${record.assistantOwnerDisplayName}`,
+    record.reviewAt ? `xem lại ${formatCoachingReviewDate(record.reviewAt, openedYear)}` : "chưa đặt lịch xem lại",
+    reasonSummary ? `lý do: ${reasonSummary}` : null,
+  ].filter(Boolean);
+  const hasLeftColumn = canManageLinks || canViewResponses;
+  // CoachingEventActions renders nothing for other states; a truthy element would still add PageHeader's empty slot.
+  const hasEventActions = canManage && (record.currentStatus === "open" || record.currentStatus === "in_progress");
+
   return (
-    <div className="grid gap-5">
-      <header className="rounded-lg border border-hairline bg-surface-1 p-5 shadow-card">
-        <nav className="flex flex-wrap items-center gap-2 text-sm text-ink-muted">
-          <Link className="font-semibold text-primary hover:underline" href="/coaching">
-            Coaching
-          </Link>
-          <span>/</span>
-          <span className="font-semibold text-ink">{record.campaignName}</span>
-        </nav>
-        <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
-              Phiếu coaching
-            </p>
-            <h1 className="mt-1 text-page-title font-bold text-ink">{record.campaignName}</h1>
-            <p className="mt-2 text-sm text-ink-muted">
-              {record.studentFullName} · {record.studentPublicCode}
-            </p>
-          </div>
-          <div className="grid justify-items-start gap-3 md:justify-items-end">
-            <div className="flex flex-wrap gap-2">
-              <CoachingPriorityBadge priority={record.priority} />
-              <CoachingStatusBadge status={record.currentStatus} />
-            </div>
-            {canManage ? (
-              <CoachingEventActions
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
+      <nav aria-label="Điều hướng Coaching" className="text-secondary">
+        <Link
+          className="inline-flex min-h-11 items-center gap-1 font-semibold text-action-link! hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus md:min-h-0"
+          href={listHref}
+        >
+          <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.8} />
+          Coaching
+        </Link>
+      </nav>
+
+      <PageHeader
+        actions={
+          hasEventActions ? (
+            <CoachingEventActions
+              actions={actions}
+              coachingRecordId={record.id}
+              currentStatus={record.currentStatus}
+            />
+          ) : undefined
+        }
+        context={
+          <>
+            <Badge tone={priority.tone}>{priority.label}</Badge>
+            <CoachingStatusBadge status={record.currentStatus} />
+          </>
+        }
+        title={`${record.campaignName} · ${record.studentFullName}`}
+      >
+        <p className="mt-1 break-words text-secondary tabular-nums text-text-muted">{context.join(" · ")}</p>
+      </PageHeader>
+
+      <div
+        className={
+          hasLeftColumn
+            ? "grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)] xl:grid-cols-[minmax(0,1fr)_420px]"
+            : "grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:max-w-[720px]"
+        }
+      >
+        {hasLeftColumn ? (
+          <div className="grid min-w-0 gap-5">
+            {canManageLinks ? (
+              <CoachingPublicLinkPanel
+                actions={actions}
+                canViewForms={canViewForms}
                 coachingRecordId={record.id}
-                currentStatus={record.currentStatus}
+                defaultExpiryDays={defaultPublicLinkExpiryDays}
+                forms={forms}
+                formsUnavailable={formsUnavailable}
+                links={links}
+                linksUnavailable={linksUnavailable}
               />
             ) : null}
+            {canViewResponses ? <ResponsesCard responses={responses} unavailable={responsesUnavailable} /> : null}
           </div>
+        ) : null}
+
+        <div className="grid min-w-0 gap-5">
+          <EventsCard events={events} />
+          <RecordCard title="Lý do theo dõi">
+            <p className="whitespace-pre-wrap break-words px-4 py-3 text-body text-text-default">{record.reason}</p>
+          </RecordCard>
         </div>
-      </header>
-
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Thông tin coaching">
-        <DetailCard label="Người phụ trách" value={record.assistantOwnerDisplayName} />
-        <DetailCard label="Ngày mở" value={formatDateTime(record.openedAt)} />
-        <DetailCard label="Ngày xem lại" value={formatDate(record.reviewAt)} />
-        <DetailCard label="Kết quả gần nhất" value={record.latestOutcome ?? "Chưa ghi nhận"} />
-      </section>
-
-      <section className="rounded-lg border border-hairline bg-surface-1 p-5 shadow-card">
-        <h2 className="text-section-title font-semibold text-ink">Lý do theo dõi</h2>
-        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink-muted">
-          {record.reason}
-        </p>
-      </section>
-
-      <section className="rounded-lg border border-hairline bg-surface-1 shadow-card">
-        <div className="border-b border-hairline px-5 py-4">
-          <h2 className="text-section-title font-semibold text-ink">Lịch sử phiếu</h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Mọi thay đổi được ghi thành sự kiện mới; lịch sử cũ không bị ghi đè.
-          </p>
-        </div>
-        {events.length === 0 ? (
-          <div className="px-5 py-10 text-center">
-            <p className="text-sm text-ink-muted">Chưa có sự kiện nào được ghi nhận.</p>
-          </div>
-        ) : (
-          <ol className="divide-y divide-hairline">
-            {events.map((event) => (
-              <li className="grid gap-2 px-5 py-4 md:grid-cols-[minmax(0,1fr)_auto]" key={event.id}>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold text-ink">{eventLabels[event.eventType]}</h3>
-                    {event.status ? <CoachingStatusBadge status={event.status} /> : null}
-                  </div>
-                  {event.note ? (
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink-muted">
-                      {event.note}
-                    </p>
-                  ) : null}
-                  {event.outcome ? (
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">
-                      {event.outcome}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="text-sm text-ink-muted md:text-right">
-                  <p>{event.occurredByDisplayName}</p>
-                  <p className="mt-1">{formatDateTime(event.occurredAt)}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-
-      <section className="rounded-lg border border-hairline bg-surface-1 p-5 shadow-card">
-        <h2 className="text-section-title font-semibold text-ink">Phản hồi Phiếu Coaching</h2>
-        <p className="mt-1 text-sm text-ink-muted">{responses.length ? `${responses.length} phản hồi đã gắn với lịch sử phiếu này.` : "Chưa có phản hồi công khai nào."}</p>
-        {responses.length ? <ul className="mt-3 divide-y divide-hairline rounded-md border border-hairline">{responses.map((response) => <li className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm" key={response.id}><span>{response.formName} · v{response.versionNumber} · {formatDateTime(response.submittedAt)}</span><Link className="font-semibold text-primary hover:underline" href={`/coaching/responses/${response.id}`}>Xem phản hồi</Link></li>)}</ul> : null}
-        <Link className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline" href="/coaching/responses">Xem tất cả phản hồi</Link>
-      </section>
-      {canManageLinks ? <CoachingPublicLinkPanel coachingRecordId={record.id} defaultExpiryDays={defaultPublicLinkExpiryDays} forms={forms} links={links} /> : null}
-
-      <div className="flex justify-end">
-        <Link
-          className="inline-flex min-h-11 items-center justify-center rounded-md border border-hairline bg-surface-1 px-4 text-sm font-semibold text-ink transition hover:border-hairline-strong hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring/25"
-          href="/coaching"
-        >
-          Quay lại danh sách
-        </Link>
       </div>
     </div>
   );
 }
 
-function DetailCard({ label, value }: { label: string; value: string }) {
+function RecordCard({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
-      <p className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-        {label}
-      </p>
-      <p className="mt-2 break-words text-sm font-semibold leading-6 text-ink">{value}</p>
-    </div>
+    <section className="min-w-0 overflow-hidden rounded-lg border border-border-subtle bg-surface-base shadow-[var(--panel-shadow)]">
+      <h2 className="border-b border-border-row px-4 py-3 text-body font-semibold text-text-strong">{title}</h2>
+      {children}
+    </section>
   );
 }
 
-function formatDate(value: string | null): string {
-  return value ? dateFormatter.format(new Date(`${value}T00:00:00`)) : "Chưa đặt lịch";
+function ResponsesCard({
+  responses,
+  unavailable,
+}: {
+  responses: readonly CoachingRecordResponseSummary[];
+  unavailable: boolean;
+}) {
+  return (
+    <RecordCard title="Phản hồi Phiếu Coaching">
+      {unavailable ? (
+        <p className="px-4 py-3 text-secondary font-medium text-danger">Không tải được phản hồi.</p>
+      ) : responses.length === 0 ? (
+        <p className="px-4 py-3 text-secondary text-text-muted">Chưa có phản hồi công khai nào.</p>
+      ) : (
+        <ul className="grid">
+          {responses.map((response) => {
+            const submittedAt = formatCoachingDateTime(response.submittedAt);
+            return (
+              <li
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border-row px-4 py-3 text-secondary"
+                key={response.id}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-text-strong">
+                    {response.formName} · v{response.versionNumber}
+                  </span>
+                  <span className="block tabular-nums text-text-muted">nộp {submittedAt}</span>
+                </span>
+                <Link
+                  className="inline-flex min-h-11 items-center font-semibold text-action-link! hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus md:min-h-0"
+                  href={`/coaching/responses/${response.id}`}
+                >
+                  {/* Every row's link would otherwise be announced as the same "Xem phản hồi". The space sits
+                      outside the sr-only span: accessible-name computation trims a span's own leading space. */}
+                  Xem phản hồi{" "}
+                  <span className="sr-only">
+                    {response.formName} v{response.versionNumber}, nộp {submittedAt}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="px-4 py-3">
+        <Link
+          className="inline-flex min-h-11 items-center text-secondary font-semibold text-action-link! hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus md:min-h-0"
+          href="/coaching/responses"
+        >
+          Xem tất cả phản hồi
+        </Link>
+      </div>
+    </RecordCard>
+  );
 }
 
-function formatDateTime(value: string): string {
-  return dateTimeFormatter.format(new Date(value));
+function EventsCard({ events }: { events: readonly CoachingRecordEvent[] }) {
+  const timeline = buildCoachingTimeline(events);
+  return (
+    <RecordCard title="Sự kiện">
+      {timeline.length === 0 ? (
+        <p className="px-4 py-3 text-secondary text-text-muted">Chưa có sự kiện nào được ghi nhận.</p>
+      ) : (
+        <ol aria-label="Sự kiện của phiếu, mới nhất trước" className="grid">
+          {timeline.map((entry) => (
+            <EventRow entry={entry} key={entry.event.id} />
+          ))}
+        </ol>
+      )}
+    </RecordCard>
+  );
+}
+
+function EventRow({ entry }: { entry: CoachingTimelineEntry }) {
+  const { event, previousStatus } = entry;
+  const quoted = event.eventType === "outcome_recorded" ? event.outcome : event.note;
+  const extraNote = event.eventType === "outcome_recorded" ? event.note : null;
+
+  return (
+    <li className="grid gap-0.5 border-b border-border-row px-4 py-2.5 text-secondary last:border-b-0">
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-text-default">
+        <strong className="font-semibold text-text-strong">{coachingEventLabels[event.eventType]}</strong>
+        {event.eventType === "status_changed" && event.status ? (
+          <>
+            {previousStatus ? (
+              <>
+                <CoachingStatusBadge status={previousStatus} />
+                <span aria-hidden="true">→</span>
+                <span className="sr-only">sang</span>
+              </>
+            ) : null}
+            <CoachingStatusBadge status={event.status} />
+          </>
+        ) : null}
+      </p>
+      {quoted ? (
+        <p className="whitespace-pre-wrap break-words text-text-default">“{quoted}”</p>
+      ) : null}
+      {extraNote ? (
+        <p className="whitespace-pre-wrap break-words text-text-muted">Ghi chú: {extraNote}</p>
+      ) : null}
+      <p className="tabular-nums text-text-muted">
+        <time dateTime={event.occurredAt}>{formatCoachingShortDateTime(event.occurredAt)}</time> ·{" "}
+        {event.occurredByDisplayName}
+      </p>
+    </li>
+  );
 }

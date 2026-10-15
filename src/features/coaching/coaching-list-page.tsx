@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { getCoachingPriorityPresentation } from "@/features/coaching/coaching-presentation";
 import { CreateCoachingDialog } from "@/features/coaching/components/create-coaching-dialog";
 import type {
   CoachingManagementOptions,
@@ -27,15 +28,6 @@ const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   month: "2-digit",
   year: "numeric",
 });
-
-const priorityMetadata: Record<
-  CoachingPriority,
-  { label: string; tone: "danger" | "info" | "warning" }
-> = {
-  high: { label: "Ưu tiên cao", tone: "danger" },
-  low: { label: "Ưu tiên thấp", tone: "info" },
-  medium: { label: "Ưu tiên trung bình", tone: "warning" },
-};
 
 const statusMetadata: Record<
   "closed" | "in_progress" | "open",
@@ -155,8 +147,9 @@ export function CoachingStatusBadge({ status }: { status: string }) {
   return <Badge tone={metadata.tone}>{metadata.label}</Badge>;
 }
 
+/** Same wording as the record header (coaching-presentation). */
 export function CoachingPriorityBadge({ priority }: { priority: CoachingPriority }) {
-  const metadata = priorityMetadata[priority];
+  const metadata = getCoachingPriorityPresentation(priority);
   return <Badge tone={metadata.tone}>{metadata.label}</Badge>;
 }
 
@@ -210,7 +203,7 @@ function CoachingMobileCard({ entry }: { entry: CoachingRecordDashboardEntry }) 
       </div>
       <p className="mt-4 font-medium text-primary">{entry.campaignName}</p>
       <dl className="mt-4 grid gap-3 text-sm">
-        <MobileField label="Ưu tiên" value={priorityMetadata[entry.priority].label} />
+        <MobileField label="Ưu tiên" value={getCoachingPriorityPresentation(entry.priority).label} />
         <MobileField label="Người phụ trách" value={entry.assistantOwnerDisplayName} />
         <MobileField label="Ngày xem lại" value={formatDate(entry.reviewAt)} />
       </dl>

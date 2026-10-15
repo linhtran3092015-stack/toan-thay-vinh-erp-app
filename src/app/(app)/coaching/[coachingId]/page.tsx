@@ -40,7 +40,21 @@ export default async function CoachingDetailRoute({
     );
   }
 
-  const detailResult = await getCoachingRecordDetailResult(coachingId);
+  const permissions = permissionResult.permissions;
+  const canManageLinks = permissions.includes("coaching_links.manage");
+  const canViewResponses = permissions.includes("coaching_responses.view");
+  const canViewForms = permissions.includes("coaching_forms.view");
+  // Forms feed only the link panel's version picker.
+  const canLoadForms = canManageLinks && canViewForms;
+  // One round of reads: the record no longer waits for its own fetch before the rest start.
+  const [detailResult, eventsResult, forms, responses, links, systemSettings] = await Promise.all([
+    getCoachingRecordDetailResult(coachingId),
+    getCoachingRecordEventsResult(coachingId),
+    canLoadForms ? getCoachingForms() : Promise.resolve([]),
+    canViewResponses ? getCoachingRecordResponses(coachingId) : Promise.resolve([]),
+    canManageLinks ? getCoachingPublicLinks(coachingId) : Promise.resolve([]),
+    canManageLinks && permissions.includes("settings.view") ? getSystemSettings() : Promise.resolve(null),
+  ]);
 
   if (!detailResult.ok) {
     return (
@@ -55,15 +69,6 @@ export default async function CoachingDetailRoute({
     notFound();
   }
 
-  const canManageLinks = permissionResult.permissions.includes("coaching_links.manage");
-  const [eventsResult, forms, responses, links, systemSettings] = await Promise.all([
-    getCoachingRecordEventsResult(coachingId),
-    permissionResult.permissions.includes("coaching_forms.view") ? getCoachingForms() : Promise.resolve([]),
-    permissionResult.permissions.includes("coaching_responses.view") ? getCoachingRecordResponses(coachingId) : Promise.resolve([]),
-    canManageLinks ? getCoachingPublicLinks(coachingId) : Promise.resolve([]),
-    canManageLinks && permissionResult.permissions.includes("settings.view") ? getSystemSettings() : Promise.resolve(null),
-  ]);
-
   if (!eventsResult.ok) {
     return (
       <ErrorState
@@ -73,15 +78,23 @@ export default async function CoachingDetailRoute({
     );
   }
 
+  // The form-data loaders return null on any error. Coerced to [] that would read as "empty": no link
+  // yet (the create form opens, and issuing silently revokes the parent's real active link), no response,
+  // or no published form (the panel would ask to publish one).
   return (
     <CoachingDetailPage
-      canManage={permissionResult.permissions.includes("coaching.manage")}
+      canManage={permissions.includes("coaching.manage")}
       events={eventsResult.data}
       record={detailResult.data}
       forms={forms ?? []}
+      formsUnavailable={forms === null}
+      canViewForms={canViewForms}
       responses={responses ?? []}
+      responsesUnavailable={responses === null}
       links={links ?? []}
+      linksUnavailable={links === null}
       canManageLinks={canManageLinks}
+      canViewResponses={canViewResponses}
       defaultPublicLinkExpiryDays={systemSettings?.["coaching.default_public_link_expiry_days"]}
     />
   );
