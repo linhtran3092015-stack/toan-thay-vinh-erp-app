@@ -182,8 +182,12 @@ describe("/dev/coaching preview", () => {
     await user.click(screen.getByRole("button", { name: "Lưu nháp" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(STUB);
 
-    await user.click(screen.getByRole("button", { name: "Xuất bản v4" }));
-    const dialog = screen.getByRole("dialog", { name: "Xuất bản v4?" });
+    // The save result is set inside the transition; "Xuất bản v4" stays disabled until it
+    // settles, so a click before that is ignored (CI flake on main after #27).
+    const publish = screen.getByRole("button", { name: "Xuất bản v4" });
+    await waitFor(() => expect(publish).toBeEnabled());
+    await user.click(publish);
+    const dialog = await screen.findByRole("dialog", { name: "Xuất bản v4?" });
     await user.click(within(dialog).getByRole("button", { name: "Xuất bản v4" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(await screen.findByRole("alert")).toHaveTextContent(STUB);
