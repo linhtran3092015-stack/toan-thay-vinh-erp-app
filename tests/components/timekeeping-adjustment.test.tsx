@@ -1149,3 +1149,275 @@ describe("K. Excluded workflows", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+// ─── L. Step 12 sheet entry points (design 14d, D8/D10/D13) ───────────────────
+
+describe("L. Step 12 adjustment sheet entry points", () => {
+  const autoEndedEntry: TimekeepingAdjustableEntry = {
+    adjustmentStatus: null,
+    checkInAt: "2025-08-02T08:00:00+07:00",
+    checkInMode: "offline",
+    checkOutAt: "2025-08-02T22:30:00+07:00",
+    checkOutMode: "auto_end",
+    id: "entry-2",
+    status: "auto_ended",
+    workDate: "2025-08-02",
+    workShiftCode: "HS02",
+    workShiftName: "Ca chiều",
+  };
+  const RULE_NOTE =
+    "Mỗi lượt chấm công chỉ có một yêu cầu chờ duyệt; đã duyệt thì không gửi thêm. Quản lý duyệt hoặc từ chối kèm lý do; kết quả hiện trong bảng công.";
+
+  it("opens on the entry named by initialEntryId and falls back to the first entry", () => {
+    const { unmount } = render(
+      <TimekeepingAdjustmentRequestDialog
+        entries={[eligibleEntry, autoEndedEntry]}
+        initialEntryId="entry-2"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Yêu cầu điều chỉnh" }));
+    const dialog = screen.getByRole("dialog", { name: "Yêu cầu điều chỉnh công" });
+    expect(within(dialog).getByLabelText("Lượt chấm công cần điều chỉnh")).toHaveValue("entry-2");
+    expect(within(dialog).getByLabelText(/Check-in đề xuất/)).toHaveValue("2025-08-02T08:00");
+    expect(within(dialog).getByLabelText(/Check-out đề xuất/)).toHaveValue("2025-08-02T22:30");
+    unmount();
+
+    render(
+      <TimekeepingAdjustmentRequestDialog
+        entries={[eligibleEntry, autoEndedEntry]}
+        initialEntryId="missing-entry"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Yêu cầu điều chỉnh" }));
+    expect(screen.getByLabelText("Lượt chấm công cần điều chỉnh")).toHaveValue(ENTRY_ID);
+  });
+
+  // Intentional change (pre-landing review cycle 1): triggerLabel and triggerSize were removed;
+  // every trigger reads "Yêu cầu điều chỉnh" at size lg (h-11), so only the accessible name,
+  // variant and class remain configurable.
+  it("applies the accessible name, variant and class over the fixed label and lg size", () => {
+    const { unmount } = render(<TimekeepingAdjustmentRequestDialog entries={[eligibleEntry]} />);
+    const defaultTrigger = screen.getByRole("button", { name: "Yêu cầu điều chỉnh" });
+    expect(defaultTrigger).toHaveClass("bg-action-primary", "h-11");
+    // Closed sheets are not mounted (a month can hold one per card).
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Lượt chấm công cần điều chỉnh")).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <TimekeepingAdjustmentRequestDialog
+        entries={[eligibleEntry, autoEndedEntry]}
+        initialEntryId="entry-2"
+        triggerAriaLabel="Yêu cầu điều chỉnh ca T7 02/08"
+        triggerClassName="ml-auto"
+        triggerVariant="secondary"
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Yêu cầu điều chỉnh ca T7 02/08" });
+    expect(trigger).toHaveTextContent("Yêu cầu điều chỉnh");
+    expect(trigger).toHaveClass("ml-auto", "bg-surface-base", "border-border-strong", "h-11");
+    expect(trigger).not.toHaveClass("bg-action-primary");
+    expect(trigger).not.toHaveClass("h-8");
+    expect(screen.queryByRole("button", { name: "Yêu cầu điều chỉnh" })).not.toBeInTheDocument();
+
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getByRole("dialog", { name: "Yêu cầu điều chỉnh công" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Hủy" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it("summarises the selected entry under the title and marks system auto-end", () => {
+    render(
+      <TimekeepingAdjustmentRequestDialog
+        entries={[eligibleEntry, autoEndedEntry]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Yêu cầu điều chỉnh" }));
+    const dialog = screen.getByRole("dialog", { name: "Yêu cầu điều chỉnh công" });
+    expect(within(dialog).getByText("T6 01/08 · ghi nhận 08:00 → 17:00")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/tự động kết thúc/)).not.toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByLabelText("Lượt chấm công cần điều chỉnh"), {
+      target: { value: "entry-2" },
+    });
+    expect(within(dialog).getByText("T7 02/08 · ghi nhận 08:00 → 22:30 (tự động kết thúc)")).toBeInTheDocument();
+  });
+
+  it("states the one-pending-request rule without pay or evidence vocabulary", () => {
+    render(
+      <TimekeepingAdjustmentRequestDialog
+        entries={[eligibleEntry, autoEndedEntry]}
+        initialEntryId="entry-2"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Yêu cầu điều chỉnh" }));
+    const dialog = screen.getByRole("dialog", { name: "Yêu cầu điều chỉnh công" });
+    expect(within(dialog).getByText(RULE_NOTE)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Hủy" })).toHaveClass("bg-surface-base");
+
+    expect(document.body).not.toHaveTextContent(
+      /giờ công|giờ tính lương|đơn giá|lương|phụ cấp|KPI|hoa hồng|tạm ứng/i,
+    );
+    expect(
+      screen.queryByText(/GPS|Wi-Fi evidence|check-in trực tiếp/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Tên mạng Wi-Fi|BSSID/i)).not.toBeInTheDocument();
+  });
+
+  it("sends the request through the override instead of the server action", async () => {
+    const requestTimeEntryAdjustment = vi.fn().mockResolvedValue({
+      message: "Đã gửi yêu cầu điều chỉnh.",
+      status: "success",
+    });
+    render(
+      <TimekeepingAdjustmentRequestDialog
+        actions={{ requestTimeEntryAdjustment }}
+        entries={[eligibleEntry, autoEndedEntry]}
+        initialEntryId="entry-2"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Yêu cầu điều chỉnh" }));
+    const dialog = screen.getByRole("dialog", { name: "Yêu cầu điều chỉnh công" });
+    fireEvent.change(within(dialog).getByLabelText(/Check-out đề xuất/), {
+      target: { value: "2025-08-02T17:00" },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/Lý do điều chỉnh/), {
+      target: { value: "Quên ra ca" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Gửi yêu cầu" }));
+
+    await waitFor(() => expect(requestTimeEntryAdjustment).toHaveBeenCalledOnce());
+    expect(requestTimeEntryAdjustment.mock.calls[0][0]).toEqual({
+      requestReason: "Quên ra ca",
+      requestedCheckInAt: "2025-08-02T01:00:00.000Z",
+      requestedCheckInMode: "offline",
+      requestedCheckOutAt: "2025-08-02T10:00:00.000Z",
+      requestedCheckOutMode: "offline",
+      timeEntryId: "entry-2",
+    });
+    expect(actions.requestTimeEntryAdjustmentAction).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(router.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("threads the override through the history panel's secondary header trigger", async () => {
+    const requestTimeEntryAdjustment = vi.fn().mockResolvedValue({
+      message: "Đã gửi yêu cầu điều chỉnh.",
+      status: "success",
+    });
+    render(
+      <TimekeepingAdjustmentRequests
+        actions={{ requestTimeEntryAdjustment }}
+        canCheck
+        entries={[eligibleEntry]}
+        requests={[]}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Yêu cầu điều chỉnh" });
+    expect(trigger).toHaveClass("bg-surface-base");
+    fireEvent.click(trigger);
+    fireEvent.change(screen.getByLabelText(/Lý do điều chỉnh/), {
+      target: { value: "Quên bấm" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+
+    await waitFor(() =>
+      expect(requestTimeEntryAdjustment).toHaveBeenCalledWith(
+        expect.objectContaining({ timeEntryId: ENTRY_ID }),
+      ),
+    );
+    expect(actions.requestTimeEntryAdjustmentAction).not.toHaveBeenCalled();
+  });
+
+  function submitReason(reason: string): void {
+    fireEvent.click(screen.getByRole("button", { name: "Yêu cầu điều chỉnh" }));
+    const dialog = screen.getByRole("dialog", { name: "Yêu cầu điều chỉnh công" });
+    fireEvent.change(within(dialog).getByLabelText(/Lý do điều chỉnh/), {
+      target: { value: reason },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Gửi yêu cầu" }));
+  }
+
+  // Value: protects=onSubmitted (the monthly card's "sent" state; month re-fetches follow the server snapshot, not this callback) fires exactly once with the submitted entry id, only after the server accepted the request and after the sheet closed and router.refresh() ran;
+  // fails_when=onSubmitted is dropped, called before the result (optimistically), called twice, or called while the sheet is still open;
+  // why_new=onSubmitted is new in review cycle 1; section C only checks close + refresh;
+  // seam=requestTimeEntryAdjustmentAction module mock (file-level), next/navigation router mock; no_claim=does not prove what the caller does with it (my-monthly-timesheet-panel.test.tsx does)
+  it("calls onSubmitted once after a successful request, after closing the sheet and refreshing", async () => {
+    actions.requestTimeEntryAdjustmentAction.mockResolvedValueOnce({
+      message: "Đã gửi yêu cầu điều chỉnh.",
+      status: "success",
+    });
+    const order: string[] = [];
+    router.refresh.mockImplementationOnce(() => {
+      order.push("refresh");
+    });
+    const onSubmitted = vi.fn(() => {
+      order.push("onSubmitted");
+    });
+    render(<TimekeepingAdjustmentRequestDialog entries={[eligibleEntry]} onSubmitted={onSubmitted} />);
+
+    submitReason("Quên ra ca");
+    expect(onSubmitted).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(onSubmitted).toHaveBeenCalledOnce());
+    // The entry the request was sent for (the sheet's select can move away from initialEntryId).
+    expect(onSubmitted).toHaveBeenCalledWith(eligibleEntry.id);
+    expect(order).toEqual(["refresh", "onSubmitted"]);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(actions.requestTimeEntryAdjustmentAction).toHaveBeenCalledOnce();
+  });
+
+  // Value: protects=a refused request (server error result) keeps the sheet open with the message and never tells the caller it was sent;
+  // fails_when=onSubmitted is called on any settled result rather than on status "success";
+  // why_new=onSubmitted is new in review cycle 1;
+  // seam=requestTimeEntryAdjustmentAction module mock; no_claim=does not cover field-level server errors (section C does)
+  it("does not call onSubmitted when the server returns an error", async () => {
+    actions.requestTimeEntryAdjustmentAction.mockResolvedValueOnce({
+      message: "Lượt chấm công này đã có yêu cầu chờ duyệt.",
+      status: "error",
+    });
+    const onSubmitted = vi.fn();
+    render(<TimekeepingAdjustmentRequestDialog entries={[eligibleEntry]} onSubmitted={onSubmitted} />);
+
+    submitReason("Gửi lại");
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("Lượt chấm công này đã có yêu cầu chờ duyệt."),
+    );
+    expect(screen.getByRole("dialog", { name: "Yêu cầu điều chỉnh công" })).toBeInTheDocument();
+    expect(onSubmitted).not.toHaveBeenCalled();
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  // Value: protects=a transport rejection (server action promise rejects) stays inside the sheet: an alert says the request may not be saved, the typed reason survives, onSubmitted and router.refresh are not called;
+  // fails_when=the try/catch around the request is removed (the rejection reaches the route error page and wipes the reason) or onSubmitted moves into a finally/always path;
+  // why_new=review cycle 1 added the catch (red-team class from step 11b) and onSubmitted; no test rejected the request action;
+  // seam=requestTimeEntryAdjustmentAction module mock rejecting; no_claim=does not prove whether the server saved the request before the connection dropped
+  it("keeps a transport rejection inside the sheet and does not call onSubmitted", async () => {
+    actions.requestTimeEntryAdjustmentAction.mockRejectedValueOnce(new Error("transport unavailable"));
+    const onSubmitted = vi.fn();
+
+    render(<TimekeepingAdjustmentRequestDialog entries={[eligibleEntry]} onSubmitted={onSubmitted} />);
+
+    submitReason("Mất mạng");
+
+    await waitFor(() => expect(actions.requestTimeEntryAdjustmentAction).toHaveBeenCalledOnce());
+    const dialog = screen.getByRole("dialog", { name: "Yêu cầu điều chỉnh công" });
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Chưa có xác nhận từ hệ thống");
+    expect(within(dialog).getByLabelText(/Lý do điều chỉnh/)).toHaveValue("Mất mạng");
+    expect(within(dialog).getByRole("button", { name: "Gửi yêu cầu" })).toBeEnabled();
+    expect(onSubmitted).not.toHaveBeenCalled();
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+});
+

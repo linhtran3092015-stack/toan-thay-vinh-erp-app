@@ -11,8 +11,10 @@ import { CenterMonthlyTimesheetManagement } from "@/features/timekeeping/compone
 import { WorkShiftDialog } from "@/features/timekeeping/components/work-shift-dialog";
 import { WorkShiftRetireAction } from "@/features/timekeeping/components/work-shift-retire-action";
 import { DataTableFrame } from "@/components/patterns/data-table-frame";
+import { PageHeader } from "@/components/patterns/page-header";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { Badge } from "@/components/ui/badge";
+import type { TimekeepingActionOverrides } from "@/features/timekeeping/timekeeping-action-overrides";
 import type {
   AttendanceVerificationConfig,
   AttendanceVerificationPolicy,
@@ -29,6 +31,8 @@ import type {
 } from "@/features/timekeeping/types";
 
 interface TimekeepingPageProps {
+  /** Inert replacements for the /dev/timekeeping preview (staff sections only); real pages pass nothing. */
+  actions?: TimekeepingActionOverrides;
   scheduleWeek?: string;
   attendanceConfig?: AttendanceVerificationConfig | null;
   attendancePolicy?: AttendanceVerificationPolicy;
@@ -64,6 +68,7 @@ function formatBreak(minutes: number): string {
 }
 
 export function TimekeepingPage({
+  actions,
   scheduleWeek = resolveScheduleWeek(undefined),
   attendanceConfig = null,
   attendancePolicy = {
@@ -96,12 +101,58 @@ export function TimekeepingPage({
   const activeWorkShifts = workShifts.filter((shift) => shift.isActive);
   const assignedEntries = entries.filter((entry) => entry.isActive !== false);
   const staffCount = new Set(assignedEntries.map((entry) => entry.staffId)).size;
+  const exceptionPanel = attendancePolicy.exceptionReviewEnabled && (canCheck || canApproveAdjustments) ? (
+    <AttendanceExceptionPanel actions={actions} canApprove={canApproveAdjustments} refreshKey={myEntries.map((entry) => `${entry.id}:${entry.status}`).join(",")} />
+  ) : null;
+  const myPanel = canCheck ? (
+    <MyTimekeepingPanel
+      actions={actions}
+      attendancePolicy={attendancePolicy}
+      canCheck={canCheck}
+      entries={myEntries}
+    />
+  ) : null;
+  const myMonthlyPanel = canCheck ? (
+    <MyMonthlyTimesheetPanel
+      actions={actions}
+      canCheck={canCheck}
+      initialEntries={myMonthlyEntries}
+      initialMonth={currentMonth}
+      initialYear={currentYear}
+    />
+  ) : null;
+  const myAdjustmentRequestsPanel = canCheck ? (
+    <TimekeepingAdjustmentRequests
+      actions={actions}
+      canCheck={canCheck}
+      entries={adjustmentEntries}
+      requests={myAdjustmentRequests}
+    />
+  ) : null;
+
+  // Design 14 (mobile-first): a person who only checks in/out gets the action
+  // first. Anyone with a management permission keeps the full page (step 16).
+  const isStaffOnly = canCheck && !canView && !canManage && !canManageVerification && !canApproveAdjustments;
+
+  if (isStaffOnly) {
+    return (
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 md:gap-6">
+        <PageHeader className="max-md:sr-only" title="Chấm công">
+          <p className="mt-1 text-secondary text-text-muted">
+            Thực hiện chấm công cá nhân và quản lý yêu cầu điều chỉnh công.
+          </p>
+        </PageHeader>
+        {myPanel}
+        {exceptionPanel}
+        {myMonthlyPanel}
+        {myAdjustmentRequestsPanel}
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6">
-      {attendancePolicy.exceptionReviewEnabled && (canCheck || canApproveAdjustments) ? (
-        <AttendanceExceptionPanel canApprove={canApproveAdjustments} refreshKey={myEntries.map((entry) => `${entry.id}:${entry.status}`).join(",")} />
-      ) : null}
+      {exceptionPanel}
       {/* Header */}
       <header className="flex flex-col gap-4 rounded-2xl border border-hairline bg-surface-1 p-6 shadow-xs md:flex-row md:items-center md:justify-between">
         <div>
@@ -141,22 +192,9 @@ export function TimekeepingPage({
         <AttendanceVerificationSettings initialConfig={attendanceConfig} />
       ) : null}
 
-      {canCheck ? (
-        <MyTimekeepingPanel
-          attendancePolicy={attendancePolicy}
-          canCheck={canCheck}
-          entries={myEntries}
-        />
-      ) : null}
+      {myPanel}
 
-      {canCheck ? (
-        <MyMonthlyTimesheetPanel
-          canCheck={canCheck}
-          initialEntries={myMonthlyEntries}
-          initialMonth={currentMonth}
-          initialYear={currentYear}
-        />
-      ) : null}
+      {myMonthlyPanel}
 
       {(canManage || canApproveAdjustments) ? (
         <CenterMonthlyTimesheetManagement
@@ -169,13 +207,7 @@ export function TimekeepingPage({
         />
       ) : null}
 
-      {canCheck ? (
-        <TimekeepingAdjustmentRequests
-          canCheck={canCheck}
-          entries={adjustmentEntries}
-          requests={myAdjustmentRequests}
-        />
-      ) : null}
+      {myAdjustmentRequestsPanel}
 
       {canApproveAdjustments ? (
         <TimekeepingAdjustmentApprovalQueue requests={adjustmentApprovalQueue} />

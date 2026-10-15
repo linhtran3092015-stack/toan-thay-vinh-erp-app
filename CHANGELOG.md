@@ -2,6 +2,31 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.18.0.0] - 2026-10-16
+
+Chấm công cá nhân dựng lại cho điện thoại theo phong cách Stumana (bước 12): một nút "Vào ca"/"Ra ca" lớn, điều kiện chấm công ghi bằng chữ đúng như máy chủ kiểm tra, bảng công dạng thẻ và tấm "Yêu cầu điều chỉnh công" mở từ đáy màn hình.
+
+### Added
+- **Thẻ chấm công** `/timekeeping` cho người chỉ có quyền chấm công: dòng giờ Việt Nam đang chạy ("Thứ Hai, 12/10/2026 · 16:58"), "Chấm công của tôi", nút chọn **Tại trung tâm / Trực tuyến** (dùng được bằng phím mũi tên) và một nút "Vào ca" lớn 56px. Bấm "Vào ca" mở tấm xác nhận quen thuộc với đúng hình thức vừa chọn và tự lấy vị trí khi chấm tại trung tâm.
+- **Điều kiện chấm công bằng chữ**, chỉ nêu điều thật sự được kiểm tra: bán kính quanh cơ sở và sai số GPS tối đa (kiểm tra khi bấm Vào ca), Wi-Fi khi chủ trung tâm yêu cầu, "Vị trí chỉ được xác minh lúc vào ca và lúc ra ca", giờ chốt không vào ca được sau 22:30 (trợ giảng) hoặc 22:45 (vị trí khác), và với trực tuyến: chỉ nhận khi có ca được xếp, trong 15 phút quanh giờ ca, không cần vị trí.
+- Sau khi lấy vị trí, tấm xác nhận ghi sai số so với mức cho phép ("sai số khoảng 85 m (cho phép tối đa 50 m)") và nhắc ra chỗ thoáng khi sai số lớn hơn mức cho phép; lý do máy chủ từ chối (ví dụ ngoài khu vực Trung tâm) vẫn hiện ngay trong tấm, kèm "Lấy vị trí hiện tại" và "Gửi chấm công chờ duyệt".
+- **Thẻ đang trong ca**: "Đang trong ca · Tại trung tâm", thời gian đã làm việc chạy từng giây, giờ vào ca và ca được xếp (hoặc nhãn không có ca được phân công), dữ liệu vị trí lúc vào ca, nhắc Ra ca tại Trung tâm cần lấy lại vị trí và giờ hệ thống tự kết thúc ca, cùng nút "Ra ca" lớn.
+- **Bảng công trên điện thoại** dạng thẻ: ngày · ca (hoặc "Ngoài lịch"), thời lượng khớp với giờ in trên thẻ, "giờ vào → giờ ra · hình thức · GPS + Wi-Fi", lý do tự kết thúc, nhãn "Ca ngoài lịch", "Yêu cầu điều chỉnh · chờ duyệt" kèm giờ đề nghị, "Điều chỉnh · đã duyệt / bị từ chối". Ca tự kết thúc có nút "Yêu cầu điều chỉnh" mở tấm điều chỉnh đúng ca đó.
+- Trang xem trước `/dev/timekeeping?state=idle|blocked|open|open-online|ended|unconfigured|wifi` (trả 404 trên production; mọi thao tác chấm công và vị trí thiết bị đều là bản giả, không ghi dữ liệu).
+
+### Changed
+- Người chỉ có quyền chấm công thấy nút chấm công đầu tiên trên điện thoại; mục "Chấm công cần xác minh", bảng công tháng và lịch sử điều chỉnh nằm bên dưới. Người có quyền quản lý vẫn thấy trang như trước.
+- **Tấm "Yêu cầu điều chỉnh công"** mở từ đáy màn hình: dòng tóm tắt ca ("CN 11/10 · ghi nhận 19:12 → 22:30"), ghi chú rõ mỗi lượt chỉ có một yêu cầu chờ duyệt và kết quả hiện trong bảng công, nút Hủy / Gửi yêu cầu bằng nhau, chừa chỗ cho thanh Home của iPhone.
+- Lời xác nhận "chấm công chờ duyệt" hiện ở đầu thẻ và vẫn còn sau khi thẻ đổi sang trạng thái mới. Khi vào ca hoặc ca kết thúc, thay đổi được đọc cho trình đọc màn hình và con trỏ bàn phím không bị mất.
+- Chọn hình thức trên thẻ không còn đổi hình thức mặc định của nút chấm công trên thanh trên cùng và Trang chủ; hệ thống chỉ ghi nhớ hình thức sau khi chấm công thành công.
+- Khi đang xem một tháng khác, bảng công của tháng đó tự cập nhật sau khi gửi yêu cầu điều chỉnh hay chấm công; nếu cập nhật không được, các thẻ được giữ lại kèm dòng "số liệu bên dưới có thể chưa mới nhất" và nút "Tải lại".
+- Hiệu ứng nhịp của nút "Vào ca" nhẹ hơn cho điện thoại và tắt hẳn khi máy bật giảm chuyển động.
+
+### Fixed
+- Đồng hồ "thời gian đã làm việc" không còn gây lỗi lệch dữ liệu giữa máy chủ và trình duyệt khi trang vừa tải.
+- Gửi yêu cầu điều chỉnh khi mất mạng không còn đưa sang trang lỗi và xóa lý do đang viết; tấm vẫn mở và nhắc tải lại trang để xem yêu cầu đã được ghi nhận chưa.
+- Chữ trên thẻ đang trong ca và nút chọn hình thức đọc rõ ở giao diện tối; ô chọn tháng/năm có viền khi dùng bàn phím; các nút nhỏ trên điện thoại đủ 44px.
+
 ## [0.17.0.0] - 2026-10-15
 
 Coaching dựng lại theo phong cách Stumana (bước 11b): trang phiếu Coaching, trình soạn biểu mẫu có khung xem trước 390px và trang phiếu phụ huynh mở từ điện thoại.

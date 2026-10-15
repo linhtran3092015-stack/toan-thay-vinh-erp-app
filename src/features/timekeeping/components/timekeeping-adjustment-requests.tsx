@@ -10,6 +10,7 @@ import {
   getAdjustmentStatusLabel,
   getTimeEntryModeLabel,
 } from "@/features/timekeeping/timekeeping-adjustment-utils";
+import type { TimekeepingActionOverrides } from "@/features/timekeeping/timekeeping-action-overrides";
 import type {
   TimekeepingAdjustableEntry,
   TimekeepingAdjustmentRequest,
@@ -17,6 +18,8 @@ import type {
 } from "@/features/timekeeping/types";
 
 interface TimekeepingAdjustmentRequestsProps {
+  /** Inert replacements for the /dev/timekeeping preview; real pages pass nothing. */
+  actions?: TimekeepingActionOverrides;
   canCheck: boolean;
   entries: readonly TimekeepingAdjustableEntry[];
   requests: readonly TimekeepingAdjustmentRequest[];
@@ -127,6 +130,7 @@ function TableCell({
 }
 
 export function TimekeepingAdjustmentRequests({
+  actions,
   canCheck,
   entries,
   requests,
@@ -195,7 +199,7 @@ export function TimekeepingAdjustmentRequests({
       aria-labelledby="adj-requests-heading"
       className="adj-history-work-area grid min-w-0 gap-4 overflow-hidden rounded-xl border border-border-subtle bg-surface-base shadow-[var(--elevation-1)]"
     >
-      <div className="flex flex-col gap-4 border-b border-border-subtle px-6 py-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-4 border-b border-border-subtle px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
         <div>
           <h2
             className="text-section-title font-semibold text-text-strong"
@@ -209,7 +213,11 @@ export function TimekeepingAdjustmentRequests({
           </p>
         </div>
         {canCheck ? (
-          <TimekeepingAdjustmentRequestDialog entries={entries} />
+          <TimekeepingAdjustmentRequestDialog
+            actions={actions}
+            entries={entries}
+            triggerVariant="secondary"
+          />
         ) : null}
       </div>
 

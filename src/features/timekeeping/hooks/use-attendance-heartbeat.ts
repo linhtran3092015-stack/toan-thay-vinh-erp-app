@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 import type { AttendanceHeartbeatResult } from "@/features/timekeeping/time-entry-action-types";
 import { submitAttendanceHeartbeatAction } from "@/features/timekeeping/time-entry-actions";
+import {
+  resolveTimekeepingGeolocation,
+  type TimekeepingActionOverrides,
+} from "@/features/timekeeping/timekeeping-action-overrides";
 
 export type LocationVerificationStatus =
   | "locating"
@@ -19,12 +23,15 @@ export const LOCATION_STATUS_LABELS: Record<LocationVerificationStatus, string> 
 };
 
 interface UseAttendanceHeartbeatOptions {
+  /** Inert geolocation + heartbeat for the /dev/timekeeping preview; must be a stable object. */
+  actions?: TimekeepingActionOverrides;
   activeSessionId: string | null;
   enabled: boolean;
   onSessionClosed?: (result: AttendanceHeartbeatResult & { sessionActive: false }) => void;
 }
 
 export function useAttendanceHeartbeat({
+  actions,
   activeSessionId,
   enabled,
   onSessionClosed,
@@ -45,7 +52,10 @@ export function useAttendanceHeartbeat({
       return;
     }
 
-    if (!navigator.geolocation) {
+    const geolocation = resolveTimekeepingGeolocation(actions);
+    const submitHeartbeat = actions?.submitAttendanceHeartbeat ?? submitAttendanceHeartbeatAction;
+
+    if (!geolocation) {
       const timer = setTimeout(() => {
         setStatus("signal_lost");
         setServerMessage("Trình duyệt không hỗ trợ định vị GPS.");
@@ -67,7 +77,7 @@ export function useAttendanceHeartbeat({
       lastSubmittedTimeRef.current = now;
 
       try {
-        const result = await submitAttendanceHeartbeatAction({
+        const result = await submitHeartbeat({
           gpsAccuracyMeters: Math.max(0, Math.round(position.coords.accuracy)),
           gpsLatitude: position.coords.latitude,
           gpsLongitude: position.coords.longitude,
@@ -109,7 +119,7 @@ export function useAttendanceHeartbeat({
     };
 
     // 1. Primary fast movement detector using watchPosition
-    watchId = navigator.geolocation.watchPosition(
+    watchId = geolocation.watchPosition(
       (position) => {
         void processLocationSample(position);
       },
@@ -123,7 +133,7 @@ export function useAttendanceHeartbeat({
 
     // 2. Backup keep-alive timer executing every 25s with FRESH sample (maximumAge: 0)
     keepAliveIntervalId = setInterval(() => {
-      navigator.geolocation.getCurrentPosition(
+      geolocation.getCurrentPosition(
         (position) => {
           void processLocationSample(position);
         },
@@ -138,13 +148,13 @@ export function useAttendanceHeartbeat({
 
     return () => {
       if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
+        geolocation.clearWatch(watchId);
       }
       if (keepAliveIntervalId !== null) {
         clearInterval(keepAliveIntervalId);
       }
     };
-  }, [activeSessionId, enabled]);
+  }, [actions, activeSessionId, enabled]);
 
   return {
     distanceM,
