@@ -1322,6 +1322,188 @@
 **Priority:** P3
 **Depends on:** None
 
+## Coaching
+
+### RPC trang phiếu công khai vẫn trả họ tên đầy đủ của học sinh
+
+**What:** Sửa `get_public_coaching_form` (migration) để chỉ trả tên gọi (hoặc không trả tên) cho vai trò `anon`.
+
+**Why:** Bước 11b chỉ hiện tên gọi trên trang, nhưng RPC (cấp cho `anon`) vẫn trả `students.full_name`; ai giữ token và khóa publishable có thể gọi thẳng RPC. Link gửi nhầm phụ huynh vẫn lộ họ tên đầy đủ của trẻ.
+
+**Context:** `supabase/migrations/20260815100000_coaching_forms_wave_b.sql:276`, `20260816151600_harden_anon_rpc_access.sql:32`, `src/app/coaching/form/[token]/page.tsx` (`getStudentGivenName`). Cần chủ trung tâm duyệt (đổi RPC nằm ngoài phạm vi redesign).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Trình soạn biểu mẫu giữ nội dung cũ khi phiên bản đổi ở tab khác
+
+**What:** Remount trình soạn khi phiên bản đổi (`key={form.versionId}` ở `/coaching/forms/[formId]`) và giữ banner kết quả qua lần remount; về lâu dài cho `save_coaching_form_draft`/publish nhận version id để từ chối ghi đè.
+
+**Why:** Hai tab/hai người cùng sửa: tab cũ bấm "Tạo bản nháp phiên bản mới" hoặc "Lưu nháp" có thể xuất bản/ghi đè bằng nội dung đang hiển thị cũ. Trạng thái client chỉ khởi tạo một lần từ props (có từ trước redesign).
+
+**Context:** `src/app/(app)/coaching/forms/[formId]/page.tsx`, `coaching-form-builder.tsx` (useState khởi tạo một lần), RPC `save_coaching_form_draft` (chọn draft theo form_id). Review ràng buộc + adversarial bước 11b.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Giá trị trình duyệt khôi phục vào phiếu phụ huynh bị xóa sau khi trang tải xong
+
+**What:** Đặt `autoComplete="off"` cho form phụ huynh hoặc đọc giá trị/checked đã khôi phục vào `answers` trong layout effect lúc mount.
+
+**Why:** Back/forward không qua bfcache, reload trên Firefox, hoặc Android tải lại tab bị đóng: trình duyệt khôi phục câu trả lời vào các ô đang khóa, rồi lần render sau hydrate xóa chúng (đã tái hiện).
+
+**Context:** `src/features/coaching/components/public-coaching-form.tsx` (fieldset `disabled={!hydrated}`, `useHydrated`). Red team review ràng buộc lần 2.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Câu trả lời dài của phụ huynh bị cắt lặng lẽ ở 4000 ký tự
+
+**What:** Bỏ `maxLength` trên ô trả lời công khai hoặc kiểm độ dài trong `validatePublicAnswers` và báo bằng lời.
+
+**Why:** Dán đoạn dài hơn 4000 ký tự bị trình duyệt cắt mà không báo; máy chủ và DB không giới hạn độ dài câu trả lời.
+
+**Context:** `coaching-question-renderer.tsx` (maxLength=COACHING_MAX_TEXT_LENGTH), `coaching-question-rules.ts`.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### "Hết hạn lúc" chấp nhận thời điểm đã qua và không có giới hạn trên
+
+**What:** Trong `issue()` báo "Thời hạn phải sau thời điểm hiện tại." trước khi gọi action; cân nhắc giới hạn (vd 90 ngày) và ép ở RPC.
+
+**Why:** Thời điểm đã qua bị gửi đi rồi nhận lỗi chung "Liên kết hoặc thời hạn không hợp lệ."; token một lần có thể sống tới năm 9999.
+
+**Context:** `coaching-public-link-panel.tsx` (`issue`, ô datetime-local), RPC `issue_coaching_public_link` (`p_expires_at <= now()`).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Link đã hết hạn nhưng chưa nộp vẫn ghi "Đang hoạt động"
+
+**What:** Khi `status = active` và `expiresAt` đã qua, hiện "Đã hết hạn" (tính sau hydrate hoặc nhận giờ máy chủ) và không mời thu hồi.
+
+**Why:** DB không bao giờ đặt trạng thái hết hạn; nhân viên tưởng link còn dùng được. Test wave-b đang ghim chữ "Đang hoạt động" cho link active có hạn trong quá khứ nên cần cập nhật test đó cùng lúc (cần duyệt).
+
+**Context:** `coaching-public-link-panel.tsx` (`linkStatus`), `tests/components/coaching-forms-wave-b.test.tsx`.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Proxy cho mọi method đi qua `/coaching/form/*`
+
+**What:** Giới hạn ngoại lệ public của `/coaching/form/*` ở GET/HEAD và POST server action của chính trang, như `/dev/*` đã làm.
+
+**Why:** Có từ trước bước 11b: POST tới đường dẫn này gọi được server action mà không qua cổng email cho phép; action vẫn kiểm quyền DB nên chỉ ảnh hưởng tài khoản có quyền Coaching nhưng không thuộc danh sách cho phép.
+
+**Context:** `src/proxy.ts:31`. Phát hiện ở adversarial bước 11b (ngoài phạm vi).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Thông báo kết quả trong builder/link panel sau các trường hợp còn lại
+
+**What:** Giữ xác nhận "Đã lưu bản nháp" qua lần chuyển trang sau lần lưu đầu; báo kết quả + trả focus sau "Thêm ghi chú"/"Đóng phiếu"; đặt lỗi thu hồi/sao chép gần nút; dùng ResultBanner cho dòng trạng thái của link panel (giữ đúng một role=status).
+
+**Why:** Các finding a11y/UX được hoãn ở review bước 11b; hành vi hiện tại không mất dữ liệu.
+
+**Context:** `coaching-form-builder.tsx`, `coaching-event-actions.tsx`, `coaching-public-link-panel.tsx`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Rời trình soạn trong lúc đang lưu không được hỏi
+
+**What:** Giữ leave guard khi đang lưu với lời thoại riêng cho biểu mẫu (biến thể "saving" hiện nói về phân quyền), hoặc khóa link quay lại khi đang lưu.
+
+**Why:** Lưu thất bại sau khi đã rời trang thì lỗi không hiện ở đâu và thay đổi mất.
+
+**Context:** `coaching-form-builder.tsx` (`useLeaveGuard(dirty && !pending)`), `src/features/settings/components/leave-guard.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Trang phiếu phụ huynh lúc chưa tải xong
+
+**What:** Đặt dòng "Đang tải phiếu…" phía trên câu hỏi và làm mờ các ô bị khóa; thêm dòng dự phòng bằng CSS cho trình duyệt không chạy được bundle (iOS < 16.4, WebView cũ); sửa câu noscript.
+
+**Why:** Trên điện thoại chậm, phụ huynh chạm ô đầu tiên không thấy gì xảy ra và lý do nằm dưới cuối form.
+
+**Context:** `public-coaching-form.tsx`, `coaching-question-renderer.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Rút tên gọi học sinh với tên có ghi chú
+
+**What:** `getStudentGivenName` bỏ phần trong ngoặc/sau gạch nối và trả null khi từ cuối không có chữ cái; dùng `nickname` nếu RPC trả.
+
+**Why:** Tên nhập kèm ghi chú ("Nguyễn Văn An (2)", "… 6A1", "… - con chị Lan") sẽ hiện "(2)", "6A1" hoặc tên người khác.
+
+**Context:** `public-coaching-form-shell.tsx:31`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Rút gọn lý do theo grapheme
+
+**What:** Dùng `Intl.Segmenter` (grapheme, chuẩn hóa NFC) khi cắt lý do 80 ký tự.
+
+**Why:** Cắt theo code point vẫn có thể tách cờ/emoji ZWJ hoặc dấu thanh tiếng Việt dạng tổ hợp.
+
+**Context:** `coaching-presentation.ts` (`summarizeCoachingReason`).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Vệ sinh test Coaching
+
+**What:** Chạy các block giờ Việt Nam trong `tests/unit/coaching-presentation.test.ts` qua nhiều múi giờ; reset `vi.useRealTimers()`/`vi.unstubAllEnvs()` trong afterEach của `coaching-public-link-copy.test.tsx`; sửa header test route và docstring "cùng giá trị" (chỉ đúng trong một phút).
+
+**Why:** Trên máy múi giờ +07 một hồi quy về giờ local vẫn qua test; test timeout dưới tải có thể để rò TZ/Date giả sang test sau.
+
+**Context:** `tests/unit/coaching-presentation.test.ts`, `tests/components/coaching-public-link-copy.test.tsx`, `tests/components/public-coaching-form-route.test.tsx`, `coaching-presentation.ts:103`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Gọn mã Coaching (gợi ý của review)
+
+**What:** Dùng `Field`/`Textarea` cho dialog sự kiện và các ô của link panel; map 4 ô thang điểm; dùng chung card với `CareCard`; dùng chung helper ngày giờ với student-care; một helper `settle()` cho các lời gọi action; ghi nhớ thẻ câu hỏi/câu hỏi công khai cho form 100 câu; nút 48px thay `h-12!`.
+
+**Why:** Các gợi ý simplification/performance được hoãn; không ảnh hưởng hành vi.
+
+**Context:** `coaching-event-actions.tsx`, `coaching-public-link-panel.tsx`, `coaching-form-builder.tsx`, `coaching-detail-page.tsx`, `coaching-presentation.ts`, `coaching-question-renderer.tsx`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Test thứ tự sự kiện của RPC
+
+**What:** Thêm test SQL (tests/database) khẳng định `get_coaching_record_events` trả theo `event_sequence` tăng dần.
+
+**Why:** Dòng thời gian đảo thứ tự và suy ra trạng thái trước dựa vào thứ tự này; đổi thứ tự ở RPC sẽ không làm đỏ test UI nào.
+
+**Context:** `coaching-presentation.ts` (`buildCoachingTimeline`), migration `20260802200000_coaching_event_ordering.sql`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
 ## Completed
 
 ### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp

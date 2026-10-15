@@ -2,6 +2,35 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.17.0.0] - 2026-10-15
+
+Coaching dựng lại theo phong cách Stumana (bước 11b): trang phiếu Coaching, trình soạn biểu mẫu có khung xem trước 390px và trang phiếu phụ huynh mở từ điện thoại.
+
+### Added
+- **Trang phiếu Coaching** `/coaching/[id]`: tiêu đề "Đợt · Học sinh", huy hiệu ưu tiên và trạng thái, dòng ngữ cảnh (mã học sinh · ngày mở · người phụ trách · ngày xem lại · lý do). Mỗi trạng thái có một nút chính: "Bắt đầu xử lý" khi phiếu mở, "Đóng phiếu" (ghi kết quả) khi đang xử lý, kèm "Thêm ghi chú". Phiếu đã đóng không còn nút thao tác.
+- Trang chia hai cột trên màn hình rộng: bên trái là **Link phiếu công khai** và **Phản hồi**, bên phải là **Sự kiện** (mới nhất ở trên, ghi rõ "Đổi trạng thái Mở → Đang xử lý", trích nguyên văn ghi chú và kết quả, giờ Việt Nam) và **Lý do theo dõi** đầy đủ.
+- **Link phiếu công khai**: nút "Phát link mới", mỗi link ghi biểu mẫu · phiên bản, giờ phát, hết hạn, thu hồi và trạng thái bằng chữ. Link vừa tạo hiện một lần trong ô chọn được, kèm "Sao chép liên kết" và báo đã sao chép hay chưa. Trước khi tạo, form nói rõ link đang hoạt động của học sinh cho cùng phiên bản (kể cả ở phiếu Coaching khác) sẽ bị thu hồi. Thu hồi cần ghi lý do và nêu hệ quả trước khi xác nhận. Biểu mẫu đang soạn phiên bản mới (nên tạm chưa phát link được) được nêu tên.
+- **Trình soạn biểu mẫu** `/coaching/forms/[id]` và `/coaching/forms/new`: cột trái là phần soạn, cột phải là khung "Phụ huynh sẽ thấy (390px)" hiển thị đúng các câu hỏi phụ huynh sẽ nhận. Mỗi thẻ câu hỏi có loại câu, "Bắt buộc", đưa lên/xuống, xóa, danh sách lựa chọn từng dòng với "Thêm lựa chọn", thang điểm Từ/Đến/Nhãn thấp/Nhãn cao. Hàng "Thêm câu hỏi:" có đủ 6 loại câu.
+- **Xuất bản vN** hỏi xác nhận và nêu hệ quả: câu hỏi bị khóa, link mới dùng phiên bản này, link đã gửi vẫn nộp được. Nếu còn thay đổi chưa lưu, bản nháp được lưu trước rồi mới xuất bản. Không có quyền xuất bản thì nút hiện lý do.
+- Trước khi lưu hay xuất bản, trình soạn chỉ ra ngay tại câu hỏi những gì máy chủ sẽ từ chối (lựa chọn trống hoặc trùng, thang điểm ngoài 0–10, thiếu nội dung) và đưa con trỏ tới chỗ cần sửa. Rời trang khi còn thay đổi chưa lưu sẽ được hỏi lại.
+- **Trang phiếu cho phụ huynh** `/coaching/form/[token]` thiết kế cho điện thoại: dòng "Toán Thầy Vinh · tên gọi của con", câu hỏi đánh số, dấu * cho câu bắt buộc, nút thang điểm 44px kèm nhãn hai đầu, lựa chọn 44px, nút "Gửi phiếu" 48px và ghi chú "Phiếu chỉ gửi được một lần."
+- Phụ huynh được nhắc ngay tại câu còn thiếu trước khi gửi, con trỏ chuyển tới câu đó. Câu không bắt buộc để trống không bị gửi đi. Nhấn Enter chuyển sang câu tiếp theo thay vì gửi phiếu sớm.
+- Trang xem trước `/dev/coaching?view=record|builder|public&state=…&role=manager|editor|viewer` (trả 404 trên production, mọi thao tác Coaching đều không ghi dữ liệu).
+
+### Changed
+- Danh sách Coaching, trang phiếu và hộp thoại tạo phiếu dùng cùng một cách gọi mức ưu tiên: Cao · Vừa · Thấp ("Ưu tiên vừa" thay cho "Ưu tiên trung bình").
+- Thẻ Phản hồi chỉ hiện với người có quyền xem phản hồi. Khi không tải được lịch sử link, phản hồi hay danh sách biểu mẫu, trang ghi rõ là không tải được thay vì báo "chưa có", và tạm khóa "Phát link mới".
+- Trang phiếu phụ huynh chỉ hiện tên gọi của học sinh (không hiện họ tên đầy đủ) và không cho máy tìm kiếm lập chỉ mục.
+- Trang phiếu phụ huynh khóa các câu hỏi và nút gửi cho tới khi trang tải xong, kèm dòng "Đang tải phiếu…", để không mất câu trả lời đã chọn trong lúc trang đang tải.
+
+### Fixed
+- Trình soạn trước đây không thêm được câu "Câu trả lời ngắn", ô lựa chọn xóa mất dấu xuống dòng khi gõ, và "Xuất bản" bỏ qua thay đổi chưa lưu.
+- Mất kết nối hoặc hệ thống vừa cập nhật trong lúc lưu, xuất bản, gửi phiếu, thêm ghi chú hay phát/thu hồi link không còn đưa sang trang lỗi và xóa nội dung đang nhập; màn hình giữ nguyên và báo để thử lại.
+- Khi link hết hạn, bị thu hồi hoặc đã nộp trong lúc phụ huynh đang điền, trang chuyển sang màn hình trạng thái tương ứng thay vì báo lỗi lặp lại. Lỗi đọc link tạm thời hiện "Chưa tải được phiếu." kèm nút "Tải lại trang", không còn báo "Liên kết không hợp lệ."
+- Số mà trình duyệt không đọc được (ví dụ "1,5") được báo "dùng dấu chấm" thay vì bị bỏ qua lặng lẽ.
+- Ô "Hết hạn lúc" mặc định và khi gửi đều theo giờ Việt Nam, không còn lệch 7 giờ.
+- Bấm Enter hai lần trong ô lý do thu hồi, hoặc nhấn Enter để chọn chữ khi gõ tiếng Việt, không còn gửi thu hồi hai lần hay gửi khi lý do chưa viết xong.
+
 ## [0.16.0.0] - 2026-10-15
 
 Chăm sóc học sinh dựng lại theo phong cách Stumana (bước 11a): hàng đợi công việc chăm sóc và trang chi tiết công việc. Mỗi dòng của hàng đợi chỉ có một nút, trang công việc chỉ có một nút chính, và bấm thử lại sau lỗi mạng không tạo bản ghi trùng.
