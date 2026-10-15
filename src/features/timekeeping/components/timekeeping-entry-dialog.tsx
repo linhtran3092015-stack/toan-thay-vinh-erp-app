@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
 import { requestAttendanceExceptionAction } from "@/features/timekeeping/attendance-exception-actions";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,14 @@ import type {
 import { initialTimekeepingEntryActionState } from "@/features/timekeeping/time-entry-action-types";
 import type { AttendanceVerificationPolicy } from "@/features/timekeeping/types";
 import {
+  resolveTimekeepingGeolocation,
+  type TimekeepingActionOverrides,
+} from "@/features/timekeeping/timekeeping-action-overrides";
+import {
+  readRememberedTimekeepingMode,
+  rememberTimekeepingMode,
+} from "@/features/timekeeping/timekeeping-last-mode";
+import {
   checkInTimeEntryAction,
   checkOutTimeEntryAction,
 } from "@/features/timekeeping/time-entry-actions";
@@ -28,9 +37,19 @@ import {
 type TimekeepingEntryOperation = "check-in" | "check-out";
 
 interface TimekeepingEntryDialogProps {
+  /** Inert replacements for the /dev/timekeeping preview; real pages pass nothing. */
+  actions?: TimekeepingActionOverrides;
   attendancePolicy?: AttendanceVerificationPolicy;
   /** Capture GPS as soon as the dialog opens in on-site mode (one-tap flow). */
   autoLocate?: boolean;
+  /** Mode chosen outside the dialog (the /timekeeping card); defaults to the last remembered mode. */
+  initialMode?: TimeEntryActionInput["mode"];
+  /**
+   * Receives the "chờ duyệt" confirmation instead of the dialog showing it
+   * itself: on /timekeeping the card holding this dialog is replaced once the
+   * page refreshes, so the panel keeps the message where it survives.
+   */
+  onExceptionSubmitted?: (message: string) => void;
   operation: TimekeepingEntryOperation;
   /** Custom trigger content (e.g. the topbar pill); the dialog still owns the button. */
   triggerChildren?: ReactNode;
@@ -39,22 +58,8 @@ interface TimekeepingEntryDialogProps {
   timeEntryId?: string;
 }
 
-const LAST_MODE_STORAGE_KEY = "timekeeping.lastMode";
-
 function readLastMode(): TimeEntryActionInput["mode"] {
-  try {
-    return window.localStorage.getItem(LAST_MODE_STORAGE_KEY) === "online" ? "online" : "offline";
-  } catch {
-    return "offline";
-  }
-}
-
-function rememberMode(mode: TimeEntryActionInput["mode"]): void {
-  try {
-    window.localStorage.setItem(LAST_MODE_STORAGE_KEY, mode);
-  } catch {
-    // Storage can be unavailable (private mode); remembering is a convenience only.
-  }
+  return readRememberedTimekeepingMode() ?? "offline";
 }
 
 const defaultAttendancePolicy: AttendanceVerificationPolicy = {
@@ -83,8 +88,11 @@ function createInitialValues(mode: TimeEntryActionInput["mode"] = "offline"): Ti
 
 /** Presentation for the existing check-in/out mutation; eligibility remains server-owned. */
 export function TimekeepingEntryDialog({
+  actions,
   attendancePolicy = defaultAttendancePolicy,
   autoLocate = true,
+  initialMode,
+  onExceptionSubmitted,
   operation,
   timeEntryId,
   triggerChildren,
@@ -126,7 +134,7 @@ export function TimekeepingEntryDialog({
   const isInteractionLocked = isLocating || isMutationInteractionLocked;
 
   const openDialog = (): void => {
-    const lastMode = readLastMode();
+    const lastMode = initialMode ?? readLastMode();
     requestIdRef.current = crypto.randomUUID();
     sampledAtRef.current = null;
     setReviewReason("");
@@ -175,7 +183,8 @@ export function TimekeepingEntryDialog({
   const captureLocation = (): void => {
     sampledAtRef.current = null;
     setValues((current) => ({ ...current, gpsAccuracyMeters: null, gpsLatitude: null, gpsLongitude: null }));
-    if (!navigator.geolocation) {
+    const geolocation = resolveTimekeepingGeolocation(actions);
+    if (!geolocation) {
       setLocationMessage("Trình duyệt hiện tại không hỗ trợ định vị.");
       return;
     }
@@ -183,7 +192,7 @@ export function TimekeepingEntryDialog({
     setIsLocating(true);
     setLocationMessage("");
 
-    navigator.geolocation.getCurrentPosition(
+    geolocation.getCurrentPosition(
       (position) => {
         sampledAtRef.current = Date.now();
         setValues((current) => ({
@@ -240,13 +249,13 @@ export function TimekeepingEntryDialog({
     startTransition(async () => {
       try {
         const result = isCheckIn
-          ? await checkInTimeEntryAction(values)
-          : await checkOutTimeEntryAction(values);
+          ? await (actions?.checkInTimeEntry ?? checkInTimeEntryAction)(values)
+          : await (actions?.checkOutTimeEntry ?? checkOutTimeEntryAction)(values);
 
         setActionState(result);
 
         if (result.status === "success") {
-          rememberMode(values.mode);
+          rememberTimekeepingMode(values.mode);
           setIsOpen(false);
           router.refresh();
         }
@@ -257,15 +266,22 @@ export function TimekeepingEntryDialog({
   };
 
   const hasLocation = values.gpsLatitude !== null && values.gpsLongitude !== null;
+  // Same comparison the server makes first; the radius check stays server-side.
+  const isAccuracyOverLimit = values.gpsAccuracyMeters !== null
+    && values.gpsAccuracyMeters > attendancePolicy.gpsMaxAccuracyM;
   const submitForReview = () => {
     if (isInteractionLocked || !requestIdRef.current) return;
     const requestId = requestIdRef.current;
     startTransition(async () => {
       try {
-        const result = await requestAttendanceExceptionAction({ operation, reason: reviewReason, requestId, timeEntryId: timeEntryId ?? null });
+        const result = await (actions?.requestAttendanceException ?? requestAttendanceExceptionAction)({ operation, reason: reviewReason, requestId, timeEntryId: timeEntryId ?? null });
         setActionState(result);
         if (result.status === "success") {
-          setSubmittedMessage(result.message);
+          if (onExceptionSubmitted) {
+            onExceptionSubmitted(result.message);
+          } else {
+            setSubmittedMessage(result.message);
+          }
           setIsOpen(false);
           router.refresh();
         }
@@ -319,7 +335,8 @@ export function TimekeepingEntryDialog({
         onClose={closeDialog}
         returnFocusRef={triggerRef}
       >
-        <div className="p-4 sm:p-5">
+        <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 rounded-full bg-border-strong-hover sm:hidden" />
+        <div className="p-4 pb-[calc(16px+var(--safe-area-bottom))] sm:p-5">
           <div>
             <h2 className="text-section-title font-semibold text-text-strong" id={titleId}>{title}</h2>
             <p className="mt-1 text-secondary text-text-muted" id={descriptionId}>
@@ -376,13 +393,23 @@ export function TimekeepingEntryDialog({
                   </Button>
                 ) : null}
               </div>
-              {hasLocation ? (
-                <p className="text-secondary text-text-muted">
-                  Đã có dữ liệu vị trí
-                  {values.gpsAccuracyMeters !== null ? `, sai số khoảng ${values.gpsAccuracyMeters} m` : ""}.
-                </p>
-              ) : null}
-              {locationMessage ? <p aria-live="polite" className="text-secondary text-text-muted">{locationMessage}</p> : null}
+              {/* One always-mounted live region: the capture result, the
+                  accuracy and its over-limit warning are announced together. */}
+              <div aria-live="polite" className="grid gap-2 empty:sr-only">
+                {hasLocation ? (
+                  <p className="text-secondary text-text-muted">
+                    Đã có dữ liệu vị trí
+                    {values.gpsAccuracyMeters !== null ? `, sai số khoảng ${values.gpsAccuracyMeters} m (cho phép tối đa ${attendancePolicy.gpsMaxAccuracyM} m)` : ""}.
+                  </p>
+                ) : null}
+                {hasLocation && isAccuracyOverLimit ? (
+                  <p className="flex items-start gap-2 text-secondary text-text-strong">
+                    <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                    Sai số lớn hơn mức cho phép. Thử ra chỗ thoáng rồi lấy lại vị trí.
+                  </p>
+                ) : null}
+                {locationMessage ? <p className="text-secondary text-text-muted">{locationMessage}</p> : null}
+              </div>
               {gpsErrors.length > 0 ? <p className="text-caption text-danger" id={gpsErrorId}>{gpsErrors.join(" ")}</p> : null}
             </fieldset> : null}
 
@@ -440,7 +467,7 @@ export function TimekeepingEntryDialog({
               <label className="grid gap-1">Lý do cần duyệt
                 <textarea className={`${inputClassName} min-h-20 py-2`} disabled={isInteractionLocked} maxLength={2000} value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} />
               </label>
-              <Button type="button" variant="outline" disabled={isInteractionLocked || !reviewReason.trim() || (!isCheckIn && !timeEntryId)} onClick={submitForReview}>Gửi chấm công chờ duyệt</Button>
+              <Button className="max-md:h-11" type="button" variant="outline" disabled={isInteractionLocked || !reviewReason.trim() || (!isCheckIn && !timeEntryId)} onClick={submitForReview}>Gửi chấm công chờ duyệt</Button>
             </fieldset> : null}
 
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
