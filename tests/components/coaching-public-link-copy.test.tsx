@@ -665,8 +665,11 @@ describe("CoachingPublicLinkPanel revoking", () => {
       />,
     );
     const revokeRow = async (row: HTMLElement, link: CoachingPublicLinkSummary, calls: number) => {
-      fireEvent.click(within(row).getByRole("button", { name: "Thu hồi" }));
-      fireEvent.change(within(row).getByLabelText(`Lý do thu hồi ${link.id}`), { target: { value: "Gửi nhầm" } });
+      // The previous revoke's transition may still hold the row actions under load.
+      const open = within(row).getByRole("button", { name: "Thu hồi" });
+      await waitFor(() => expect(open).toBeEnabled());
+      fireEvent.click(open);
+      fireEvent.change(await within(row).findByLabelText(`Lý do thu hồi ${link.id}`), { target: { value: "Gửi nhầm" } });
       fireEvent.click(within(row).getByRole("button", { name: "Thu hồi" }));
       await waitFor(() => expect(actions.revokeCoachingPublicLink).toHaveBeenCalledTimes(calls));
       await waitFor(() => expect(screen.queryByLabelText(`Lý do thu hồi ${link.id}`)).not.toBeInTheDocument());
