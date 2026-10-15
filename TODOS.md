@@ -1504,6 +1504,164 @@
 **Priority:** P3
 **Depends on:** None
 
+## Chấm công
+
+### Tổng giờ tháng tính cả giờ đề nghị của yêu cầu chờ duyệt hoặc bị từ chối
+
+**What:** Sửa `get_my_monthly_timekeeping_entries` (và tổng giờ của `get_center_monthly_timekeeping_overview`) để `total_minutes` chỉ dùng giờ của yêu cầu điều chỉnh đã duyệt; sau đó KPI "Tổng giờ làm việc" và cột "Thời lượng" trên máy tính khớp với thẻ di động.
+
+**Why:** RPC lấy yêu cầu xếp hạng cao nhất (duyệt > chờ > từ chối) bất kể trạng thái, nên tổng giờ cộng cả giờ chưa được duyệt hay đã bị từ chối. Bước 12 cho thẻ di động tính từ giờ in trên thẻ, nên trên cùng màn hình thẻ và KPI/bảng có thể lệch nhau. Lương dùng giờ đã duyệt, nên bảng công đang báo nhiều hơn số được trả.
+
+**Context:** `supabase/migrations/20260915170000_*` (lateral `adj`, `coalesce(adj.requested_*)`), `src/features/timekeeping/components/my-monthly-timesheet-panel.tsx` (`totalMinutes` KPI, `TimesheetRow`, `minutesBetween`). Cần migration, chủ trung tâm duyệt. Test KPI "25.5" dùng `totalMinutes` của fixture.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Mã lỗi yêu cầu điều chỉnh không khớp SQL
+
+**What:** Đồng bộ bảng thông báo lỗi trong `timekeeping-adjustment-actions.ts` với mã mà `request_time_entry_adjustment` thật sự raise (`TIME_ENTRY_ALREADY_HAS_APPROVED_ADJUSTMENT`, `..._WORK_DATE_INVALID`, `TIME_ENTRY_MUST_BE_CLOSED_FOR_ADJUSTMENT`, `TIME_ENTRY_NOT_AVAILABLE_FOR_ADJUSTMENT`, lỗi trùng chỉ mục yêu cầu chờ duyệt, `..._REASON_REQUIRED`, `..._TIME_RANGE_INVALID`, `..._CANNOT_USE_FUTURE_TIME`, `..._VALUES_INVALID`).
+
+**Why:** Hầu hết lỗi rơi về câu chung "Không thể gửi yêu cầu điều chỉnh. Dữ liệu chưa được cập nhật.", kể cả khi gửi lại một yêu cầu đã được ghi nhận (lỗi trùng), nên nhân sự không biết phải làm gì.
+
+**Context:** `supabase/migrations/20260729090000_*` (dòng 289–399) và chỉ mục `time_entry_adjustment_one_pending_request_idx`; file action là server action nên bước 12 (chỉ trình bày) không sửa.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Làm gọn cập nhật nền của bảng công tháng khác
+
+**What:** Trong `my-monthly-timesheet-panel.tsx`: (1) cập nhật nền thành công thì xóa luôn cảnh báo "Không thể tải bảng công…" của lần chọn tháng trước và không chồng dòng "chưa mới nhất" lên danh sách rỗng; (2) vùng `role="status"` đang chứa chữ sr-only khi tải làm khung lưới dịch 16px mỗi lần đổi tháng: để vùng sr-only trừ khi có thông báo nhìn thấy; (3) nút "Tải lại" cần trạng thái đang tải, báo lại khi thất bại lần nữa và giữ con trỏ khi thành công; (4) cân nhắc chạy cập nhật nền bằng promise thường thay vì `startTransition` async (transition async làm các transition khác, kể cả `router.refresh()`, chờ fetch xong nên một thao tác vẫn tốn hai lần tải); khóa in-flight chỉ xóa khi đúng request; thêm test cho chốt thứ tự request; bỏ `mockResolvedValue` rò rỉ ở test thẻ (dòng ~459) và siết đuôi test in-flight.
+
+**Why:** Review ràng buộc bước 12 (sau 3 vòng sửa) tìm thấy các điểm này; không sửa thêm vì đã chạm giới hạn vòng sửa. Tình huống chỉ xảy ra khi đang xem tháng khác tháng hiện tại.
+
+**Context:** `refreshMonthInBackground`, `loadMonth`, effect snapshot theo `initialEntries`, `staleMonthNotice`; ghi chép `.gstack/ship-records/step12.md` mục "Binding pass". Bài học `async-transition-defers-refresh-snapshot`, `empty-sr-only-live-region-shift`.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Tấm "Ra ca" không mặc định theo hình thức của ca đang mở
+
+**What:** Truyền `initialMode={entry.checkInMode}` cho tấm Ra ca của thẻ đang trong ca; quyết định với chủ trung tâm có cho ra ca "Trực tuyến" một ca vào "Tại trung tâm" hay không.
+
+**Why:** Tấm Ra ca mở theo hình thức nhớ trong trình duyệt, và `check_out_time_entry` chỉ kiểm tra vị trí khi ra ca hình thức offline: một ca tại trung tâm có thể ra ca "Trực tuyến" ở bất kỳ đâu không cần GPS, trong khi thẻ ghi "Ra ca tại Trung tâm cần lấy lại vị trí". Lỗ hổng phía máy chủ có từ trước bước 12.
+
+**Context:** `src/features/timekeeping/components/my-timekeeping-panel.tsx` (`OpenShiftCard`), `supabase/migrations/20260904010000_*` (`check_out_time_entry`, nhánh `normalized_mode = 'offline'`). Phát hiện của adversarial bước 12.
+
+**Effort:** S (UI) / M (server)
+**Priority:** P2
+**Depends on:** Chủ trung tâm quyết định phần server
+
+### Tên ca trước khi vào ca và số "Chờ xác minh" trong tháng
+
+**What:** Thêm RPC `get_my_shift_today()` (security definer, chỉ ca của chính mình) để thẻ hiện "Ca chiều 17:00–21:30 · Theo lịch tuần" trước khi vào ca và báo trước quy tắc trực tuyến; gộp số ca chờ xác minh (từ `get_attendance_exception_reviews` lọc theo mình, hoặc RPC tháng trả cả ca chưa xác minh) vào phần tóm tắt tháng.
+
+**Why:** Thiết kế 14a có tên ca và "Chờ xác minh n ca" nhưng trợ giảng không có quyền đọc phân công (`timekeeping.view`) và RPC tháng loại ca chưa xác minh; bước 12 bỏ hai phần này để không hiển thị dữ liệu không có thật.
+
+**Context:** `M/20260916100000` (`resolve_staff_shift_for_checkin` revoke), `M/20260915170000:292` (`time_entry_is_verified`). Cần migration.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Nút chấm công trên thanh trên cùng thành nút chính thứ hai ở /timekeeping
+
+**What:** Quyết định ẩn hoặc hạ nút "Chấm công" của thanh trên cùng khi đang ở `/timekeeping` (thẻ đã có "Vào ca" lớn).
+
+**Why:** Trên trang thật, trợ giảng thấy hai nút màu chính mở cùng một tấm (quy tắc một nút chính mỗi trang); trong ca còn có hai chấm nhấp nháy. Trang xem trước `/dev/timekeeping` không có nút trên thanh nên không thấy.
+
+**Context:** `src/components/layout/topbar.tsx`, `topbar-timekeeping-button.tsx`. Ngoài phạm vi bước 12 (hợp đồng thanh trên cùng).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Chủ trung tâm
+
+### Test Coaching chập chờn khi chạy cả bộ lúc máy tải cao
+
+**What:** Sửa các test chờ trạng thái thay vì đọc một lần: `coaching-form-builder.test.tsx` ("Tạo bản nháp phiên bản mới" bị từ chối, "Xuất bản" bị từ chối), `coaching-public-link-copy.test.tsx` (thu hồi dòng thứ hai), `dev-coaching-preview.test.tsx` (lưu và xuất bản bản nháp).
+
+**Why:** Khi tải máy cao các test này đôi khi đỏ (đã gặp 4 lần trong bước 12) dù chạy riêng luôn xanh. Bản sửa đã làm ở bước 12 bị gỡ khỏi nhánh vì nằm ngoài phạm vi và cần đo P(fail|regression) trước/sau.
+
+**Context:** Commit e62b2c0 (đã revert ở 659f845) là điểm bắt đầu; chạy kèm phép thử ép lỗi để chứng minh test vẫn đỏ khi có lỗi thật.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Phần thiết kế 14 chưa có dữ liệu thật
+
+**What:** Khi có dữ liệu: danh sách "Buổi học trong ca" (cần liên kết trợ giảng ↔ buổi học, chủ trung tâm đã hoãn mô hình giáo viên theo lớp); khoảng cách tới cơ sở trước khi vào ca (cần tọa độ cho `timekeeping.check` hoặc RPC xem trước; check-in hiện tính rồi bỏ khoảng cách); dòng "Ca đang mở chưa được tính vào lương tạm tính" (đúng, nhưng test cấm từ ngữ lương trên màn hình cá nhân — cần chủ trung tâm chọn cách nói).
+
+**Why:** Bước 12 bỏ các phần này vì không có nguồn đúng sự thật.
+
+**Context:** `.gstack/briefs/step12-map-rules-data.md` mục 4.
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** Chủ trung tâm
+
+### Quy tắc chấm công không nhất quán ở máy chủ
+
+**What:** Thống nhất giờ chốt của "Gửi chấm công chờ duyệt" (SQL dùng 23:30) với giờ chốt theo vai trò (22:30 trợ giảng, 22:45 vị trí khác); gỡ hoặc cập nhật mã theo dõi vị trí liên tục đã chết từ 2026-09-15 (`useAttendanceHeartbeat`, `AttendanceHeartbeatWatcher`, nhánh chữ "Vị trí được theo dõi liên tục trong ca").
+
+**Why:** Thông báo lỗi nói 22:30/22:45 nhưng SQL ngoại lệ dùng 23:30; mã heartbeat không còn tác dụng nhưng vẫn có đường hiển thị chữ không đúng nếu cờ bật lại.
+
+**Context:** `M/20260915170000:125,149`, `src/features/timekeeping/hooks/use-attendance-heartbeat.ts`, `timekeeping-staff-presentation.ts`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Thẻ đang trong ca để mở qua giờ chốt
+
+**What:** Khi "Ra ca" trả lỗi không còn ca mở (ca đã tự kết thúc lúc 22:30/22:45) thì làm mới trang; làm mới khi quay lại tab (`visibilitychange`/`pageshow`); cân nhắc dừng đồng hồ sau giờ chốt.
+
+**Why:** Điện thoại giữ trang từ chiều tới khuya vẫn hiện "Đang trong ca" và bấm "Ra ca" chỉ báo lỗi, không tự cập nhật.
+
+**Context:** `timekeeping-entry-dialog.tsx` (chỉ `router.refresh()` khi thành công), `my-timekeeping-panel.tsx` (`ElapsedClock`).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Hoàn thiện nhỏ màn chấm công cá nhân
+
+**What:** Lời xác nhận "chờ duyệt" xóa khi lần chấm công sau thành công; tấm điều chỉnh của từng thẻ nằm trong khối `md:hidden` nên xoay ngang máy làm tấm biến mất (đưa Dialog ra `document.body`); câu quy tắc trực tuyến ghi rõ "từ 15 phút trước giờ bắt đầu tới 15 phút sau giờ kết thúc"; dòng Wi-Fi nhắc cả BSSID; ô chọn tháng bị khóa khi đang tải làm mất con trỏ; tiêu đề tấm "tự động kết thúc" và thẻ "tự kết thúc" nên cùng một cách nói; trùng câu mô tả trang cá nhân trong `timekeeping-page.tsx`; nhịp "Vào ca" lặp vô hạn (cân nhắc dừng sau vài lần); kích thước nút lớn dùng `!` thay vì size `xl` của Button; ô nhập 14px có thể làm iOS phóng to; test trang xem trước chờ hẹn giờ thật 500ms.
+
+**Why:** Các điểm review bước 12 đánh giá P3, gom lại một chỗ.
+
+**Context:** Ghi chép `.gstack/ship-records/step12.md` (các mục Skipped).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Gợi ý gọn mã chấm công (review bước 12)
+
+**What:** Radio gốc của trình duyệt thay cho radiogroup tự viết; gộp hai hook đồng hồ và hai keyframes nhịp; dùng chung hàm định dạng giờ HH:MM, thứ ngắn, thời lượng (`src/lib/datetime.ts`); tùy chọn tay cầm tấm đáy trong `ui/dialog.tsx` (đang lặp ở 3 nơi).
+
+**Why:** Giảm trùng lặp; không ảnh hưởng hành vi.
+
+**Context:** Phát hiện của chuyên gia đơn giản hóa và review chung bước 12.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Người vừa quản lý vừa chấm công vẫn thấy bố cục cũ
+
+**What:** Ở bước 16 (thiết kế 18, chấm công quản lý), đưa thẻ chấm công cá nhân lên đầu cho người có cả quyền xem/quản lý, và chuyển bảng công máy tính sang token mới.
+
+**Why:** Bước 12 chỉ đổi bố cục cho người chỉ có quyền chấm công; bảng máy tính còn màu Tailwind thô (amber/emerald).
+
+**Context:** `src/features/timekeeping/timekeeping-page.tsx` (`isStaffOnly`), `my-monthly-timesheet-panel.tsx` (`TimesheetRow`).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Bước 16
+
 ## Completed
 
 ### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp
