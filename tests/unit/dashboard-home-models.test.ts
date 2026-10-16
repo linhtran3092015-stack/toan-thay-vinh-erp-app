@@ -253,7 +253,8 @@ describe("needs-action list", () => {
     const list = buildNeedsAction(model(owner));
 
     expect(list.items.map((item) => item.key)).toEqual(["sessions-unmarked", "sepay", "payroll-review", "advances-pending", "debt"]);
-    expect(list.items[0]).toMatchObject({ href: "/sessions?lock=unlocked&to=2026-10-12", title: "2 buổi quá giờ chưa xong điểm danh" });
+    // The list's own "Chưa điểm danh" filter (the same rule as this item), bounded at today.
+    expect(list.items[0]).toMatchObject({ href: "/sessions?attendance=missing&to=2026-10-12", title: "2 buổi quá giờ chưa xong điểm danh" });
     expect(list.items[0].detail).toBe("Lớp x (13:30 hôm nay) · Lớp y (hôm qua)");
     expect(list.items.find((item) => item.key === "sepay")?.href).toBe("/finance/sepay?queue=review");
     expect(list.complete).toBe(true);
@@ -311,7 +312,7 @@ describe("needs-action list", () => {
         }),
       }),
     );
-    expect(many.items[0]).toMatchObject({ actionLabel: "Xem buổi học", href: "/sessions?lock=unlocked&to=2026-10-12", title: "3+ buổi quá giờ chưa xong điểm danh" });
+    expect(many.items[0]).toMatchObject({ actionLabel: "Xem buổi học", href: "/sessions?attendance=missing&to=2026-10-12", title: "3+ buổi quá giờ chưa xong điểm danh" });
     expect(many.items[0].detail).toBe("Lớp x (13:30 hôm nay) · Lớp y (hôm qua) · và 1 buổi khác");
     // The item's own title carries the "+"; the list total counts items, so it stays exact.
     expect(many).toMatchObject({ total: many.items.length, totalIsFloor: false });
@@ -480,7 +481,10 @@ describe("needs-action list", () => {
     const lockItem = (list: ReturnType<typeof buildNeedsAction>) => list.items.find((item) => item.key === "sessions-awaiting-lock");
 
     const item = lockItem(buildNeedsAction(model([...ta], { awaitingLock: awaiting })));
-    expect(item).toMatchObject({ href: "/sessions?status=completed&lock=unlocked", kind: "sessions", title: "3+ buổi đã kết thúc chờ khóa" });
+    // Bounded at today so the list's newest-first window is spent on past sessions.
+    // Only ready-to-lock sessions are counted, so the list's word for them, not the chip's "Chờ khóa".
+    expect(item).toMatchObject({ badge: "Sẵn sàng khóa", href: "/sessions?status=completed&lock=unlocked&to=2026-10-12", kind: "sessions", title: "3+ buổi sẵn sàng khóa" });
+    expect(lockItem(buildNeedsAction(model([...ta], { awaitingLock: readyFeed({ count: 2, truncated: false }) })))).toMatchObject({ title: "2 buổi sẵn sàng khóa" });
 
     expect(lockItem(buildNeedsAction(model(ta.filter((code) => code !== "sessions.lock"), { awaitingLock: awaiting })))).toBeUndefined();
     expect(lockItem(buildNeedsAction(model([...ta], { awaitingLock: readyFeed({ count: 0, truncated: false }) })))).toBeUndefined();

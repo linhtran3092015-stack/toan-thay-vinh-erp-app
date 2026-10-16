@@ -2,6 +2,28 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.20.0.0] - 2026-10-16
+
+Danh sách học vụ dựng lại theo phong cách Stumana (bước 14a): trang Buổi học cho thấy ngay buổi nào chưa điểm danh, buổi nào sẵn sàng khóa; Kết quả học tập và Tín chỉ chấm bài lọc được theo đúng nhu cầu hằng ngày.
+
+### Added
+- **Buổi học** `/sessions`: lọc nhanh Tất cả · Hôm nay · Tuần này · Chưa điểm danh · Chờ khóa · Đã khóa · Đã hủy, mỗi chip kèm số buổi khi dữ liệu đã tải đủ cho chip đó. Chọn "Tuần này" hiện dòng "Tuần 12–18/10/2026 · n buổi · x chưa điểm danh · y chờ khóa".
+- Bảng buổi học mới: Ngày · giờ ("T2 12/10 · 18:00–20:00"), Lớp kèm khối · cấp, Loại (Chính / Bù / Bổ sung), Hình thức · phòng ("Online · có link"), Điểm danh và Kết quả dạng x/y, Trạng thái ("Đang diễn ra", "Sẵn sàng khóa", "Thiếu N điểm danh", "Không có học sinh", "Chưa bắt đầu", "Chưa hoàn thành", lý do hủy) và một nút mỗi dòng: "Khóa", "Điểm danh" hoặc "Mở". Dòng còn thiếu điểm danh được tô nhạt; màn hình hẹp hiện dạng thẻ.
+- Bộ lọc của Buổi học nằm trên địa chỉ trang, nên tải lại hay bấm Quay lại vẫn giữ nguyên; trang cũng báo khi khoảng ngày đang chọn chưa được tải đủ và có nút "Tải lại danh sách".
+- **Kết quả học tập** `/learning-results`: lọc nhanh Chưa có điểm · Dưới 5 · Vở chưa nộp · Cần chú ý; lọc theo lớp, khối, khoảng ngày, vở và tình trạng điểm; bảng Học sinh · Lớp · Buổi · Điểm KT · Vở · Điểm vở · Nhận xét · Chấm lúc · Khóa. Khi đã tải đủ 500 kết quả mới nhất, trang báo nếu khoảng ngày đang chọn vượt ra ngoài phần đã tải.
+- **Tín chỉ chấm bài** `/grading-credits`: lọc theo tháng, người chấm (khi xem toàn bộ) và lớp; dòng tổng tín chỉ ghi đúng con số, hoặc "ít nhất N" khi danh sách chưa chứa hết tháng; nút "Mở kết quả buổi" cho người xem được buổi học.
+- Trang xem trước `/dev/lists?view=sessions|results|credits` với `role=owner|ta` và `state=normal|capped|empty` (trả 404 trên production, chỉ dùng dữ liệu mẫu).
+
+### Changed
+- Khung "buổi đã hoàn thành chưa khóa" trên trang Buổi học tính điểm danh theo đúng quy tắc khóa (học sinh học thêm không làm số vượt sĩ số), chỉ hiện nút "Điểm danh" cho người có quyền điểm danh, ghi "N+" khi còn nhiều hơn, và báo rõ khi không tải được hoặc chỉ tải được một phần hàng đợi khóa.
+- Thông báo hằng ngày về buổi chờ khóa và các liên kết trên Trang chủ mở thẳng chip "Chờ khóa" hoặc "Chưa điểm danh", chỉ đọc các buổi tới hôm nay. Mục Trang chủ đổi thành "N buổi sẵn sàng khóa" cho khớp với danh sách.
+- Danh sách buổi học không còn nhận đường dẫn phòng học trực tuyến, chỉ biết buổi đó "có link".
+
+### Fixed
+- Số điểm danh và số kết quả của từng buổi không còn bị thiếu khi một tuần có hơn 1.000 lượt điểm danh; file xuất danh sách buổi học cũng đếm đủ.
+- Tín chỉ chấm bài tính tháng và giờ "Ghi nhận lúc" theo giờ Việt Nam: tín chỉ ghi lúc 00:30 ngày 1/10 thuộc tháng 10, không còn tùy múi giờ máy chủ.
+- Tìm kiếm trong Kết quả học tập tìm được tên có chữ "Đ" khi gõ "d".
+
 ## [0.19.0.0] - 2026-10-16
 
 Phiếu học phí dựng lại theo phong cách Stumana (bước 13): bảng chuẩn bị kỳ thu nháp tính "Phải thu" đúng như lúc khóa kỳ, trang mẫu phiếu có xem trước A5 ngay khi gõ, và phiếu học phí in đúng khổ A5, mỗi phiếu một trang.

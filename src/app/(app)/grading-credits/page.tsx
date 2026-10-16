@@ -1,8 +1,9 @@
-import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getGradingCreditsDashboardResult } from "@/features/grading-credits/data";
 import { GradingCreditListPage } from "@/features/grading-credits/grading-credit-list-page";
+import { GRADING_CREDITS_LIMIT } from "@/features/grading-credits/grading-credit-models";
+import { getVietnamToday } from "@/lib/datetime";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 import { permissionDeniedDescription } from "@/lib/permissions/labels";
@@ -27,7 +28,7 @@ export default async function GradingCreditsRoute() {
     );
   }
 
-  const gradingCreditsResult = await getGradingCreditsDashboardResult();
+  const gradingCreditsResult = await getGradingCreditsDashboardResult(GRADING_CREDITS_LIMIT);
 
   if (!gradingCreditsResult.ok) {
     return (
@@ -41,20 +42,16 @@ export default async function GradingCreditsRoute() {
   const canViewAll = permissionResult.permissions.includes(
     "grading_credits.view_all",
   );
+  const canViewSessions = permissionResult.permissions.includes("sessions.view");
 
-  if (gradingCreditsResult.data.length === 0) {
-    return (
-      <EmptyState
-        description="Tín chỉ sẽ được ghi nhận tự động khi một buổi học hoàn thành được khóa và có kết quả đã chấm."
-        title="Chưa có tín chỉ chấm bài"
-      />
-    );
-  }
-
+  // Zero credits still renders the page: the list shows its own in-frame empty state.
   return (
     <GradingCreditListPage
       canViewAll={canViewAll}
+      canViewSessions={canViewSessions}
       entries={gradingCreditsResult.data}
+      limit={GRADING_CREDITS_LIMIT}
+      today={getVietnamToday()}
     />
   );
 }

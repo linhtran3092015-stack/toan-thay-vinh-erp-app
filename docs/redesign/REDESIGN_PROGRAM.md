@@ -25,7 +25,7 @@ The redesign must preserve all of the following unless a separate, explicitly ap
 ## Explicit non-goals
 
 - Rebuild the ERP, redesign its domain model, or introduce a tenant/organization model.
-- Introduce server-side filtering or server-side pagination in this program. Approved exception: the class-page enrolment search (v0.8.0.0); see WORKFLOW_CONTRACTS_A_E.md, Enrollment lifecycle.
+- Introduce server-side filtering or server-side pagination in this program. Approved exceptions: the class-page enrolment search (v0.8.0.0; see WORKFLOW_CONTRACTS_A_E.md, Enrollment lifecycle) and the sessions directory's server-side date window (v0.20.0.0; see WORKFLOW_CONTRACTS_A_E.md, Sessions).
 - Add a central permission registry, central action registry, schema-driven mega-table, universal form engine, or third-party UI component library.
 - Add a global academic-year selector or imply a cross-module academic-year filter.
 - Add a new attendance route.

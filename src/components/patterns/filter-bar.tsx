@@ -16,6 +16,12 @@ interface FilterBarProps {
   label?: string;
   /** Number of filter controls after the search field; sets the design grid. */
   fieldCount?: number;
+  /**
+   * Explicit track list for the fields (the trailing `auto` reset column is added),
+   * for bars whose fields need floors, e.g. date inputs that must show a full date.
+   * Wins over `fieldCount`.
+   */
+  columns?: string;
 }
 
 /**
@@ -27,6 +33,7 @@ export function FilterBar({
   activeCount = 0,
   children,
   className,
+  columns,
   fieldCount,
   label = "Bộ lọc",
   onReset,
@@ -39,15 +46,19 @@ export function FilterBar({
         className,
       )}
       style={
-        fieldCount
-          ? { gridTemplateColumns: `minmax(220px, 1.4fr) repeat(${fieldCount}, minmax(0, 1fr)) auto` }
-          : undefined
+        columns
+          ? { gridTemplateColumns: `${columns} auto` }
+          : fieldCount
+            ? { gridTemplateColumns: `minmax(220px, 1.4fr) repeat(${fieldCount}, minmax(0, 1fr)) auto` }
+            : undefined
       }
     >
       {children}
       {activeCount > 0 && onReset ? (
         <Button
-          className="text-action-primary hover:text-action-primary-hover"
+          // justify-self-start: a `columns` track list without fr tracks leaves the
+          // trailing auto column wide; the button keeps its own width at its start.
+          className="justify-self-start text-action-primary hover:text-action-primary-hover"
           onClick={onReset}
           variant="ghost"
         >

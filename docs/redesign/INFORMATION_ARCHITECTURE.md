@@ -60,11 +60,11 @@ Source of truth: `navigationGroups` in `src/config/navigation.ts` (Stumana redes
 
 - A page title and primary page action area may clarify an existing page’s purpose; they must not alter action availability.
 - The top bar shows a real-route breadcrumb on every route that belongs to the navigation: the domain (linked) only when that domain has a module strip, then the current module (`aria-current="page"`), built by `getNavigationBreadcrumb`. Routes outside the navigation show no breadcrumb. Record-level crumbs (a student or class name) belong to the page, not the shell; detail pages may add them.
-- Table/list filters use URL-backed client view state while preserving current full-directory reads, client filtering, and pagination semantics.
+- Table/list filters use URL-backed client view state while preserving current full-directory reads, client filtering, and pagination semantics. Exception: `/sessions` reads its `from`/`to` range on the server (v0.20.0.0, WORKFLOW_CONTRACTS_A_E.md, Sessions).
 - Responsive navigation changes presentation only; it must preserve navigation visibility and route access parity.
 
 ## Information architecture non-goals
 
-- No route renames, redirects, permission-code changes, or new global filtering semantics.
+- No route renames, redirects, permission-code changes, or new global filtering semantics. (`/sessions` redirecting its own undated "Chờ khóa" / "Chưa điểm danh" URLs to the same route bounded at today is a same-route query normalization, owner-approved in v0.20.0.0.)
 - No claims that an academic-year selection affects every module.
 - No new attendance, search, calendar, or notification workflow.

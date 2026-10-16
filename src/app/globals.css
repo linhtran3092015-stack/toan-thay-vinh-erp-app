@@ -562,7 +562,10 @@ body::before {
   }
 }
 
-/* Wave 5 Sessions: choose dense filters/table only when the operational work area is safe. */
+/* Sessions directory (design 16b): the work area, not a device label, selects the
+   dense filters/table or the filter sheet/record list. 1120px covers the table's
+   1108px min width + the frame border (+12px like Students), the shared threshold
+   of the wide operational tables; the seven-field FilterBar needs it too. */
 .sessions-directory {
   container-type: inline-size;
 }
@@ -581,7 +584,10 @@ body::before {
 }
 
 @container (min-width: 1120px) {
-  .sessions-filter-bar,
+  .sessions-filter-bar {
+    display: grid;
+  }
+
   .sessions-directory-table {
     display: block;
   }
@@ -589,10 +595,6 @@ body::before {
   .sessions-filter-trigger,
   .sessions-directory-record-list {
     display: none;
-  }
-
-  .sessions-filter-fields {
-    grid-template-columns: minmax(220px, 1.45fr) repeat(5, minmax(118px, 1fr)) auto;
   }
 }
 

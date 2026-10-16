@@ -6,14 +6,18 @@ import type {
 } from "@/features/grading-credits/read-models";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export async function getGradingCreditsDashboardResult(): Promise<
-  GradingCreditReadResult<readonly GradingCreditDashboardEntry[]>
-> {
+/** The dashboard summary's cap; `/grading-credits` asks for more (`GRADING_CREDITS_LIMIT`). */
+const DEFAULT_GRADING_CREDITS_LIMIT = 200;
+
+/** `limit` is the RPC's `p_limit` (1-500); callers that cut the list must say how many they asked for. */
+export async function getGradingCreditsDashboardResult(
+  limit = DEFAULT_GRADING_CREDITS_LIMIT,
+): Promise<GradingCreditReadResult<readonly GradingCreditDashboardEntry[]>> {
   try {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase.rpc(
       "get_grading_credits_dashboard",
-      { p_limit: 200 },
+      { p_limit: limit },
     );
 
     if (error || !data) {

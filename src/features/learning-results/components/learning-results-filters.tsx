@@ -1,162 +1,256 @@
-import type { ReactNode } from "react";
+"use client";
 
-import { Button } from "@/components/ui/button";
-import type { LearningResultFiltersState } from "@/features/learning-results/read-models";
+import { useId, type ChangeEvent, type ReactNode, type RefObject } from "react";
 
-interface ClassOption {
-  id: string;
-  label: string;
-}
+import {
+  FilterBar,
+  FilterField,
+  FilterInput,
+  FilterSelect,
+  FilterSheet,
+} from "@/components/patterns/filter-bar";
+import type {
+  LearningResultClassOption,
+  LearningResultFilterChange,
+  LearningResultFiltersState,
+  LearningResultNotebookFilter,
+  LearningResultScoreFilter,
+} from "@/features/learning-results/learning-result-models";
 
 interface LearningResultsFiltersProps {
-  classOptions: readonly ClassOption[];
+  activeFilterCount: number;
+  classOptions: readonly LearningResultClassOption[];
   filters: LearningResultFiltersState;
   gradeOptions: readonly number[];
-  hasActiveFilters: boolean;
-  onChange: (nextFilters: LearningResultFiltersState) => void;
+  isOpen: boolean;
+  onClose: () => void;
+  onFilterChange: LearningResultFilterChange;
   onReset: () => void;
+  /** Rows the current filters match; labels the sheet's apply button. */
+  resultCount?: number;
+  returnFocusRef: RefObject<HTMLElement | null>;
+  /**
+   * Classes of the wrapper around the desktop bar (the page owns the
+   * container-query breakpoint that hides it on narrow widths). The sheet
+   * stays outside the wrapper so it can still open when the bar is hidden.
+   */
+  barWrapperClassName?: string;
 }
 
+/**
+ * Desktop bar tracks, one per field in order: Tìm kiếm, Lớp, Khối, Từ ngày,
+ * Đến ngày, Vở, Tình trạng điểm. The date tracks have a 148px floor so a full
+ * `dd/mm/yyyy` plus the picker icon is never clipped; the selects share what is
+ * left. The floors sum to 844px: the bar at the 1072px container threshold has
+ * about 1038px inside its border and padding, less 7 gaps of 12px and the
+ * "Xóa lọc (n)" button (~105px), which leaves ~849px.
+ */
+const DESKTOP_FILTER_COLUMNS = [
+  "minmax(180px, 1.6fr)",
+  "minmax(96px, 1.2fr)",
+  "minmax(88px, 0.8fr)",
+  "minmax(148px, 1fr)",
+  "minmax(148px, 1fr)",
+  "minmax(88px, 0.9fr)",
+  "minmax(96px, 1.1fr)",
+].join(" ");
+
+/**
+ * Desktop filter bar plus the narrow-width sheet, both fed by the same fields
+ * (design 06 pattern): search, lớp, khối, từ ngày, đến ngày, vở, tình trạng điểm.
+ */
 export function LearningResultsFilters({
+  activeFilterCount,
+  barWrapperClassName,
   classOptions,
   filters,
   gradeOptions,
-  hasActiveFilters,
-  onChange,
+  isOpen,
+  onClose,
+  onFilterChange,
   onReset,
+  resultCount,
+  returnFocusRef,
 }: LearningResultsFiltersProps) {
-  const updateFilter = (
-    key: keyof LearningResultFiltersState,
-    value: string,
-  ) => {
-    onChange({ ...filters, [key]: value });
-  };
+  const titleId = useId();
+  const fields = (scope: "desktop" | "mobile") => (
+    <LearningResultFilterFields
+      classOptions={classOptions}
+      filters={filters}
+      gradeOptions={gradeOptions}
+      onFilterChange={onFilterChange}
+      scope={scope}
+    />
+  );
 
   return (
-    <section
-      aria-label="Bộ lọc kết quả học tập"
-      className="border-y border-hairline bg-surface-1 py-4"
-    >
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-        <label className="grid gap-1.5 text-xs font-semibold text-ink-muted sm:col-span-2">
-          <span>Tìm học viên hoặc lớp</span>
-          <input
-            className={inputClassName}
-            onChange={(event) => updateFilter("search", event.target.value)}
-            placeholder="Tên, mã học viên, tên lớp..."
-            type="search"
-            value={filters.search}
-          />
-        </label>
-
-        <FilterSelect
-          label="Khối"
-          onChange={(value) => updateFilter("grade", value)}
-          value={filters.grade}
+    <>
+      <div className={barWrapperClassName}>
+        <FilterBar
+          activeCount={activeFilterCount}
+          className="learning-results-filter-bar"
+          columns={DESKTOP_FILTER_COLUMNS}
+          label="Bộ lọc kết quả học tập"
+          onReset={onReset}
         >
-          <option value="">Khối 1-12</option>
-          {gradeOptions.map((grade) => (
-            <option key={grade} value={grade}>
-              Khối {grade}
-            </option>
-          ))}
-        </FilterSelect>
-
-        <FilterSelect
-          label="Lớp"
-          onChange={(value) => updateFilter("classId", value)}
-          value={filters.classId}
-        >
-          <option value="">Tất cả lớp</option>
-          {classOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </FilterSelect>
-
-        <FilterSelect
-          label="Tình trạng"
-          onChange={(value) => updateFilter("scoreStatus", value)}
-          value={filters.scoreStatus}
-        >
-          <option value="">Tất cả</option>
-          <option value="attention">Cần chú ý</option>
-          <option value="complete">Đủ dữ liệu</option>
-          <option value="missing">Thiếu dữ liệu</option>
-        </FilterSelect>
-
-        <FilterSelect
-          label="Trạng thái vở"
-          onChange={(value) => updateFilter("notebookStatus", value)}
-          value={filters.notebookStatus}
-        >
-          <option value="">Tất cả</option>
-          <option value="submitted">Đã nộp</option>
-          <option value="not_submitted">Chưa nộp</option>
-          <option value="not_required">Không yêu cầu</option>
-        </FilterSelect>
-
-        <div className="flex items-end">
-          <Button
-            className="min-h-11 w-full"
-            disabled={!hasActiveFilters}
-            onClick={onReset}
-            type="button"
-            variant="outline"
-          >
-            Xóa lọc
-          </Button>
-        </div>
-
-        <label className="grid gap-1.5 text-xs font-semibold text-ink-muted">
-          <span>Từ ngày</span>
-          <input
-            className={inputClassName}
-            onChange={(event) => updateFilter("dateFrom", event.target.value)}
-            type="date"
-            value={filters.dateFrom}
-          />
-        </label>
-
-        <label className="grid gap-1.5 text-xs font-semibold text-ink-muted">
-          <span>Đến ngày</span>
-          <input
-            className={inputClassName}
-            onChange={(event) => updateFilter("dateTo", event.target.value)}
-            type="date"
-            value={filters.dateTo}
-          />
-        </label>
+          {fields("desktop")}
+        </FilterBar>
       </div>
-    </section>
+      <FilterSheet
+        activeCount={activeFilterCount}
+        isOpen={isOpen}
+        onClose={onClose}
+        onReset={onReset}
+        resetTestId="mobile-result-reset-filters"
+        resultLabel={
+          resultCount === undefined
+            ? "Xem kết quả"
+            : `Xem ${resultCount} kết quả`
+        }
+        returnFocusRef={returnFocusRef}
+        subject="kết quả học tập"
+        titleId={titleId}
+      >
+        {fields("mobile")}
+      </FilterSheet>
+    </>
   );
 }
 
-function FilterSelect({
+function LearningResultFilterFields({
+  classOptions,
+  filters,
+  gradeOptions,
+  onFilterChange,
+  scope,
+}: Pick<
+  LearningResultsFiltersProps,
+  "classOptions" | "filters" | "gradeOptions" | "onFilterChange"
+> & { scope: "desktop" | "mobile" }) {
+  const text =
+    (key: "dateFrom" | "dateTo" | "search") =>
+    (event: ChangeEvent<HTMLInputElement>) =>
+      onFilterChange(key, event.target.value);
+
+  return (
+    <>
+      <FilterField label="Tìm kiếm">
+        <FilterInput
+          active={filters.search.trim().length > 0}
+          autoComplete="off"
+          data-testid={`${scope}-result-search`}
+          onChange={text("search")}
+          placeholder="Học sinh, mã hoặc lớp"
+          type="search"
+          value={filters.search}
+        />
+      </FilterField>
+      <SelectField
+        label="Lớp"
+        onChange={(event) => onFilterChange("classId", event.target.value)}
+        testId={`${scope}-result-class`}
+        value={filters.classId}
+      >
+        <option value="">Tất cả lớp</option>
+        {classOptions.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </SelectField>
+      <SelectField
+        label="Khối"
+        onChange={(event) => onFilterChange("grade", event.target.value)}
+        testId={`${scope}-result-grade`}
+        value={filters.grade}
+      >
+        <option value="">Tất cả khối</option>
+        {gradeOptions.map((grade) => (
+          <option key={grade} value={grade}>
+            Khối {grade}
+          </option>
+        ))}
+      </SelectField>
+      <FilterField label="Từ ngày">
+        <FilterInput
+          active={filters.dateFrom !== ""}
+          data-testid={`${scope}-result-date-from`}
+          max={filters.dateTo || undefined}
+          onChange={text("dateFrom")}
+          type="date"
+          value={filters.dateFrom}
+        />
+      </FilterField>
+      <FilterField label="Đến ngày">
+        <FilterInput
+          active={filters.dateTo !== ""}
+          data-testid={`${scope}-result-date-to`}
+          min={filters.dateFrom || undefined}
+          onChange={text("dateTo")}
+          type="date"
+          value={filters.dateTo}
+        />
+      </FilterField>
+      <SelectField
+        label="Vở"
+        onChange={(event) =>
+          onFilterChange(
+            "notebookStatus",
+            event.target.value as LearningResultNotebookFilter,
+          )
+        }
+        testId={`${scope}-result-notebook`}
+        value={filters.notebookStatus}
+      >
+        <option value="">Tất cả</option>
+        <option value="submitted">Đã nộp</option>
+        <option value="not_submitted">Chưa nộp</option>
+        <option value="not_required">Không yêu cầu</option>
+      </SelectField>
+      <SelectField
+        label="Tình trạng điểm"
+        onChange={(event) =>
+          onFilterChange(
+            "scoreStatus",
+            event.target.value as LearningResultScoreFilter,
+          )
+        }
+        testId={`${scope}-result-score`}
+        value={filters.scoreStatus}
+      >
+        <option value="">Tất cả</option>
+        <option value="scored">Có điểm</option>
+        <option value="unscored">Chưa có điểm</option>
+        <option value="below_five">Dưới 5</option>
+        <option value="attention">Cần chú ý</option>
+      </SelectField>
+    </>
+  );
+}
+
+function SelectField({
   children,
   label,
   onChange,
+  testId,
   value,
 }: {
   children: ReactNode;
   label: string;
-  onChange: (value: string) => void;
+  onChange: (event: ChangeEvent<HTMLSelectElement>) => void;
+  testId: string;
   value: string;
 }) {
   return (
-    <label className="grid gap-1.5 text-xs font-semibold text-ink-muted">
-      <span>{label}</span>
-      <select
-        className={inputClassName}
-        onChange={(event) => onChange(event.target.value)}
+    <FilterField label={label}>
+      <FilterSelect
+        active={value !== ""}
+        data-testid={testId}
+        onChange={onChange}
         value={value}
       >
         {children}
-      </select>
-    </label>
+      </FilterSelect>
+    </FilterField>
   );
 }
-
-const inputClassName =
-  "h-11 min-w-0 rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring/20";

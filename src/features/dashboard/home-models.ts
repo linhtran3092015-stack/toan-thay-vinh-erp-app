@@ -573,7 +573,8 @@ export function buildNeedsAction(model: DashboardHomeReadModel): NeedsActionList
         actionLabel: sessions.length === 1 ? "Mở buổi học" : "Xem buổi học",
         badge: "Quá hạn",
         detail: sorted.slice(0, 2).map((item) => sessionShortLabel(item, model.today)).join(" · ") + (sorted.length > 2 ? ` · và ${sorted.length - 2} buổi khác` : ""),
-        href: sessions.length === 1 ? `/sessions/${sessions[0].id}` : `/sessions?lock=unlocked&to=${model.today}`,
+        // The list's "Chưa điểm danh" chip state (the same rule as this item), so landing presses the chip; `to` keeps its server window on past sessions.
+        href: sessions.length === 1 ? `/sessions/${sessions[0].id}` : `/sessions?attendance=missing&to=${model.today}`,
         key: "sessions-unmarked",
         kind: "sessions",
         title: `${count} buổi quá giờ chưa xong điểm danh`,
@@ -626,12 +627,15 @@ export function buildNeedsAction(model: DashboardHomeReadModel): NeedsActionList
     if (count <= 0) return;
     items.push({
       actionLabel: "Xem buổi chờ khóa",
-      badge: "Chờ khóa",
+      // Only the ready set (roster > 0, nothing missing) is counted: the list's word for it,
+      // since the "Chờ khóa" chip the link lands on counts every completed, unlocked session.
+      badge: "Sẵn sàng khóa",
       detail: "Đã điểm danh đủ. Khóa buổi để chốt học phí và công của buổi.",
-      href: "/sessions?status=completed&lock=unlocked",
+      // The list's "Chờ khóa" chip state, so landing presses the chip.
+      href: `/sessions?status=completed&lock=unlocked&to=${model.today}`,
       key: "sessions-awaiting-lock",
       kind: "sessions",
-      title: `${count}${truncated ? "+" : ""} buổi đã kết thúc chờ khóa`,
+      title: `${count}${truncated ? "+" : ""} buổi sẵn sàng khóa`,
       tone: "info",
     });
   });
