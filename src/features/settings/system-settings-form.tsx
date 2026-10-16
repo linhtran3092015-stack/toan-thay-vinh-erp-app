@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 
 import { StickySaveBar } from "@/components/patterns/sticky-save-bar";
@@ -33,7 +34,6 @@ const FIELD_LABELS = {
   zaloAbsenceMessageEnabled: "Tạo tin khi vắng không phép",
   zaloCommentMessageEnabled: "Tạo tin nhận xét cuối buổi",
   zaloAbsenceTemplate: "Mẫu tin vắng không phép",
-  zaloCommentTemplate: "Mẫu tin nhận xét cuối buổi",
 } as const;
 
 export type SystemSettingsFieldName = keyof typeof FIELD_LABELS;
@@ -60,7 +60,6 @@ function toFields(values: SystemSettings): SystemSettingsFields {
     zaloCenterAccountId: lf(values["zalo.center_account_id"]),
     zaloCenterAccountName: lf(values["zalo.center_account_name"]),
     zaloCommentMessageEnabled: values["zalo.comment_message_enabled"] === "on" ? "on" : "",
-    zaloCommentTemplate: lf(values["zalo.comment_template"]),
   };
 }
 
@@ -222,7 +221,8 @@ export function SystemSettingsForm({
         <SettingsCard
           description={
             <>
-              Gửi qua ZaloCRM từ nick trung tâm vào nhóm sổ liên lạc của từng học sinh. Chọn nick trong danh sách (cần đã cấu hình ZALOCRM_BASE_URL / ZALOCRM_API_KEY). Mẫu tin dùng các biến {"{center} {student} {class} {date} {time} {comment} {scores}"}.
+              Gửi qua ZaloCRM từ nick trung tâm vào nhóm sổ liên lạc của từng học sinh. Chọn nick trong danh sách (cần đã cấu hình ZALOCRM_BASE_URL / ZALOCRM_API_KEY). Mẫu tin vắng dùng các biến {"{center} {student} {class} {date} {time}"}. Mẫu tin nhận xét cuối buổi sửa ở{" "}
+              <Link className="font-semibold text-action-link hover:underline" href="/settings/zalo">Cài đặt → Tin Zalo</Link>.
             </>
           }
           title="Tin nhắn phụ huynh (Zalo)"
@@ -242,11 +242,6 @@ export function SystemSettingsForm({
             <Field className="md:col-span-2" label={FIELD_LABELS.zaloAbsenceTemplate} required>
               {(props) => (
                 <textarea className={cn(controlClassName, "min-h-20 py-2")} defaultValue={defaults.zaloAbsenceTemplate} maxLength={1000} name="zaloAbsenceTemplate" required {...props} />
-              )}
-            </Field>
-            <Field className="md:col-span-2" label={FIELD_LABELS.zaloCommentTemplate} required>
-              {(props) => (
-                <textarea className={cn(controlClassName, "min-h-20 py-2")} defaultValue={defaults.zaloCommentTemplate} maxLength={1000} name="zaloCommentTemplate" required {...props} />
               )}
             </Field>
           </div>
@@ -336,7 +331,6 @@ export function SystemSettingsReadOnly({ settings }: { settings: SystemSettings 
             [FIELD_LABELS.zaloAbsenceMessageEnabled, enabled(fields.zaloAbsenceMessageEnabled)],
             [FIELD_LABELS.zaloCommentMessageEnabled, enabled(fields.zaloCommentMessageEnabled)],
             [FIELD_LABELS.zaloAbsenceTemplate, fields.zaloAbsenceTemplate, true],
-            [FIELD_LABELS.zaloCommentTemplate, fields.zaloCommentTemplate, true],
           ]}
         />
       </SettingsCard>

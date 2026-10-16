@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 
+import type { RankBand } from "@/features/parent-messages/comment-template";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { parseSystemSettings, type SystemSettings } from "@/features/settings/system-settings";
 
@@ -26,3 +27,10 @@ async function _getCenterDisplayName(): Promise<string> {
  * read the center name in the same render pass.
  */
 export const getCenterDisplayName = cache(_getCenterDisplayName);
+
+/** grading_rank_bands (Tin Zalo preview; the database ranks queued messages itself). */
+export async function getGradingRankBands(): Promise<RankBand[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.from("grading_rank_bands").select("min_score,label").order("min_score");
+  return (data ?? []).map((row) => ({ label: row.label, minScore: Number(row.min_score) }));
+}

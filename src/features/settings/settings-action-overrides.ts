@@ -2,7 +2,7 @@ import type { listZaloAccountsAction } from "@/features/parent-messages/actions"
 import type { saveWebsite } from "@/features/website/actions";
 import type { Palette } from "@/features/website/schema";
 
-import type { setRolePermissionsAction, updateSystemSettingsAction } from "./actions";
+import type { setRolePermissionsAction, updateSystemSettingsAction, updateZaloCommentTemplateAction } from "./actions";
 
 /**
  * Optional replacements for every write (and external read) the settings hub
@@ -19,4 +19,5 @@ export interface SettingsActionOverrides {
   saveWebsite?: typeof saveWebsite;
   setRolePermissions?: typeof setRolePermissionsAction;
   updateSystemSettings?: typeof updateSystemSettingsAction;
+  updateZaloCommentTemplate?: typeof updateZaloCommentTemplateAction;
 }

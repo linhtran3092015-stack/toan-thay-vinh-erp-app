@@ -28,6 +28,7 @@ export function getSettingsTocGroups({ canViewAudit, canViewUsers }: SettingsToc
         // The landing needs settings.view, which the whole hub already requires.
         { exact: true, href: SETTINGS_OVERVIEW_HREF, label: "Tổng quan" },
         { href: "/settings/general", label: "Chung" },
+        { href: "/settings/zalo", label: "Tin Zalo" },
         { href: "/settings/branding", label: "Thương hiệu & giao diện" },
         { href: "/settings/website", label: "Trang web công khai" },
       ],

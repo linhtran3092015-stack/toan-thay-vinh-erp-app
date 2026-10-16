@@ -161,7 +161,7 @@ describe("SystemSettingsForm save bar", () => {
     expect(screen.queryByRole("region", { name: "Thanh lưu thay đổi" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
-  // Value: protects=the exact payload sent to updateSystemSettingsAction: all 13 keys, numbers as numbers, an unticked checkbox as false, the Zalo nick picked from the list (id and display name) and a multi-line address;
+  // Value: protects=the exact payload sent to updateSystemSettingsAction: all 12 keys (the comment template moved to Cài đặt → Tin Zalo), numbers as numbers, an unticked checkbox as false, the Zalo nick picked from the list (id and display name) and a multi-line address;
   // fails_when=toPayload drops or renames a key, sends numbers as strings, sends an unticked box as true or a missing value, loses the picked nick, or drops the address line break;
   // why_new=earlier tests only checked a few keys with objectContaining; seam=the settings actions module is mocked; the Zalo list goes through the injected stub; no_claim=server-side validation, nor CRLF handling (jsdom normalises textarea values; the CRLF saved-values test covers toFields)
   it("sends the full payload", async () => {
@@ -188,7 +188,6 @@ describe("SystemSettingsForm save bar", () => {
       zaloCenterAccountId: "zalo-1",
       zaloCenterAccountName: "Nick trung tâm (0912)",
       zaloCommentMessageEnabled: true,
-      zaloCommentTemplate: SYSTEM_SETTING_DEFAULTS["zalo.comment_template"],
     });
     expect(await within(bar()).findByRole("status")).toHaveTextContent("Đã lưu cài đặt hệ thống.");
   });
@@ -222,7 +221,6 @@ describe("SystemSettingsForm save bar", () => {
       ...SYSTEM_SETTING_DEFAULTS,
       "center.address": "Số 1 Lê Lợi\r\nPhường Bến Nghé",
       "zalo.absence_template": "Dòng 1\r\nDòng 2 {student}",
-      "zalo.comment_template": "Nhận xét\r\n{comment}",
     } as unknown as typeof SYSTEM_SETTING_DEFAULTS;
     render(<SystemSettingsForm initialValues={crlf} />);
     expect(bar()).toHaveTextContent("Chưa có thay đổi");
