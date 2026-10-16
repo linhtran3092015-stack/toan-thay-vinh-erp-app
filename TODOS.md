@@ -1844,6 +1844,188 @@
 **Priority:** P3
 **Depends on:** None
 
+## Danh sách theo lô
+
+### Ai mở được trang Buổi học
+
+**What:** Kiểm tra trên production xem trợ giảng có mở được `/sessions` không. Loader nối bảng `classes`, mà theo migration thì chỉ chủ trung tâm có `classes.view`. Nếu dòng của trợ giảng bị rơi mất thì cần một view hoặc RPC đọc buổi học không đòi `classes.view`. Cần anh quyết.
+
+**Why:** Trợ giảng là người điểm danh. Nếu danh sách trống với họ, chip "Chưa điểm danh" và nút "Điểm danh" không tới được người cần dùng.
+
+**Context:** `getSessionDirectory` trong `src/features/sessions/data.ts` (join `classes!class_sessions_class_id_fkey`); bản đồ quyền ở `.gstack/briefs/step14a-map-rules-data.md`. Review bước 14a: RLS `classes_select_authorized` trả embed lớp rỗng cho người không có `classes.view`, loader coi cả danh sách là `invalid_response` nên trang hiện "Không tải được danh sách buổi học"; nhánh `canViewClasses=false` (tên lớp không có link) vì vậy chưa bao giờ chạy trên production, còn bản xem trước `/dev/lists?view=sessions&role=ta` lại hiện danh sách bình thường. Có từ trước bước 14a.
+
+**Effort:** S (kiểm tra) / M (sửa)
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+### Đếm điểm danh và kết quả bằng một RPC tổng hợp
+
+**What:** Thay việc tải từng dòng `session_attendance` và `session_results` (chia 150 id, phân trang 1000) bằng một RPC `SECURITY INVOKER` nhận danh sách id buổi và trả về số đếm theo buổi (tất cả, đã điểm danh trong danh sách, được nhận kết quả, số kết quả).
+
+**Why:** Mỗi lần mở `/sessions` với 300 buổi đang tải khoảng 7.500 dòng điểm danh và 6.000 dòng kết quả (gần 1 MB JSON, khoảng 14 yêu cầu) chỉ để ra 300 bộ số; xuất CSV đi cùng đường này với tới 1.000 buổi. Bước 14a không được đổi RPC nên giữ cách đọc từng dòng (đã chạy song song hai bảng).
+
+**Context:** `getSessionDirectory` trong `src/features/sessions/data.ts`; index `(class_session_id, attendance_status)` đã có. Cùng lúc có thể gom việc đếm chip trên client thành một vòng (`countSessionQuickFilters` đang lọc lại 7 lần mỗi lần gõ tìm kiếm).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Đồng hồ của trang Buổi học dừng ở lúc tải
+
+**What:** Cho `today`/`nowTime` của `/sessions` chạy tiếp trên trình duyệt sau khi tải (lấy mốc từ server, cập nhật theo phút hoặc khi quay lại tab), hoặc làm mới dữ liệu khi sang ngày mới.
+
+**Why:** Mọi thao tác lọc chỉ ghi URL qua History API nên không gọi lại server: để tab mở qua giờ kết thúc buổi thì buổi đó không chuyển sang "Chưa bắt đầu"/"Chưa hoàn thành", qua nửa đêm thì chip "Hôm nay"/"Tuần này" vẫn ghi ngày cũ.
+
+**Context:** `src/app/(app)/sessions/page.tsx` (truyền `today`, `nowTime`), `src/features/sessions/session-list-page.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Mẫu số điểm danh cho buổi đang diễn ra và buổi ngoài hàng đợi khóa
+
+**What:** Hiện `x/y` cho mọi buổi đã bắt đầu, lấy sĩ số theo từng buổi, thay cho "x đã ghi" ở buổi đang diễn ra và buổi đã hoàn thành nhưng không có trong hàng đợi khóa.
+
+**Why:** Hiện chỉ buổi đã khóa và buổi trong hàng đợi (RPC `get_unlocked_completed_sessions`) có sĩ số đúng quy tắc khóa; đoán mẫu số từ số dòng điểm danh sẽ sai khi có học sinh học thêm.
+
+**Context:** `getSessionAttendanceCell` trong `src/features/sessions/session-directory-models.ts`. Cần RPC trả `roster_count` theo danh sách id buổi (cùng công thức khóa) thay vì gọi từng buổi.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Thao tác hàng loạt trên danh sách Buổi học
+
+**What:** Chọn nhiều buổi để đổi phòng hoặc hủy buổi ở nhiều lớp (thiết kế 16b), kèm hộp thoại nêu hậu quả.
+
+**Why:** Hiện chỉ có hủy hàng loạt trong trang một lớp (`cancelClassSessionsAction`, theo lớp). Bước 14a không có checkbox vì chưa có action xuyên lớp.
+
+**Context:** `src/features/sessions/session-list-page.tsx` (D9 trong `.gstack/briefs/step14a-brief.md`). Cần action mới, kiểm quyền `sessions.manage`, ghi audit.
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Liên kết thẳng tới tab của trang buổi học
+
+**What:** Các nút "Khóa", "Điểm danh" (`/sessions`), "Mở buổi" (`/learning-results`) và "Mở kết quả buổi" (`/grading-credits`) mở đúng khu vực khóa, điểm danh hoặc kết quả, thay vì đầu trang buổi học.
+
+**Why:** Người dùng bấm "Khóa" phải tự cuộn tới khu vực khóa; tên nút hứa nhiều hơn chỗ nó dẫn tới.
+
+**Context:** Trang `/sessions/[sessionId]` chưa đọc tham số tab hay neo; cần thêm neo hoặc `?tab=` ở `src/features/sessions/session-detail-page.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Tổng chính xác ngoài số dòng đã tải
+
+**What:** Đếm đúng tổng ở ba danh sách khi dữ liệu vượt giới hạn tải: số buổi theo chip (`/sessions`, cửa sổ 300 buổi), số kết quả (`/learning-results`, 500 dòng), tổng tín chỉ theo tháng và người chấm (`/grading-credits`, 500 tín chỉ mới nhất, hiện ghi "ít nhất N").
+
+**Why:** Các con số hiện chỉ đếm trên dòng đã tải và trang đã nói rõ điều đó; muốn số đủ cần head count hoặc đọc phân trang theo RLS.
+
+**Context:** `SESSION_DIRECTORY_WINDOW_LIMIT`, `LEARNING_RESULTS_LIMIT`, `GRADING_CREDITS_LIMIT`; `summarizeCreditTotal` trong `src/features/grading-credits/grading-credit-models.ts`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Bộ lọc Kết quả học tập và Tín chỉ chấm bài lên URL
+
+**What:** Đưa bộ lọc, chip và trang của `/learning-results` và `/grading-credits` lên URL (History API như `/sessions`), để trang chủ và các trang khác liên kết thẳng tới, ví dụ "Chưa có điểm" của một lớp.
+
+**Why:** Hai trang đang giữ bộ lọc trong state của trình duyệt; tải lại hoặc chia sẻ link là mất bộ lọc.
+
+**Context:** `src/features/learning-results/learning-results-page.tsx`, `src/features/grading-credits/grading-credit-list-page.tsx`; mẫu ở `src/features/sessions/session-directory-url-state.ts`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Cột còn thiếu so với thiết kế 16a
+
+**What:** Thêm giờ, loại và phòng của buổi vào `/learning-results`, khối và cấp lớp vào `/grading-credits`, và trạng thái "miễn" cho điểm nếu anh muốn có.
+
+**Why:** Các RPC hiện không trả các trường này nên bước 14a bỏ chúng (bỏ hẳn lựa chọn "Miễn" ở bộ lọc tình trạng điểm).
+
+**Context:** `src/features/learning-results/data.ts`, `src/features/grading-credits/data.ts` (`get_grading_credits_dashboard`). "Miễn" cần quy tắc nghiệp vụ mới.
+
+**Effort:** M
+**Priority:** P4
+**Depends on:** Quyết định của anh (trạng thái miễn)
+
+### Bảng chuyển sang thẻ ở màn hình laptop 1280px
+
+**What:** Thu hẹp bảng `/sessions` (min 1108px) và `/learning-results` (min 1060px), hoặc cho cuộn ngang, để laptop 1280px vẫn thấy bảng thay vì thẻ.
+
+**Why:** Vùng làm việc ở 1280px chỉ khoảng 990px nên hai trang hiện thẻ; ngưỡng 1120px của `/sessions` có từ trước bước 14a.
+
+**Context:** `.sessions-*` trong `src/app/globals.css`, `@min-[1072px]` trong `src/features/learning-results/learning-results-page.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Lọc trạng thái và khóa ngay ở máy chủ cho "Chờ khóa" và "Chưa điểm danh"
+
+**What:** Khi `/sessions` mở ở chip "Chờ khóa" (`status=completed&lock=unlocked`) hoặc "Chưa điểm danh" (`attendance=missing`), lọc `status`/`locked_at is null` ngay trong truy vấn (không chỉ lọc trên trình duyệt), ghi bộ lọc đó vào `loadedRange` để các chip khác biết phải tải lại.
+
+**Why:** Hai chip này giờ đọc tới hôm nay, nhưng vẫn là 300 buổi mới nhất mọi trạng thái; buổi cũ chưa khóa còn thiếu điểm danh (loại không bao giờ tự khóa) có thể nằm ngoài cửa sổ, nên danh sách mà khung hàng đợi và Trang chủ dẫn tới thiếu đúng các buổi cần xử lý. Review adversarial bước 14a (Medium).
+
+**Context:** `src/app/(app)/sessions/page.tsx`, `getSessionDirectory` trong `src/features/sessions/data.ts`, `getSessionWindowNotice` / `isSessionQuickFilterCountComplete` trong `session-directory-models.ts`.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Đo chi phí RPC hàng đợi khóa trên dữ liệu thật
+
+**What:** Chạy `EXPLAIN ANALYZE` cho `get_unlocked_completed_sessions` trên production; nếu chậm, gom `resolve_class_session_rosters` thành một lần cho cả danh sách buổi.
+
+**Why:** RPC gọi hàm sĩ số (SECURITY DEFINER, không inline được) cho từng buổi và lần nữa trong `EXISTS` cho từng dòng điểm danh; `/sessions` và Trang chủ chờ RPC này mỗi lần tải. Chi phí tăng theo số buổi tồn đọng chứ không theo `p_limit`.
+
+**Context:** `supabase/migrations/20261013090000_phase2a_session_reschedule_and_lock_queue.sql`, `src/features/sessions/unlocked-sessions-data.ts`.
+
+**Effort:** S (đo) / M (sửa)
+**Priority:** P3
+**Depends on:** None
+
+### Số đếm của danh sách buổi học khi đang có người điểm danh
+
+**What:** Đọc dòng điểm danh/kết quả theo keyset (`gt("id", last)`) thay vì offset, và đánh dấu tỷ lệ Kết quả là chưa đầy đủ khi số kết quả vượt số học sinh được nhận kết quả (dòng chỉ có nhận xét, học sinh vắng có kết quả).
+
+**Why:** Phân trang offset trên id ngẫu nhiên có thể đếm trùng hoặc bỏ sót khi có người điểm danh đúng lúc tải; tỷ lệ "26/25" hoặc "3/0" hiện như số chính xác.
+
+**Context:** `getSessionDirectory` (`src/features/sessions/data.ts`), `getSessionResultCell` (`session-directory-models.ts`).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Thông báo "chưa tải đủ" sai khi xóa ô Đến ngày
+
+**What:** Một hàm dùng chung cho "ngày kết thúc thực tế" của chip Chờ khóa / Chưa điểm danh (không có ngày nghĩa là tới hôm nay), dùng ở cả route (điều kiện chuyển hướng) và ở trang (khi kiểm tra cửa sổ đã tải).
+
+**Why:** Đang ở chip đã giới hạn tới hôm nay mà xóa ô "Đến ngày" thì trang báo "chưa được tải đủ" dù tập đó đã đủ; bấm "Tải lại danh sách" thì máy chủ thêm lại `to=hôm nay` và ngày vừa xóa quay lại.
+
+**Context:** `src/features/sessions/session-list-page.tsx` (`getSessionWindowNotice`), `src/app/(app)/sessions/page.tsx` (redirect).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Dọn sau bước 14a
+
+**What:** Sửa các ghi chú và tên test còn nói link thông báo hằng ngày đi qua ánh xạ chip trên trình duyệt (giờ route đã chuyển hướng); giữ tham số lặp khi chuyển hướng URL không có ngày; thêm test chuyển hướng cho chữ có dấu, `page`, `class` và thứ tự kiểm quyền; chặn năm `0000` trong ngày lọc; báo cửa sổ 500 kết quả cả khi lọc lớp/khối cũ hơn phần đã tải; buổi khóa trước khi bắt buộc đủ điểm danh không nên hiện y/y; đổi tên `SessionDirectoryClock` (đang chứa cả hàng đợi khóa); cân nhắc đọc danh sách và hàng đợi cùng một thời điểm.
+
+**Why:** Các điểm nhỏ còn lại từ review bước 14a (INFO/Low); không cái nào chặn việc phát hành.
+
+**Context:** `session-directory-models.ts`, `session-directory-url-state.ts`, `src/app/(app)/sessions/page.tsx`, `tests/components/sessions-route.test.tsx`, `src/features/learning-results/learning-result-models.ts`.
+
+**Effort:** M
+**Priority:** P4
+**Depends on:** None
+
 ## Completed
 
 ### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp
