@@ -165,7 +165,13 @@ export function TuitionPeriodLockedWorkspace({ period, rows, summary }: TuitionP
           </summary>
           <div className="p-3">
             <TuitionBulkPrintControls
-              notices={rows.map((row) => ({ grade: row.grade, href: noticeHref(row), id: row.itemId, name: row.studentName }))}
+              notices={rows.map((row) => ({
+                grade: row.grade,
+                href: noticeHref(row),
+                id: row.itemId,
+                name: row.studentName,
+                payableAmountVnd: row.payableAmountVnd,
+              }))}
             />
           </div>
         </details>

@@ -11,7 +11,9 @@ import {
   type TuitionPeriodItemQueryRow,
   type TuitionPeriodPaymentSummary,
 } from "@/features/tuition/period-summary";
-import { getTuitionLockReadiness, summarizeTuitionPreview } from "@/features/tuition/readiness";
+import { getTuitionLockReadiness } from "@/features/tuition/readiness";
+import { buildReadinessStudents } from "@/features/tuition/readiness-students";
+import { ReloadPreviewButton } from "@/features/tuition/reload-preview-button";
 import { TuitionLockedPeriodActions, TuitionPeriodHeader, TuitionPeriodLockedWorkspace } from "@/features/tuition/tuition-period-detail";
 import { TuitionPeriodDirectory } from "@/features/tuition/tuition-period-directory";
 import { TuitionPeriodPageLockPanel } from "@/features/tuition/tuition-period-lock-panel";
@@ -123,23 +125,52 @@ function summaryFor(period: TuitionPeriodListItem, payments: Payment[], payments
   return summarizeTuitionPeriodRows(toCurrentTuitionItemRows(items), { dueOn: period.dueOn, paymentsVisible, today: TODAY });
 }
 
+/** Draft class names (the preview returns enrollment class ids only; names need classes.view). */
+const draftClassNames: Record<string, string> = {
+  ...Object.fromEntries(students.map((student) => [`class-${student.grade}`, student.klass])),
+  "class-9c": "Luyện thi vào 10 T9C",
+};
+
+/**
+ * Opening balances that exercise every lock case on the readiness table:
+ * s-01 owes a session (upper bound, two classes and two rates), s-02 has a
+ * partial credit, s-08 is covered by its balance (no payment); the rest start at 0.
+ */
+const openingBalances: Record<string, number> = { "s-01": -1, "s-02": 3, "s-08": 10 };
+
 function previewRows(state: TuitionPreviewState): TuitionPreviewRow[] {
   if (state === "empty" || state === "errors") return [];
+  // `normal`: exactly one student per fixable blocker (s-05 rate, s-06 source) plus s-03 without a primary guardian.
   const blocked = state === "normal";
-  return students.flatMap((student, index) =>
-    Array.from({ length: 8 }, (_, session) => ({
+  return students.flatMap((student, index) => {
+    const base = {
       acquisitionSourceId: blocked && index === 5 ? null : "source-direct",
       blockerCode: blocked && index === 2 ? "MISSING_PRIMARY_GUARDIAN" : null,
-      classId: `class-${student.grade}`,
-      classSessionId: `session-${student.id}-${session}`,
       enrollmentId: `enrollment-${student.id}`,
-      openingBalanceSessions: index === 7 ? 2 : 0,
-      sessionDate: `2026-11-${String(2 + session * 3).padStart(2, "0")}`,
+      openingBalanceSessions: openingBalances[student.id] ?? 0,
       sessionKind: "regular",
       studentId: student.id,
+    };
+    const regular = Array.from({ length: 8 }, (_, session) => ({
+      ...base,
+      classId: `class-${student.grade}`,
+      classSessionId: `session-${student.id}-${session}`,
+      sessionDate: `2026-11-${String(2 + session * 3).padStart(2, "0")}`,
       unitPriceVnd: blocked && index === 4 ? null : 200_000,
-    })),
-  );
+    }));
+    // s-01 also attends the exam-prep class at a second rate.
+    const extra =
+      student.id === "s-01"
+        ? Array.from({ length: 4 }, (_, session) => ({
+            ...base,
+            classId: "class-9c",
+            classSessionId: `session-${student.id}-c-${session}`,
+            sessionDate: `2026-11-${String(3 + session * 7).padStart(2, "0")}`,
+            unitPriceVnd: 250_000,
+          }))
+        : [];
+    return [...regular, ...extra];
+  });
 }
 
 function systemBlockersFor(state: TuitionPreviewState): TuitionSystemBlocker[] {
@@ -195,11 +226,11 @@ function DraftView({ can, state }: { can: (code: PermissionCode) => boolean; sta
   const rows = previewRows(state);
   const systemBlockers = systemBlockersFor(state);
   const readiness = getTuitionLockReadiness(rows, systemBlockers);
-  const summary = summarizeTuitionPreview(rows);
+  const summary = buildReadinessStudents(rows);
 
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
-      <TuitionPeriodHeader period={draftPeriod} studentCount={readiness.previewUnavailable ? null : readiness.studentCount} />
+      <TuitionPeriodHeader actions={<ReloadPreviewButton />} period={draftPeriod} studentCount={readiness.previewUnavailable ? null : readiness.studentCount} />
       <PeriodStepper steps={buildTuitionPeriodSteps({ counts: null, itemCount: 0, requestCount: 0, status: "draft" })} />
       <TuitionPeriodPageLockPanel canLock={can("tuition_periods.lock")} lockAction={previewActions.lock} period={draftPeriod} preview={rows} systemBlockers={systemBlockers} variant="primary" />
       <TuitionReadinessTable
@@ -207,9 +238,14 @@ function DraftView({ can, state }: { can: (code: PermissionCode) => boolean; sta
         setSourcesAction={previewActions.setSources}
         canManageRates={can("students.manage_tuition_rates")}
         canManageSources={can("students.correct_acquisition_source")}
+        // Like the real page: without classes.view (the accountant) the class column reads "—".
+        classNames={can("classes.view") ? draftClassNames : {}}
         labels={Object.fromEntries(students.map((student) => [student.id, `${student.name} (${student.code})`]))}
         leadSources={[{ code: "DIRECT", id: "source-direct", name: "Đến trực tiếp trung tâm" }]}
+        lockContext={{ renewalAccount: { accountNumber: "0399886886", bankCode: "MB" }, templateVersion: 3 }}
         periodId={draftPeriod.id}
+        periodName={draftPeriod.name}
+        previewUnavailable={readiness.previewUnavailable}
         studentDetails={Object.fromEntries(students.map((student) => [student.id, { fullName: student.name, id: student.id, publicCode: student.code }]))}
         students={summary}
       />

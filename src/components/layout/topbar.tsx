@@ -43,7 +43,7 @@ export function Topbar({
       : String(unreadNotificationCount);
 
   return (
-    <header className="sticky top-[var(--safe-area-top)] z-30 flex h-[var(--topbar-h)] items-center gap-3 border-b border-border-subtle bg-surface-base px-4 md:px-5 lg:px-6">
+    <header className="sticky top-[var(--safe-area-top)] z-30 flex h-[var(--topbar-h)] items-center gap-3 border-b border-border-subtle bg-surface-base px-4 md:px-5 lg:px-6 print:hidden">
       <button
         aria-label="Mở điều hướng chính"
         className="flex h-10 w-10 flex-none items-center justify-center rounded-md text-text-strong hover:bg-interactive-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus md:hidden"

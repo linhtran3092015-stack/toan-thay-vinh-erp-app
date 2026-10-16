@@ -14,7 +14,10 @@ import {
 } from "@/features/tuition/data";
 import { canReadTuitionPayments, summarizeTuitionPeriodRows } from "@/features/tuition/period-summary";
 import { getTuitionPeriodItemRows } from "@/features/tuition/period-summary-data";
-import { getTuitionLockReadiness, summarizeTuitionPreview } from "@/features/tuition/readiness";
+import { getTuitionLockReadiness } from "@/features/tuition/readiness";
+import { getTuitionReadinessContext } from "@/features/tuition/readiness-data";
+import { buildReadinessStudents } from "@/features/tuition/readiness-students";
+import { ReloadPreviewButton } from "@/features/tuition/reload-preview-button";
 import { ClearLockedFlag, TuitionLockedPeriodActions, TuitionPeriodHeader, TuitionPeriodLockedWorkspace } from "@/features/tuition/tuition-period-detail";
 import { TuitionPeriodPageLockPanel } from "@/features/tuition/tuition-period-lock-panel";
 import { TuitionReadinessTable } from "@/features/tuition/tuition-readiness-table";
@@ -70,19 +73,26 @@ export default async function TuitionPeriodDetailPage({
 
   if (period.status === "draft") {
     const readiness = await getTuitionPeriodReadiness(period);
-    const students = summarizeTuitionPreview(readiness.rows);
+    // Same per-student fields as summarizeTuitionPreview, plus what the lock would bill (readiness-students.ts).
+    const students = buildReadinessStudents(readiness.rows);
     const studentIds = students.map(student => student.studentId);
+    const classIds = [...new Set(students.flatMap(student => student.classIds))];
     const lockReadiness = getTuitionLockReadiness(readiness.rows, readiness.systemBlockers);
 
-    const [labels, studentDetails, leadSources] = await Promise.all([
+    const [labels, studentDetails, leadSources, context] = await Promise.all([
       getTuitionStudentLabels(studentIds),
       getTuitionStudentDetails(studentIds),
       getTuitionLeadSources(),
+      getTuitionReadinessContext(period, classIds),
     ]);
 
     return (
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
-        <TuitionPeriodHeader period={period} studentCount={lockReadiness.previewUnavailable ? null : lockReadiness.studentCount} />
+        <TuitionPeriodHeader
+          actions={<ReloadPreviewButton />}
+          period={period}
+          studentCount={lockReadiness.previewUnavailable ? null : lockReadiness.studentCount}
+        />
         <PeriodStepper steps={buildTuitionPeriodSteps({ counts: null, itemCount: 0, requestCount: 0, status: "draft" })} />
         <TuitionPeriodPageLockPanel
           canLock={granted.includes("tuition_periods.lock")}
@@ -94,9 +104,14 @@ export default async function TuitionPeriodDetailPage({
         <TuitionReadinessTable
           canManageRates={granted.includes("students.manage_tuition_rates")}
           canManageSources={granted.includes("students.correct_acquisition_source")}
+          classNames={context.classNames}
           labels={labels}
           leadSources={leadSources}
+          lockContext={context}
           periodId={periodId}
+          periodName={period.name}
+          // Rows plus a failed system-blocker read still show the students; no rows and a failure = preview failed.
+          previewUnavailable={lockReadiness.previewUnavailable && readiness.rows.length === 0}
           studentDetails={studentDetails}
           students={students}
         />

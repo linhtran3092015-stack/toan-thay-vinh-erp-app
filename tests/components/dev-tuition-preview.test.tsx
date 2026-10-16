@@ -99,4 +99,33 @@ describe("/dev/tuition preview", () => {
     expect(stubs.setRates).toHaveBeenCalledTimes(1);
     expectNoRealWrites();
   });
+
+  // Step 13: the draft fixtures cover every 15a readiness case.
+  it("shows every readiness case of design 15a on the draft fixtures", () => {
+    const { unmount } = render(<TuitionPreview role="owner" state="normal" view="draft" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Tất cả\s*10$/ }));
+    const caption = "Học sinh trong kỳ thu Học phí tháng 11/2026";
+    let table = screen.getByRole("table", { name: caption });
+    for (const text of ["Thiếu đơn giá từ 02/11", "Thiếu nguồn", "Chưa có phụ huynh chính", "Không cần thanh toán · đủ số dư", "tối đa", "Toán 9A tối 2-4-6 · Luyện thi vào 10 T9C"]) {
+      expect(within(table).getByText(text)).toBeInTheDocument();
+    }
+    expect(within(table).getAllByText("Đủ dữ liệu").length).toBeGreaterThan(0);
+    expect(within(table).getByText(/^2\.800\.000\s*₫$/)).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Sửa hồ sơ Lý Nhật Quang (TTV-00088) (tab mới)" })).toHaveAttribute("href", "/students/s-03/edit");
+    expect(screen.getByText("Khi khóa: phiếu dùng mẫu v3 · tài khoản tái phí MB 0399886886")).toBeInTheDocument();
+    unmount();
+
+    const ready = render(<TuitionPreview role="owner" state="ready" view="draft" />);
+    expect(screen.getByRole("button", { name: /^Tất cả\s*10$/ })).toHaveAttribute("aria-pressed", "true");
+    table = screen.getByRole("table", { name: caption });
+    expect(within(table).getByText("Không cần thanh toán · đủ số dư")).toBeInTheDocument();
+    expect(within(table).getByText("tối đa")).toBeInTheDocument();
+    expect(within(table).queryByText(/^Thiếu/)).not.toBeInTheDocument();
+    ready.unmount();
+
+    render(<TuitionPreview role="accountant" state="normal" view="draft" />);
+    // No classes.view: the class column falls back to "—" like the real page.
+    expect(within(screen.getByRole("table", { name: caption })).queryByText(/^Toán/)).not.toBeInTheDocument();
+    expectNoRealWrites();
+  });
 });

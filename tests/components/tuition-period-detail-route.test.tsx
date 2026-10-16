@@ -1,7 +1,7 @@
 // Value: protects=the tuition period page (design 07b) for a draft (stepper on step 1, readiness table kept, GuardedActionPanel lock with the exact label as the page's one primary and its blocked reason linked by aria-describedby, success reloads the period with ?locked=1, errors inline, a network error refreshes) and a locked period (success banner only for ?locked=1 and the flag then dropped from the URL, step 4 not done when every request was voided, stepper on step 4 with the SePay queue link, KPI strip with "Chưa đến hạn" before the due date and the payable definition, chips in the payment badges' vocabulary with counts disabled at zero, class filter, notice links, "quá hạn" in words after the due date, print controls, the payment-request link behind its permission, one primary), and a failed period read as an error;
 // fails_when=the lock button text changes, locking is allowed with unmet conditions, the action is not called with the period id, a lock success is lost, the locked flag accepts other values, survives a reload or takes other query parameters/the hash with it, a failed item read shows zeros in the stepper, a network error does not refresh, voided requests mark collection done, a reissued item's original gets its own row or link, a payable row without a readable request reads "Không phải thu" or completes the collection, an unknown row shows an amount in Đã thu/Còn lại, chips disagree with the rows or the badges, a zero chip stays clickable, the due date counts as overdue, overdue is colour only, the review link shows without sepay.view, "Yêu cầu thanh toán" shows without payments.view/manage (finance.view alone included) or hides with payments.manage, the SePay primary is lost when payments are unreadable, a failed read says "Không tìm thấy", or a page renders two primaries;
-// why_new=step 7a recomposed both branches of /finance/tuition-periods/[periodId];
-// seam=data loaders, permissions, today and the "use server" actions mocked at their module boundaries; no_claim=does not prove the loaders' queries (tuition-period-summary-data tests) or the RPCs' behaviour
+// why_new=step 7a recomposed both branches of /finance/tuition-periods/[periodId]; step 13 (design 15a) added the secondary "Tải lại xem trước", the lock context caption and the readiness KPI strip/preview-failed frame on the draft branch;
+// seam=data loaders (readiness-data included), permissions, today and the "use server" actions mocked at their module boundaries; no_claim=does not prove the loaders' queries (tuition-period-summary-data tests) or the RPCs' behaviour
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -14,6 +14,7 @@ const dependencies = vi.hoisted(() => ({
   getCachedDatabasePermissions: vi.fn(),
   getTuitionPeriodItemRows: vi.fn(),
   getTuitionPeriodReadiness: vi.fn(),
+  getTuitionReadinessContext: vi.fn(),
   loadTuitionPeriods: vi.fn(),
 }));
 const router = vi.hoisted(() => ({ refresh: vi.fn(), replace: vi.fn() }));
@@ -31,6 +32,10 @@ vi.mock("@/features/tuition/data", () => ({
   loadTuitionPeriods: dependencies.loadTuitionPeriods,
   getTuitionStudentDetails: vi.fn(async () => ({ s1: { fullName: "Nguyễn An", id: "s1", publicCode: "TTV-1" } })),
   getTuitionStudentLabels: vi.fn(async () => ({ s1: "Nguyễn An (TTV-1)" })),
+}));
+// Step 13 (design 15a): class names, template version and renewal account for the draft readiness table.
+vi.mock("@/features/tuition/readiness-data", () => ({
+  getTuitionReadinessContext: dependencies.getTuitionReadinessContext,
 }));
 vi.mock("@/features/tuition/period-summary-data", () => ({
   getTuitionPeriodItemRows: dependencies.getTuitionPeriodItemRows,
@@ -87,6 +92,7 @@ const primaries = (container: HTMLElement) => container.querySelectorAll('a[clas
 
 beforeEach(() => {
   dependencies.loadTuitionPeriods.mockResolvedValue([draft, locked]);
+  dependencies.getTuitionReadinessContext.mockResolvedValue({ classNames: {}, renewalAccount: null, templateVersion: null });
 });
 
 afterEach(() => {
@@ -146,6 +152,66 @@ describe("tuition period page · draft", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Không rõ kỳ thu đã được khóa chưa; tải lại trang để kiểm tra trước khi thử lại."));
     expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("adds a secondary reload, the lock context and the readiness KPI strip without a second primary", async () => {
+    dependencies.getCachedDatabasePermissions.mockResolvedValue({ ok: true, permissions: ["tuition_periods.view", "tuition_periods.lock"] });
+    dependencies.getTuitionPeriodReadiness.mockResolvedValue({ rows: [previewRow()], systemBlockers: [] });
+    dependencies.getTuitionReadinessContext.mockResolvedValue({
+      classNames: { class: "Toán 9A" },
+      renewalAccount: { accountNumber: "0399886886", bankCode: "MB" },
+      templateVersion: 3,
+    });
+
+    const { container } = render(await route("nov"));
+
+    expect(dependencies.getTuitionReadinessContext).toHaveBeenCalledWith(draft, ["class"]);
+    const reload = screen.getByRole("button", { name: "Tải lại xem trước" });
+    expect(reload).not.toHaveClass("bg-action-primary");
+    expect(primaries(container)).toHaveLength(1);
+    expect(primaries(container)[0]).toBe(screen.getByRole("button", { name: "Khóa kỳ và tạo yêu cầu thanh toán" }));
+    fireEvent.click(reload);
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+
+    expect(screen.getByText("Khi khóa: phiếu dùng mẫu v3 · tài khoản tái phí MB 0399886886")).toBeInTheDocument();
+    expect(screen.getByLabelText("Chuẩn bị thu")).toHaveTextContent("Dự kiến phải thu200.000 ₫1 yêu cầu thanh toán khi khóa");
+    const table = screen.getByRole("table", { name: "Học sinh trong kỳ thu Học phí tháng 11/2026" });
+    expect(within(table).getByText("Nguyễn An (TTV-1)").closest("tr")).toHaveTextContent("Toán 9A");
+  });
+
+  it("says the preview failed in the readiness table instead of showing an empty period", async () => {
+    dependencies.getCachedDatabasePermissions.mockResolvedValue({ ok: true, permissions: ["tuition_periods.view"] });
+    dependencies.getTuitionPeriodReadiness.mockResolvedValue({
+      rows: [],
+      systemBlockers: [{ code: "PREVIEW_UNAVAILABLE", message: "Không tải được đầy đủ dữ liệu kỳ thu. Vui lòng tải lại trước khi khóa kỳ." }],
+    });
+
+    render(await route("nov"));
+
+    expect(screen.getByRole("table", { name: "Học sinh trong kỳ thu Học phí tháng 11/2026" }).parentElement).toHaveTextContent(
+      "Chưa tải được xem trước kỳ thu. Bấm “Tải lại xem trước” để thử lại.",
+    );
+    expect(screen.queryByLabelText("Chuẩn bị thu")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tải lại xem trước" })).toBeInTheDocument();
+  });
+
+  // Value: protects=with preview rows loaded but the system-blocker read failed, the table still lists the students and the lock panel reports the failure;
+  // fails_when=the page passes lockReadiness.previewUnavailable straight to the table (hiding loaded students) or the lock panel drops the failure;
+  // why_new=step 13 added the previewUnavailable prop with a rows-present exception; only the no-rows case was tested;
+  // seam=none (loaders mocked at module boundaries as above); no_claim=does not prove getTuitionPeriodReadiness's failure mapping (data.ts)
+  it("keeps listing loaded students when only the system-blocker read failed", async () => {
+    dependencies.getCachedDatabasePermissions.mockResolvedValue({ ok: true, permissions: ["tuition_periods.view"] });
+    dependencies.getTuitionPeriodReadiness.mockResolvedValue({
+      rows: [previewRow()],
+      systemBlockers: [{ code: "PREVIEW_UNAVAILABLE", message: "Không tải được đầy đủ dữ liệu kỳ thu. Vui lòng tải lại trước khi khóa kỳ." }],
+    });
+
+    render(await route("nov"));
+
+    const table = screen.getByRole("table", { name: "Học sinh trong kỳ thu Học phí tháng 11/2026" });
+    expect(within(table).getByText("Nguyễn An (TTV-1)")).toBeInTheDocument();
+    expect(table.parentElement).not.toHaveTextContent("Chưa tải được xem trước kỳ thu");
+    expect(screen.getAllByText(/Không tải được đầy đủ dữ liệu kỳ thu/).length).toBeGreaterThan(0);
   });
 
   it("shows no lock button without tuition_periods.lock and says who locks", async () => {
@@ -223,7 +289,10 @@ describe("tuition period page · locked", () => {
 
     // Printing keeps the bulk controls over the current notices only.
     expect(screen.getByRole("button", { name: "In đã chọn / cả khối" })).toBeInTheDocument();
-    expect(screen.getByText("In phiếu học phí").closest("details")).toHaveTextContent("Chưa chọn: in toàn bộ 5 phiếu.");
+    const print = screen.getByText("In phiếu học phí").closest("details") as HTMLElement;
+    expect(print).toHaveTextContent("Chưa chọn: in toàn bộ 5 phiếu.");
+    // Counts over the current notices: 4 with an amount to pay (the reissue replaces Dũng's cancelled one), Em's needs none.
+    expect(within(print).getByText(/^5 phiếu · 4 [^·]+ · 1 không cần thanh toán$/)).toBeInTheDocument();
     // No SePay permission: no review link anywhere and no page primary.
     expect(screen.queryByRole("link", { name: /đối soát/i })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Yêu cầu thanh toán" })).toBeInTheDocument();

@@ -1662,6 +1662,188 @@
 **Priority:** P3
 **Depends on:** Bước 16
 
+## Phiếu học phí
+
+### Mã QR trên phiếu đã thanh toán hoặc thanh toán một phần
+
+**What:** Khi in lại phiếu (lẻ hoặc cả khối), phiếu có yêu cầu đã thanh toán hoặc thanh toán một phần không in mã QR đủ số tiền nữa: ẩn QR và đóng dấu "ĐÃ THANH TOÁN", hoặc in số còn lại. Cần anh quyết.
+
+**Why:** Phụ huynh đã trả nhận lại QR đủ tiền và có thể chuyển lần hai; SePay chỉ tự khớp yêu cầu đang chờ nên khoản thứ hai rơi vào hàng đợi thủ công và phải hoàn tiền.
+
+**Context:** `resolvePayment` trong `src/features/tuition/fee-notice-model.ts` chỉ dựa vào snapshot; `loadFeeNotices` (`fee-notice-data.ts`) chưa đọc `student_payment_requests.status` (RLS cần payments.view, như `canReadTuitionPayments`). Có từ trước bước 13.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+### In hàng loạt gửi toàn bộ mã phiếu trên URL
+
+**What:** Mở tab in bằng `periodId` + khối (và danh sách chọn riêng nếu có) rồi đọc phiếu ở máy chủ, thay vì ghép mọi id vào `?itemIds=`.
+
+**Why:** Mỗi id tốn khoảng 39 ký tự; kỳ trên khoảng 360 phiếu vượt giới hạn URL/header (414/431) khi bấm "In đã chọn / cả khối" mà chưa chọn gì.
+
+**Context:** `TuitionBulkPrintControls` (`print-controls.tsx`), route `src/app/(app)/finance/tuition-periods/print/page.tsx`, `parseFeeNoticeItemIds` (chưa giới hạn số id).
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Đối chiếu chi tiết buổi với tổng tiền trên phiếu
+
+**What:** Chỉ in "12 buổi × 200.000 ₫ · …" khi Σ buổi × đơn giá đúng bằng số tiền phải nộp; nếu không thì in tổng số buổi. Kiểm tra `max_rows` PostgREST trên production ≥ 1000.
+
+**Why:** `fetchPaged` dừng khi một trang trả ít hơn 1000 dòng; nếu production giới hạn thấp hơn, chi tiết buổi bị cắt mà không báo lỗi. Cùng giả định đó bảo vệ việc đọc phiếu thay thế.
+
+**Context:** `buildFeeNoticeModel` (`fee-notice-model.ts`), `fetchPaged`/`fetchChunked` trong `src/features/classes/detail/class-detail-data.ts`. Một lần đọc dòng lỗi hiện cũng làm mất chi tiết của cả lô in.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Làm mới trang phiếu sau khi phát hành lại
+
+**What:** Gọi `router.refresh()` khi phát hành lại thành công trong `TuitionReissueForm`.
+
+**Why:** Trang phiếu chuyển sang "đã được thay thế" chỉ nhờ Next 16 tự render lại trang hiện tại sau `revalidatePath("/finance/tuition-periods")`; tài liệu Next gọi hành vi này là tạm thời. Nếu đổi, phiếu gốc vẫn hiện như hiện hành và in được với QR đã hủy.
+
+**Context:** `src/features/tuition/reissue-form.tsx`; action `reissueTuitionItemAction` (không sửa trong bước giao diện).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Quyền in phiếu lẻ và in hàng loạt khác nhau
+
+**What:** Quyết định nút "In phiếu" trên trang một phiếu có cần `tuition_periods.export` như in hàng loạt không. Cần anh quyết.
+
+**Why:** Người chỉ có quyền xem kỳ thu in được từng phiếu có QR, trong khi in hàng loạt yêu cầu quyền xuất.
+
+**Context:** `FeeNoticeDetailScreen` (`fee-notice-screens.tsx`), route notice và print.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+### Mã chuyển khoản gửi tới vietqr.app
+
+**What:** Tự tạo ảnh QR (thư viện QR trong ứng dụng hoặc route máy chủ) thay vì tải từ `vietqr.app/img?...&des=<mã chuyển khoản>`. Cần anh quyết.
+
+**Why:** Mã chuyển khoản chứa họ tên học sinh, năm sinh và số điện thoại phụ huynh; in hàng loạt gửi cả khối tới dịch vụ bên ngoài. Có từ trước bước 13.
+
+**Context:** `buildLockedVietQrPaymentDetails` trong `src/features/finance/vietqr.ts`.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+### "Phải thu" chính xác cho học sinh nợ buổi đầu kỳ
+
+**What:** Với người có quyền xem thanh toán, đọc số buổi đang nằm ở phiếu chờ thanh toán của kỳ khác để tính đúng phần nợ mang sang, bỏ nhãn "tối đa".
+
+**Why:** Lúc khóa, phần nợ được trừ đi số buổi đã có trên phiếu kỳ khác còn chờ thanh toán; bảng chuẩn bị hiện chỉ biết cận trên.
+
+**Context:** `computeLockFigures` (`readiness-students.ts`); công thức ở `lock_tuition_collection_period` (migration 20261012130100, dòng 152–160).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Cách ghi số dư âm và phiếu đã thay thế trên giấy
+
+**What:** Ghi rõ phần nợ đầu kỳ đã tính ở phiếu này hay ở phiếu kỳ khác (thay cho "−3 buổi (nợ)"), và quyết định phiếu đã được thay thế có còn in số tiền + hạn thanh toán không. Cần anh quyết cách ghi.
+
+**Why:** Phụ huynh có thể hiểu nợ đã gộp vào phiếu này rồi bỏ qua phiếu cũ còn phải trả; phiếu đã thay thế in ra vẫn có số tiền nổi bật.
+
+**Context:** `formatFeeNoticeBalance` (`fee-notice-model.ts`), `fee-notice-a5.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Báo trước các phiếu thiếu mã QR khi in hàng loạt
+
+**What:** Thanh công cụ trang in đếm và liệt kê phiếu không có QR (thiếu thông tin chuyển khoản, số tiền lệch); cảnh báo "Vẫn in" nêu phiếu nào chưa tải được QR.
+
+**Why:** Những phiếu đó in ra chỉ có dòng "liên hệ trung tâm", và nhân viên dễ quen bấm "Vẫn in".
+
+**Context:** `FeeNoticePrintScreen` (`fee-notice-screens.tsx`), `TuitionPrintButton` (`print-button.tsx`).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Lời giải thích khi số tiền QR không khớp
+
+**What:** Thêm lý do vào trạng thái "unavailable" (thiếu hợp đồng / số tiền lệch / trạng thái không chờ thanh toán) để nhãn "Loại phiếu" và dòng cho nhân viên nói đúng nguyên nhân; cập nhật chú thích quy tắc QR và câu "Mã QR VietQR luôn in trên phiếu cần thanh toán." ở trang mẫu.
+
+**Why:** Sau khi đối chiếu số tiền, phiếu lệch số tiền bị ghi là "snapshot không đầy đủ"; chú thích đầu file còn liệt kê quy tắc cũ.
+
+**Context:** `fee-notice-model.ts` (docstring và `getFeeNoticeKindLabel`), `fee-notice-a5.tsx`, `template-management.tsx`, đầu `tests/unit/fee-notice-model.test.ts`. RPC hiện không tạo ra số tiền lệch.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Bảng chuẩn bị: hiệu năng và bố cục
+
+**What:** Chỉ dựng bảng hoặc thẻ đang hiện (hai bố cục đang cùng render), cân nhắc chia trang khi trên khoảng 200 học sinh; đổi cỡ nút theo container thay vì viewport (máy tính bảng 768–1080px); thẻ hồ sơ mở tab mới như bảng; hiện trạng thái đang tải trong khung khi "Tải lại xem trước".
+
+**Why:** 300–500 học sinh tạo gấp đôi DOM; ở máy tính bảng các thẻ có ô chọn 44px nhưng nút xung quanh 32px; chạm nhầm vào thẻ làm mất đơn giá đang gõ.
+
+**Context:** `src/features/tuition/tuition-readiness-table.tsx`, `RecordListItem` (`responsive-record-list.tsx`, chưa có `target`).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Xem trước kỳ thu đọc theo trang có thể trùng hoặc thiếu dòng
+
+**What:** Bỏ trùng theo `classSessionId` cho từng học sinh khi gom dòng xem trước; ghi chú lớp đầu tiên có thể khác lớp in trên phiếu khi hai buổi đầu cùng ngày.
+
+**Why:** `getTuitionPeriodPreview` chạy lại cả hàm xem trước cho mỗi trang 500 dòng; một thay đổi giữa hai trang làm số buổi và "Phải thu" lệch dù được ghi là chính xác.
+
+**Context:** `buildReadinessStudents` (`readiness-students.ts`), `data.ts`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Hiện "Chưa có phụ huynh chính" ngay cả khi học sinh còn thiếu đơn giá hoặc nguồn
+
+**What:** Đọc `student_guardians` (người có quyền) để báo thiếu phụ huynh chính sớm, thay vì đợi bổ sung đơn giá và nguồn xong.
+
+**Why:** Hàm xem trước chỉ trả một mã blocker mỗi dòng theo thứ tự ưu tiên, nên lỗi phụ huynh lộ ra muộn.
+
+**Context:** `preview_tuition_collection_period` (CASE thứ tự), ghi chú dưới bảng chuẩn bị.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Mẫu phiếu: xuất bản cùng lúc và phiếu dài hơn một trang A5
+
+**What:** Cảnh báo khi phiên bản mới nhất sau khi xuất bản khác phiên bản dự kiến (có người khác vừa xuất bản); báo trong xem trước khi nội dung làm phiếu sang trang A5 thứ hai; bật lại tùy chọn hiện QR nếu anh muốn (cần đổi server action).
+
+**Why:** RPC đánh số phiên bản không kiểm tra phiên bản dự kiến nên có thể ghi đè thay đổi của người khác; thông báo 1000 ký tự + chân trang 300 ký tự đẩy phiếu sang trang thứ hai.
+
+**Context:** `template-management.tsx`, `TEMPLATE_FIELD_LIMITS` (`receipt-template-models.ts`), `publishTuitionTemplateAction`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Dọn phần dùng chung sau bước 13
+
+**What:** Gom helper ghi lỗi đọc dữ liệu (`settled`/`logReadFailure` ở các loader tuition), chuyển `fetchPaged`/`fetchChunked` sang module chung; thêm lựa chọn tự đưa con trỏ tới `ResultBanner` và kiểu liên kết trong banner; thêm lựa chọn xuống dòng cho `Badge`/`TableHeaderCell` (thay `whitespace-normal!`); căn phải lý do khi nút bị khóa trong `Button`; sửa chữ `text-action-primary` trên nền soft ở giao diện tối (chip, BulkActionBar); thống nhất cỡ số KPI (28px hiện tại so với 20px trong thiết kế 15a và 7b).
+
+**Why:** Các đoạn giống nhau đang lặp ở nhiều file; vài lớp `!` phụ thuộc tên lớp nội bộ của component gốc.
+
+**Context:** `src/features/tuition/{readiness-data,receipt-template-data,fee-notice-data,period-summary-data}.ts`, `src/components/shared/result-banner.tsx`, `src/components/ui/{badge,button}.tsx`, `src/components/patterns/{quick-filter-chips,bulk-action-bar}.tsx`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
 ## Completed
 
 ### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp

@@ -69,4 +69,37 @@ describe("Wave A student and print workflows", () => {
     expect(String(open.mock.calls[1][0])).toContain("00000000-0000-0000-0000-000000000002");
     expect(String(open.mock.calls[1][0])).not.toContain("00000000-0000-0000-0000-000000000003");
   });
+
+  it("counts payable and no-payment notices, grade options and the print scope", () => {
+    render(<TuitionBulkPrintControls notices={[
+      { grade: 6, href: "/ignored", id: "00000000-0000-0000-0000-000000000001", name: "An", payableAmountVnd: 1_200_000 },
+      { grade: 6, href: "/ignored", id: "00000000-0000-0000-0000-000000000002", name: "Bình", payableAmountVnd: 0 },
+      { grade: 7, href: "/ignored", id: "00000000-0000-0000-0000-000000000003", name: "Chi", payableAmountVnd: 900_000 },
+      { grade: 0, href: "/ignored", id: "00000000-0000-0000-0000-000000000004", name: "Dũng", payableAmountVnd: 400_000 },
+    ]} />);
+    // Counts amounts due, not unpaid requests (payment status is not read here).
+    expect(screen.getByText("4 phiếu · 3 có số tiền phải nộp · 1 không cần thanh toán")).toBeInTheDocument();
+    const grade = screen.getByLabelText("In theo khối");
+    expect(Array.from(grade.querySelectorAll("option")).map((option) => [option.value, option.textContent])).toEqual([
+      ["", "Chọn khối để in"],
+      ["6", "Khối 6 · 2 phiếu"],
+      ["7", "Khối 7 · 1 phiếu"],
+      ["0", "Chưa rõ khối · 1 phiếu"],
+    ]);
+    expect(screen.getByText(/^Chưa chọn: in toàn bộ 4 phiếu\. Mở tab in, mỗi phiếu một trang A5\.$/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Dũng · Chưa rõ khối")).not.toBeChecked();
+    // 44px rows on touch, 40px from md.
+    expect(screen.getByLabelText("Dũng · Chưa rõ khối").closest("label")).toHaveClass("min-h-11", "md:min-h-10");
+
+    fireEvent.change(grade, { target: { value: "6" } });
+    fireEvent.click(screen.getByLabelText(/Chi · Khối 7/));
+    expect(screen.getByText(/^3 phiếu sẽ được in\. Mở tab in, mỗi phiếu một trang A5\.$/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "In đã chọn / cả khối" })).not.toHaveClass("bg-action-primary");
+  });
+
+  it("leaves the payable counts out when amounts are not known", () => {
+    render(<TuitionBulkPrintControls notices={[{ grade: 6, href: "/ignored", id: "00000000-0000-0000-0000-000000000001", name: "An" }]} />);
+    expect(screen.getByText(/^1 phiếu$/)).toBeInTheDocument();
+    expect(screen.queryByText(/phải nộp|cần thanh toán/)).not.toBeInTheDocument();
+  });
 });

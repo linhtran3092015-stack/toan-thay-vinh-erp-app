@@ -44,14 +44,14 @@ function ModuleNavigationContent({
 
   return (
     <>
-      <div className="hidden border-b border-border-subtle bg-surface-base md:block">
+      <div className="hidden border-b border-border-subtle bg-surface-base md:block print:hidden">
         <DesktopModuleNavigation
           domain={domain}
           navigationLabel={navigationLabel}
           pathname={pathname}
         />
       </div>
-      <div className="border-b border-border-subtle bg-surface-base px-4 py-2 md:hidden">
+      <div className="border-b border-border-subtle bg-surface-base px-4 py-2 md:hidden print:hidden">
         <MobileModuleSelector
           key={pathname}
           domain={domain}
