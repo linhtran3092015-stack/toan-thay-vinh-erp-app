@@ -2,6 +2,30 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.19.0.0] - 2026-10-16
+
+Phiếu học phí dựng lại theo phong cách Stumana (bước 13): bảng chuẩn bị kỳ thu nháp tính "Phải thu" đúng như lúc khóa kỳ, trang mẫu phiếu có xem trước A5 ngay khi gõ, và phiếu học phí in đúng khổ A5, mỗi phiếu một trang.
+
+### Added
+- **Bảng chuẩn bị của kỳ thu nháp** `/finance/tuition-periods/[id]`: dòng "Khi khóa: phiếu dùng mẫu vN · tài khoản tái phí …" và bốn số "Dự kiến phải thu", "Không cần thanh toán (đủ số dư)", "Đủ dữ liệu x / y", "Còn blocker".
+- Mỗi học sinh có Lớp, Buổi kỳ này, Số dư đầu kỳ (số âm màu đỏ), Đơn giá ("200.000 / 250.000 ₫" khi có nhiều mức), và **Phải thu** tính giống lúc khóa kỳ: số dư dương bù cho các buổi sớm nhất, học sinh nợ buổi đầu kỳ ghi "tối đa", thiếu đơn giá ghi "—". Lý do còn vướng ghi bằng chữ ("Thiếu đơn giá từ 02/11", "Thiếu nguồn", "Chưa có phụ huynh chính", "Không cần thanh toán · đủ số dư"), học sinh còn vướng xếp lên đầu; màn hình hẹp hiện dạng thẻ.
+- Lọc nhanh Còn blocker / Thiếu đơn giá / Thiếu nguồn / Thiếu phụ huynh chính / Đủ dữ liệu / Không cần thanh toán / Tất cả, ô "Tìm học sinh" và nút "Tải lại xem trước".
+- **Bổ sung đơn giá và nguồn từ một lựa chọn**: tick học sinh một lần rồi lưu từng phần; mỗi nút chỉ gửi những em còn thiếu đúng phần đó, em thiếu cả hai vẫn được giữ chọn cho lần lưu sau.
+- **Trang mẫu phiếu** `/finance/tuition-periods/templates`: phiên bản đang dùng, người và lúc xuất bản, các kỳ đã khóa dùng phiên bản này và số kỳ nháp sẽ dùng bản mới nhất khi khóa. Nút "Xuất bản phiên bản vN" chỉ bật khi có thay đổi và có lý do, lý do bị khóa ghi ngay dưới nút. Kèm lịch sử phiên bản và bản xem trước phiếu A5 bằng dữ liệu mẫu, cập nhật theo nội dung đang gõ.
+- **Phiếu học phí khổ A5**: tên trung tâm, kỳ thu, mã yêu cầu, tiêu đề, thông báo, hạn thanh toán, học viên, lớp, số buổi theo từng đơn giá (kèm buổi nợ đầu kỳ), số dư đầu kỳ, số tiền phải nộp và khung QR VietQR với ngân hàng · số tài khoản · tên tài khoản và nội dung chuyển khoản in nguyên văn. Phiếu không cần thanh toán ghi "KHÔNG CẦN THANH TOÁN" cùng số buổi còn lại sau kỳ.
+- **In hàng loạt**: mỗi phiếu đúng một trang A5, sắp theo khối rồi tên. Nút "In n phiếu" chờ mã QR tải xong; nếu có mã QR chưa tải được thì báo trước và cần bấm "Vẫn in" thêm một lần.
+- Trang xem trước `/dev/fee-notices?view=templates|print|notice` và phần bảng chuẩn bị trong `/dev/tuition?view=draft` (trả 404 trên production; mọi thao tác đều không ghi dữ liệu).
+
+### Changed
+- Trang một phiếu: tiêu đề "Phiếu học phí · tên học sinh", nhãn bản gốc / bản thay thế, "Loại phiếu", nút "In phiếu". Khung "Điều chỉnh / phát hành lại" ghi rõ hệ quả, sau khi phát hành vẫn giữ kết quả cùng liên kết tới bản thay thế hiện hành.
+- Khung "In phiếu học phí" của kỳ đã khóa ghi "n phiếu · x có số tiền phải nộp · y không cần thanh toán" và số phiếu của từng khối.
+- In bất kỳ trang nào trong ERP (kể cả phiếu lương) không còn in kèm thanh bên, thanh trên cùng và dải mô-đun.
+
+### Fixed
+- In hàng loạt không còn in mã QR của yêu cầu đã bị hủy khi phiếu gốc đã được phát hành lại; phiếu cũ được thay bằng bản thay thế hiện hành, phiếu chưa đọc được bản hiện hành được báo riêng.
+- Phiếu chỉ in mã QR khi số tiền trong mã QR đúng bằng số tiền in trên phiếu; phiếu thiếu thông tin chuyển khoản hướng dẫn phụ huynh liên hệ trung tâm thay vì in câu dành cho nhân viên.
+- Form phát hành lại giữ số tiền và lý do đã nhập khi bị từ chối, nhận số tiền lẻ (ví dụ 2.437.500 ₫), và thông báo xuất bản mẫu / phát hành lại hiện đúng màu thành công hay lỗi.
+
 ## [0.18.0.0] - 2026-10-16
 
 Chấm công cá nhân dựng lại cho điện thoại theo phong cách Stumana (bước 12): một nút "Vào ca"/"Ra ca" lớn, điều kiện chấm công ghi bằng chữ đúng như máy chủ kiểm tra, bảng công dạng thẻ và tấm "Yêu cầu điều chỉnh công" mở từ đáy màn hình.
