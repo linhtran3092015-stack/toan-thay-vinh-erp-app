@@ -154,6 +154,11 @@ export function SessionPreview({ role, state }: { role: "owner" | "ta"; state: S
         canViewResults={permissions.includes("results.view")}
         canViewStudents={permissions.includes("students.view")}
         detail={detail}
+        messageContact={
+          state === "ready" || state === "locked"
+            ? { saved: { phone: "0912 345 678", supervisorName: "Cô Lê Bích Ngọc", updatedAt: "2026-10-12T13:00:00Z" }, suggestion: null }
+            : { saved: null, suggestion: { phone: "0912 345 678", supervisorName: "Cô Lê Bích Ngọc" } }
+        }
       />
     </AppShell>
   );
