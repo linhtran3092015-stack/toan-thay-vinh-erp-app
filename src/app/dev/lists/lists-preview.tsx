@@ -6,8 +6,21 @@ import type { ClassDirectoryItem } from "@/features/classes/read-models";
 import type { StudentDirectoryItem } from "@/features/students/read-models";
 import type { StudentDirectoryMetrics } from "@/features/students/student-directory-metrics";
 import { StudentListPage } from "@/features/students/student-list-page";
-import { DATABASE_PERMISSION_CODES } from "@/lib/permissions/types";
+import { GradingCreditListPage } from "@/features/grading-credits/grading-credit-list-page";
+import { LearningResultsPage } from "@/features/learning-results/learning-results-page";
+import { UnlockedSessionQueue } from "@/features/sessions/components/unlocked-session-queue";
+import { SESSION_QUEUE_LIMIT } from "@/features/sessions/session-directory-models";
+import { SessionListPage } from "@/features/sessions/session-list-page";
+import { DATABASE_PERMISSION_CODES, type PermissionCode } from "@/lib/permissions/types";
 import type { StudentLifecycleStatus } from "@/types/domain";
+
+import { creditEntries, ownCreditEntries } from "./credit-fixtures";
+import { cappedResultItems, resultItems } from "./result-fixtures";
+import { cappedPreviewSessionQueue, previewSessionQueue, previewSessions, sessionPreviewNowTime, sessionPreviewToday } from "./session-fixtures";
+
+export type ListsPreviewView = "students" | "classes" | "sessions" | "results" | "credits";
+export type ListsPreviewRole = "owner" | "ta";
+export type ListsPreviewState = "normal" | "capped" | "empty";
 
 const classNames = [
   "Toán 9A tối 2-4-6",
@@ -140,17 +153,97 @@ const classes: ClassDirectoryItem[] = classRows.map(([name, code, grade, level, 
   weeklySessionCount: weekly,
 }));
 
-export function ListsPreview({ view }: { view: "students" | "classes" }) {
+const previewPathnames: Record<ListsPreviewView, string> = {
+  classes: "/classes",
+  credits: "/grading-credits",
+  results: "/learning-results",
+  sessions: "/sessions",
+  students: "/students",
+};
+
+// A teaching assistant: own credits only, no student or class pages.
+const taPermissions: PermissionCode[] = [
+  "attendance.mark",
+  "attendance.view",
+  "grading_credits.view",
+  "results.manage",
+  "results.view",
+  "sessions.view",
+];
+
+function previewPermissions(role: ListsPreviewRole): PermissionCode[] {
+  return role === "ta" ? taPermissions : DATABASE_PERMISSION_CODES.filter((code) => code !== "student_care.view");
+}
+
+export function ListsPreview({ role, state, view }: { role: ListsPreviewRole; state: ListsPreviewState; view: ListsPreviewView }) {
+  const permissions = previewPermissions(role);
+  const can = (code: PermissionCode) => permissions.includes(code);
+  const credits = state === "empty" ? [] : role === "ta" ? ownCreditEntries : creditEntries;
+  // "capped": a full queue page (partial), so the newest completed session has no queue facts.
+  const sessionQueue = state === "capped" ? cappedPreviewSessionQueue : previewSessionQueue;
+  // "capped": the items fill the limit, so the panel says "N+" like the route at a full page;
+  // the list's partial notice gets the same limit, so both name one number.
+  const sessionQueueLimit = state === "capped" ? sessionQueue.items.length : SESSION_QUEUE_LIMIT;
+  // The panel's "Lọc danh sách" stays on this preview (same role and state), never the real /sessions.
+  const sessionListPath = `/dev/lists?view=sessions${role === "owner" ? "" : `&role=${role}`}${state === "normal" ? "" : `&state=${state}`}`;
+
   return (
     <AppShell
-      authUser={{ displayName: "Phạm Thu Hạnh", email: "hanh@example.com", id: "dev-user", initials: "PH" }}
+      authUser={role === "ta" ? { displayName: "Trần Thu Hà", email: "ha@example.com", id: "grader-1", initials: "TH" } : { displayName: "Phạm Thu Hạnh", email: "hanh@example.com", id: "dev-user", initials: "PH" }}
       centerDisplayName="Toán Thầy Vinh"
-      permissions={DATABASE_PERMISSION_CODES.filter((code) => code !== "student_care.view")}
-      previewPathname={view === "classes" ? "/classes" : "/students"}
+      permissions={permissions}
+      previewPathname={previewPathnames[view]}
       unreadNotificationCount={4}
     >
       {view === "classes" ? (
         <ClassListPage canCreateClass canImportClasses classes={classes} />
+      ) : view === "sessions" ? (
+        // basePath: filter writes stay on /dev/lists, so a reload re-renders fixtures, never the real route.
+        <SessionListPage
+          basePath="/dev/lists"
+          canLock={can("sessions.lock")}
+          canManageSessions={can("sessions.manage")}
+          canMarkAttendance={can("attendance.mark")}
+          canViewAttendance={can("attendance.view")}
+          canViewClasses={can("classes.view")}
+          canViewResults={can("results.view")}
+          loadedRange={{ dateFrom: null, dateTo: null }}
+          nowTime={sessionPreviewNowTime}
+          queueItems={state === "empty" ? [] : sessionQueue.items.map(({ id, missingAttendanceCount, rosterCount }) => ({ id, missingAttendanceCount, rosterCount }))}
+          queuePanel={
+            state === "empty" ? null : (
+              <UnlockedSessionQueue
+                canLock={can("sessions.lock")}
+                canMarkAttendance={can("attendance.mark")}
+                limit={sessionQueueLimit}
+                listPath={sessionListPath}
+                queue={sessionQueue}
+                today={sessionPreviewToday}
+              />
+            )
+          }
+          queueLimit={sessionQueueLimit}
+          queueStatus={state === "capped" ? "partial" : "ok"}
+          sessions={state === "empty" ? [] : previewSessions}
+          // The fixture clock, so "Hôm nay" and "Tuần này" never drift with the wall clock.
+          today={sessionPreviewToday}
+        />
+      ) : view === "results" ? (
+        <LearningResultsPage
+          canViewSessions={can("sessions.view")}
+          canViewStudents={can("students.view")}
+          items={state === "empty" ? [] : state === "capped" ? cappedResultItems : resultItems}
+        />
+      ) : view === "credits" ? (
+        <GradingCreditListPage
+          canViewAll={can("grading_credits.view_all")}
+          canViewSessions={can("sessions.view")}
+          entries={credits}
+          // "capped": the loaded rows fill the limit, so older months only get a lower bound.
+          limit={state === "capped" ? credits.length : undefined}
+          // The same fixture clock, so the default month never drifts.
+          today={sessionPreviewToday}
+        />
       ) : (
         <StudentListPage canCreateStudent canImportStudents canManageStatus metrics={studentMetrics} students={students} />
       )}
