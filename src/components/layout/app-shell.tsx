@@ -72,7 +72,7 @@ export function AppShell({
   };
 
   return (
-    <div className="min-h-screen bg-surface-canvas text-text-strong">
+    <div className="min-h-screen bg-surface-canvas text-text-strong print:min-h-0 print:bg-white">
       {permissions.includes("student_care.view") ? <StudentCareRefresh /> : null}
       <Sidebar
         activeDomainKey={activeDomain?.key}
@@ -83,7 +83,7 @@ export function AppShell({
         pathname={pathname}
       />
 
-      <div className="min-h-screen md:pl-[var(--rail-w)] xl:pl-[var(--sidebar-w)]">
+      <div className="min-h-screen md:pl-[var(--rail-w)] xl:pl-[var(--sidebar-w)] print:min-h-0 print:pl-0">
         <Topbar
           attendancePolicy={attendancePolicy}
           breadcrumb={breadcrumb}
@@ -97,7 +97,7 @@ export function AppShell({
         />
         <ModuleNavigation domain={activeDomain} pathname={pathname} />
 
-        <main className="mx-auto max-w-[1600px] px-4 py-4 md:px-5 md:py-5 lg:p-6">
+        <main className="mx-auto max-w-[1600px] px-4 py-4 md:px-5 md:py-5 lg:p-6 print:max-w-none print:p-0">
           {children}
         </main>
       </div>

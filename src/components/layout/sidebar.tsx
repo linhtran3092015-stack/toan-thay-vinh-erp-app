@@ -97,7 +97,7 @@ export function Sidebar({
   return (
     <>
       {/* Tablet rail (72px) grows into the 240px sidebar from xl. */}
-      <aside className="fixed inset-y-0 left-[var(--safe-area-left)] z-40 hidden w-[var(--rail-w)] border-r border-[var(--nav-sidebar-border)] bg-[var(--nav-sidebar-bg)] pb-[var(--safe-area-bottom)] pt-[var(--safe-area-top)] text-[var(--nav-sidebar-fg)] md:block xl:w-[var(--sidebar-w)]">
+      <aside className="fixed inset-y-0 left-[var(--safe-area-left)] z-40 hidden w-[var(--rail-w)] border-r border-[var(--nav-sidebar-border)] bg-[var(--nav-sidebar-bg)] pb-[var(--safe-area-bottom)] pt-[var(--safe-area-top)] text-[var(--nav-sidebar-fg)] md:block xl:w-[var(--sidebar-w)] print:hidden">
         <SidebarContents
           activeDomainKey={activeDomainKey}
           centerDisplayName={centerDisplayName}
@@ -110,7 +110,7 @@ export function Sidebar({
       <div
         aria-hidden="true"
         className={cn(
-          "fixed inset-0 z-50 bg-[var(--overlay-scrim)] transition-opacity duration-150 md:hidden",
+          "fixed inset-0 z-50 bg-[var(--overlay-scrim)] transition-opacity duration-150 md:hidden print:hidden",
           isMobileOpen
             ? "pointer-events-auto opacity-100"
             : "pointer-events-none opacity-0",
@@ -122,7 +122,7 @@ export function Sidebar({
         <aside
           aria-label="Điều hướng chính"
           aria-modal="true"
-          className="fixed inset-y-0 left-0 z-50 w-[min(320px,calc(100vw-32px))] bg-[var(--nav-sidebar-bg)] pb-[var(--safe-area-bottom)] pl-[var(--safe-area-left)] pt-[var(--safe-area-top)] text-[var(--nav-sidebar-fg)] shadow-[var(--elevation-2)] md:hidden"
+          className="fixed inset-y-0 left-0 z-50 w-[min(320px,calc(100vw-32px))] bg-[var(--nav-sidebar-bg)] pb-[var(--safe-area-bottom)] pl-[var(--safe-area-left)] pt-[var(--safe-area-top)] text-[var(--nav-sidebar-fg)] shadow-[var(--elevation-2)] md:hidden print:hidden"
           ref={mobilePanelRef}
           role="dialog"
         >

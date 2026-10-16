@@ -1365,8 +1365,45 @@ a {
   }
 }
 @media print {
-  body { background: #fff !important; }
-  .fee-notice { break-after: page; page-break-after: always; }
+  /* The screen's 100vh floor would add a blank trailing page. */
+  body { background: #fff !important; min-height: 0; }
+}
+
+/* Phiếu học phí (design 15b): every .fee-notice-a5 sheet prints on its own A5
+   page with no printer margin; the sheet's 10 mm padding is the margin. The
+   width is fixed and the height follows the page, so an overlong notice flows
+   onto a second page instead of being clipped. Unlayered, so these win over
+   the sheet's on-screen utilities. */
+@page fee-notice {
+  size: A5 portrait;
+  margin: 0;
+}
+
+@media print {
+  .fee-notice-a5 {
+    page: fee-notice;
+    break-after: page;
+    width: 148mm;
+    max-width: none;
+    margin: 0;
+    padding: 10mm;
+    /* An overlong notice keeps its 10 mm padding on the continuation page. */
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .fee-notice-a5:last-child {
+    break-after: auto;
+  }
+
+  /* An overlong notice may flow onto a second page, but never through the
+     amount table or the QR box. */
+  .fee-notice-a5 [data-print-keep] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
 
 /* Configurable ERP accent (Settings → Thương hiệu). The default is the
