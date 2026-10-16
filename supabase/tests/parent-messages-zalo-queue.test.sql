@@ -60,9 +60,9 @@ select is(
 -- 3. Session result comment → message, TA edits and sends --------------------
 select lives_ok($$select public.record_session_result('2f000000-0000-4000-8000-000000000031', '2f000000-0000-4000-8000-000000000041', 8.5, null, 'not_required', 'Làm bài tốt, cần cẩn thận phép chia')$$, 'record a result with a comment');
 select is(
-  (select content from public.parent_messages where event_code = 'session.comment'),
-  'Trung tâm Toán Thầy Vinh - nhận xét buổi 03/09/2018 lớp PM-6A (Parent messages 6A) của An: Làm bài tốt, cần cẩn thận phép chia Điểm kiểm tra: 8.5.',
-  'the comment message includes the comment and score');
+  (select content like E'THẦY VINH VÀ THẦY CÔ CỘNG SỰ KÍNH GỬI PHỤ HUYNH NHẬN XÉT TÌNH HÌNH CỦA CON BUỔI HỌC NGÀY 03/09/2018\n\n- Tên học sinh: Nguyễn Văn An\n- Kết quả: Điểm luyện tập cuối buổi: 8,5 - Xếp hạng: Tiến bộ\n\n- Nhận xét cho học sinh:\nLàm bài tốt, cần cẩn thận phép chia\n\nChủ nhiệm CLB:%' from public.parent_messages where event_code = 'session.comment'),
+  true,
+  'the comment message uses the 17/10/2026 template with the comment and score');
 
 select set_config('request.jwt.claim.sub', '2f000000-0000-4000-8000-000000000002', true);
 select lives_ok($$select public.update_parent_message_content((select id from public.parent_messages where event_code = 'session.comment'), 'Nhận xét đã sửa bởi trợ giảng')$$, 'the TA can edit a queued message');

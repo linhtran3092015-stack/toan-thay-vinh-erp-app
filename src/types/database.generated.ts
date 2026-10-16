@@ -2100,6 +2100,44 @@ export type Database = {
           },
         ]
       }
+      grading_rank_bands: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          min_score: number
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          min_score: number
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          min_score?: number
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grading_rank_bands_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guardians: {
         Row: {
           created_at: string
@@ -2221,7 +2259,12 @@ export type Database = {
           error_message: string | null
           event_code: string
           id: string
+          parts_sent: number
+          parts_total: number | null
           provider_message_id: string | null
+          provider_message_ids: string[]
+          sending_by: string | null
+          sending_until: string | null
           sent_at: string | null
           sent_by: string | null
           skip_reason: string | null
@@ -2246,7 +2289,12 @@ export type Database = {
           error_message?: string | null
           event_code: string
           id?: string
+          parts_sent?: number
+          parts_total?: number | null
           provider_message_id?: string | null
+          provider_message_ids?: string[]
+          sending_by?: string | null
+          sending_until?: string | null
           sent_at?: string | null
           sent_by?: string | null
           skip_reason?: string | null
@@ -2271,7 +2319,12 @@ export type Database = {
           error_message?: string | null
           event_code?: string
           id?: string
+          parts_sent?: number
+          parts_total?: number | null
           provider_message_id?: string | null
+          provider_message_ids?: string[]
+          sending_by?: string | null
+          sending_until?: string | null
           sent_at?: string | null
           sent_by?: string | null
           skip_reason?: string | null
@@ -2297,6 +2350,13 @@ export type Database = {
           {
             foreignKeyName: "parent_messages_content_edited_by_fkey"
             columns: ["content_edited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parent_messages_sending_by_fkey"
+            columns: ["sending_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -4218,6 +4278,61 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_message_contacts: {
+        Row: {
+          class_session_id: string
+          created_at: string
+          created_by: string
+          grading_contact_phone: string
+          id: string
+          supervisor_name: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          class_session_id: string
+          created_at?: string
+          created_by: string
+          grading_contact_phone: string
+          id?: string
+          supervisor_name: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          class_session_id?: string
+          created_at?: string
+          created_by?: string
+          grading_contact_phone?: string
+          id?: string
+          supervisor_name?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_message_contacts_class_session_id_fkey"
+            columns: ["class_session_id"]
+            isOneToOne: true
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_message_contacts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_message_contacts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -7332,6 +7447,49 @@ export type Database = {
         Args: never
         Returns: number
       }
+      begin_parent_message_send: {
+        Args: {
+          p_content_md5?: string
+          p_message_id: string
+          p_parts_total: number
+        }
+        Returns: {
+          attempts: number
+          class_session_id: string | null
+          content: string
+          content_edited_by: string | null
+          created_at: string
+          dedupe_key: string
+          error_message: string | null
+          event_code: string
+          id: string
+          parts_sent: number
+          parts_total: number | null
+          provider_message_id: string | null
+          provider_message_ids: string[]
+          sending_by: string | null
+          sending_until: string | null
+          sent_at: string | null
+          sent_by: string | null
+          skip_reason: string | null
+          skipped_at: string | null
+          skipped_by: string | null
+          source_id: string
+          source_type: string
+          status: string
+          student_id: string
+          thread_id: string
+          thread_type: string
+          updated_at: string
+          zalo_account_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "parent_messages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       book_crm_trial_session: {
         Args: {
           p_class_session_id?: string
@@ -7616,6 +7774,14 @@ export type Database = {
       coaching_validate_question: {
         Args: { p_configuration: Json; p_question_type: string }
         Returns: boolean
+      }
+      comment_template_fill: {
+        Args: { p_text: string; p_vars: Json }
+        Returns: string
+      }
+      comment_template_state: {
+        Args: { p_text: string; p_vars: Json }
+        Returns: number
       }
       commission_recognized_at_for_cashflow: {
         Args: {
@@ -8973,6 +9139,7 @@ export type Database = {
           linked_student_public_code: string
         }[]
       }
+      format_message_score: { Args: { p_score: number }; Returns: string }
       format_student_payment_transfer_code: {
         Args: {
           p_guardian_id: string
@@ -9399,10 +9566,14 @@ export type Database = {
           class_code: string
           class_session_id: string
           content: string
+          content_edited: boolean
           created_at: string
           error_message: string
           event_code: string
           message_id: string
+          parts_sent: number
+          parts_total: number
+          send_block_reason: string
           sent_at: string
           sent_by_name: string
           session_date: string
@@ -9659,6 +9830,7 @@ export type Database = {
         Args: { p_week_start: string }
         Returns: Json
       }
+      grading_rank_label: { Args: { p_score: number }; Returns: string }
       has_permission: {
         Args: { required_permission: string }
         Returns: boolean
@@ -9990,6 +10162,10 @@ export type Database = {
         Args: { phone_value: string }
         Returns: string
       }
+      parent_message_send_block_reason: {
+        Args: { p_message_id: string }
+        Returns: string
+      }
       parent_message_vars: {
         Args: { p_class_session_id: string; p_student_id: string }
         Returns: Json
@@ -10174,6 +10350,51 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_parent_message_part: {
+        Args: {
+          p_error_message?: string
+          p_message_id: string
+          p_part_no: number
+          p_provider_message_id?: string
+          p_success: boolean
+        }
+        Returns: {
+          attempts: number
+          class_session_id: string | null
+          content: string
+          content_edited_by: string | null
+          created_at: string
+          dedupe_key: string
+          error_message: string | null
+          event_code: string
+          id: string
+          parts_sent: number
+          parts_total: number | null
+          provider_message_id: string | null
+          provider_message_ids: string[]
+          sending_by: string | null
+          sending_until: string | null
+          sent_at: string | null
+          sent_by: string | null
+          skip_reason: string | null
+          skipped_at: string | null
+          skipped_by: string | null
+          source_id: string
+          source_type: string
+          status: string
+          student_id: string
+          thread_id: string
+          thread_type: string
+          updated_at: string
+          zalo_account_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "parent_messages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       record_parent_message_result: {
         Args: {
           p_error_message?: string
@@ -10191,7 +10412,12 @@ export type Database = {
           error_message: string | null
           event_code: string
           id: string
+          parts_sent: number
+          parts_total: number | null
           provider_message_id: string | null
+          provider_message_ids: string[]
+          sending_by: string | null
+          sending_until: string | null
           sent_at: string | null
           sent_by: string | null
           skip_reason: string | null
@@ -10243,6 +10469,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      refresh_queued_session_comment_messages: {
+        Args: { p_class_session_id?: string }
+        Returns: number
+      }
       reissue_tuition_collection_item: {
         Args: {
           p_original_item_id: string
@@ -10280,8 +10510,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      render_comment_message: {
+        Args: { p_footer: string; p_template: string; p_vars: Json }
+        Returns: string
+      }
       render_parent_message: {
         Args: { p_template: string; p_vars: Json }
+        Returns: string
+      }
+      render_session_comment_message: {
+        Args: { p_result_id: string }
         Returns: string
       }
       reopen_payroll_period: {
@@ -10952,6 +11190,10 @@ export type Database = {
         }[]
       }
       session_auto_lock_after_days: { Args: never; Returns: number }
+      session_comment_message_vars: {
+        Args: { p_result_id: string }
+        Returns: Json
+      }
       set_attendance_verification_config: {
         Args: {
           p_attendance_radius_m: number
@@ -10967,6 +11209,24 @@ export type Database = {
       set_finance_order_review: {
         Args: { p_is_checked: boolean; p_source_cashflow_record_id: string }
         Returns: Json
+      }
+      set_grading_rank_bands: {
+        Args: { p_bands: Json }
+        Returns: {
+          created_at: string
+          id: string
+          label: string
+          min_score: number
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "grading_rank_bands"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       set_role_permissions: {
         Args: {
@@ -11002,6 +11262,29 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "sepay_receiving_account_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_session_message_contact: {
+        Args: {
+          p_class_session_id: string
+          p_grading_contact_phone: string
+          p_supervisor_name: string
+        }
+        Returns: {
+          class_session_id: string
+          created_at: string
+          created_by: string
+          grading_contact_phone: string
+          id: string
+          supervisor_name: string
+          updated_at: string
+          updated_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "session_message_contacts"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -11044,7 +11327,12 @@ export type Database = {
           error_message: string | null
           event_code: string
           id: string
+          parts_sent: number
+          parts_total: number | null
           provider_message_id: string | null
+          provider_message_ids: string[]
+          sending_by: string | null
+          sending_until: string | null
           sent_at: string | null
           sent_by: string | null
           skip_reason: string | null
@@ -11499,7 +11787,12 @@ export type Database = {
           error_message: string | null
           event_code: string
           id: string
+          parts_sent: number
+          parts_total: number | null
           provider_message_id: string | null
+          provider_message_ids: string[]
+          sending_by: string | null
+          sending_until: string | null
           sent_at: string | null
           sent_by: string | null
           skip_reason: string | null
