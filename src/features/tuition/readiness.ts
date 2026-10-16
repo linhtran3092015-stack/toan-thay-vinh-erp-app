@@ -1,9 +1,15 @@
 import type { TuitionPreviewRow, TuitionSystemBlocker } from "./data";
 
+/** Per-student blocker codes the preview reports; any other code is shown by its label (or the code itself). */
+export const MISSING_RATE_ISSUE = "MISSING_EFFECTIVE_TUITION_RATE";
+export const MISSING_SOURCE_ISSUE = "MISSING_ACQUISITION_SOURCE";
+export const MISSING_GUARDIAN_ISSUE = "MISSING_PRIMARY_GUARDIAN";
+export const knownStudentIssues: ReadonlySet<string> = new Set([MISSING_RATE_ISSUE, MISSING_SOURCE_ISSUE, MISSING_GUARDIAN_ISSUE]);
+
 export const tuitionBlockerLabels: Record<string, string> = {
-  MISSING_EFFECTIVE_TUITION_RATE: "Thiếu đơn giá có hiệu lực vào ngày học",
-  MISSING_ACQUISITION_SOURCE: "Chưa có nguồn học viên",
-  MISSING_PRIMARY_GUARDIAN: "Chưa có phụ huynh chính",
+  [MISSING_RATE_ISSUE]: "Thiếu đơn giá có hiệu lực vào ngày học",
+  [MISSING_SOURCE_ISSUE]: "Chưa có nguồn học viên",
+  [MISSING_GUARDIAN_ISSUE]: "Chưa có phụ huynh chính",
 };
 
 export function summarizeTuitionPreview(rows: TuitionPreviewRow[]) {
@@ -12,17 +18,15 @@ export function summarizeTuitionPreview(rows: TuitionPreviewRow[]) {
     const student = students.get(row.studentId) ?? { studentId: row.studentId, sessions: 0, missingRateFrom: null, issues: new Set<string>() };
     student.sessions += 1;
     if (row.unitPriceVnd === null) {
-      student.issues.add("MISSING_EFFECTIVE_TUITION_RATE");
+      student.issues.add(MISSING_RATE_ISSUE);
       if (!student.missingRateFrom || row.sessionDate < student.missingRateFrom) student.missingRateFrom = row.sessionDate;
     }
-    if (!row.acquisitionSourceId) student.issues.add("MISSING_ACQUISITION_SOURCE");
+    if (!row.acquisitionSourceId) student.issues.add(MISSING_SOURCE_ISSUE);
     if (row.blockerCode) student.issues.add(row.blockerCode);
     students.set(row.studentId, student);
   }
   return [...students.values()].map(student => ({ ...student, issues: [...student.issues] }));
 }
-
-const knownStudentIssues = new Set(["MISSING_EFFECTIVE_TUITION_RATE", "MISSING_ACQUISITION_SOURCE", "MISSING_PRIMARY_GUARDIAN"]);
 
 export interface TuitionLockReadiness {
   /** Students in the preview (one per student, many sessions each). */
@@ -53,9 +57,9 @@ export interface TuitionLockReadiness {
 export function getTuitionLockReadiness(rows: TuitionPreviewRow[], systemBlockers: TuitionSystemBlocker[]): TuitionLockReadiness {
   const students = summarizeTuitionPreview(rows);
   const count = (code: string) => students.filter((student) => student.issues.includes(code)).length;
-  const missingRates = count("MISSING_EFFECTIVE_TUITION_RATE");
-  const missingSources = count("MISSING_ACQUISITION_SOURCE");
-  const missingGuardians = count("MISSING_PRIMARY_GUARDIAN");
+  const missingRates = count(MISSING_RATE_ISSUE);
+  const missingSources = count(MISSING_SOURCE_ISSUE);
+  const missingGuardians = count(MISSING_GUARDIAN_ISSUE);
   const otherIssues = students.filter((student) => student.issues.some((code) => !knownStudentIssues.has(code))).length;
   const previewUnavailable = systemBlockers.some((blocker) => blocker.code === "PREVIEW_UNAVAILABLE");
   const isEmpty = rows.length === 0 && systemBlockers.length === 0;
