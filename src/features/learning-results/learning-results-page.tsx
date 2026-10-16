@@ -1,27 +1,51 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 
-import { EmptyState } from "@/components/shared/empty-state";
+import { TableState } from "@/components/patterns/data-table-frame";
+import { FilterInput, FilterTrigger } from "@/components/patterns/filter-bar";
+import { PageHeader } from "@/components/patterns/page-header";
+import { Pagination } from "@/components/patterns/pagination";
+import {
+  QuickFilterChips,
+  type QuickFilterChip,
+} from "@/components/patterns/quick-filter-chips";
 import { Button } from "@/components/ui/button";
+import { LearningResultRecordList } from "@/features/learning-results/components/learning-result-record-list";
 import { LearningResultsFilters } from "@/features/learning-results/components/learning-results-filters";
 import { LearningResultsTable } from "@/features/learning-results/components/learning-results-table";
-import type {
-  LearningResultDirectoryItem,
-  LearningResultFiltersState,
+import {
+  applyLearningResultQuickChip,
+  countActiveLearningResultFilters,
+  countLearningResultQuickChips,
+  defaultLearningResultFilters,
+  getLearningResultClassOptions,
+  getLearningResultGradeOptions,
+  getLearningResultQuickChip,
+  getOldestLearningResultDate,
+  learningResultQuickChipLabels,
+  learningResultQuickChipValues,
+  matchesLearningResultFilters,
+  paginateLearningResults,
+  reachesBeforeLoadedWindow,
+  type LearningResultFilterChange,
+  type LearningResultFiltersState,
+  type LearningResultQuickChip,
+} from "@/features/learning-results/learning-result-models";
+import {
+  LEARNING_RESULTS_LIMIT,
+  type LearningResultDirectoryItem,
 } from "@/features/learning-results/read-models";
+import { formatIsoDate } from "@/lib/datetime";
 
-const PAGE_SIZE = 20;
-
-const defaultFilters: LearningResultFiltersState = {
-  classId: "",
-  dateFrom: "",
-  dateTo: "",
-  grade: "",
-  notebookStatus: "",
-  search: "",
-  scoreStatus: "",
-};
+/*
+ * Responsive switch: the work area, not the device, picks the table or the
+ * card list. The page root is a Tailwind container (`@container`) and the
+ * table/filter bar show from `@min-[1072px]` = the table's `min-w-[1060px]`
+ * + the 2px frame border + 10px of slack (laptop 1366px minus the sidebar and
+ * page padding leaves ~1078px). The class names are spelled out in full so the
+ * Tailwind scanner sees them; change all of them together.
+ */
 
 interface LearningResultsPageProps {
   canViewSessions: boolean;
@@ -29,275 +53,244 @@ interface LearningResultsPageProps {
   items: LearningResultDirectoryItem[];
 }
 
+/**
+ * Learning results directory (design 16a): header with the loaded count, quick
+ * chips, filters, a framed table (cards on narrow widths) and a pager. Pure
+ * props-in client state; filters are not in the URL.
+ */
 export function LearningResultsPage({
   canViewSessions,
   canViewStudents,
   items,
 }: LearningResultsPageProps) {
-  const [filters, setFilters] =
-    useState<LearningResultFiltersState>(defaultFilters);
+  const [filters, setFilters] = useState<LearningResultFiltersState>(
+    defaultLearningResultFilters,
+  );
   const [page, setPage] = useState(1);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterTriggerRef = useRef<HTMLButtonElement>(null);
+
+  const isCapped = items.length === LEARNING_RESULTS_LIMIT;
+  // Only a capped load can be missing older rows; find where it stops once.
+  const oldestLoadedDate = useMemo(
+    () => (isCapped ? getOldestLearningResultDate(items) : null),
+    [isCapped, items],
+  );
 
   const classOptions = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          items.map((item) => [
-            item.classId,
-            { id: item.classId, label: item.className },
-          ]),
-        ).values(),
-      ).sort((left, right) => left.label.localeCompare(right.label, "vi")),
+    () => getLearningResultClassOptions(items),
     [items],
   );
-
   const gradeOptions = useMemo(
-    () =>
-      Array.from(new Set(items.map((item) => item.classGrade))).sort(
-        (left, right) => left - right,
-      ),
+    () => getLearningResultGradeOptions(items),
     [items],
   );
-
   const filteredItems = useMemo(
-    () => items.filter((item) => matchesFilters(item, filters)),
+    () => items.filter((item) => matchesLearningResultFilters(item, filters)),
     [filters, items],
   );
+  const chipCounts = useMemo(
+    () => countLearningResultQuickChips(items, filters),
+    [filters, items],
+  );
+  const pagination = useMemo(
+    () => paginateLearningResults(filteredItems, page),
+    [filteredItems, page],
+  );
 
-  const pageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pageCount);
-  const pageStart = (currentPage - 1) * PAGE_SIZE;
-  const pageItems = filteredItems.slice(pageStart, pageStart + PAGE_SIZE);
-  const pageNumbers = getVisiblePageNumbers(currentPage, pageCount);
-  const hasActiveFilters = Object.values(filters).some(Boolean);
+  const activeFilterCount = countActiveLearningResultFilters(filters);
+  const hasFilters = activeFilterCount > 0;
+  const isEmptyByFilter = filteredItems.length === 0 && items.length > 0;
+  const isBeforeLoadedWindow =
+    oldestLoadedDate !== null &&
+    reachesBeforeLoadedWindow(filters, oldestLoadedDate);
 
-  const summary = useMemo(() => summarizeResults(filteredItems), [filteredItems]);
-
-  const updateFilters = (nextFilters: LearningResultFiltersState) => {
-    setFilters(nextFilters);
+  const changeFilter: LearningResultFilterChange = (key, value) => {
+    setFilters((current) => ({ ...current, [key]: value }));
     setPage(1);
   };
-
   const resetFilters = () => {
-    setFilters(defaultFilters);
+    setFilters(defaultLearningResultFilters);
     setPage(1);
   };
+  const pressChip = (chip: LearningResultQuickChip) => {
+    setFilters((current) => applyLearningResultQuickChip(current, chip));
+    setPage(1);
+  };
+
+  // Counts come from the loaded rows only; while the range may reach past them
+  // they would read as exact, so the chips go without numbers.
+  const chips: QuickFilterChip<LearningResultQuickChip>[] =
+    learningResultQuickChipValues.map((value) => ({
+      count: isBeforeLoadedWindow ? undefined : chipCounts[value],
+      countTone: value === "below_five" ? "danger" : "default",
+      label: learningResultQuickChipLabels[value],
+      value,
+    }));
+
+  const emptyState: ReactNode = isEmptyByFilter ? (
+    <TableState>
+      <p className="text-body font-semibold text-text-strong">
+        {isBeforeLoadedWindow
+          ? "Không có kết quả trong phần đã tải"
+          : "Không có kết quả khớp bộ lọc"}
+      </p>
+      <p className="text-secondary text-text-muted">
+        {isBeforeLoadedWindow
+          ? `Khoảng ngày đang chọn vượt quá ${LEARNING_RESULTS_LIMIT} kết quả mới nhất; kết quả cũ hơn chưa được tải.`
+          : "Nới rộng điều kiện hoặc xóa bộ lọc để xem lại danh sách."}
+      </p>
+      <Button className="mt-2" onClick={resetFilters} size="sm" variant="secondary">
+        Xóa lọc
+      </Button>
+    </TableState>
+  ) : (
+    <TableState>
+      <p className="text-body font-semibold text-text-strong">
+        Chưa có kết quả học tập
+      </p>
+      <p className="text-secondary text-text-muted">
+        Kết quả xuất hiện khi giáo viên nhập điểm và nhận xét ở từng buổi học.
+      </p>
+    </TableState>
+  );
+
+  const pager = (variant: "frame" | "standalone") => (
+    <Pagination
+      itemLabel="kết quả"
+      label={
+        variant === "frame"
+          ? "Phân trang kết quả học tập"
+          : "Phân trang kết quả học tập (danh sách gọn)"
+      }
+      onPageChange={setPage}
+      page={pagination.page}
+      pageCount={pagination.pageCount}
+      rangeEnd={pagination.rangeEnd}
+      rangeStart={pagination.rangeStart}
+      total={pagination.total}
+      variant={variant}
+    />
+  );
 
   return (
-    <div className="grid min-w-0 gap-5">
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase text-ink-muted">
-            Học vụ
-          </p>
-          <h1 className="mt-1 font-display text-2xl font-bold text-ink">
-            Kết quả học tập
-          </h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            Theo dõi điểm kiểm tra, tình trạng vở và nhận xét theo từng buổi học.
-          </p>
-        </div>
-        <p className="text-sm font-semibold text-ink-muted">
-          {filteredItems.length}/{items.length} kết quả
-        </p>
-      </header>
-
-      <section
-        aria-label="Tổng quan kết quả"
-        className="grid grid-cols-2 gap-3 xl:grid-cols-4"
+    <div className="learning-results-directory @container grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
+      <PageHeader
+        actions={
+          <FilterTrigger
+            activeCount={activeFilterCount}
+            className="@min-[1072px]:hidden"
+            onClick={() => setIsFilterOpen(true)}
+            ref={filterTriggerRef}
+          />
+        }
+        title="Kết quả học tập"
       >
-        <SummaryItem label="Kết quả đang xem" value={String(summary.total)} />
-        <SummaryItem label="Điểm kiểm tra TB" value={formatAverage(summary.testAverage)} />
-        <SummaryItem label="Điểm vở TB" value={formatAverage(summary.notebookAverage)} />
-        <SummaryItem
-          emphasis={summary.attentionCount > 0}
-          label="Cần chú ý"
-          value={String(summary.attentionCount)}
+        <p className="mt-1 text-secondary tabular-nums text-text-muted">
+          {isCapped
+            ? `${LEARNING_RESULTS_LIMIT} kết quả mới nhất (giới hạn tải)`
+            : `${items.length} kết quả`}
+          {filteredItems.length !== items.length
+            ? ` · ${filteredItems.length} khớp bộ lọc`
+            : ""}
+        </p>
+      </PageHeader>
+
+      <div className="flex @min-[1072px]:hidden">
+        <FilterInput
+          active={filters.search.trim().length > 0}
+          aria-label="Tìm kết quả học tập"
+          autoComplete="off"
+          className="h-11"
+          onChange={(event) => changeFilter("search", event.target.value)}
+          placeholder="Học sinh, mã hoặc lớp"
+          type="search"
+          value={filters.search}
         />
-      </section>
+      </div>
 
       <LearningResultsFilters
+        activeFilterCount={activeFilterCount}
+        barWrapperClassName="hidden @min-[1072px]:block"
         classOptions={classOptions}
         filters={filters}
         gradeOptions={gradeOptions}
-        hasActiveFilters={hasActiveFilters}
-        onChange={updateFilters}
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        onFilterChange={changeFilter}
         onReset={resetFilters}
+        resultCount={filteredItems.length}
+        returnFocusRef={filterTriggerRef}
       />
 
-      {filteredItems.length === 0 ? (
-        <EmptyState
-          actionLabel={hasActiveFilters ? "Xóa bộ lọc" : undefined}
-          description={
-            hasActiveFilters
-              ? "Không có kết quả nào phù hợp với điều kiện đang chọn."
-              : "Chưa có kết quả học tập nào được ghi nhận."
-          }
-          onAction={hasActiveFilters ? resetFilters : undefined}
-          title={hasActiveFilters ? "Không tìm thấy kết quả" : "Chưa có kết quả học tập"}
-        />
-      ) : (
-        <>
+      <QuickFilterChips
+        chips={chips}
+        className="max-md:[&_button]:h-11"
+        label="Lọc nhanh kết quả"
+        onChange={pressChip}
+        value={getLearningResultQuickChip(filters)}
+      />
+
+      {isBeforeLoadedWindow && oldestLoadedDate ? (
+        <div
+          className="rounded-lg border border-warning-border bg-warning-bg px-4 py-2.5"
+          role="status"
+        >
+          <p className="text-secondary text-warning-ink">
+            Khoảng ngày đang chọn vượt quá {LEARNING_RESULTS_LIMIT} kết quả mới
+            nhất đã tải; từ {formatIsoDate(oldestLoadedDate)} trở về trước có
+            thể thiếu kết quả.
+          </p>
+        </div>
+      ) : null}
+
+      <div className="learning-results-directory-results grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
+        <p aria-live="polite" className="sr-only">
+          {pagination.total === 0
+            ? "Không có kết quả"
+            : `Hiển thị ${pagination.rangeStart}-${pagination.rangeEnd} của ${pagination.total} kết quả`}
+        </p>
+
+        <div className="hidden @min-[1072px]:block">
           <LearningResultsTable
             canViewSessions={canViewSessions}
             canViewStudents={canViewStudents}
-            items={pageItems}
+            empty={emptyState}
+            footer={pagination.total > 0 ? pager("frame") : undefined}
+            items={pagination.rows}
+            status={filteredItems.length === 0 ? "empty" : "ready"}
           />
+        </div>
 
-          <nav
-            aria-label="Phân trang kết quả học tập"
-            className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface-1 px-4 py-3 text-sm shadow-card md:flex-row md:items-center md:justify-between"
-          >
-            <p className="text-ink-muted">
-              Hiển thị {pageStart + 1}-
-              {Math.min(pageStart + PAGE_SIZE, filteredItems.length)} của {filteredItems.length}
-              {" "}kết quả · Trang {currentPage}/{pageCount}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                className="min-h-11"
-                disabled={currentPage === 1}
-                onClick={() => setPage(currentPage - 1)}
+        <div className="grid gap-2 @min-[1072px]:hidden">
+          <p className="flex items-center justify-between text-secondary text-text-muted">
+            <span className="tabular-nums">{filteredItems.length} kết quả</span>
+            {hasFilters ? (
+              <button
+                className="-my-3 min-h-11 rounded-md px-2 font-semibold text-action-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+                onClick={resetFilters}
                 type="button"
-                variant="outline"
               >
-                Trước
-              </Button>
-              {pageNumbers.map((pageNumber) => (
-                <Button
-                  aria-current={pageNumber === currentPage ? "page" : undefined}
-                  className="min-h-11 min-w-11"
-                  key={pageNumber}
-                  onClick={() => setPage(pageNumber)}
-                  type="button"
-                  variant={pageNumber === currentPage ? "secondary" : "ghost"}
-                >
-                  {pageNumber}
-                </Button>
-              ))}
-              <Button
-                className="min-h-11"
-                disabled={currentPage === pageCount}
-                onClick={() => setPage(currentPage + 1)}
-                type="button"
-                variant="outline"
-              >
-                Sau
-              </Button>
+                Xóa lọc
+              </button>
+            ) : null}
+          </p>
+          {filteredItems.length === 0 ? (
+            <div className="rounded-lg border border-border-subtle bg-surface-base">
+              {emptyState}
             </div>
-          </nav>
-        </>
-      )}
+          ) : (
+            <>
+              <LearningResultRecordList
+                canViewSessions={canViewSessions}
+                canViewStudents={canViewStudents}
+                items={pagination.rows}
+              />
+              {pager("standalone")}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
-}
-
-function SummaryItem({
-  emphasis = false,
-  label,
-  value,
-}: {
-  emphasis?: boolean;
-  label: string;
-  value: string;
-}) {
-  return (
-    <article className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
-      <p className="text-xs font-semibold text-ink-muted">{label}</p>
-      <p
-        className={`mt-2 text-xl font-bold ${emphasis ? "text-danger" : "text-ink"}`}
-      >
-        {value}
-      </p>
-    </article>
-  );
-}
-
-function matchesFilters(
-  item: LearningResultDirectoryItem,
-  filters: LearningResultFiltersState,
-): boolean {
-  const search = normalizeSearch(filters.search);
-  const searchableText = normalizeSearch(
-    `${item.studentName} ${item.studentCode} ${item.className} ${item.classCode}`,
-  );
-
-  return (
-    (!search || searchableText.includes(search)) &&
-    (!filters.grade || item.classGrade === Number(filters.grade)) &&
-    (!filters.classId || item.classId === filters.classId) &&
-    (!filters.notebookStatus || item.notebookStatus === filters.notebookStatus) &&
-    (!filters.scoreStatus || matchesScoreStatus(item, filters.scoreStatus)) &&
-    (!filters.dateFrom || item.sessionDate >= filters.dateFrom) &&
-    (!filters.dateTo || item.sessionDate <= filters.dateTo)
-  );
-}
-
-function matchesScoreStatus(
-  item: LearningResultDirectoryItem,
-  status: string,
-): boolean {
-  if (status === "attention") {
-    return needsAttention(item);
-  }
-
-  const complete =
-    item.testScore !== null &&
-    (item.notebookStatus === "not_required" ||
-      (item.notebookStatus === "submitted" && item.notebookScore !== null));
-
-  return status === "complete" ? complete : !complete;
-}
-
-function needsAttention(item: LearningResultDirectoryItem): boolean {
-  return (
-    item.notebookStatus === "not_submitted" ||
-    (item.testScore !== null && item.testScore < 5) ||
-    (item.notebookScore !== null && item.notebookScore < 5)
-  );
-}
-
-function summarizeResults(items: readonly LearningResultDirectoryItem[]) {
-  const testScores = items.flatMap((item) =>
-    item.testScore === null ? [] : [item.testScore],
-  );
-  const notebookScores = items.flatMap((item) =>
-    item.notebookScore === null ? [] : [item.notebookScore],
-  );
-
-  return {
-    attentionCount: items.filter(needsAttention).length,
-    notebookAverage: average(notebookScores),
-    testAverage: average(testScores),
-    total: items.length,
-  };
-}
-
-function average(values: readonly number[]): number | null {
-  if (values.length === 0) {
-    return null;
-  }
-
-  return values.reduce((total, value) => total + value, 0) / values.length;
-}
-
-function formatAverage(value: number | null): string {
-  return value === null ? "Chưa có" : `${value.toFixed(1)}/10`;
-}
-
-function normalizeSearch(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("vi")
-    .trim();
-}
-
-function getVisiblePageNumbers(currentPage: number, pageCount: number): number[] {
-  if (pageCount <= 5) {
-    return Array.from({ length: pageCount }, (_, index) => index + 1);
-  }
-
-  const start = Math.min(Math.max(1, currentPage - 2), pageCount - 4);
-  return Array.from({ length: 5 }, (_, index) => start + index);
 }

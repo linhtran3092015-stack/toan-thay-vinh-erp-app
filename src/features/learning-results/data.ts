@@ -2,9 +2,10 @@ import "server-only";
 
 import { z } from "zod";
 
-import type {
-  LearningResultDirectoryItem,
-  LearningResultsDirectoryResult,
+import {
+  LEARNING_RESULTS_LIMIT,
+  type LearningResultDirectoryItem,
+  type LearningResultsDirectoryResult,
 } from "@/features/learning-results/read-models";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -67,7 +68,7 @@ export async function getLearningResultsDirectory(): Promise<LearningResultsDire
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase.rpc(
       "get_learning_results_directory",
-      { p_limit: 500 },
+      { p_limit: LEARNING_RESULTS_LIMIT },
     );
 
     if (error) {

@@ -1,3 +1,6 @@
+/** Rows the directory loads (the RPC maximum); the page says so when it was reached. */
+export const LEARNING_RESULTS_LIMIT = 500;
+
 export type LearningResultNotebookStatus =
   | "submitted"
   | "not_submitted"
@@ -23,16 +26,6 @@ export interface LearningResultDirectoryItem {
   studentId: string;
   studentName: string;
   testScore: number | null;
-}
-
-export interface LearningResultFiltersState {
-  classId: string;
-  dateFrom: string;
-  dateTo: string;
-  grade: string;
-  notebookStatus: string;
-  search: string;
-  scoreStatus: string;
 }
 
 export type LearningResultsDirectoryResult =

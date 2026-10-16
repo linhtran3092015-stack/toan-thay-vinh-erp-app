@@ -1,5 +1,5 @@
-import { LoadingState } from "@/components/shared/loading-state";
+import { LearningResultsSkeleton } from "@/features/learning-results/components/learning-results-skeleton";
 
 export default function LearningResultsLoading() {
-  return <LoadingState rows={8} title="Đang tải kết quả học tập" />;
+  return <LearningResultsSkeleton />;
 }
