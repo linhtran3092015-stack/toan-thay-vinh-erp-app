@@ -8,7 +8,19 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const views: readonly ListsPreviewView[] = ["students", "classes", "sessions", "results", "credits", "advances", "staff", "commissions"];
+const views: readonly ListsPreviewView[] = [
+  "students",
+  "classes",
+  "sessions",
+  "results",
+  "credits",
+  "advances",
+  "staff",
+  "commissions",
+  "finance-orders",
+  "session-ledger",
+  "payment-requests",
+];
 const roles: readonly ListsPreviewRole[] = ["owner", "ta", "accountant"];
 const states: readonly ListsPreviewState[] = ["normal", "capped", "empty"];
 
