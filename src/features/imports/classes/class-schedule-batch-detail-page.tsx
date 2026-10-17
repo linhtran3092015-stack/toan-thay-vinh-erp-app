@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { VIETNAM_TIME_ZONE } from "@/lib/datetime";
 
 import { commitClassScheduleImportBatchAction } from "./actions";
 import type {
@@ -171,7 +172,7 @@ export function ClassScheduleBatchDetailPage({
           <div>
             <span className="text-slate-500">Thời gian tạo:</span>
             <p className="font-semibold text-slate-900">
-              {new Date(batch.created_at).toLocaleString("vi-VN")}
+              {new Date(batch.created_at).toLocaleString("vi-VN", { timeZone: VIETNAM_TIME_ZONE })}
             </p>
           </div>
           {batch.committed_at && (
@@ -179,7 +180,7 @@ export function ClassScheduleBatchDetailPage({
               <div>
                 <span className="text-slate-500">Thời gian import:</span>
                 <p className="font-semibold text-emerald-800">
-                  {new Date(batch.committed_at).toLocaleString("vi-VN")}
+                  {new Date(batch.committed_at).toLocaleString("vi-VN", { timeZone: VIETNAM_TIME_ZONE })}
                 </p>
               </div>
               <div>
@@ -208,7 +209,7 @@ export function ClassScheduleBatchDetailPage({
           <p className="mt-1 text-xs text-emerald-800">
             Các lớp học và lịch học mới đã được khởi tạo trong hệ thống dữ liệu vận hành.
             {batch.committed_at && (
-              <span> Thời gian ghi: {new Date(batch.committed_at).toLocaleString("vi-VN")}.</span>
+              <span> Thời gian ghi: {new Date(batch.committed_at).toLocaleString("vi-VN", { timeZone: VIETNAM_TIME_ZONE })}.</span>
             )}
           </p>
         </div>

@@ -24,6 +24,7 @@ import type {
   StudentImportRowInput,
   StudentImportValidationResult,
 } from "@/features/imports/students/types";
+import { VIETNAM_TIME_ZONE } from "@/lib/datetime";
 
 interface StudentImportCommitPanelProps {
   canCreateStudents: boolean;
@@ -47,6 +48,7 @@ function formatCommittedAt(
     {
       dateStyle: "medium",
       timeStyle: "medium",
+      timeZone: VIETNAM_TIME_ZONE,
     },
   ).format(parsedDate);
 }

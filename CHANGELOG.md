@@ -2,6 +2,11 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.21.0.2] - 2026-10-17
+
+### Fixed
+- **Ngày giờ luôn hiện theo giờ Việt Nam**, dù máy chủ chạy ở múi giờ nào: ghi chú CRM ("Hoàng Minh Khôi · 01:30 18/10/2026"), lời mời tài khoản đang chờ ("Đã thêm …"), ngày tạo trong danh sách yêu cầu thanh toán, giờ giao dịch trong cửa sổ đối soát SePay, thời gian tạo và thời gian import của lô import lớp và lịch học, và thời điểm commit khi import học viên. Trước đây các mục này định dạng theo múi giờ của máy chủ, nên máy chủ Vercel (UTC) in lệch 7 giờ (ghi chú lúc 01:30 ngày 18/10 hiện "18:30 17/10/2026") và trang có thể báo lỗi React #418 khi hydrate. Định dạng hiển thị giữ nguyên.
+
 ## [0.21.0.0] - 2026-10-17
 
 Tin Zalo nhận xét cuối buổi theo mẫu mới cho mọi buổi (kế hoạch chấm bài AI, giai đoạn 2b): tiêu đề có ngày học, họ tên, dòng Kết quả, nhận xét và thông tin liên hệ; mục không có dữ liệu tự ẩn; tin dài tự tách 2–3 tin gửi liền nhau; vở còn chờ chấm hoặc chưa điền trợ giảng giám thị thì chưa gửi được.

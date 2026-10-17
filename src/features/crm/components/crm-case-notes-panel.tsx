@@ -11,6 +11,7 @@ import { addCaseNoteAction, completeFollowUpAction } from "@/features/crm/action
 import type { CrmActionOverrides } from "@/features/crm/crm-action-overrides";
 import type { CrmActionResultState } from "@/features/crm/forms/crm-action-types";
 import type { CrmCaseNoteReadModel } from "@/features/crm/read-models";
+import { formatDateTime, formatIsoDate } from "@/lib/datetime";
 
 const fieldClassName =
   "h-10 w-full rounded-md border border-border-subtle bg-field-bg px-3 text-body text-text-strong outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring";
@@ -124,11 +125,11 @@ export function CrmCaseNotesPanel({
                       item.followUpDoneAt ? (
                         <Badge tone="success">Đã theo dõi</Badge>
                       ) : overdue ? (
-                        <Badge tone="danger">Quá hạn {formatDate(item.followUpAt)}</Badge>
+                        <Badge tone="danger">Quá hạn {formatIsoDate(item.followUpAt)}</Badge>
                       ) : dueToday ? (
                         <Badge tone="warning">Hẹn hôm nay</Badge>
                       ) : (
-                        <Badge tone="info">Hẹn {formatDate(item.followUpAt)}</Badge>
+                        <Badge tone="info">Hẹn {formatIsoDate(item.followUpAt)}</Badge>
                       )
                     ) : null}
                   </div>
@@ -146,16 +147,4 @@ export function CrmCaseNotesPanel({
       </CardContent>
     </Card>
   );
-}
-
-function formatDate(value: string): string {
-  const [year, month, day] = value.slice(0, 10).split("-");
-  return `${day}/${month}/${year}`;
-}
-
-const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", hour: "2-digit", minute: "2-digit", month: "2-digit", year: "numeric" });
-
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date);
 }
