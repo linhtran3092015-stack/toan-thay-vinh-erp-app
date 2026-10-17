@@ -1,77 +1,81 @@
-import type { ReactNode, RefObject } from "react";
-import { X } from "lucide-react";
+"use client";
 
-import { FilterBar } from "@/components/patterns/filter-bar";
-import { Dialog } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { useId, type ChangeEvent, type ReactNode, type RefObject } from "react";
+
+import { FilterBar, FilterField, FilterInput, FilterSelect, FilterSheet } from "@/components/patterns/filter-bar";
+import { paymentRequestStatusLabels, type PaymentRequestStatus } from "@/features/finance/payment-request-directory-models";
 import type { PaymentRequestFiltersState } from "@/features/finance/read-models";
 
 interface PaymentRequestFiltersProps {
   activeFilterCount: number;
   filters: PaymentRequestFiltersState;
-  isDrawerOpen: boolean;
+  isSheetOpen: boolean;
   onChange: (key: keyof PaymentRequestFiltersState, value: string) => void;
-  onCloseDrawer: () => void;
+  onCloseSheet: () => void;
   onReset: () => void;
-  returnFocusRef: RefObject<HTMLButtonElement | null>;
+  /** Rows the current filters keep, for the sheet's "Xem n yêu cầu". */
+  resultCount: number;
+  returnFocusRef: RefObject<HTMLElement | null>;
 }
 
+/**
+ * Tìm kiếm · Trạng thái · Loại nạp · Từ ngày · Đến ngày. Both selects get a
+ * 196px floor (the longest option, "Thanh toán một phần", ~140px of 14px text
+ * plus padding and the arrow), the date inputs 140px (a full dd/mm/yyyy and the
+ * picker icon). At the 1120px work-area threshold the bar's inner width is
+ * 1086px (p-4 and the border); minus 5 × 12px gaps and the ~100px "Xóa lọc (n)"
+ * button, 926px remain: the floors take 220 + 2 × 196 + 2 × 140 = 892px and the
+ * 34px left over is shared by the fr weights.
+ */
+const PAYMENT_REQUEST_FILTER_COLUMNS = "minmax(220px, 1fr) repeat(2, minmax(196px, 1fr)) repeat(2, minmax(140px, 0.8fr))";
+
+/** The select's order (expired kept as an option though nothing writes it today); words from the badge map. */
+const statusOptions: readonly PaymentRequestStatus[] = ["pending", "partially_paid", "paid", "expired", "cancelled"];
+
+/**
+ * Desktop bar from the 1120px work-area threshold, a sheet behind the "Bộ lọc"
+ * trigger below it (sessions precedent). The bar sits in a wrapper carrying the
+ * `.payment-request-filter-bar` hook: globals.css switches that hook between
+ * `none` and `block`, which would otherwise replace the bar's own grid.
+ */
 export function PaymentRequestFilters({
   activeFilterCount,
   filters,
-  isDrawerOpen,
+  isSheetOpen,
   onChange,
-  onCloseDrawer,
+  onCloseSheet,
   onReset,
+  resultCount,
   returnFocusRef,
 }: PaymentRequestFiltersProps) {
+  const titleId = useId();
+
   return (
     <>
-      <FilterBar
-        className="payment-request-filter-bar"
-      >
-        <PaymentRequestFilterFields
-          filters={filters}
-          onChange={onChange}
+      <div className="payment-request-filter-bar">
+        <FilterBar
+          activeCount={activeFilterCount}
+          columns={PAYMENT_REQUEST_FILTER_COLUMNS}
+          label="Bộ lọc yêu cầu thanh toán"
           onReset={onReset}
-          scope="desktop"
-          showReset={activeFilterCount > 0}
-        />
-      </FilterBar>
+        >
+          <PaymentRequestFilterFields filters={filters} onChange={onChange} scope="desktop" />
+        </FilterBar>
+      </div>
 
-      <Dialog
-        ariaLabelledBy="payment-request-filter-drawer-title"
-        className="ml-auto flex h-full max-h-none w-full max-w-sm flex-col rounded-none sm:max-h-[92vh] sm:rounded-xl"
-        onClose={onCloseDrawer}
-        isOpen={isDrawerOpen}
+      <FilterSheet
+        activeCount={activeFilterCount}
+        isOpen={isSheetOpen}
+        onClose={onCloseSheet}
+        onReset={onReset}
+        resetTestId="drawer-payment-request-reset-filters"
+        resultLabel={`Xem ${resultCount} yêu cầu`}
         returnFocusRef={returnFocusRef}
+        subject="yêu cầu thanh toán"
+        titleId={titleId}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-border-subtle px-5 py-4">
-          <div>
-            <h2 className="text-section-title text-text-strong" id="payment-request-filter-drawer-title">
-              Bộ lọc{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-            </h2>
-            <p className="mt-1 text-secondary text-text-muted">Thu hẹp danh sách yêu cầu đang tải.</p>
-          </div>
-          <button
-            aria-label="Đóng bộ lọc"
-            className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
-            onClick={onCloseDrawer}
-            type="button"
-          >
-            <X aria-hidden="true" size={20} strokeWidth={2} />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <PaymentRequestFilterFields
-            filters={filters}
-            onChange={onChange}
-            onReset={onReset}
-            scope="drawer"
-            showReset={activeFilterCount > 0}
-          />
-        </div>
-      </Dialog>
+        <PaymentRequestFilterFields filters={filters} onChange={onChange} scope="drawer" />
+      </FilterSheet>
     </>
   );
 }
@@ -79,70 +83,79 @@ export function PaymentRequestFilters({
 function PaymentRequestFilterFields({
   filters,
   onChange,
-  onReset,
   scope,
-  showReset,
 }: {
   filters: PaymentRequestFiltersState;
   onChange: (key: keyof PaymentRequestFiltersState, value: string) => void;
-  onReset: () => void;
   scope: "desktop" | "drawer";
-  showReset: boolean;
 }) {
-  const prefix = scope === "desktop" ? "payment-request-filter-grid" : "grid";
+  const update = (key: keyof PaymentRequestFiltersState) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    onChange(key, event.target.value);
+
   return (
-    <div className={`${prefix} gap-3`}>
-      <label className="grid gap-1.5 text-label text-text-muted payment-request-search-field">
-        <span>Tìm kiếm</span>
-        <input
-          className={inputClassName}
+    <>
+      <FilterField label="Tìm kiếm">
+        <FilterInput
+          active={filters.search.trim().length > 0}
+          autoComplete="off"
           data-testid={`${scope}-payment-request-search`}
-          onChange={(event) => onChange("search", event.target.value)}
-          placeholder="Mã yêu cầu, học viên, SĐT, nội dung CK..."
+          onChange={update("search")}
+          placeholder="Mã yêu cầu, học sinh, SĐT, nội dung CK"
           type="search"
           value={filters.search}
         />
-      </label>
-
-      <FilterSelect label="Trạng thái" onChange={(value) => onChange("status", value)} value={filters.status}>
+      </FilterField>
+      <SelectField label="Trạng thái" onChange={update("status")} testId={`${scope}-payment-request-status`} value={filters.status}>
         <option value="">Tất cả trạng thái</option>
-        <option value="pending">Chờ thanh toán</option>
-        <option value="partially_paid">Thanh toán một phần</option>
-        <option value="paid">Đã thanh toán</option>
-        <option value="expired">Hết hạn</option>
-        <option value="cancelled">Đã hủy</option>
-      </FilterSelect>
-
-      <FilterSelect label="Loại nạp" onChange={(value) => onChange("topupType", value)} value={filters.topupType}>
+        {statusOptions.map((status) => (
+          <option key={status} value={status}>{paymentRequestStatusLabels[status]}</option>
+        ))}
+      </SelectField>
+      <SelectField label="Loại nạp" onChange={update("topupType")} testId={`${scope}-payment-request-topup`} value={filters.topupType}>
         <option value="">Tất cả loại nạp</option>
         <option value="new">Tuyển mới</option>
         <option value="renewal">Tái phí</option>
-      </FilterSelect>
-
-      <label className="grid gap-1.5 text-label text-text-muted">
-        <span>Từ ngày</span>
-        <input className={inputClassName} onChange={(event) => onChange("createdFrom", event.target.value)} type="date" value={filters.createdFrom} />
-      </label>
-      <label className="grid gap-1.5 text-label text-text-muted">
-        <span>Đến ngày</span>
-        <input className={inputClassName} onChange={(event) => onChange("createdTo", event.target.value)} type="date" value={filters.createdTo} />
-      </label>
-      <div className="flex items-end">
-        <Button className="min-h-11 w-full" disabled={!showReset} onClick={onReset} type="button" variant="outline">
-          Xóa lọc
-        </Button>
-      </div>
-    </div>
+      </SelectField>
+      <FilterField label="Từ ngày">
+        <FilterInput
+          active={filters.createdFrom.length > 0}
+          data-testid={`${scope}-payment-request-from`}
+          onChange={update("createdFrom")}
+          type="date"
+          value={filters.createdFrom}
+        />
+      </FilterField>
+      <FilterField label="Đến ngày">
+        <FilterInput
+          active={filters.createdTo.length > 0}
+          data-testid={`${scope}-payment-request-to`}
+          onChange={update("createdTo")}
+          type="date"
+          value={filters.createdTo}
+        />
+      </FilterField>
+    </>
   );
 }
 
-function FilterSelect({ children, label, onChange, value }: { children: ReactNode; label: string; onChange: (value: string) => void; value: string }) {
+function SelectField({
+  children,
+  label,
+  onChange,
+  testId,
+  value,
+}: {
+  children: ReactNode;
+  label: string;
+  onChange: (event: ChangeEvent<HTMLSelectElement>) => void;
+  testId: string;
+  value: string;
+}) {
   return (
-    <label className="grid gap-1.5 text-label text-text-muted">
-      <span>{label}</span>
-      <select className={inputClassName} onChange={(event) => onChange(event.target.value)} value={value}>{children}</select>
-    </label>
+    <FilterField label={label}>
+      <FilterSelect active={value !== ""} data-testid={testId} onChange={onChange} value={value}>
+        {children}
+      </FilterSelect>
+    </FilterField>
   );
 }
-
-const inputClassName = "h-11 min-w-0 rounded-md border border-border-subtle bg-surface-base px-3 text-control text-text-default outline-none transition focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:bg-disabled-bg disabled:text-text-muted";
