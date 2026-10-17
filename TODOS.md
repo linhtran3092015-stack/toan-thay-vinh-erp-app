@@ -2026,6 +2026,126 @@
 **Priority:** P4
 **Depends on:** None
 
+### Tổng tiền theo kỳ trên Tạm ứng và theo tháng trên Hoa hồng
+
+**What:** Hiện tổng tiền trên đầu `/advances` (thiết kế 16c: "tổng 14.000.000 ₫", nên là "Khấu trừ kỳ MM/YYYY: X ₫ (đã duyệt + đã trừ)") và tổng doanh thu đủ điều kiện theo tháng trên `/commissions`, bằng số do máy chủ tính.
+
+**Why:** Bước 14b chỉ hiện số đơn/số bản ghi. Test của hai trang cấm cộng tiền trên trình duyệt (bảng lương mới là nơi tính khấu trừ; chưa có khoản hoa hồng nào), và danh sách hoa hồng chỉ tải 500 bản ghi mới nhất nên tổng tháng cũ có thể thiếu.
+
+**Context:** `src/features/advances/advance-list-page.tsx`, `src/features/commissions/commission-list-page.tsx` (test nguồn cấm `.reduce(`); RPC `get_salary_advances_dashboard`, `get_sales_commission_accruals_dashboard`. Cần RPC tổng hợp hoặc trường tổng trong RPC hiện có.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Quyết định của anh (có muốn hiện tổng tiền không)
+
+### Lương tạm tính trong hộp thoại đối soát tạm ứng
+
+**What:** Hiện "Lương tạm tính đến hôm nay" của nhân sự trong hộp thoại Đối soát/Phê duyệt tạm ứng (thiết kế 16c), cho người có quyền `advances.review`.
+
+**Why:** `get_staff_payroll_estimate` cần `payroll.dashboard.view` (chỉ chủ trung tâm có), nên kế toán không đọc được; hệ thống cũng không có số "dự kiến cả tháng". Bước 14b bỏ dòng này và không nhắc quy tắc 50% (hệ thống không có quy tắc đó).
+
+**Context:** `src/features/advances/components/salary-advance-decision-dialog.tsx`; `supabase/migrations/20261010100000_payroll_daily_estimate_breakdown.sql`; route `src/app/api/payroll/staff-estimate/route.ts`. Cần quyết định ai được xem lương tạm tính của người khác, có thêm trần tạm ứng không.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Cột "Giao dịch nguồn" trên Hoa hồng
+
+**What:** Thêm cột "Giao dịch nguồn" (thiết kế 16a) trên `/commissions`, mở được giao dịch tiền về đã tạo bản ghi.
+
+**Why:** Hàng chỉ có `source_cashflow_record_id` (uuid); không có trang nào mở một bản ghi dòng tiền, và mã tham chiếu chỉ đọc được với `finance.view`/`cashflow.view`. Bước 14b bỏ cột thay vì in uuid vô nghĩa.
+
+**Context:** `src/features/commissions/read-models.ts` (`sourceCashflowRecordId`), RPC `get_sales_commission_accruals_dashboard` (`supabase/migrations/20261012160000_commission_recognized_on_bank_date.sql`).
+
+**Effort:** M
+**Priority:** P4
+**Depends on:** Trang chi tiết giao dịch hoặc mã tham chiếu đọc được trong phạm vi hoa hồng
+
+### Cột "Đăng nhập gần nhất" trên Nhân sự
+
+**What:** Ghi lại thời điểm đăng nhập để `/staff` hiện cột "Đăng nhập gần nhất" (thiết kế 16a).
+
+**Why:** `profiles.last_login_at` có cột nhưng không có gì ghi vào, nên trước đây mọi dòng đều "Chưa ghi nhận"; `auth.users.last_sign_in_at` chỉ đọc được bằng service role. Bước 14b bỏ cột.
+
+**Context:** `src/features/staff/data.ts`, `docs/backend/RBAC_MODEL.md`. Cần hook đăng nhập ghi `last_login_at` hoặc RPC security definer chỉ trả thời điểm đăng nhập.
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** None
+
+### Giới hạn và phân trang ở RPC Tạm ứng
+
+**What:** Cho `get_salary_advances_dashboard` nhận giới hạn/phân trang và trả cờ "còn nữa", thay vì trả hết.
+
+**Why:** RPC không có `limit`; PostgREST cắt ở 1.000 dòng mà không báo. Bước 14b chỉ ghi "có thể chưa đủ" khi đúng 1.000 dòng.
+
+**Context:** `supabase/migrations/20260729110000_salary_advances_foundation.sql` (`get_salary_advances_dashboard`), `src/features/advances/data.ts`.
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** None
+
+### Bộ lọc Tạm ứng, Nhân sự, Hoa hồng lên URL
+
+**What:** Đưa chip và bộ lọc của `/advances`, `/staff`, `/commissions` lên URL (History API như `/sessions`), ví dụ để trang chủ mở thẳng "Cần xử lý".
+
+**Why:** Bước 14b giữ bộ lọc trong state vì test của ba trang chỉ mock `useRouter`; tải lại là mất bộ lọc.
+
+**Context:** `src/features/advances/advance-directory-models.ts`, `src/features/staff/staff-directory-models.ts`, `src/features/commissions/commission-directory-models.ts`; mẫu `src/features/sessions/session-directory-url-state.ts`. Phải sửa mock `next/navigation` trong test có chủ ý.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Dọn sau bước 14b
+
+**What:** Ghi lại lựa chọn lọc đã rơi về "Tất cả" vào state (để lần tải lại sau không tự bật lại bộ lọc cũ) ở `/advances`, `/staff`, `/commissions`; thêm test phía `/payroll` cho anchor `payroll-period-{id}` mà link "Kỳ lương" dùng; bỏ `lastLoginAt` khỏi `StaffDirectoryMember` nếu không làm mục "Đăng nhập gần nhất"; giữ dòng nhân sự vừa thu hồi vai trò trong danh sách (hoặc báo ở đầu trang) khi đang lọc theo đúng vai trò đó, vì hiện dòng biến mất cùng thông báo thành công; chuẩn hóa từ khóa tìm kiếm một lần cho mỗi dòng (useMemo) ở `/advances` và `/staff`; chỉ hiện "Kỳ lương" cho người xem được bảng lương kỳ đó (có `payroll.manage`/`accountant_reconcile`/`owner_approve` hoặc là đơn của chính mình).
+
+**Why:** Các điểm nhỏ còn lại từ review bước 14b (INFO); không cái nào chặn phát hành.
+
+**Context:** `resolveAdvanceFilters`/`resolveStaffDirectoryFilters`/`resolveCommissionFilters`, `src/features/advances/advance-directory-models.ts` (`getPayrollPeriodHref`), `src/features/payroll/payroll-page.tsx`, `src/features/staff/data.ts`, `src/features/staff/staff-directory-page.tsx`.
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** None
+
+### Đơn tạm ứng của chủ trung tâm khi chỉ có một chủ
+
+**What:** Quyết định ai duyệt đơn tạm ứng của chính chủ trung tâm khi trung tâm chỉ có một người giữ `advances.owner_approve`: cấp quyền này cho một vai trò tin cậy trong ma trận phân quyền ở Cài đặt (đã làm được, không cần code), hay thêm một quy tắc riêng cho đơn của chủ.
+
+**Why:** RPC cấm tự duyệt (`SALARY_ADVANCE_SELF_DECISION_FORBIDDEN`) và mặc định chỉ vai trò chủ trung tâm có `advances.owner_approve`, nên đơn của chủ sau bước đối soát nằm ở "Chờ phê duyệt" cho tới khi có người khác giữ quyền phê duyệt. Bước 14b chỉ ghi đúng tình trạng ("Đơn của bạn · cần người khác phê duyệt").
+
+**Context:** `supabase/migrations/20261012120100_salary_advance_no_self_decision.sql`, `supabase/migrations/20260729110000_salary_advances_foundation.sql` (cấp quyền), `src/features/advances/advance-directory-models.ts`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Một người vừa đối soát vừa phê duyệt cùng đơn tạm ứng
+
+**What:** Quyết định có bắt buộc người phê duyệt khác người đối soát không. Nếu có, thêm điều kiện `approved_by <> reviewed_by` trong `approve_salary_advance` và trả id người đối soát cho giao diện để ẩn nút.
+
+**Why:** Chủ trung tâm giữ cả `advances.review` và `advances.owner_approve`, nên có thể đối soát rồi tự phê duyệt cùng một đơn (RPC chỉ cấm duyệt đơn của chính mình). Từ bước 14b, chip "Cần xử lý" gộp cả hai bước cho chủ, nên việc này dễ xảy ra hơn; dòng "Quy tắc" trong hộp thoại lại mô tả hai người khác nhau.
+
+**Context:** `supabase/migrations/20261012120100_salary_advance_no_self_decision.sql` (`approve_salary_advance`), `src/features/advances/advance-directory-models.ts` (`getAdvanceDecisionStage`, `buildAdvanceChips`), `src/features/advances/components/salary-advance-decision-dialog.tsx` (`DECISION_RULES`). Review đối kháng bước 14b, F1.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+### Hộp thoại xét duyệt tạm ứng khi danh sách tải lại
+
+**What:** Gắn `key` theo `id:stage` cho `SalaryAdvanceDecisionDialog` và giữ hộp thoại đang mở ở cấp trang; bỏ cờ chuyển focus sang thông báo khi focus vẫn ở nút; thêm test nhánh "Từ chối" ở bước phê duyệt chuyển đúng thông báo của action lên trang; ghi log lỗi RPC trong `commissions/data.ts`; chỉ gửi xuống trình duyệt các trường trang thật sự dùng (staff, commissions, advances); ghi rõ "chỉ trừ cho nhân sự có phiếu lương trong lần tính" ở thông báo duyệt; báo "có thể chưa đủ" ở "Đơn khác cùng kỳ" khi đã chạm 1.000 dòng.
+
+**Why:** Các điểm Low từ review đối kháng và pass ràng buộc bước 14b (đã chạm giới hạn 3 vòng sửa): nếu lần tải lại tới lúc hộp thoại thứ hai đang mở, quyết định cũ có thể gửi sai bước; một lần tải lại sau có thể kéo focus về thông báo cũ.
+
+**Context:** `src/features/advances/advance-list-page.tsx` (`AdvanceRowActions`, effect focus), `src/features/advances/components/salary-advance-decision-dialog.tsx`, `src/features/commissions/data.ts`, các route `staff`/`commissions`/`advances`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
 ## Tin nhắn phụ huynh (Zalo)
 
 ### Gỡ RPC `record_parent_message_result` cũ sau khi bản 0.21 chạy ổn

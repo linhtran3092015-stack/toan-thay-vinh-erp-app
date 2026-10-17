@@ -15,10 +15,11 @@ vi.mock("@/features/commissions/data", () => ({
   getSalesCommissionAccrualsDashboardResult: dependencies.getSalesCommissionAccrualsDashboardResult,
 }));
 vi.mock("@/features/commissions/commission-list-page", () => ({
-  CommissionListPage: ({ canManage, entries }: { canManage: boolean; entries: readonly { id: string }[] }) => (
+  CommissionListPage: ({ canManage, entries, limit }: { canManage: boolean; entries: readonly { id: string }[]; limit?: number }) => (
     <div>
       <p>canManage:{String(canManage)}</p>
       <p>entries:{entries.length}</p>
+      <p>limit:{String(limit)}</p>
     </div>
   ),
 }));
@@ -72,5 +73,23 @@ describe("Commissions route authority", () => {
 
     expect(screen.getByText("canManage:false")).toBeInTheDocument();
     expect(dependencies.getSalesCommissionAccrualsDashboardResult).toHaveBeenCalledOnce();
+  });
+
+  // Value: protects=the route asks the reader for the RPC maximum (500) and tells the page the same cap, so the "có thể chưa đủ" notice names the number actually loaded; fails_when=the route falls back to the 200 default or passes a different limit to the page than to the reader; seam=reader and page are mocked; no_claim=the RPC's own 1-500 range check
+  it("reads the newest 500 rows and passes that cap to the page", async () => {
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["commissions.view"],
+    });
+    dependencies.getSalesCommissionAccrualsDashboardResult.mockResolvedValueOnce({
+      data: [],
+      ok: true,
+    });
+
+    render(await CommissionsRoute());
+
+    expect(dependencies.getSalesCommissionAccrualsDashboardResult).toHaveBeenCalledWith(500);
+    expect(screen.getByText("limit:500")).toBeInTheDocument();
+    expect(screen.getByText("entries:0")).toBeInTheDocument();
   });
 });

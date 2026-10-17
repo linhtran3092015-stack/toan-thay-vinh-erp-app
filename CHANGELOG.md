@@ -2,6 +2,28 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.22.0.0] - 2026-10-17
+
+Danh sách nhân sự dựng lại theo phong cách Stumana (bước 14b): Tạm ứng lương cho người xét duyệt thấy ngay đơn nào đang chờ mình, Nhân sự và Hoa hồng lọc được theo đúng nhu cầu hằng ngày.
+
+### Added
+- **Tạm ứng lương** `/advances`: lọc nhanh Tất cả · Cần xử lý (đơn mình được đối soát hoặc phê duyệt, không tính đơn của chính mình) · Đang chờ (với người chỉ gửi đơn) · Đã duyệt, chưa trừ · Đã trừ · Từ chối; tìm nhân sự, lọc trạng thái và kỳ trừ; dòng đầu trang "Kỳ trừ 10/2026 · n đơn · x chờ đối soát · y chờ phê duyệt".
+- Bảng tạm ứng mới: Nhân sự ("NS-007 · gửi 12/10 09:40", "đối soát 10/10 bởi …", "duyệt …", "trừ kỳ 09/2026", "từ chối …"), Số tiền (₫), Trừ vào kỳ, Lý do, Trạng thái kèm chú thích ("đã gửi, chờ kế toán đối soát", "chưa trừ vào lương", "tính lương 05/10", lý do từ chối) và một nút mỗi dòng: "Đối soát", "Phê duyệt", "Kỳ lương" (mở đúng kỳ trên trang Bảng lương) hoặc "Xem" (xem lại toàn bộ diễn biến và ghi chú). Đơn của chính mình ghi "Đơn của bạn · cần người khác đối soát/phê duyệt".
+- Hộp thoại đối soát/phê duyệt hiện "Đơn khác cùng kỳ" của cùng nhân sự và quy tắc thật: không tự xét đơn của mình, từ chối cần lý do, khoản đã duyệt chỉ được trừ khi tính bảng lương kỳ đó lúc kỳ còn nháp.
+- Gửi đơn, đối soát hay phê duyệt thành công hiện thông báo ngay trên trang; gửi đơn mới thì bỏ bộ lọc để thấy đơn vừa gửi; xử lý hết "Cần xử lý" thì trang ghi "Đã xử lý hết đơn cần xử lý."
+- **Nhân sự** `/staff`: lọc nhanh Tất cả · Đang làm việc · Tạm khóa · Đã nghỉ; tìm theo tên, mã, email hoặc số điện thoại (gõ không dấu cũng được); lọc theo vai trò; bảng Nhân sự · Vai trò · Trạng thái · Vào làm · SĐT · Mở hồ sơ, quản lý vai trò ngay trong dòng; nút "Tài khoản và lời mời" cho người mở được Cài đặt.
+- **Hoa hồng** `/commissions`: lọc theo tháng ghi nhận, Sale (với người quản lý hoa hồng) và nguồn MMA/Sandbox; giờ tiền về theo giờ Việt Nam; tải tới 500 bản ghi mới nhất và báo khi tháng đang chọn có thể chưa đủ.
+- Trang xem trước `/dev/lists?view=advances|staff|commissions` thêm `role=accountant` (trả 404 trên production, mọi nút gửi chỉ trả lời "Bản xem trước không ghi dữ liệu.").
+
+### Changed
+- Số tiền tạm ứng và doanh thu hoa hồng ghi bằng ₫; thời điểm gửi, xét, duyệt và tiền về hiện theo giờ Việt Nam (trước đây có thể lệch 7 giờ).
+- Nút đối soát/phê duyệt không còn hiện trên đơn của chính người xem (máy chủ vốn đã từ chối).
+- Huy hiệu trạng thái nhân sự dùng chung kiểu huy hiệu mới, cả trên trang hồ sơ nhân sự.
+- Ngày mặc định của "Kỳ khấu trừ" khi gửi đơn tạm ứng theo tháng Việt Nam thay vì giờ của máy.
+
+### Removed
+- Cột "Đăng nhập gần nhất" trên Nhân sự (hệ thống chưa ghi thời điểm đăng nhập, nên cột luôn trống).
+
 ## [0.21.0.0] - 2026-10-17
 
 Tin Zalo nhận xét cuối buổi theo mẫu mới cho mọi buổi (kế hoạch chấm bài AI, giai đoạn 2b): tiêu đề có ngày học, họ tên, dòng Kết quả, nhận xét và thông tin liên hệ; mục không có dữ liệu tự ẩn; tin dài tự tách 2–3 tin gửi liền nhau; vở còn chờ chấm hoặc chưa điền trợ giảng giám thị thì chưa gửi được.
