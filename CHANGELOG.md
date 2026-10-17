@@ -2,6 +2,12 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.21.0.1] - 2026-10-17
+
+### Fixed
+- **Trang chi tiết buổi học** không còn báo lỗi React #418 (lệch nội dung khi hydrate) trên production. Trước đây thẻ "Thao tác buổi học" của buổi sắp diễn ra hoặc đang diễn ra định dạng ngày theo múi giờ của máy chủ, nên máy chủ Vercel (UTC) in ngày hôm trước ("3B · 27/11/2026" cho buổi Thứ Bảy 28/11/2026) còn trình duyệt ở Việt Nam in đúng ngày. Thẻ này nay dùng chung hàm định dạng ngày của hệ thống, nên máy chủ và trình duyệt luôn hiện cùng một ngày.
+- **Ảnh đại diện Google** ở menu tài khoản không còn bị chính sách bảo mật nội dung (CSP) chặn: `img-src` cho phép `https://lh3.googleusercontent.com`, chỉ cho ảnh.
+
 ## [0.21.0.0] - 2026-10-17
 
 Tin Zalo nhận xét cuối buổi theo mẫu mới cho mọi buổi (kế hoạch chấm bài AI, giai đoạn 2b): tiêu đề có ngày học, họ tên, dòng Kết quả, nhận xét và thông tin liên hệ; mục không có dữ liệu tự ẩn; tin dài tự tách 2–3 tin gửi liền nhau; vở còn chờ chấm hoặc chưa điền trợ giảng giám thị thì chưa gửi được.

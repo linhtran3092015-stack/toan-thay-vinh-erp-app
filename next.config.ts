@@ -16,7 +16,9 @@ const withSerwist = withSerwistInit({
 });
 
 // Security headers (review S4). CSP stays compatible with Next.js inline
-// bootstrap scripts and the Supabase/VietQR origins the app talks to.
+// bootstrap scripts and the Supabase/VietQR origins the app talks to. Google
+// sign-in avatars (the account menu's <img>) load from lh3.googleusercontent.com,
+// allowed for images only.
 const supabaseOrigin = (() => {
   try {
     return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").origin;
@@ -34,7 +36,7 @@ const contentSecurityPolicy = [
   `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
-  `img-src 'self' data: blob: https://vietqr.app${supabaseOrigin ? ` ${supabaseOrigin}` : ""}`,
+  `img-src 'self' data: blob: https://vietqr.app https://lh3.googleusercontent.com${supabaseOrigin ? ` ${supabaseOrigin}` : ""}`,
   `connect-src 'self'${supabaseOrigin ? ` ${supabaseOrigin} ${supabaseWsOrigin}` : ""}`,
   "worker-src 'self' blob:",
   "manifest-src 'self'",

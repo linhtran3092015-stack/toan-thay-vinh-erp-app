@@ -28,6 +28,7 @@ import {
   CANCEL_REASON_MIN_LENGTH,
 } from "@/features/sessions/forms/session-lifecycle-form-schema";
 import type { SessionStatus } from "@/features/sessions/read-models";
+import { formatIsoDate } from "@/lib/datetime";
 
 type LifecycleIntent =
   | "start"
@@ -200,7 +201,7 @@ export function SessionLifecycleActions({
         <div>
           <p className="font-semibold text-ink">
             {classCode} ·{" "}
-            {formatDate(sessionDate)}
+            {formatIsoDate(sessionDate)}
           </p>
 
           <p className="mt-1 text-sm text-ink-muted">
@@ -450,17 +451,5 @@ function SuccessNotice({
     <div className="rounded-md border border-success-border bg-success-bg p-3 text-body text-success">
       {children}
     </div>
-  );
-}
-
-function formatDate(
-  value: string,
-): string {
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(
-    new Date(`${value}T00:00:00+07:00`),
   );
 }
