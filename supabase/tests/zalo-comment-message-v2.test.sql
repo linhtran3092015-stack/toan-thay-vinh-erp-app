@@ -115,14 +115,14 @@ select public.update_system_settings(pg_catalog.jsonb_build_object('zalo.comment
   E'THẦY VINH VÀ THẦY CÔ CỘNG SỰ KÍNH GỬI PHỤ HUYNH NHẬN XÉT TÌNH HÌNH CỦA CON BUỔI HỌC NGÀY {date}\n\n- Tên học sinh: {student_full_name}\n- Kết quả: Điểm luyện tập cuối buổi: {test_score} - Điểm vở: {notebook_score} - Xếp hạng: {rank}\n\n- Bài làm của học sinh:\n{answer_text}\n\n- Bài chữa chi tiết của thầy cô:\n{solution}\n\n- Nhận xét cho học sinh:\n{comment}\n\n{footer}'));
 
 -- 4. Session result → message, send lock -------------------------------------
-select public.record_session_result('3a000000-0000-4000-8000-000000000031', '3a000000-0000-4000-8000-000000000041', 8.5, null, 'not_submitted', 'Con làm bài cẩn thận.');
+select public.record_session_result('3a000000-0000-4000-8000-000000000031', '3a000000-0000-4000-8000-000000000041', 8.5, null, 'pending', 'Con làm bài cẩn thận.');
 select is(
   (select content like E'%- Kết quả: Điểm luyện tập cuối buổi: 8,5 - Xếp hạng: Tiến bộ\n\n- Nhận xét cho học sinh:\nCon làm bài cẩn thận.\n\nChủ nhiệm CLB: Thầy Lã Quang Vinh\nSĐT các thầy cô hỗ trợ:%'
    from public.parent_messages where dedupe_key like 'session.comment:%' and student_id = '3a000000-0000-4000-8000-000000000041'),
   true, 'without notebook score and supervisor the message hides those parts');
 select is(
   (select send_block_reason from public.get_parent_message_queue('queued', 50) where student_id = '3a000000-0000-4000-8000-000000000041'),
-  'Chưa có điểm vở; Chưa điền trợ giảng giám thị', 'the queue explains why sending is locked');
+  'Chưa chấm vở; Chưa điền trợ giảng giám thị', 'the queue explains why sending is locked');
 
 select set_config('request.jwt.claim.sub', '3a000000-0000-4000-8000-000000000002', true);
 select throws_ok(
@@ -159,7 +159,7 @@ select is(
   true, 'filling the supervisor re-renders the queued message');
 select is(
   (select send_block_reason from public.get_parent_message_queue('queued', 50) where student_id = '3a000000-0000-4000-8000-000000000041'),
-  'Chưa có điểm vở', 'only the notebook score is still missing');
+  'Chưa chấm vở', 'only the notebook score is still missing');
 
 -- Notebook score arrives later: the queued message updates and unlocks.
 select public.update_session_result((select id from public.session_results where student_id = '3a000000-0000-4000-8000-000000000041'), 8.5, 9, 'submitted', 'Con làm bài cẩn thận.', 'chấm vở xong');
