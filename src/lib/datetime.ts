@@ -45,7 +45,7 @@ export function formatWeekdayDate(value: string, options?: { year?: boolean }): 
   return `${weekday}, ${match[3]}/${match[2]}/${match[1]}`;
 }
 
-/** ISO timestamp → `13/10/2026 08:30` in Vietnam time. */
+/** ISO timestamp → `08:30 13/10/2026` in Vietnam time (the vi-VN order: time first). */
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
   const date = new Date(value);
@@ -95,4 +95,24 @@ export function addDays(isoDate: string, days: number): string {
 export function formatMonth(value: string): string {
   const match = /^(\d{4})-(\d{2})/.exec(value);
   return match ? `${match[2]}/${match[1]}` : value;
+}
+
+/**
+ * ISO timestamp → compact Vietnam date `12/10`, or `12/10/2025` when the year
+ * differs from `today` (`YYYY-MM-DD`, Vietnam). Lists use it for "gửi 12/10".
+ */
+export function formatShortDate(value: string | null | undefined, today: string): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const [year, month, day] = toVietnamDate(date).split("-");
+  return year === today.slice(0, 4) ? `${day}/${month}` : `${day}/${month}/${year}`;
+}
+
+/** ISO timestamp → `12/10 09:40` in Vietnam time (`12/10/2025 09:40` in another year). */
+export function formatShortDateTime(value: string | null | undefined, today: string): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${formatShortDate(value, today)} ${getVietnamTime(date).slice(0, 5)}`;
 }
