@@ -4,7 +4,7 @@
 
 These workflow descriptions capture currently observed behavior. Presentation may change in later waves, but no workflow may gain, lose, or reinterpret a transition, permission check, RPC, validation rule, audit path, or error mapping.
 
-Owner-approved exceptions are recorded next to the workflow they change, each marked with its release: the client lock-readiness mirror (v0.7.0.0, Sessions), and class-page bulk cancel, class-page enrolment and server-side enrolment search (v0.8.0.0, Sessions and Students), class-page transfer and reserve with the expected-enrolment check (v0.9.0.0, Students), and the sessions directory's server-side date window with its until-today redirect and the larger list reads (v0.20.0.0, Sessions).
+Owner-approved exceptions are recorded next to the workflow they change, each marked with its release: the client lock-readiness mirror (v0.7.0.0, Sessions), and class-page bulk cancel, class-page enrolment and server-side enrolment search (v0.8.0.0, Sessions and Students), class-page transfer and reserve with the expected-enrolment check (v0.9.0.0, Students), the sessions directory's server-side date window with its until-today redirect and the larger list reads (v0.20.0.0, Sessions), and the sales-commission list's larger read (v0.22.0.0, List reads outside A–E).
 
 ## Students
 
@@ -124,3 +124,7 @@ stateDiagram-v2
 - Lock confirmation remains explicit and descriptive; the feature owns wording and Server Action binding.
 - After a lock, the same read model continues to show locked/immutable state after refresh and navigation.
 - Ledger consequences remain server/RPC-owned; presentation does not calculate session quantities or introduce fractional values.
+
+## List reads outside A–E
+
+- The sales-commission list (`/commissions`) reads `get_sales_commission_accruals_dashboard` with `p_limit` 500 (the RPC's maximum; the loader's default stays 200, the RPC's own default). Month, sale and source filters stay client filters over the loaded rows, and the page says when a selected month may be cut by that cap ("Tháng MM/YYYY có thể chưa đủ…"). Unchanged RPC, RLS scope and permissions (`commissions.view`, `commissions.manage`); no write path. Owner-approved for the Stumana redesign step 14b (v0.22.0.0).
