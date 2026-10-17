@@ -181,19 +181,14 @@ describe("Staff directory list (design 16a)", () => {
     expect(screen.queryByRole("navigation", { name: /Phân trang nhân sự/ })).not.toBeInTheDocument();
   });
 
-  // Value: protects=the "Tài khoản và lời mời" link only shows to viewers who can open /settings/users (its settings layout also requires settings.view), in both header layouts; fails_when=the link renders without canOpenAccounts, or the prop stops defaulting to false; why_new=the link was unconditional and dead-ended staff.view-only viewers on a permission-denied screen; seam=none (prop); no_claim=the route's permission read (staff-route.test.tsx)
+  // Value: protects=the "Tài khoản và lời mời" link only shows to viewers who can open /settings/users (its settings layout also requires settings.view); fails_when=the link renders without canOpenAccounts, or the prop stops defaulting to false; why_new=the link was unconditional and dead-ended staff.view-only viewers on a permission-denied screen; seam=none (prop); no_claim=the route's permission read (staff-route.test.tsx)
   it("shows the accounts link only when the viewer can open settings", () => {
     const view = render(<StaffDirectoryPage canManageRoles={false} canViewRoles members={directory} roleOptions={[]} />);
     expect(screen.getByRole("heading", { level: 1, name: "Nhân sự" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Tài khoản và lời mời" })).not.toBeInTheDocument();
     view.unmount();
 
-    const embedded = render(<StaffDirectoryPage canManageRoles={false} canViewRoles headingLevel={2} members={directory} roleOptions={[]} />);
-    expect(screen.getByRole("heading", { level: 2, name: "Nhân sự" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Tài khoản và lời mời" })).not.toBeInTheDocument();
-    embedded.unmount();
-
-    render(<StaffDirectoryPage canManageRoles={false} canOpenAccounts canViewRoles headingLevel={2} members={directory} roleOptions={[]} />);
+    render(<StaffDirectoryPage canManageRoles={false} canOpenAccounts canViewRoles members={directory} roleOptions={[]} />);
     expect(screen.getByRole("link", { name: "Tài khoản và lời mời" })).toHaveAttribute("href", "/settings/users");
   });
 

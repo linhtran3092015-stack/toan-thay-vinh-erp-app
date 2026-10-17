@@ -202,10 +202,10 @@ const previewShellUsers: Record<ListsPreviewRole, { displayName: string; email: 
 export function ListsPreview({ role, state, view }: { role: ListsPreviewRole; state: ListsPreviewState; view: ListsPreviewView }) {
   const permissions = previewPermissions(role);
   const can = (code: PermissionCode) => permissions.includes(code);
-  // Only the owner holds grading_credits.view_all; every other role gets the own-scope list
-  // (the accountant holds no grading_credits.view at all, so the real route denies it; the
-  // preview still shows the own-scope layout with the TA's fixture rows, never everyone's).
-  const credits = state === "empty" ? [] : role === "owner" ? creditEntries : ownCreditEntries;
+  // Same permission as the page's canViewAll, so rows and the grader column never disagree:
+  // only the owner holds grading_credits.view_all. The accountant holds no grading_credits.view
+  // at all (the real route denies it); the preview shows the own-scope layout with the TA's rows.
+  const credits = state === "empty" ? [] : can("grading_credits.view_all") ? creditEntries : ownCreditEntries;
   // "capped": a full queue page (partial), so the newest completed session has no queue facts.
   const sessionQueue = state === "capped" ? cappedPreviewSessionQueue : previewSessionQueue;
   // "capped": the items fill the limit, so the panel says "N+" like the route at a full page;

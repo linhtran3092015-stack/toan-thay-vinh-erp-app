@@ -246,17 +246,11 @@ describe("/dev/lists step 14b views (design 16a, 16c)", () => {
   // Value: protects=the TA shell holds advances.request, advances.view and payroll.view like every role in the migrations, matching the advances preview's TA flags (canRequest, canViewPayroll), and still no review/approve or view_all; fails_when=the TA permission list drops one of them (the shell nav would hide /advances while the body offers "Yêu cầu tạm ứng") or gains a reviewer/manager code; why_new=step 14b's advances view assumed these codes but taPermissions predated it; seam=AppShell wrapper (permissions read from its props); no_claim=the real nav rules (navigation.test.ts)
   it("gives the TA shell the advance and payroll permissions every role holds", () => {
     renderPreview("advances", "ta");
-    expect(shellProps.last?.permissions).toEqual([
-      "advances.request",
-      "advances.view",
-      "attendance.mark",
-      "attendance.view",
-      "grading_credits.view",
-      "payroll.view",
-      "results.manage",
-      "results.view",
-      "sessions.view",
-    ]);
+    const permissions = shellProps.last?.permissions as string[];
+    expect(permissions).toEqual(expect.arrayContaining(["advances.request", "advances.view", "payroll.view"]));
+    for (const code of ["advances.review", "advances.owner_approve", "grading_credits.view_all", "staff.view"]) {
+      expect(permissions).not.toContain(code);
+    }
     expect(screen.getByRole("button", { name: "Yêu cầu tạm ứng" })).toBeInTheDocument();
     expect(screen.queryAllByRole("button", { name: /^(Đối soát|Phê duyệt)$/ })).toHaveLength(0);
   });

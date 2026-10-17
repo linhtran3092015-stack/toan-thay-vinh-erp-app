@@ -53,12 +53,8 @@ interface StaffDirectoryPageProps {
    */
   canOpenAccounts?: boolean;
   canViewRoles: boolean;
-  description?: string;
-  eyebrow?: string;
-  headingLevel?: 1 | 2;
   members: readonly StaffDirectoryMember[];
   roleOptions: readonly StaffRoleOption[];
-  title?: string;
 }
 
 /*
@@ -87,12 +83,8 @@ export function StaffDirectoryPage({
   canManageRoles,
   canOpenAccounts = false,
   canViewRoles,
-  description,
-  eyebrow,
-  headingLevel = 1,
   members,
   roleOptions,
-  title = "Nhân sự",
 }: StaffDirectoryPageProps) {
   const [requestedFilters, setRequestedFilters] = useState<StaffDirectoryFilters>(defaultStaffDirectoryFilters);
   const [requestedPage, setRequestedPage] = useState(1);
@@ -196,23 +188,9 @@ export function StaffDirectoryPage({
 
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
-      {headingLevel === 1 ? (
-        <PageHeader actions={accountsLink} title={title}>
-          {eyebrow ? <p className="text-label text-text-muted">{eyebrow}</p> : null}
-          {contextLine}
-          {description ? <p className="mt-1 max-w-3xl text-secondary text-text-muted">{description}</p> : null}
-        </PageHeader>
-      ) : (
-        <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            {eyebrow ? <p className="text-label text-text-muted">{eyebrow}</p> : null}
-            <h2 className="mt-1 text-section-title text-text-strong">{title}</h2>
-            {contextLine}
-            {description ? <p className="mt-1 max-w-3xl text-secondary text-text-muted">{description}</p> : null}
-          </div>
-          {accountsLink ? <div className="flex shrink-0 flex-wrap gap-2">{accountsLink}</div> : null}
-        </header>
-      )}
+      <PageHeader actions={accountsLink} title="Nhân sự">
+        {contextLine}
+      </PageHeader>
 
       <div className="staff-directory-work-area grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
         {/* Counts follow search + role; a status without rows is hidden unless it is the active one. */}
