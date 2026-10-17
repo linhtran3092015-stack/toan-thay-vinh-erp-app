@@ -203,6 +203,7 @@ function LearningResultFilterFields({
         value={filters.notebookStatus}
       >
         <option value="">Tất cả</option>
+        <option value="pending">Chờ chấm</option>
         <option value="submitted">Đã nộp</option>
         <option value="not_submitted">Chưa nộp</option>
         <option value="not_required">Không yêu cầu</option>

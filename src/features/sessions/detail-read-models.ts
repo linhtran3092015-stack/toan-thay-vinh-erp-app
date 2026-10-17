@@ -23,6 +23,7 @@ export function isSessionAttendanceStatus(value: string): value is SessionAttend
 }
 
 export type SessionNotebookStatus =
+  | "pending"
   | "submitted"
   | "not_submitted"
   | "not_required";

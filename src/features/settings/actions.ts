@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { COMMENT_FOOTER_MAX_CHARS, COMMENT_TEMPLATE_MAX_CHARS } from "@/features/parent-messages/comment-template";
 import type { SettingsActionState } from "@/features/settings/action-types";
 import { getCurrentOwnerStatus } from "@/features/settings/data";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -58,7 +59,6 @@ const updateSystemSettingsSchema = z.object({
   zaloCenterAccountId: z.string().trim().max(200),
   zaloCenterAccountName: z.string().trim().max(200),
   zaloCommentMessageEnabled: z.boolean(),
-  zaloCommentTemplate: z.string().trim().min(1, "Bắt buộc nhập mẫu tin nhận xét.").max(1000),
   teacherDisplayName: z.string().trim().min(1, "Bắt buộc nhập tên giáo viên / thương hiệu.").max(160),
 });
 
@@ -371,7 +371,6 @@ export async function updateSystemSettingsAction(input: UpdateSystemSettingsInpu
       "zalo.center_account_id": parsed.data.zaloCenterAccountId,
       "zalo.center_account_name": parsed.data.zaloCenterAccountName,
       "zalo.comment_message_enabled": parsed.data.zaloCommentMessageEnabled ? "on" : "off",
-      "zalo.comment_template": parsed.data.zaloCommentTemplate,
       "teacher.display_name": parsed.data.teacherDisplayName,
     } });
     if (error) return createErrorState(getRpcErrorMessage(error.message));
@@ -381,6 +380,36 @@ export async function updateSystemSettingsAction(input: UpdateSystemSettingsInpu
     revalidatePath("/sessions");
     revalidatePath("/parent-messages");
     return { message: "Đã lưu cài đặt hệ thống.", status: "success" };
+  } catch {
+    return createErrorState("Không thể kết nối hệ thống cài đặt.");
+  }
+}
+
+const zaloCommentTemplateSchema = z.object({
+  footer: z.string().max(COMMENT_FOOTER_MAX_CHARS, "Thông tin cuối tối đa 1.500 ký tự."),
+  template: z
+    .string()
+    .trim()
+    .min(1, "Bắt buộc nhập mẫu tin nhận xét.")
+    .max(COMMENT_TEMPLATE_MAX_CHARS, "Mẫu tin nhận xét tối đa 3.000 ký tự."),
+});
+
+/** Owner-only (settings.manage): the end-of-session Zalo comment template and its footer. */
+export async function updateZaloCommentTemplateAction(input: z.input<typeof zaloCommentTemplateSchema>): Promise<SettingsActionState> {
+  const parsed = zaloCommentTemplateSchema.safeParse(input);
+  if (!parsed.success) return createErrorState(parsed.error.issues[0]?.message ?? "Mẫu tin không hợp lệ.");
+  const { getDatabasePermissions } = await import("@/lib/permissions/database-permissions");
+  const permissions = await getDatabasePermissions();
+  if (!permissions.ok || !permissions.permissions.includes("settings.manage")) return createErrorState("Chỉ chủ trung tâm được sửa mẫu tin Zalo.");
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.rpc("update_system_settings", {
+      p_values: { "zalo.comment_footer": parsed.data.footer, "zalo.comment_template": parsed.data.template },
+    });
+    if (error) return createErrorState(getRpcErrorMessage(error.message));
+    revalidatePath("/settings/zalo");
+    revalidatePath("/parent-messages");
+    return { message: "Đã lưu mẫu tin. Tin nhận xét đang chờ (chưa sửa tay) đã cập nhật theo mẫu mới.", status: "success" };
   } catch {
     return createErrorState("Không thể kết nối hệ thống cài đặt.");
   }

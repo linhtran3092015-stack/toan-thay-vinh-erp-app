@@ -17,6 +17,7 @@ export const attendanceStatusLabels: Record<SessionAttendanceStatus, string> = {
 export const notebookStatusLabels: Record<SessionNotebookStatus, string> = {
   not_required: "Không yêu cầu",
   not_submitted: "Chưa nộp",
+  pending: "Chờ chấm vở",
   submitted: "Đã nộp",
 };
 

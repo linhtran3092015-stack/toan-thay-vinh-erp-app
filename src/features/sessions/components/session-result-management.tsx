@@ -164,7 +164,7 @@ export function SessionResultManagement({
       ),
       notebookStatus:
         participant.notebookStatus ??
-        "not_submitted",
+        "pending",
       reason: "",
       resultId: participant.resultId,
       studentId: participant.studentId,
@@ -649,6 +649,10 @@ function ResultEditor({
             }
             value={editor.notebookStatus}
           >
+            <option value="pending">
+              Chờ chấm vở
+            </option>
+
             <option value="submitted">
               Đã nộp
             </option>

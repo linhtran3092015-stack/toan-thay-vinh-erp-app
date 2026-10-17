@@ -131,6 +131,20 @@ describe("Session attendance and result presentation", () => {
     expect(screen.getByLabelText(/Lý do cập nhật/)).toBeInTheDocument();
   });
 
+  it("starts a new result's notebook at Chờ chấm vở so the Zalo comment waits for grading", () => {
+    render(<SessionResultManagement {...resultProps({ participants: [{ ...participant, notebookStatus: null }] })} />);
+    fireEvent.click(screen.getAllByRole("button", { name: /Nhập kết quả cho học viên/ })[0]);
+
+    const notebook = screen.getByRole("combobox", { name: /Trạng thái vở/ });
+    expect(notebook).toHaveValue("pending");
+    expect(within(notebook).getAllByRole("option").map((option) => option.textContent?.trim())).toEqual([
+      "Chờ chấm vở",
+      "Đã nộp",
+      "Chưa nộp",
+      "Không yêu cầu",
+    ]);
+  });
+
   it("renders existing result validation feedback through the shared error presentation", async () => {
     resultActions.recordSessionResultAction.mockResolvedValueOnce({ fieldErrors: { testScore: ["Điểm không hợp lệ."] }, message: "Không thể ghi kết quả.", status: "error" });
     render(<SessionResultManagement {...resultProps()} />);

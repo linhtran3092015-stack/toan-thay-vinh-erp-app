@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { PageHeader } from "@/components/patterns/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -15,6 +15,8 @@ import {
   skipParentMessageAction,
   updateParentMessageContentAction,
 } from "@/features/parent-messages/actions";
+import { PARENT_MESSAGE_MAX_CHARS, planMessageParts, splitMessageParts } from "@/features/parent-messages/comment-template";
+import { MessagePartsPreview, MessageSplitSummary } from "@/features/parent-messages/components/message-parts-preview";
 import type { ParentMessageQueueItem, ParentMessageStatus } from "@/features/parent-messages/data";
 import { formatDateTime, formatIsoDate, formatTime } from "@/lib/datetime";
 
@@ -108,6 +110,13 @@ function ParentMessageCard({ canSend, item }: { canSend: boolean; item: ParentMe
   const [isPending, startTransition] = useTransition();
   const actionable = item.status === "queued" || item.status === "failed";
   const meta = statusMeta[item.status];
+  const plan = useMemo(() => planMessageParts(item.content), [item.content]);
+  const draftParts = useMemo(() => (isEditing ? splitMessageParts(content) : []), [content, isEditing]);
+  // Why Gửi stays disabled: the database lock (notebook score, supervisor) or more than 3 Zalo messages.
+  const blockReason = actionable ? (item.sendBlockReason ?? (plan.ok ? null : plan.reason)) : null;
+  const partlySent = item.partsSent > 0 && item.partsTotal !== null && item.partsSent < item.partsTotal;
+  // A partly sent message is frozen so a retry resumes on the same parts.
+  const canEdit = actionable && item.partsSent === 0;
 
   const run = (work: () => Promise<{ message: string; ok: boolean }>) => {
     if (isPending) return;
@@ -147,7 +156,23 @@ function ParentMessageCard({ canSend, item }: { canSend: boolean; item: ParentMe
 
       {isEditing ? (
         <div className="mt-3 grid gap-2">
-          <Textarea className="min-h-28" disabled={isPending} maxLength={2000} onChange={(event) => setContent(event.target.value)} value={content} />
+          <Textarea
+            className="min-h-28"
+            disabled={isPending}
+            maxLength={PARENT_MESSAGE_MAX_CHARS}
+            onChange={(event) => setContent(event.target.value)}
+            rows={Math.min(24, Math.max(6, content.split("\n").length + 1))}
+            value={content}
+          />
+          <MessageSplitSummary maxChars={PARENT_MESSAGE_MAX_CHARS} parts={draftParts} text={content} />
+          {draftParts.length > 1 ? (
+            <details className="rounded-md border border-border-subtle px-3 py-2">
+              <summary className="cursor-pointer text-caption font-semibold text-text-muted">Xem chỗ tách tin</summary>
+              <div className="mt-2">
+                <MessagePartsPreview parts={draftParts} />
+              </div>
+            </details>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <Button disabled={isPending || content.trim().length === 0} onClick={() => run(() => updateParentMessageContentAction({ content, messageId: item.id }))} size="sm" type="button">
               Lưu nội dung
@@ -158,8 +183,22 @@ function ParentMessageCard({ canSend, item }: { canSend: boolean; item: ParentMe
           </div>
         </div>
       ) : (
-        <p className="mt-3 whitespace-pre-wrap rounded-md bg-surface-sunken px-3 py-2 text-body text-text-default">{item.content}</p>
+        <div className="mt-3">
+          <MessagePartsPreview parts={plan.parts} sentCount={item.partsSent} />
+        </div>
       )}
+
+      {blockReason ? (
+        <p className="mt-2 text-caption font-semibold text-warning-ink">Chưa gửi được: {blockReason}</p>
+      ) : null}
+      {actionable && item.contentEdited && item.eventCode === "session.comment" ? (
+        <p className="mt-2 text-caption text-text-muted">Đã sửa tay: tin không tự cập nhật khi điểm hoặc nhận xét thay đổi.</p>
+      ) : null}
+      {partlySent ? (
+        <p className="mt-2 text-caption text-text-muted">
+          Đã gửi {item.partsSent}/{item.partsTotal} tin. Gửi lại sẽ đi tiếp từ tin {item.partsSent + 1}.
+        </p>
+      ) : null}
 
       {item.status === "failed" && item.errorMessage ? (
         <p className="mt-2 text-caption text-danger">Lỗi lần gửi trước: {item.errorMessage}</p>
@@ -179,12 +218,31 @@ function ParentMessageCard({ canSend, item }: { canSend: boolean; item: ParentMe
 
       {actionable && canSend && !isEditing ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button disabled={isPending} isLoading={isPending} onClick={() => run(() => sendParentMessageAction({ messageId: item.id }))} size="sm" type="button">
-            {item.status === "failed" ? "Gửi lại" : "Gửi vào nhóm Zalo"}
+          <Button
+            disabled={isPending || blockReason !== null}
+            isLoading={isPending}
+            onClick={() => run(() => sendParentMessageAction({ messageId: item.id }))}
+            size="sm"
+            title={blockReason ?? undefined}
+            type="button"
+          >
+            {partlySent ? `Gửi tiếp từ tin ${item.partsSent + 1}` : item.status === "failed" ? "Gửi lại" : "Gửi vào nhóm Zalo"}
           </Button>
-          <Button disabled={isPending} onClick={() => setIsEditing(true)} size="sm" type="button" variant="outline">
-            Sửa nội dung
-          </Button>
+          {canEdit ? (
+            <Button
+              disabled={isPending}
+              onClick={() => {
+                // Start from the latest text: it may have been re-rendered since the last edit was cancelled.
+                setContent(item.content);
+                setIsEditing(true);
+              }}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Sửa nội dung
+            </Button>
+          ) : null}
           {isSkipping ? (
             <span className="flex flex-wrap items-center gap-2">
               <input

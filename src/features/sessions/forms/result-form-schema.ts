@@ -96,6 +96,7 @@ const optionalCommentSchema = z.preprocess(
 );
 
 const notebookStatusSchema = z.enum([
+  "pending",
   "submitted",
   "not_submitted",
   "not_required",

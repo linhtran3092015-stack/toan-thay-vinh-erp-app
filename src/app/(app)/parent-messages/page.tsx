@@ -6,6 +6,9 @@ import { getCachedDatabasePermissions } from "@/lib/permissions/database-permiss
 import { permissionDeniedDescription } from "@/lib/permissions/labels";
 import { isZaloCrmConfigured } from "@/lib/zalo-crm";
 
+// A long comment goes as up to 3 ZaloCRM calls 1,5 s apart (15 s timeout each).
+export const maxDuration = 60;
+
 const statuses = new Set<ParentMessageStatus | "all">(["queued", "sent", "failed", "skipped", "expired", "all"]);
 
 export default async function ParentMessagesPage({

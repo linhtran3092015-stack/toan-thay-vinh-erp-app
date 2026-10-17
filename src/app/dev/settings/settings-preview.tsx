@@ -1,17 +1,19 @@
 "use client";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { DEFAULT_COMMENT_FOOTER, DEFAULT_COMMENT_TEMPLATE } from "@/features/parent-messages/comment-template";
 import { SettingsHub } from "@/features/settings/components/settings-hub";
 import { PermissionMatrixPage } from "@/features/settings/permission-matrix-page";
 import type { SettingsActionOverrides } from "@/features/settings/settings-action-overrides";
 import type { SystemSettingKey, SystemSettings } from "@/features/settings/system-settings";
 import { SystemSettingsForm, SystemSettingsReadOnly, type SystemSettingsFields } from "@/features/settings/system-settings-form";
+import { ZaloMessageSettings } from "@/features/settings/zalo-message-settings";
 import type { SettingsPermission, SettingsPermissionMatrix, SettingsRole } from "@/features/settings/types";
 import { WebsiteEditor } from "@/features/website/editor";
 import { createDefaultWebsite, type Website } from "@/features/website/schema";
 import { DATABASE_PERMISSION_CODES, type PermissionCode } from "@/lib/permissions/types";
 
-export type SettingsPreviewView = "general" | "branding" | "website" | "permissions";
+export type SettingsPreviewView = "general" | "zalo" | "branding" | "website" | "permissions";
 export type SettingsPreviewRole = "owner" | "manager" | "viewer";
 export type SettingsPreviewState = "normal" | "dirty" | "error";
 
@@ -47,6 +49,7 @@ export const previewSettingsActions: Required<SettingsActionOverrides> = {
   saveWebsite: async () => ({ message: STUB, ok: false }),
   setRolePermissions: async () => ({ message: STUB, status: "error" }),
   updateSystemSettings: async () => ({ message: STUB, status: "error" }),
+  updateZaloCommentTemplate: async () => ({ message: STUB, status: "error" }),
 };
 
 /** `state=error`: realistic failures so the danger banner above the save bar can be reviewed. */
@@ -59,6 +62,7 @@ export const previewSettingsErrorActions: Required<SettingsActionOverrides> = {
     ? { message: "Danh sách quyền có mục không hợp lệ hoặc đã ngừng hoạt động.", status: "error" }
     : { message: "Đã cập nhật quyền của vai trò.", status: "success" },
   updateSystemSettings: async () => ({ message: "Không thể kết nối hệ thống cài đặt.", status: "error" }),
+  updateZaloCommentTemplate: async () => ({ message: "Không thể kết nối hệ thống cài đặt.", status: "error" }),
 };
 
 const managerPermissions: readonly PermissionCode[] = [
@@ -92,8 +96,17 @@ const settingsFixture = {
   "zalo.center_account_id": "zalo-account-1",
   "zalo.center_account_name": "Toán Thầy Vinh (0912 345 678)",
   "zalo.comment_message_enabled": "on",
-  "zalo.comment_template": "{center} - nhận xét buổi {date} lớp {class} của {student}: {comment}{scores}",
+  "zalo.comment_template": DEFAULT_COMMENT_TEMPLATE,
+  "zalo.comment_footer": DEFAULT_COMMENT_FOOTER,
 } satisfies Record<SystemSettingKey, string | number>;
+
+const rankBandsFixture = [
+  { label: "Tiến bộ ít", minScore: 0 },
+  { label: "Tiến bộ vừa", minScore: 5 },
+  { label: "Tiến bộ", minScore: 8 },
+  { label: "Tiến bộ nhiều", minScore: 9 },
+  { label: "Rất tiến bộ", minScore: 10 },
+];
 
 // SystemSettings carries the defaults' literal types; the fixture is a valid value set.
 const systemSettings = settingsFixture as unknown as SystemSettings;
@@ -239,6 +252,17 @@ export function SettingsPreview({
           ) : (
             <SystemSettingsReadOnly settings={systemSettings} />
           )
+        ) : null}
+        {view === "zalo" ? (
+          <ZaloMessageSettings
+            actions={actions}
+            bands={rankBandsFixture}
+            canManage={canManageSettings}
+            centerName="Trung tâm Toán Thầy Vinh"
+            initialDraft={seeded ? { template: `${settingsFixture["zalo.comment_template"]}\n\nCảm ơn phụ huynh đã đồng hành.` } : undefined}
+            initialFooter={settingsFixture["zalo.comment_footer"]}
+            initialTemplate={settingsFixture["zalo.comment_template"]}
+          />
         ) : null}
         {view === "branding" || view === "website" ? (
           <WebsiteEditor

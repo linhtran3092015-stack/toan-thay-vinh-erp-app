@@ -2110,6 +2110,44 @@
 **Priority:** P4
 **Depends on:** None
 
+## Tin nhắn phụ huynh (Zalo)
+
+### Gỡ RPC `record_parent_message_result` cũ sau khi bản 0.21 chạy ổn
+
+**What:** Ứng dụng từ 0.21.0.0 gửi qua `begin_parent_message_send` + `record_parent_message_part`. RPC cũ `record_parent_message_result` chỉ còn để bản ứng dụng cũ chạy được trong lúc deploy; gỡ bằng một migration sau.
+
+**Why:** RPC cũ ghi "đã gửi" mà không qua khóa Gửi (điểm vở, trợ giảng giám thị) và không cập nhật `parts_sent` / `provider_message_ids`.
+
+**Context:** `supabase/migrations/20261017090000_zalo_comment_message_v2.sql`; pgTAP `parent-messages-zalo-queue.test.sql` còn gọi RPC cũ, cần đổi sang luồng mới khi gỡ.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** 0.21.0.0 chạy ổn trên production
+
+### Màn sửa thang xếp hạng
+
+**What:** RPC `set_grading_rank_bands` (chỉ `settings.manage`) đã có; Cài đặt → Tin Zalo mới chỉ hiện thang. Thêm form sửa (mốc điểm + nhãn, bắt buộc mốc 0) ở Cài đặt → Chấm bài AI (Giai đoạn 3) hoặc ngay trong Tin Zalo.
+
+**Why:** Chủ trung tâm muốn đổi nhãn xếp hạng hiện phải nhờ người chạy SQL.
+
+**Context:** Kế hoạch chấm bài AI mục 4.1 và 4.7.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Phần đã gửi nhưng chưa kịp ghi có thể bị gửi lặp
+
+**What:** Nếu ZaloCRM nhận một phần nhưng ứng dụng không ghi được `record_parent_message_part` (mất mạng, hết thời gian chạy), lần gửi lại sau khi khóa 2 phút hết hạn sẽ gửi lại phần đó.
+
+**Why:** ZaloCRM chưa nhận khóa chống trùng (idempotency key) cho `/api/public/messages/send`.
+
+**Context:** `sendParentMessageAction` trong `src/features/parent-messages/actions.ts`. Cách sửa: gửi kèm khóa `message_id:part_no` khi ZaloCRM hỗ trợ.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** ZaloCRM hỗ trợ khóa chống trùng
+
 ## Completed
 
 ### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp
