@@ -16,7 +16,7 @@ import {
   payrollTaskLabels,
   type StaffPayrollProfile,
 } from "@/features/staff/payroll-profile-types";
-import { EmploymentStatusBadge } from "@/features/staff/staff-directory-page";
+import { EmploymentStatusBadge } from "@/features/staff/components/employment-status-badge";
 import type { StaffDetailReadModel, StaffRateVersion } from "@/features/staff/types";
 
 interface StaffDetailPageProps {

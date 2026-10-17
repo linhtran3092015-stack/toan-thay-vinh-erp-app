@@ -8,8 +8,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const views: readonly ListsPreviewView[] = ["students", "classes", "sessions", "results", "credits"];
-const roles: readonly ListsPreviewRole[] = ["owner", "ta"];
+const views: readonly ListsPreviewView[] = ["students", "classes", "sessions", "results", "credits", "advances", "staff", "commissions"];
+const roles: readonly ListsPreviewRole[] = ["owner", "ta", "accountant"];
 const states: readonly ListsPreviewState[] = ["normal", "capped", "empty"];
 
 function pick<T extends string>(value: string | string[] | undefined, allowed: readonly T[], fallback: T): T {

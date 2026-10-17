@@ -712,7 +712,8 @@ body::before {
 }
 
 /* Staff 1: query the zero-padding directory work area. The two extra pixels
-   let a 1180px table remain fully visible inside DataTableFrame borders. */
+   let the 1040px directory table (design 16a) remain fully visible inside
+   DataTableFrame borders. */
 .staff-directory-work-area,
 .staff-rate-history-work-area {
   container-type: inline-size;
@@ -850,8 +851,9 @@ body::before {
   }
 }
 
-/* Advances: seven operational columns need 1200px inside DataTableFrame;
-   its two borders require +2px on this zero-padding work area. */
+/* Advances (design 16c): six columns need 1040px inside DataTableFrame;
+   its two borders require +2px on this zero-padding work area, so the table
+   shows on a 1366px laptop beside the sidebar, like CRM. */
 .salary-advance-directory-work-area {
   container-type: inline-size;
 }
@@ -887,7 +889,7 @@ body::before {
   display: grid;
 }
 
-@container (min-width: 1120px) {
+@container (min-width: 1042px) {
   .salary-advance-directory-table {
     display: block;
   }
@@ -907,7 +909,7 @@ body::before {
   display: grid;
 }
 
-@container (min-width: 1120px) {
+@container (min-width: 1042px) {
   .staff-directory-table {
     display: block;
   }

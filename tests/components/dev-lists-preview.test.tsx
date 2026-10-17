@@ -1,6 +1,6 @@
 // Value: protects=the /dev/lists preview of design 16 (sessions, learning results, grading credits) renders the real list pages from fixtures with a fixed clock (16/10/2026 12:00), keeps every URL write on the History API and on /dev/lists itself (the router is never called and the address never becomes /sessions, so neither a click nor a reload reaches the production-backed route), gives the shell the real route as previewPathname, gates links and columns by the role's permissions (owner vs TA), covers the capped (a full lock-queue page: notice and N+ panel naming the same cap, the newest completed session without queue facts) and empty states, keeps the queue panel's "Lọc danh sách" on /dev/lists (pressing "Chờ khóa" there), falls back on unknown params and 404s in production;
 // fails_when=the sessions list goes back to router.replace/push or writes /sessions?… from the preview, a fixture drifts so a state (lock queue readiness, overdue captions, cancelled reason, online link, Vietnam-month credit) disappears, the panel link leaves the preview, state=capped stops showing the partial queue (or its notice and panel disagree on the cap), the TA gets lock actions, class/student links or the grader column, the empty sessions view loses its table frame, the param whitelist stops falling back, or the production guard is removed;
-// why_new=step 14a adds the sessions, results and credits views to /dev/lists;
+// why_new=step 14a adds the sessions, results and credits views to /dev/lists; step 14b adds advances, staff and commissions (their bodies are covered by dev-lists-{advances,staff,commissions}-preview tests) and the accountant role;
 // seam=next/navigation is mocked (notFound throws a marker, the router is spied, search params are a settable string, `view=sessions` in the sessions cases); AppShell is replaced by a marked wrapper exposing its props; window.history is spied; no_claim=does not prove the real routes' loaders or that /dev is unreachable in production at the proxy (public-coaching-route-access covers that gate)
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
@@ -64,6 +64,11 @@ describe("/dev/lists page", () => {
 
     const fallback = (await DevListsPage({ searchParams: Promise.resolve({ role: "admin", state: ["empty", "normal"], view: "orders" }) })) as ReactElement<Record<string, unknown>>;
     expect(fallback.props).toEqual({ role: "owner", state: "empty", view: "students" });
+
+    for (const view of ["advances", "staff", "commissions"] as const) {
+      const step14b = (await DevListsPage({ searchParams: Promise.resolve({ role: "accountant", view }) })) as ReactElement<Record<string, unknown>>;
+      expect(step14b.props).toEqual({ role: "accountant", state: "normal", view });
+    }
   });
 });
 
@@ -200,6 +205,15 @@ describe("/dev/lists credits view (design 16a)", () => {
     expect(screen.getAllByTestId("grading-credit-total")[0]).toHaveTextContent("Tổng tín chỉ (tháng 10/2026): 10");
   });
 
+  // Value: protects=only the owner (grading_credits.view_all) sees every grader's credits; the accountant gets the own-scope list like the TA; fails_when=the credits pick falls back to everyone's rows for any role other than "ta" (canViewAll false over everyone's credits: 18 instead of 10); why_new=step 14b added the accountant role and the old `role === "ta"` branch let it fall through to every grader's credits; seam=AppShell wrapper (permissions read from its props); no_claim=the real /grading-credits route, which denies the accountant (no grading_credits.view)
+  it("shows the accountant only own-scope credits without the grader column", () => {
+    renderPreview("credits", "accountant");
+    expect(shellProps.last?.permissions).not.toContain("grading_credits.view_all");
+    expect(screen.getByText("Phạm vi: của tôi")).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Người chấm" })).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("grading-credit-total")[0]).toHaveTextContent("Tổng tín chỉ (tháng 10/2026): 10");
+  });
+
   it("only claims a lower bound when the loaded rows fill the limit", () => {
     renderPreview("credits", "owner", "capped");
     fireEvent.change(screen.getByTestId("desktop-credit-month"), { target: { value: "all" } });
@@ -209,5 +223,48 @@ describe("/dev/lists credits view (design 16a)", () => {
   it("renders the in-frame empty state", () => {
     renderPreview("credits", "owner", "empty");
     expect(screen.getAllByText("Chưa có tín chỉ chấm bài").length).toBeGreaterThan(0);
+  });
+});
+
+describe("/dev/lists step 14b views (design 16a, 16c)", () => {
+  it("renders the advances, staff and commissions pages with the real route as previewPathname", () => {
+    const advances = renderPreview("advances");
+    expect(shellProps.last?.previewPathname).toBe("/advances");
+    expect(screen.getByRole("table", { name: "Danh sách yêu cầu tạm ứng lương" })).toBeInTheDocument();
+    advances.unmount();
+
+    const staff = renderPreview("staff");
+    expect(shellProps.last?.previewPathname).toBe("/staff");
+    expect(screen.getByRole("table", { name: "Danh sách nhân sự" })).toBeInTheDocument();
+    staff.unmount();
+
+    renderPreview("commissions");
+    expect(shellProps.last?.previewPathname).toBe("/commissions");
+    expect(screen.getByRole("table", { name: "Danh sách doanh thu đủ điều kiện hoa hồng" })).toBeInTheDocument();
+  });
+
+  // Value: protects=the TA shell holds advances.request, advances.view and payroll.view like every role in the migrations, matching the advances preview's TA flags (canRequest, canViewPayroll), and still no review/approve or view_all; fails_when=the TA permission list drops one of them (the shell nav would hide /advances while the body offers "Yêu cầu tạm ứng") or gains a reviewer/manager code; why_new=step 14b's advances view assumed these codes but taPermissions predated it; seam=AppShell wrapper (permissions read from its props); no_claim=the real nav rules (navigation.test.ts)
+  it("gives the TA shell the advance and payroll permissions every role holds", () => {
+    renderPreview("advances", "ta");
+    const permissions = shellProps.last?.permissions as string[];
+    expect(permissions).toEqual(expect.arrayContaining(["advances.request", "advances.view", "payroll.view"]));
+    for (const code of ["advances.review", "advances.owner_approve", "grading_credits.view_all", "staff.view"]) {
+      expect(permissions).not.toContain(code);
+    }
+    expect(screen.getByRole("button", { name: "Yêu cầu tạm ứng" })).toBeInTheDocument();
+    expect(screen.queryAllByRole("button", { name: /^(Đối soát|Phê duyệt)$/ })).toHaveLength(0);
+  });
+
+  it("signs the advances owner and the accountant in as the fixture people, with the accountant's narrow permissions", () => {
+    const owner = renderPreview("advances");
+    expect(shellProps.last?.authUser).toMatchObject({ displayName: "Nguyễn Văn Vinh" });
+    owner.unmount();
+
+    renderPreview("advances", "accountant");
+    expect(shellProps.last?.authUser).toMatchObject({ displayName: "Lê Thu Hằng" });
+    expect(shellProps.last?.permissions).toEqual(["advances.request", "advances.review", "advances.view", "payroll.view"]);
+    // The accountant reviews but never approves.
+    expect(screen.queryAllByRole("button", { name: "Phê duyệt" })).toHaveLength(0);
+    expect(screen.getAllByRole("button", { name: "Đối soát" }).length).toBeGreaterThan(0);
   });
 });

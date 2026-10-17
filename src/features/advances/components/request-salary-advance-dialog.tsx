@@ -6,19 +6,36 @@ import { useId, useRef, useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { requestSalaryAdvanceAction } from "@/features/advances/actions/advance-actions";
+import type { AdvanceActionOverrides } from "@/features/advances/advance-action-overrides";
 import { AdvanceActionMessage } from "@/features/advances/components/advance-action-message";
+import {
+  advanceFieldClassName,
+  advanceTextareaClassName,
+} from "@/features/advances/components/advance-field";
 import type { AdvanceActionState } from "@/features/advances/forms/advance-action-types";
+import { getVietnamToday } from "@/lib/datetime";
 
-const formInputClassName =
-  "min-h-11 w-full rounded-md border border-border-subtle bg-surface-base px-3 text-control text-text-default outline-none transition focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
-
+/**
+ * The current Vietnam month (`YYYY-MM`): the server rejects a month before it,
+ * so the browser's own time zone must not pick the default.
+ */
 function getCurrentMonthValue(): string {
-  const currentDate = new Date();
-  return `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`;
+  return getVietnamToday().slice(0, 7);
 }
 
 /** Collects a Salary Advance request without deciding eligibility or Payroll effects. */
-export function RequestSalaryAdvanceDialog() {
+export function RequestSalaryAdvanceDialog({
+  actions,
+  onOpen,
+  onSuccess,
+}: {
+  /** Server-action override for the /dev preview; the real page passes nothing. */
+  actions?: Pick<AdvanceActionOverrides, "requestSalaryAdvance">;
+  /** Called when the trigger opens the dialog (the page drops its last action notice). */
+  onOpen?: () => void;
+  /** Called with the action's message once the request is recorded (the dialog has closed). */
+  onSuccess?: (message: string) => void;
+} = {}) {
   const router = useRouter();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -55,6 +72,7 @@ export function RequestSalaryAdvanceDialog() {
     setRequestNote("");
     setActionState(null);
     setIsOpen(true);
+    onOpen?.();
   };
 
   const closeDialog = (): void => {
@@ -75,7 +93,8 @@ export function RequestSalaryAdvanceDialog() {
 
     setActionState(null);
     startTransition(async () => {
-      const result = await requestSalaryAdvanceAction({
+      const request = actions?.requestSalaryAdvance ?? requestSalaryAdvanceAction;
+      const result = await request({
         amountVnd: Number(amountVnd),
         deductionPeriodMonth: `${deductionMonth}-01`,
         requestNote,
@@ -84,6 +103,7 @@ export function RequestSalaryAdvanceDialog() {
 
       if (result.status === "success") {
         setIsOpen(false);
+        onSuccess?.(result.message);
         router.refresh();
       }
     });
@@ -105,22 +125,22 @@ export function RequestSalaryAdvanceDialog() {
         returnFocusRef={triggerRef}
       >
         <div className="p-4 sm:p-5">
-          <h2 className="text-section-title text-text-strong" id={titleId}>
+          <h2 className="text-section-title font-semibold text-text-strong" id={titleId}>
             Yêu cầu tạm ứng lương
           </h2>
           <p className="mt-1 text-secondary text-text-muted" id={descriptionId}>
             Hệ thống sẽ xác minh yêu cầu và kỳ khấu trừ trước khi ghi nhận.
           </p>
 
-          <form className="mt-5 grid gap-5" onSubmit={handleSubmit}>
+          <form className="mt-4 grid gap-4" onSubmit={handleSubmit}>
             <div className="grid gap-1.5">
-              <label className="text-label text-text-default" htmlFor={amountId}>
+              <label className="text-label font-medium text-text-strong" htmlFor={amountId}>
                 Số tiền (VND)
               </label>
               <input
                 aria-describedby={amountError ? amountErrorId : undefined}
                 aria-invalid={Boolean(amountError)}
-                className={formInputClassName}
+                className={advanceFieldClassName}
                 disabled={isInteractionLocked}
                 id={amountId}
                 inputMode="numeric"
@@ -136,13 +156,13 @@ export function RequestSalaryAdvanceDialog() {
             </div>
 
             <div className="grid gap-1.5">
-              <label className="text-label text-text-default" htmlFor={deductionMonthId}>
+              <label className="text-label font-medium text-text-strong" htmlFor={deductionMonthId}>
                 Kỳ khấu trừ
               </label>
               <input
                 aria-describedby={deductionMonthDescribedBy}
                 aria-invalid={Boolean(deductionMonthError)}
-                className={formInputClassName}
+                className={advanceFieldClassName}
                 disabled={isInteractionLocked}
                 id={deductionMonthId}
                 onChange={(event) => setDeductionMonth(event.target.value)}
@@ -159,13 +179,13 @@ export function RequestSalaryAdvanceDialog() {
             </div>
 
             <div className="grid gap-1.5">
-              <label className="text-label text-text-default" htmlFor={requestNoteId}>
+              <label className="text-label font-medium text-text-strong" htmlFor={requestNoteId}>
                 Lý do tạm ứng
               </label>
               <textarea
                 aria-describedby={requestNoteError ? requestNoteErrorId : undefined}
                 aria-invalid={Boolean(requestNoteError)}
-                className={`${formInputClassName} min-h-28 resize-y py-3`}
+                className={advanceTextareaClassName}
                 disabled={isInteractionLocked}
                 id={requestNoteId}
                 maxLength={2000}
@@ -180,11 +200,11 @@ export function RequestSalaryAdvanceDialog() {
 
             <AdvanceActionMessage actionState={actionState} />
 
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button className="min-h-11" disabled={isInteractionLocked} onClick={closeDialog} size="lg" type="button" variant="ghost">
+            <div className="flex flex-col-reverse gap-2 border-t border-border-subtle pt-4 sm:flex-row sm:justify-end">
+              <Button className="max-md:h-11" disabled={isInteractionLocked} onClick={closeDialog} type="button" variant="secondary">
                 Hủy
               </Button>
-              <Button className="min-h-11" disabled={isInteractionLocked} isLoading={isInteractionLocked} size="lg" type="submit">
+              <Button className="max-md:h-11" disabled={isInteractionLocked} isLoading={isInteractionLocked} type="submit">
                 {isInteractionLocked ? "Đang gửi yêu cầu…" : "Gửi yêu cầu"}
               </Button>
             </div>

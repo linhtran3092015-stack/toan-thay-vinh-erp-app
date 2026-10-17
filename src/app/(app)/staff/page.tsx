@@ -34,6 +34,9 @@ export default async function StaffRoute() {
     canViewRoles &&
     permissionResult.permissions.includes("staff.roles.manage");
 
+  // /settings/users also needs `settings.view` (settings layout gate).
+  const canOpenAccounts = permissionResult.permissions.includes("settings.view");
+
   const directoryResult = await getStaffDirectory({
     includeRoles: canViewRoles,
   });
@@ -59,6 +62,7 @@ export default async function StaffRoute() {
   return (
     <StaffDirectoryPage
       canManageRoles={canManageRoles}
+      canOpenAccounts={canOpenAccounts}
       canViewRoles={canViewRoles}
       members={directoryResult.members}
       roleOptions={directoryResult.roleOptions ?? []}
