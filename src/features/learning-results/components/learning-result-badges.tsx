@@ -83,6 +83,7 @@ const notebookStatusLabels: Record<
 > = {
   not_required: "Không yêu cầu vở",
   not_submitted: "Chưa nộp vở",
+  pending: "Chờ chấm vở",
   submitted: "Đã nộp vở",
 };
 
@@ -93,12 +94,14 @@ const compactNotebookStatusLabels: Record<
 > = {
   not_required: "Không yêu cầu",
   not_submitted: "Chưa nộp",
+  pending: "Chờ chấm",
   submitted: "Đã nộp",
 };
 
 const notebookTones: Record<LearningResultNotebookStatus, BadgeTone> = {
   not_required: "neutral",
   not_submitted: "danger",
+  pending: "warning",
   submitted: "success",
 };
 

@@ -21,7 +21,7 @@ export interface ParentMessageQueueItem {
   partsSent: number;
   /** Fixed at the first send (null before). */
   partsTotal: number | null;
-  /** Why Gửi is locked (queued/failed only), e.g. "Chưa có điểm vở". */
+  /** Why Gửi is locked (queued/failed only), e.g. "Chưa chấm vở". */
   sendBlockReason: string | null;
   sentAt: string | null;
   sentByName: string | null;

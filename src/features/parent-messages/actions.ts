@@ -37,7 +37,7 @@ async function requirePermission(code: "attendance.mark" | "students.update" | "
 
 function rpcErrorMessage(error: { details?: string | null; message: string }): string {
   const message = error.message;
-  // The lock reason comes from parent_message_send_block_reason ("Chưa có điểm vở; Chưa điền trợ giảng giám thị").
+  // The lock reason comes from parent_message_send_block_reason ("Chưa chấm vở; Chưa điền trợ giảng giám thị").
   if (message.includes("PARENT_MESSAGE_SEND_BLOCKED")) return `Chưa gửi được: ${error.details?.trim() || "tin chưa đủ điều kiện gửi"}.`;
   const known: Record<string, string> = {
     ATTENDANCE_MARK_PERMISSION_DENIED: "Tài khoản hiện tại không có quyền gửi tin nhắn phụ huynh.",

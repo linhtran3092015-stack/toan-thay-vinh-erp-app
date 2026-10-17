@@ -4,6 +4,7 @@ import {
   DEFAULT_COMMENT_FOOTER,
   DEFAULT_COMMENT_TEMPLATE,
   formatMessageScore,
+  NOTEBOOK_NOT_SUBMITTED_TEXT,
   planMessageParts,
   rankLabelForScore,
   renderCommentMessage,
@@ -115,6 +116,15 @@ ${FOOTER_TAIL}`);
     const nothing = render({ notebook_score: "", rank: "", test_score: "" });
     expect(nothing).toContain("- Tên học sinh: Nguyễn Minh Anh\n\n- Nhận xét");
     expect(nothing).not.toContain("Kết quả");
+  });
+
+  // Value: protects=a student who did not hand in the notebook gets "Điểm vở: Chưa nộp vở" in the Kết quả line (owner decision 17/10/2026), the same words the SQL vars produce;
+  // fails_when=the preview's not-submitted text drifts from session_comment_message_vars or the part is hidden like a pending notebook;
+  // why_new=the "Chờ chấm vở" status splits "not graded yet" from "not handed in"; seam=none; no_claim=does not prove the SQL side (notebook-pending-status.test.sql does)
+  it("says the notebook was not handed in instead of hiding it", () => {
+    expect(render({ notebook_score: NOTEBOOK_NOT_SUBMITTED_TEXT })).toContain(
+      "- Kết quả: Điểm luyện tập cuối buổi: 8,5 - Điểm vở: Chưa nộp vở - Xếp hạng: Tiến bộ\n",
+    );
   });
 
   // Value: protects=an empty supervisor block hides only its own footer lines; the club head and the support numbers (a label with static lines) stay;

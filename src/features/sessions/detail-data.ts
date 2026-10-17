@@ -135,6 +135,7 @@ function isNotebookStatus(
   value: string,
 ): value is SessionNotebookStatus {
   return [
+    "pending",
     "submitted",
     "not_submitted",
     "not_required",

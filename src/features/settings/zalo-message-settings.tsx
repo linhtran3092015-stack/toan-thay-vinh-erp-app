@@ -11,6 +11,7 @@ import {
   COMMENT_TEMPLATE_MAX_CHARS,
   COMMENT_TEMPLATE_VARIABLES,
   formatMessageScore,
+  NOTEBOOK_NOT_SUBMITTED_TEXT,
   planMessageParts,
   rankLabelForScore,
   renderCommentMessage,
@@ -53,6 +54,7 @@ interface SampleOptions {
   hasAnswer: boolean;
   hasNotebook: boolean;
   hasSupervisor: boolean;
+  notebookNotSubmitted: boolean;
   hasTest: boolean;
 }
 
@@ -65,7 +67,7 @@ function sampleVars(centerName: string, bands: readonly RankBand[], options: Sam
     comment: SAMPLE_COMMENT,
     date: "17/10/2026",
     grading_contact_phone: options.hasSupervisor ? "0912 345 678" : "",
-    notebook_score: options.hasNotebook ? formatMessageScore(9) : "",
+    notebook_score: options.hasNotebook ? formatMessageScore(9) : options.notebookNotSubmitted ? NOTEBOOK_NOT_SUBMITTED_TEXT : "",
     rank: rankLabelForScore(testScore, bands),
     scores: "",
     solution: options.hasAnswer ? SAMPLE_SOLUTION : "",
@@ -110,7 +112,13 @@ export function ZaloMessageSettings({
   const [saved, setSaved] = useState(() => ({ footer: lf(initialFooter), template: lf(initialTemplate) }));
   const [template, setTemplate] = useState(() => initialDraft?.template ?? saved.template);
   const [footer, setFooter] = useState(() => initialDraft?.footer ?? saved.footer);
-  const [options, setOptions] = useState<SampleOptions>({ hasAnswer: false, hasNotebook: true, hasSupervisor: true, hasTest: true });
+  const [options, setOptions] = useState<SampleOptions>({
+    hasAnswer: false,
+    hasNotebook: true,
+    hasSupervisor: true,
+    hasTest: true,
+    notebookNotSubmitted: false,
+  });
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -155,7 +163,14 @@ export function ZaloMessageSettings({
   useLeaveGuard(canManage && changed.length > 0 && !pending, onCancel);
   useSaveInFlightGuard(pending);
 
-  const toggle = (key: keyof SampleOptions) => setOptions((current) => ({ ...current, [key]: !current[key] }));
+  // A notebook either has a score or was not handed in, never both.
+  const toggle = (key: keyof SampleOptions) =>
+    setOptions((current) => {
+      const next = { ...current, [key]: !current[key] };
+      if (key === "hasNotebook" && next.hasNotebook) next.notebookNotSubmitted = false;
+      if (key === "notebookNotSubmitted" && next.notebookNotSubmitted) next.hasNotebook = false;
+      return next;
+    });
 
   return (
     <form className="grid gap-5" onSubmit={onSubmit}>
@@ -223,6 +238,7 @@ export function ZaloMessageSettings({
               <legend className="sr-only">Dữ liệu của học sinh mẫu</legend>
               <PreviewToggle checked={options.hasTest} onChange={() => toggle("hasTest")}>Có điểm luyện tập</PreviewToggle>
               <PreviewToggle checked={options.hasNotebook} onChange={() => toggle("hasNotebook")}>Có điểm vở</PreviewToggle>
+              <PreviewToggle checked={options.notebookNotSubmitted} onChange={() => toggle("notebookNotSubmitted")}>Học sinh chưa nộp vở</PreviewToggle>
               <PreviewToggle checked={options.hasSupervisor} onChange={() => toggle("hasSupervisor")}>Đã điền trợ giảng giám thị</PreviewToggle>
               <PreviewToggle checked={options.hasAnswer} onChange={() => toggle("hasAnswer")}>Có bài làm và bài chữa (chấm AI)</PreviewToggle>
             </fieldset>

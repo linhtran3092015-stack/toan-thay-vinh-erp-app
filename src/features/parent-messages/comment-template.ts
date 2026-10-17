@@ -45,6 +45,9 @@ SĐT các thầy cô hỗ trợ:
 
 - SĐT phản ánh nếu PH,HS không được hỗ trợ: Thầy Vinh 09666 49198`;
 
+/** {notebook_score} when the student did not hand in the notebook (session_comment_message_vars in SQL). */
+export const NOTEBOOK_NOT_SUBMITTED_TEXT = "Chưa nộp vở";
+
 /** Placeholders the comment template understands, in the order the settings help lists them. */
 export const COMMENT_TEMPLATE_VARIABLES = [
   { key: "date", label: "Ngày buổi học (17/10/2026)" },
@@ -53,7 +56,7 @@ export const COMMENT_TEMPLATE_VARIABLES = [
   { key: "class", label: "Mã và tên lớp" },
   { key: "time", label: "Giờ học" },
   { key: "test_score", label: "Điểm luyện tập cuối buổi" },
-  { key: "notebook_score", label: "Điểm vở" },
+  { key: "notebook_score", label: "Điểm vở (\"Chưa nộp vở\" khi học sinh không nộp)" },
   { key: "rank", label: "Xếp hạng theo thang điểm" },
   { key: "answer_text", label: "Bài làm của học sinh (chấm AI, sắp có)" },
   { key: "solution", label: "Lời giải cả đề (chấm AI, sắp có)" },
