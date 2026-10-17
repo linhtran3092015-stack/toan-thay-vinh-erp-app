@@ -25,6 +25,7 @@ import {
   getSepayAccountPurposePresentation,
   getSepayMatchPresentation,
 } from "@/features/finance/components/sepay-transaction-history";
+import { formatDateTime } from "@/lib/datetime";
 
 export interface SepayReconciliationCandidateView {
   expectedAmountVnd: number;
@@ -64,21 +65,8 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
 });
 
-const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-
 function formatCurrency(value: number): string {
   return currencyFormatter.format(value);
-}
-
-function formatDateTime(value: string): string {
-  const timestamp = new Date(value);
-  return Number.isNaN(timestamp.getTime()) ? value : dateTimeFormatter.format(timestamp);
 }
 
 function getSourceLabel(source: SepayTransactionReadModel["ingestionSource"]): string {

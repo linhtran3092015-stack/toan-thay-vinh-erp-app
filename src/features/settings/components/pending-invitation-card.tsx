@@ -15,6 +15,7 @@ import type {
   SettingsAccountInvitation,
   SettingsRole,
 } from "@/features/settings/types";
+import { VIETNAM_TIME_ZONE } from "@/lib/datetime";
 
 export function PendingInvitationCard({
   invitation,
@@ -184,5 +185,6 @@ function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("vi-VN", {
     dateStyle: "short",
     timeStyle: "short",
+    timeZone: VIETNAM_TIME_ZONE,
   }).format(new Date(value));
 }

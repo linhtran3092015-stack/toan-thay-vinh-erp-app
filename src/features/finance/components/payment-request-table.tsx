@@ -6,6 +6,7 @@ import { ResponsiveRecordList } from "@/components/patterns/responsive-record-li
 import { PaymentRequestCancelDialog } from "@/features/finance/components/payment-request-cancel-dialog";
 import { PaymentRequestStatusBadge } from "@/features/finance/components/payment-request-status-badge";
 import type { PaymentRequestReadModel } from "@/features/finance/read-models";
+import { VIETNAM_TIME_ZONE } from "@/lib/datetime";
 
 interface PaymentRequestTableProps {
   canCancel?: boolean;
@@ -153,6 +154,7 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
 const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit",
   month: "2-digit",
+  timeZone: VIETNAM_TIME_ZONE,
   year: "numeric",
 });
 
