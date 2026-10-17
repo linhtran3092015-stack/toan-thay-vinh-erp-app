@@ -30,6 +30,13 @@ interface SalaryAdvanceDecisionDialogProps {
   /** Server-action overrides for the /dev preview; the real page passes nothing. */
   actions?: Pick<AdvanceActionOverrides, "approveSalaryAdvance" | "reviewSalaryAdvance">;
   advance: SalaryAdvanceDashboardEntry;
+  /** Called when the trigger opens the dialog (the page drops its last action notice). */
+  onOpen?: () => void;
+  /**
+   * Called with the action's message once the decision is recorded (the dialog
+   * has closed, before the refresh): the row may then leave the active filter.
+   */
+  onSuccess?: (message: string) => void;
   /**
    * Other loaded requests of the same staff member and deduction month, shown
    * as "Đơn khác cùng kỳ" (a list, never a sum). Omitted: the fact is not shown.
@@ -78,15 +85,23 @@ const contentByStage: Record<
 const REJECTION_PLACEHOLDER = "VD: Thiếu chứng từ, nhân sự cần bổ sung";
 
 // The real rules only (migrations): two steps, no self-decision, a reason to reject,
-// deducted when that month's payroll is calculated (a payroll already calculated for that
-// month picks it up only on recalculation). No amount cap exists, so none is stated.
+// deducted when that month's payroll is calculated while its period is still a draft.
+// `generate_payroll_calculation_run` raises PAYROLL_PERIOD_NOT_DRAFT on a locked period,
+// so it must be reopened and recalculated; reopening a paid period raises
+// PAYROLL_PERIOD_ALREADY_PAID, so a paid period can no longer take the deduction.
+// No amount cap exists, so none is stated.
+const APPROVED_NOTICE =
+  "Đã duyệt tạm ứng. Khoản này được trừ khi tính bảng lương kỳ đã chọn lúc kỳ còn nháp.";
+
 const DECISION_RULES =
-  "Kế toán đối soát → chủ trung tâm phê duyệt. Không tự đối soát hoặc tự duyệt đơn của chính mình. Từ chối cần lý do. Khoản đã duyệt được trừ khi tính bảng lương kỳ đã chọn; nếu bảng lương kỳ đó đã tính rồi thì phải tính lại mới trừ.";
+  "Kế toán đối soát → chủ trung tâm phê duyệt. Không tự đối soát hoặc tự duyệt đơn của chính mình. Từ chối cần lý do. Khoản đã duyệt được trừ khi tính bảng lương kỳ đã chọn lúc kỳ còn nháp; kỳ đã chốt phải mở lại rồi tính lại, kỳ đã trả lương thì không trừ được nữa.";
 
 /** Confirms one explicit, server-owned Salary Advance review or approval outcome. */
 export function SalaryAdvanceDecisionDialog({
   actions,
   advance,
+  onOpen,
+  onSuccess,
   relatedEntries,
   stage,
   today,
@@ -118,6 +133,7 @@ export function SalaryAdvanceDecisionDialog({
     setNote("");
     setActionState(null);
     setIsOpen(true);
+    onOpen?.();
   };
 
   const closeDialog = (): void => {
@@ -154,6 +170,9 @@ export function SalaryAdvanceDecisionDialog({
 
       if (result.status === "success") {
         setIsOpen(false);
+        // The action's approve text promises the deduction; the page notice repeats the
+        // real rule instead (a period already calculated or paid does not pick it up).
+        onSuccess?.(decision === "approved" ? APPROVED_NOTICE : result.message);
         router.refresh();
       }
     });

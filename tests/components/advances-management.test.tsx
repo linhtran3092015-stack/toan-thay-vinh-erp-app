@@ -183,7 +183,13 @@ describe("Advances list redesign", () => {
     // One requested + one reviewed row of others, each in the table and the card list.
     expect(screen.getAllByRole("button", { name: "Đối soát" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Phê duyệt" })).toHaveLength(2);
-    expect(screen.getAllByText("Đơn của bạn · cần người khác xử lý")).toHaveLength(2);
+    // Stage-specific: the full text once in the table (sr-only) and once on the card.
+    expect(screen.getAllByText("Đơn của bạn · cần người khác đối soát")).toHaveLength(2);
+    // The table's 150px Thao tác cell shows the short label; the full text is its title and sr-only.
+    const ownShort = within(tableRows()[0]).getByText("Đơn của bạn");
+    expect(ownShort).toHaveAttribute("aria-hidden", "true");
+    expect(ownShort.parentElement).toHaveAttribute("title", "Đơn của bạn · cần người khác đối soát");
+    expect(within(tableRows()[0]).getByText("Đơn của bạn · cần người khác đối soát")).toHaveClass("sr-only");
     expect(within(tableRows()[0]).queryByRole("button", { name: "Đối soát" })).not.toBeInTheDocument();
     // The own row is still readable: caption plus the read-only "Xem", in the table and the card.
     expect(screen.getAllByRole("button", { name: "Xem chi tiết tạm ứng của Lê Thu Hằng" })).toHaveLength(2);
@@ -325,8 +331,8 @@ describe("Advances list redesign", () => {
     expect(related).toHaveLength(1);
     expect(related[0].textContent).toMatch(/^1\.000\.000\s₫ · Đã phê duyệt · gửi 04\/10$/);
     expect(dialog).toHaveTextContent("Không tự đối soát hoặc tự duyệt đơn của chính mình. Từ chối cần lý do.");
-    // Approval does not touch a payroll already calculated for that month.
-    expect(dialog).toHaveTextContent("Khoản đã duyệt được trừ khi tính bảng lương kỳ đã chọn; nếu bảng lương kỳ đó đã tính rồi thì phải tính lại mới trừ.");
+    // Deducted only by a calculation on a draft period: a locked one is reopened and recalculated, a paid one cannot take it.
+    expect(dialog).toHaveTextContent("Khoản đã duyệt được trừ khi tính bảng lương kỳ đã chọn lúc kỳ còn nháp; kỳ đã chốt phải mở lại rồi tính lại, kỳ đã trả lương thì không trừ được nữa.");
     expect(dialog).not.toHaveTextContent(/Lương tạm tính|50%|dự kiến/);
     expect(screen.getByLabelText("Ghi chú")).toHaveAttribute("placeholder", "VD: Đủ chứng từ, chuyển chủ duyệt");
   });
@@ -407,6 +413,109 @@ describe("Advances list redesign", () => {
     // The next filter change dismisses the note.
     fireEvent.click(within(chips).getByRole("button", { name: "Từ chối1" }));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  // Value (review cycle 2, R2-1/R2-2): protects=a decision taken under "Cần xử lý" is confirmed on the page even though the decided row leaves the queue, the filters stay where the user was working, an emptied queue says so, and focus moves to the notice once the row's trigger is gone instead of falling to <body>; fails_when=SalaryAdvanceDecisionDialog stops calling onSuccess, the page resets filters on a decision, the notice is an alert or never shows, the empty queue shows the generic "Không có đơn khớp bộ lọc", or focus is lost with the row; why_new=decisions closed silently and only the request had a page notice; seam=the mocked reviewSalaryAdvanceAction resolves success, rerender with the decided row stands in for router.refresh; no_claim=the server action's own message wording
+  it("confirms a decision on the page while the decided row leaves Cần xử lý, keeping the filters", async () => {
+    actions.reviewSalaryAdvanceAction.mockResolvedValueOnce({ message: "Đã chuyển yêu cầu sang bước chủ trung tâm duyệt.", status: "success" });
+    const props = { canApprove: false, canRequest: false, canReview: true, today: TODAY, viewerId: VIEWER };
+    const { rerender } = render(<AdvanceListPage {...props} entries={lifecycle()} />);
+
+    const chips = screen.getByRole("group", { name: "Lọc nhanh tạm ứng" });
+    fireEvent.click(within(chips).getByRole("button", { name: "Cần xử lý1" }));
+    expect(tableRows()).toHaveLength(1);
+
+    const trigger = within(tableRows()[0]).getByRole("button", { name: "Đối soát" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Đối soát yêu cầu tạm ứng" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Chuyển bước phê duyệt" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(router.refresh).toHaveBeenCalledOnce();
+    const notice = screen.getByRole("status");
+    expect(notice).toHaveTextContent("Đã chuyển yêu cầu sang bước chủ trung tâm duyệt.");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(notice.compareDocumentPosition(chips) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The row is still there until the refresh lands, so focus stays on its trigger.
+    expect(trigger).toHaveFocus();
+
+    // The refresh lands: the row is reviewed now, which a reviewer-only viewer cannot decide further.
+    rerender(<AdvanceListPage {...props} entries={lifecycle().map((entry) => (
+      entry.id === "r-1" ? { ...entry, reviewedAt: "2026-10-16T03:00:00.000Z", reviewedByDisplayName: "Lê Thu Hằng", status: "review" } : entry
+    ))} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Đã chuyển yêu cầu sang bước chủ trung tâm duyệt.");
+    expect(screen.getByRole("status").parentElement).toHaveFocus();
+    expect(screen.queryByRole("button", { name: "Đối soát" })).not.toBeInTheDocument();
+    // Filters unchanged: the queue chip stays pressed (at 0) and the select agrees.
+    expect(within(chips).getByRole("button", { name: "Cần xử lý0" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Trạng thái")).toHaveValue("actionable");
+    expect(screen.getAllByText("Đã xử lý hết đơn cần xử lý.")).toHaveLength(2);
+    expect(screen.queryByText("Không có đơn khớp bộ lọc")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Xem tất cả" })[0]);
+    expect(screen.getByLabelText("Trạng thái")).toHaveValue("all");
+    expect(tableRows()).toHaveLength(6);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  // Value (review cycle 2, R2-1): protects=the page-level notice belongs to the last action only: moving to another page or opening the next decision or request dialog dismisses it; fails_when=the pager, a decision trigger or the request trigger stops clearing the notice (onOpen not called or not wired), so a stale confirmation sits over unrelated work; why_new=only a filter change cleared the request notice; seam=the mocked reviewSalaryAdvanceAction resolves success; no_claim=what the notice says
+  it("drops the notice on a page change and when a dialog opens", async () => {
+    const success = { message: "Đã chuyển yêu cầu sang bước chủ trung tâm duyệt.", status: "success" };
+    actions.reviewSalaryAdvanceAction.mockResolvedValueOnce(success).mockResolvedValueOnce(success).mockResolvedValueOnce(success);
+    const entries = Array.from({ length: 25 }, (_, index) => advance({ id: `row-${index}`, requestNote: `Đơn số ${index + 1}` }));
+    render(<AdvanceListPage canApprove={false} canRequest canReview entries={entries} today={TODAY} viewerId={VIEWER} />);
+
+    const decide = async () => {
+      fireEvent.click(within(tableRows()[0]).getByRole("button", { name: "Đối soát" }));
+      fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Chuyển bước phê duyệt" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(screen.getByRole("status")).toHaveTextContent("Đã chuyển yêu cầu sang bước chủ trung tâm duyệt.");
+    };
+
+    await decide();
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Phân trang tạm ứng" })).getByRole("button", { name: "Sau" }));
+    expect(tableRows()).toHaveLength(5);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    await decide();
+    fireEvent.click(within(tableRows()[1]).getByRole("button", { name: "Đối soát" }));
+    expect(screen.getByRole("dialog", { name: "Đối soát yêu cầu tạm ứng" })).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Hủy" }));
+
+    await decide();
+    fireEvent.click(screen.getByRole("button", { name: "Yêu cầu tạm ứng" }));
+    expect(screen.getByRole("dialog", { name: "Yêu cầu tạm ứng lương" })).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  // Value (review cycle 2, R2-2): protects="Đã xử lý hết đơn cần xử lý." is said only when no loaded row is left to decide; with decidable rows outside a search, or under another status, the generic filtered-empty text and "Xóa lọc" stay; fails_when=the cleared-queue text keys on the empty result alone and claims the queue is done while a search hides open requests; why_new=the cleared-queue text is new; seam=none; no_claim=the decision flow (tested above)
+  it("keeps the generic empty text when a search, not the queue, empties Cần xử lý", () => {
+    render(<AdvanceListPage canApprove canRequest={false} canReview entries={lifecycle()} today={TODAY} viewerId={VIEWER} />);
+
+    fireEvent.click(within(screen.getByRole("group", { name: "Lọc nhanh tạm ứng" })).getByRole("button", { name: "Cần xử lý2" }));
+    fireEvent.change(screen.getByLabelText("Tìm nhân sự"), { target: { value: "khong co ai" } });
+    expect(screen.getAllByText("Không có đơn khớp bộ lọc")).toHaveLength(2);
+    expect(screen.queryByText("Đã xử lý hết đơn cần xử lý.")).not.toBeInTheDocument();
+  });
+
+  // Value (review cycle 2, P2-4/R2-7): protects=an own request waiting for the owner says so ("cần người khác phê duyệt") in full on the card and behind the short "Đơn của bạn" label in the table, beside its "Xem"; fails_when=the table drops the full text (no title, no sr-only), the card shows only the short label, or the approve-stage text reads as the review one; why_new=the own-pending caption was one vague text for both stages; seam=none; no_claim=the 150px cell's actual line breaks (jsdom has no layout)
+  it("names the owner step for the viewer's own reviewed request", () => {
+    render(<AdvanceListPage canApprove canRequest={false} canReview={false} entries={[
+      advance({ id: "v-own", requestNote: "Đơn của tôi", reviewedAt: "2026-10-10T03:15:00.000Z", staffDisplayName: "Lê Thu Hằng", staffId: VIEWER, status: "review" }),
+    ]} today={TODAY} viewerId={VIEWER} />);
+
+    const full = "Đơn của bạn · cần người khác phê duyệt";
+    const row = tableRows()[0];
+    expect(within(row).getByText("Đơn của bạn").parentElement).toHaveAttribute("title", full);
+    expect(within(row).getByText(full)).toHaveClass("sr-only");
+    expect(within(row).getByRole("button", { name: "Xem chi tiết tạm ứng của Lê Thu Hằng" })).toBeInTheDocument();
+    const card = within(screen.getByRole("list", { name: "Danh sách yêu cầu tạm ứng lương" })).getByRole("listitem");
+    expect(within(card).getByText(full)).not.toHaveClass("sr-only");
+    expect(within(card).queryByText("Đơn của bạn")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Phê duyệt" })).not.toBeInTheDocument();
   });
 
   // Value (extension, coverage pass 1): protects=a filter change sends the list back to page 1; fails_when=updateFilters stops resetting the page, so a chip pressed on page 2 opens mid-list (21–25) instead of at the top; why_new=paging was only tested without a filter change; seam=none; no_claim=the Pagination component's own buttons
@@ -653,4 +762,18 @@ describe("Salary Advance dialogs", () => {
     expect(router.refresh).toHaveBeenCalledOnce();
     expect(trigger).toHaveFocus();
   });
+
+  // Value (review cycle 3, R3-1): protects=the page notice after an approval states the real deduction rule (only while the month's payroll is still a draft) instead of echoing the action's promise that it "sẽ được khấu trừ"; fails_when=the dialog forwards the server's approve text to onSuccess; why_new=cycle 2 started surfacing success messages, and the approve text contradicts the dialog's own rule for calculated or paid periods; seam=none (onSuccess prop); no_claim=the server action's own message (unchanged, never shown on the page)
+  it("tells the page the real deduction rule after an approval, never the action's promise", async () => {
+    actions.approveSalaryAdvanceAction.mockResolvedValueOnce({ message: "Đã duyệt tạm ứng. Khoản này sẽ được khấu trừ ở kỳ đã chọn.", status: "success" });
+    const onSuccess = vi.fn();
+    render(<SalaryAdvanceDecisionDialog advance={advance({ status: "review" })} onSuccess={onSuccess} stage="approve" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Phê duyệt" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Phê duyệt yêu cầu tạm ứng" })).getByRole("button", { name: "Phê duyệt tạm ứng" }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
+    expect(onSuccess).toHaveBeenCalledWith("Đã duyệt tạm ứng. Khoản này được trừ khi tính bảng lương kỳ đã chọn lúc kỳ còn nháp.");
+  });
 });
+

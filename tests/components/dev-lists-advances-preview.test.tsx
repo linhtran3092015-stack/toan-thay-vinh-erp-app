@@ -76,7 +76,8 @@ describe("/dev/lists advances preview", () => {
     const chips = screen.getByRole("group", { name: "Lọc nhanh tạm ứng" });
     // 4 requested (own excluded) + 3 reviewed.
     expect(within(chips).getByRole("button", { name: "Cần xử lý7" })).toBeInTheDocument();
-    expect(screen.getAllByText("Đơn của bạn · cần người khác xử lý")).toHaveLength(2);
+    // The own request is still at review: full text once in the table (sr-only) and once on the card.
+    expect(screen.getAllByText("Đơn của bạn · cần người khác đối soát")).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Đối soát" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: "Phê duyệt" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "Mở kỳ lương 09/2026" })[0]).toHaveAttribute(
@@ -118,7 +119,8 @@ describe("/dev/lists advances preview", () => {
     expect(screen.queryByRole("button", { name: "Phê duyệt" })).not.toBeInTheDocument();
     // Every role holds payroll.view in the migrations, so the deducted rows link to their period.
     expect(screen.getAllByRole("link", { name: "Mở kỳ lương 09/2026" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Đơn của bạn · cần người khác xử lý")).toHaveLength(2);
+    // The own request is still at review: full text once in the table (sr-only) and once on the card.
+    expect(screen.getAllByText("Đơn của bạn · cần người khác đối soát")).toHaveLength(2);
 
     fireEvent.click(screen.getAllByRole("button", { name: "Đối soát" })[0]);
     const dialog = screen.getByRole("dialog", { name: "Đối soát yêu cầu tạm ứng" });

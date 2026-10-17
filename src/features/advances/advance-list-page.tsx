@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 
 import {
   DataTableFrame,
@@ -29,11 +29,14 @@ import {
   describeAdvanceIdentity,
   describeAdvanceStatusCaption,
   describeAdvanceSummary,
+  describeOwnPendingCaption,
   filterAdvances,
   getActiveAdvanceChip,
   getAdvanceGroupOption,
   getAdvanceRowAction,
   getPayrollPeriodHref,
+  isActionableAdvance,
+  OWN_PENDING_SHORT_CAPTION,
   paginateAdvances,
   resolveAdvanceFilters,
   type AdvanceDirectoryFilters,
@@ -72,7 +75,6 @@ export interface AdvanceListPageProps {
 }
 
 const CAPTION = "Danh sách yêu cầu tạm ứng lương";
-const OWN_PENDING_CAPTION = "Đơn của bạn · cần người khác xử lý";
 
 /*
  * Responsive switch: `.salary-advance-directory-work-area` is the container; the
@@ -110,8 +112,14 @@ export function AdvanceListPage({
   );
   const [requestedFilters, setRequestedFilters] = useState<AdvanceDirectoryFilters>(allAdvanceFilters);
   const [requestedPage, setRequestedPage] = useState(1);
-  /** Success message of the last request sent from this page; cleared by the next filter change. */
-  const [requestNotice, setRequestNotice] = useState<string | null>(null);
+  /**
+   * Success message of the last request or decision made on this page; cleared
+   * by the next filter, reset or page change and when either dialog opens.
+   */
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
+  /** Set by a success; consumed once focus has been moved to the notice. */
+  const pendingNoticeFocusRef = useRef(false);
 
   const options = useMemo(() => buildAdvanceOptions(entries), [entries]);
   const filters = useMemo(
@@ -122,34 +130,67 @@ export function AdvanceListPage({
   const chips = useMemo(() => buildAdvanceChips(entries, filters, viewer), [entries, filters, viewer]);
   const relatedById = useMemo(() => buildRelatedAdvances(entries), [entries]);
   const pagination = useMemo(() => paginateAdvances(filtered, requestedPage), [filtered, requestedPage]);
+  const hasActionable = useMemo(
+    () => entries.some((entry) => isActionableAdvance(entry, viewer)),
+    [entries, viewer],
+  );
 
   const canDecide = canDecideAdvances(viewer);
   const groupOption = getAdvanceGroupOption(viewer);
   const summary = describeAdvanceSummary(entries, { period: filters.period, viewer });
   const activeFilterCount = countActiveAdvanceFilters(filters);
   const hasNoData = entries.length === 0;
+  // "Cần xử lý" is active and no loaded row is left to decide (a search or month alone keeps the generic text).
+  const isQueueCleared = filters.status === "actionable" && !hasActionable;
 
+  // After a success the dialog hands focus back to its trigger. A decided row can
+  // then leave the list (the refresh lands, or the row no longer matches "Cần xử
+  // lý"), taking the trigger with it: move focus to the notice instead of <body>.
+  useEffect(() => {
+    if (!actionNotice || !pendingNoticeFocusRef.current) return;
+    const active = document.activeElement;
+    // Focus is still somewhere useful (the trigger stayed): leave it.
+    if (active && active !== document.body && active.isConnected) return;
+    pendingNoticeFocusRef.current = false;
+    noticeRef.current?.focus();
+  }, [actionNotice, entries]);
+
+  const clearActionNotice = () => {
+    setActionNotice(null);
+    pendingNoticeFocusRef.current = false;
+  };
+  const showActionNotice = (message: string) => {
+    setActionNotice(message);
+    pendingNoticeFocusRef.current = true;
+  };
   const updateFilters = (next: Partial<AdvanceDirectoryFilters>) => {
     setRequestedFilters({ ...filters, ...next });
     setRequestedPage(1);
-    setRequestNotice(null);
+    clearActionNotice();
   };
   const resetFilters = () => {
     setRequestedFilters(allAdvanceFilters);
     setRequestedPage(1);
-    setRequestNotice(null);
+    clearActionNotice();
+  };
+  const changePage = (page: number) => {
+    setRequestedPage(page);
+    clearActionNotice();
   };
   // A new request must not land behind an active chip or filter: show everything and say it was sent.
   const handleRequestSuccess = (message: string) => {
     setRequestedFilters(allAdvanceFilters);
     setRequestedPage(1);
-    setRequestNotice(message);
+    showActionNotice(message);
   };
 
   const rowProps = (entry: SalaryAdvanceDashboardEntry) => ({
     action: getAdvanceRowAction(entry, viewer, { canViewPayroll }),
     actions,
     entry,
+    onDecisionOpen: clearActionNotice,
+    // A decision keeps the filters (the user is working the queue): the row may leave it, the notice says why.
+    onDecisionSuccess: showActionNotice,
     relatedEntries: relatedById.get(entry.id) ?? [],
     today: businessToday,
   });
@@ -164,6 +205,19 @@ export function AdvanceListPage({
               ? "Yêu cầu bạn gửi sẽ hiện tại đây cùng bước đối soát và phê duyệt."
               : "Các yêu cầu trong phạm vi tài khoản hiện tại sẽ hiện tại đây."}
           </p>
+        </>
+      ) : isQueueCleared ? (
+        <>
+          <p className="text-body font-semibold text-text-strong">Đã xử lý hết đơn cần xử lý.</p>
+          <p className="text-secondary text-text-muted">Đơn đã xử lý vẫn có trong “Tất cả”.</p>
+          <Button
+            className="mt-2 max-md:h-11"
+            onClick={() => updateFilters({ status: ALL_OPTION })}
+            size="sm"
+            variant="secondary"
+          >
+            Xem tất cả
+          </Button>
         </>
       ) : (
         <>
@@ -181,7 +235,7 @@ export function AdvanceListPage({
 
   const paginationProps = {
     itemLabel: "đơn",
-    onPageChange: setRequestedPage,
+    onPageChange: changePage,
     page: pagination.page,
     pageCount: pagination.pageCount,
     rangeEnd: pagination.end,
@@ -193,7 +247,13 @@ export function AdvanceListPage({
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
       <PageHeader
         actions={
-          canRequest ? <RequestSalaryAdvanceDialog actions={actions} onSuccess={handleRequestSuccess} /> : undefined
+          canRequest ? (
+            <RequestSalaryAdvanceDialog
+              actions={actions}
+              onOpen={clearActionNotice}
+              onSuccess={handleRequestSuccess}
+            />
+          ) : undefined
         }
         title="Tạm ứng lương"
       >
@@ -201,7 +261,16 @@ export function AdvanceListPage({
       </PageHeader>
 
       <div className="salary-advance-directory-work-area grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
-        {requestNotice ? <ResultBanner title={requestNotice} tone="success" /> : null}
+        {actionNotice ? (
+          // Focus target when a decided row's trigger is gone (see the effect above).
+          <div
+            className="rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+            ref={noticeRef}
+            tabIndex={-1}
+          >
+            <ResultBanner title={actionNotice} tone="success" />
+          </div>
+        ) : null}
 
         {hasNoData ? null : (
           <>
@@ -335,6 +404,8 @@ interface AdvanceRowProps {
   action: AdvanceRowAction;
   actions?: AdvanceActionOverrides;
   entry: SalaryAdvanceDashboardEntry;
+  onDecisionOpen: () => void;
+  onDecisionSuccess: (message: string) => void;
   relatedEntries: readonly SalaryAdvanceDashboardEntry[];
   today: string;
 }
@@ -369,7 +440,7 @@ function AdvanceTableRow(props: AdvanceRowProps) {
       </TableCell>
       <TableCell className="py-2">
         <div className="flex flex-wrap items-center justify-end gap-1">
-          <AdvanceRowActions {...props} size="sm" />
+          <AdvanceRowActions {...props} layout="table" />
         </div>
       </TableCell>
     </TableRow>
@@ -413,7 +484,7 @@ function AdvanceCard(props: AdvanceRowProps) {
       </dl>
 
       <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border-row pt-2">
-        <AdvanceRowActions {...props} size="lg" />
+        <AdvanceRowActions {...props} layout="card" />
       </div>
     </article>
   );
@@ -439,15 +510,21 @@ function AdvanceRowActions({
   action,
   actions,
   entry,
+  layout,
+  onDecisionOpen,
+  onDecisionSuccess,
   relatedEntries,
-  size,
   today,
-}: AdvanceRowProps & { size: AdvanceRowControlSize }) {
+}: AdvanceRowProps & { layout: "card" | "table" }) {
+  const size: AdvanceRowControlSize = layout === "table" ? "sm" : "lg";
+
   if (action.kind === "decide") {
     return (
       <SalaryAdvanceDecisionDialog
         actions={actions}
         advance={entry}
+        onOpen={onDecisionOpen}
+        onSuccess={onDecisionSuccess}
         relatedEntries={relatedEntries}
         stage={action.stage}
         today={today}
@@ -459,9 +536,19 @@ function AdvanceRowActions({
 
   if (action.kind === "own-pending") {
     // No decision on one's own request, but it can still be read.
+    const caption = describeOwnPendingCaption(action.stage);
+
     return (
       <>
-        <span className="text-right text-caption text-text-muted">{OWN_PENDING_CAPTION}</span>
+        {layout === "table" ? (
+          // The 150px Thao tác cell fits a short label beside "Xem"; the full text is the title and sr-only.
+          <span className="whitespace-nowrap text-caption text-text-muted" title={caption}>
+            <span aria-hidden="true">{OWN_PENDING_SHORT_CAPTION}</span>
+            <span className="sr-only">{caption}</span>
+          </span>
+        ) : (
+          <span className="text-right text-caption text-text-muted">{caption}</span>
+        )}
         <SalaryAdvanceDetailDialog entry={entry} triggerSize={size} />
       </>
     );

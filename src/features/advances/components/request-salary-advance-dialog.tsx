@@ -26,10 +26,13 @@ function getCurrentMonthValue(): string {
 /** Collects a Salary Advance request without deciding eligibility or Payroll effects. */
 export function RequestSalaryAdvanceDialog({
   actions,
+  onOpen,
   onSuccess,
 }: {
   /** Server-action override for the /dev preview; the real page passes nothing. */
   actions?: Pick<AdvanceActionOverrides, "requestSalaryAdvance">;
+  /** Called when the trigger opens the dialog (the page drops its last action notice). */
+  onOpen?: () => void;
   /** Called with the action's message once the request is recorded (the dialog has closed). */
   onSuccess?: (message: string) => void;
 } = {}) {
@@ -69,6 +72,7 @@ export function RequestSalaryAdvanceDialog({
     setRequestNote("");
     setActionState(null);
     setIsOpen(true);
+    onOpen?.();
   };
 
   const closeDialog = (): void => {

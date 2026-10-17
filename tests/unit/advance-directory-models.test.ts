@@ -14,6 +14,7 @@ import {
   describeAdvanceIdentity,
   describeAdvanceStatusCaption,
   describeAdvanceSummary,
+  describeOwnPendingCaption,
   describeRelatedAdvance,
   filterAdvances,
   getActiveAdvanceChip,
@@ -89,9 +90,19 @@ describe("row actions and Cần xử lý", () => {
     expect(isActionableAdvance(reviewed, accountant)).toBe(false);
     expect(isActionableAdvance(reviewed, approverOnly)).toBe(true);
     expect(isActionableAdvance(other, approverOnly)).toBe(false);
-    expect(getAdvanceRowAction(own, owner, { canViewPayroll: true })).toEqual({ kind: "own-pending" });
+    expect(getAdvanceRowAction(own, owner, { canViewPayroll: true })).toEqual({ kind: "own-pending", stage: "review" });
     expect(getAdvanceRowAction(other, owner, { canViewPayroll: true })).toEqual({ kind: "decide", stage: "review" });
     expect(getAdvanceRowAction(reviewed, owner, { canViewPayroll: true })).toEqual({ kind: "decide", stage: "approve" });
+  });
+
+  // Value (review cycle 2, P2-4/R2-7): protects=an own pending row says who must act at its stage (another reviewer for a request, another owner for a reviewed one) instead of a vague "người khác xử lý"; fails_when=own-pending drops its stage or the caption names the wrong role for a stage; why_new=the own-pending action carried no stage; seam=none; no_claim=the table's short caption markup (advances-management.test.tsx)
+  it("tells an own pending row which role must act at its stage", () => {
+    const ownReviewed = advance("own-reviewed", { staffId: ME, status: "review" });
+    expect(getAdvanceRowAction(ownReviewed, owner, { canViewPayroll: true })).toEqual({ kind: "own-pending", stage: "approve" });
+    // An accountant cannot approve, so their own reviewed row is a plain view, not own-pending.
+    expect(getAdvanceRowAction(ownReviewed, accountant, { canViewPayroll: true })).toEqual({ kind: "view", payrollPeriodId: null });
+    expect(describeOwnPendingCaption("review")).toBe("Đơn của bạn · cần người khác đối soát");
+    expect(describeOwnPendingCaption("approve")).toBe("Đơn của bạn · cần người khác phê duyệt");
   });
 
   it("does not set own rows apart when the viewer id is unknown", () => {

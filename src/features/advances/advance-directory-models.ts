@@ -104,7 +104,7 @@ export function isWaitingAdvance(entry: SalaryAdvanceDashboardEntry): boolean {
 export type AdvanceRowAction =
   | { kind: "decide"; stage: AdvanceDecisionStage }
   /** The viewer could decide this stage, but it is their own request. */
-  | { kind: "own-pending" }
+  | { kind: "own-pending"; stage: AdvanceDecisionStage }
   | { kind: "view"; payrollPeriodId: string | null };
 
 export function getAdvanceRowAction(
@@ -115,7 +115,7 @@ export function getAdvanceRowAction(
   const stage = getAdvanceDecisionStage(entry, viewer);
 
   if (stage) {
-    return isOwnAdvance(entry, viewer) ? { kind: "own-pending" } : { kind: "decide", stage };
+    return { kind: isOwnAdvance(entry, viewer) ? "own-pending" : "decide", stage };
   }
 
   return {
@@ -123,6 +123,21 @@ export function getAdvanceRowAction(
     payrollPeriodId:
       entry.status === "deducted" && canViewPayroll ? entry.deductionPayrollPeriodId : null,
   };
+}
+
+/** Short label for an own pending row where space is tight (the table's Thao tác cell). */
+export const OWN_PENDING_SHORT_CAPTION = "Đơn của bạn";
+
+/**
+ * Full caption for an own pending row, naming the step someone else must take:
+ * đối soát for a request, phê duyệt for a reviewed one (the RPCs refuse a
+ * self-decision at either step). Role-neutral on purpose: an owner can grant
+ * advances.owner_approve to another role in the permission matrix.
+ */
+export function describeOwnPendingCaption(stage: AdvanceDecisionStage): string {
+  return stage === "review"
+    ? "Đơn của bạn · cần người khác đối soát"
+    : "Đơn của bạn · cần người khác phê duyệt";
 }
 
 /** `/payroll` anchors each period by id; there is no per-period route. */
