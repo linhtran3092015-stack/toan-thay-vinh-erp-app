@@ -2,6 +2,25 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.23.0.0] - 2026-10-18
+
+Danh sách Tài chính dựng lại theo phong cách Stumana (bước 14c): Đơn hàng cho kế toán thấy ngay đơn nào chưa xác nhận và quyết toán SB từng đợt, Sổ cái số buổi đọc dễ hơn, Yêu cầu thanh toán lọc nhanh theo trạng thái và ghi giờ đúng giờ Việt Nam.
+
+### Added
+- **Đơn hàng** `/finance/orders`: lọc nhanh Tất cả · Chưa xác nhận · Đã xác nhận · Chưa cấu hình; dải tổng Số đơn · Học phí · Chi phí vận hành (ghi "chưa gồm n đơn chưa cấu hình", "—" khi chưa đơn nào có chính sách chi phí) · Chưa xác nhận · Chưa cấu hình; dòng đầu trang "Tháng 10/2026 · n đơn · x chưa xác nhận · y chưa cấu hình", thêm "theo bộ lọc" khi đang lọc loại, nguồn hoặc đợt.
+- Bảng **quyết toán chi phí vận hành SB** ba đợt nằm ngay trên danh sách đơn: Tuyển mới, Tái phí, Học phí, Chi phí vận hành, Xác nhận; đợt đang diễn ra ghi "đang diễn ra (đến hôm nay)", đợt chưa tới ghi "chưa tới" thay vì số 0; ghi rõ Xác nhận chỉ là dấu kế toán đã kiểm tra, chưa phải chốt quyết toán.
+- Bảng đơn hàng 8 cột vừa màn hình laptop 1366px: Giao dịch (giờ Việt Nam, mã ngân hàng, nội dung chuyển khoản), Học sinh (mã, lớp, phụ huynh và SĐT), Loại, Nguồn kèm Sale, Học phí, Chi phí vận hành, Đợt, Xác nhận. Đơn đã xác nhận ghi "Đã xác nhận · lúc 16/10 08:20"; lưu không được thì báo ngay tại dòng đó; trình đọc màn hình đọc "Đã xác nhận đơn …" sau khi lưu.
+- **Sổ cái số buổi** `/finance/session-ledger`: loại bút toán thành huy hiệu, ngày hiệu lực kèm giờ ghi nhận, tham chiếu mở yêu cầu thanh toán (mã PAY-) hoặc buổi học khi người xem có quyền; trang vẫn chỉ đọc.
+- **Yêu cầu thanh toán** `/finance/payment-requests`: lọc nhanh Chờ thanh toán · Thanh toán một phần · Đã thanh toán · Đã hủy (Hết hạn khi có); bộ lọc tìm kiếm, trạng thái, loại nạp, khoảng ngày tạo (ngăn bộ lọc trên màn hình hẹp); bảng Mã (loại · giờ tạo) · Học sinh · Phụ huynh · Số buổi (+ tặng) · Phải thu (đơn giá/buổi) · Đã thu (còn lại, trả thừa, giờ thanh toán) · Trạng thái (kèm "chờ quá 14 ngày") · Thao tác; phân trang chuẩn; hủy phiếu thành công hiện "Đã hủy phiếu thu …" ngay trên trang.
+- Trang xem trước `/dev/lists?view=finance-orders|session-ledger|payment-requests` với `role=owner|accountant|ta` và `state=normal|capped|empty` (trả 404 trên production; nút xác nhận và hủy phiếu chỉ trả lời "Bản xem trước không ghi dữ liệu.").
+
+### Changed
+- Dải tiền của Yêu cầu thanh toán: "Phải thu" không còn cộng phiếu đã hủy hoặc hết hạn; "Đã thu"; "Còn chờ nhận" vẫn tính trong danh sách đang tải; trang báo khi danh sách chỉ gồm 1.000 yêu cầu mới nhất.
+- "Tạo yêu cầu" trên Yêu cầu thanh toán và "Tạo yêu cầu thanh toán" trên Tổng quan Tài chính chỉ hiện cho người mở được trang tạo (cần thêm quyền xem học sinh); tên học sinh trên các trang này chỉ là link khi người xem mở được hồ sơ.
+- Giờ tạo, giờ thanh toán và giờ ghi nhận sổ cái hiện theo giờ Việt Nam (trước đây có thể lệch 7 giờ); lọc theo ngày tạo tính theo ngày Việt Nam; tìm kiếm không dấu nhận cả "Đ".
+- "Chờ quá 14 ngày" dùng đúng mốc của cảnh báo phiếu quá hạn trên trang chủ.
+- Bốn thẻ tổng lớn trên Đơn hàng thay bằng dải tổng gọn; nút và link trên Tổng quan Tài chính hiện đúng màu.
+
 ## [0.22.0.0] - 2026-10-17
 
 Danh sách nhân sự dựng lại theo phong cách Stumana (bước 14b): Tạm ứng lương cho người xét duyệt thấy ngay đơn nào đang chờ mình, Nhân sự và Hoa hồng lọc được theo đúng nhu cầu hằng ngày.
