@@ -431,7 +431,7 @@ body::before {
 }
 
 /* Finance 1: the payment-request work area is deliberately the query
-   container so the 1280px table threshold excludes surrounding page/card padding. */
+   container so the table threshold excludes surrounding page/card padding. */
 .payment-request-operational-work-area {
   container-type: inline-size;
 }
@@ -450,8 +450,9 @@ body::before {
   display: inline-flex;
 }
 
-/* Wide operational tables appear from the shared 1120px work-area threshold
-   and scroll horizontally inside DataTableFrame on narrower laptops. */
+/* Step 14c: the payment-request table (1118px floor) and its desktop filter bar
+   appear from the shared 1120px work-area threshold; below it the record list
+   and the filter sheet trigger take over. */
 @container (min-width: 1120px) {
   .payment-request-filter-bar,
   .payment-request-directory-table {
@@ -461,10 +462,6 @@ body::before {
   .payment-request-directory-record-list,
   .payment-request-filter-trigger {
     display: none;
-  }
-
-  .payment-request-filter-grid {
-    grid-template-columns: minmax(260px, 1.6fr) repeat(4, minmax(138px, 1fr)) minmax(118px, auto);
   }
 }
 
@@ -515,7 +512,8 @@ body::before {
   }
 }
 
-/* Finance orders retain compact records until the full operational table is safe. */
+/* Finance orders (step 14c): compact records until the 1040px table fits; 1042px
+   covers the table plus the frame border and fits a 1366px laptop beside the 240px sidebar. */
 .finance-orders-operational-work-area {
   container-type: inline-size;
 }
@@ -528,7 +526,7 @@ body::before {
   display: grid;
 }
 
-@container (min-width: 1120px) {
+@container (min-width: 1042px) {
   .finance-orders-directory-table {
     display: block;
   }
@@ -551,8 +549,9 @@ body::before {
   display: grid;
 }
 
-/* DataTableFrame owns a one-pixel border on each side of its 1080px table. */
-@container (min-width: 1082px) {
+/* DataTableFrame owns a one-pixel border on each side of its 1040px table (step 14c),
+   so the table fits a 1366px laptop beside the 240px sidebar. */
+@container (min-width: 1042px) {
   .session-ledger-directory-table {
     display: block;
   }
