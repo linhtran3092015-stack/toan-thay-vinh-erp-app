@@ -2100,7 +2100,7 @@
 
 ### Dọn sau bước 14b
 
-**What:** Ghi lại lựa chọn lọc đã rơi về "Tất cả" vào state (để lần tải lại sau không tự bật lại bộ lọc cũ) ở `/advances`, `/staff`, `/commissions`; thêm test phía `/payroll` cho anchor `payroll-period-{id}` mà link "Kỳ lương" dùng; bỏ `lastLoginAt` khỏi `StaffDirectoryMember` nếu không làm mục "Đăng nhập gần nhất"; bỏ các prop không ai dùng của `StaffDirectoryPage` (`headingLevel`, `eyebrow`, `description`, `title`); chuẩn hóa từ khóa tìm kiếm một lần cho mỗi dòng (useMemo) ở `/advances` và `/staff`; chỉ hiện "Kỳ lương" cho người xem được bảng lương kỳ đó (có `payroll.manage`/`accountant_reconcile`/`owner_approve` hoặc là đơn của chính mình).
+**What:** Ghi lại lựa chọn lọc đã rơi về "Tất cả" vào state (để lần tải lại sau không tự bật lại bộ lọc cũ) ở `/advances`, `/staff`, `/commissions`; thêm test phía `/payroll` cho anchor `payroll-period-{id}` mà link "Kỳ lương" dùng; bỏ `lastLoginAt` khỏi `StaffDirectoryMember` nếu không làm mục "Đăng nhập gần nhất"; giữ dòng nhân sự vừa thu hồi vai trò trong danh sách (hoặc báo ở đầu trang) khi đang lọc theo đúng vai trò đó, vì hiện dòng biến mất cùng thông báo thành công; chuẩn hóa từ khóa tìm kiếm một lần cho mỗi dòng (useMemo) ở `/advances` và `/staff`; chỉ hiện "Kỳ lương" cho người xem được bảng lương kỳ đó (có `payroll.manage`/`accountant_reconcile`/`owner_approve` hoặc là đơn của chính mình).
 
 **Why:** Các điểm nhỏ còn lại từ review bước 14b (INFO); không cái nào chặn phát hành.
 
@@ -2108,6 +2108,42 @@
 
 **Effort:** S
 **Priority:** P4
+**Depends on:** None
+
+### Đơn tạm ứng của chủ trung tâm khi chỉ có một chủ
+
+**What:** Quyết định ai duyệt đơn tạm ứng của chính chủ trung tâm khi trung tâm chỉ có một người giữ `advances.owner_approve`: cấp quyền này cho một vai trò tin cậy trong ma trận phân quyền ở Cài đặt (đã làm được, không cần code), hay thêm một quy tắc riêng cho đơn của chủ.
+
+**Why:** RPC cấm tự duyệt (`SALARY_ADVANCE_SELF_DECISION_FORBIDDEN`) và mặc định chỉ vai trò chủ trung tâm có `advances.owner_approve`, nên đơn của chủ sau bước đối soát nằm ở "Chờ phê duyệt" cho tới khi có người khác giữ quyền phê duyệt. Bước 14b chỉ ghi đúng tình trạng ("Đơn của bạn · cần người khác phê duyệt").
+
+**Context:** `supabase/migrations/20261012120100_salary_advance_no_self_decision.sql`, `supabase/migrations/20260729110000_salary_advances_foundation.sql` (cấp quyền), `src/features/advances/advance-directory-models.ts`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Một người vừa đối soát vừa phê duyệt cùng đơn tạm ứng
+
+**What:** Quyết định có bắt buộc người phê duyệt khác người đối soát không. Nếu có, thêm điều kiện `approved_by <> reviewed_by` trong `approve_salary_advance` và trả id người đối soát cho giao diện để ẩn nút.
+
+**Why:** Chủ trung tâm giữ cả `advances.review` và `advances.owner_approve`, nên có thể đối soát rồi tự phê duyệt cùng một đơn (RPC chỉ cấm duyệt đơn của chính mình). Từ bước 14b, chip "Cần xử lý" gộp cả hai bước cho chủ, nên việc này dễ xảy ra hơn; dòng "Quy tắc" trong hộp thoại lại mô tả hai người khác nhau.
+
+**Context:** `supabase/migrations/20261012120100_salary_advance_no_self_decision.sql` (`approve_salary_advance`), `src/features/advances/advance-directory-models.ts` (`getAdvanceDecisionStage`, `buildAdvanceChips`), `src/features/advances/components/salary-advance-decision-dialog.tsx` (`DECISION_RULES`). Review đối kháng bước 14b, F1.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+### Hộp thoại xét duyệt tạm ứng khi danh sách tải lại
+
+**What:** Gắn `key` theo `id:stage` cho `SalaryAdvanceDecisionDialog` và giữ hộp thoại đang mở ở cấp trang; bỏ cờ chuyển focus sang thông báo khi focus vẫn ở nút; thêm test nhánh "Từ chối" ở bước phê duyệt chuyển đúng thông báo của action lên trang; ghi log lỗi RPC trong `commissions/data.ts`; chỉ gửi xuống trình duyệt các trường trang thật sự dùng (staff, commissions, advances); ghi rõ "chỉ trừ cho nhân sự có phiếu lương trong lần tính" ở thông báo duyệt; báo "có thể chưa đủ" ở "Đơn khác cùng kỳ" khi đã chạm 1.000 dòng.
+
+**Why:** Các điểm Low từ review đối kháng và pass ràng buộc bước 14b (đã chạm giới hạn 3 vòng sửa): nếu lần tải lại tới lúc hộp thoại thứ hai đang mở, quyết định cũ có thể gửi sai bước; một lần tải lại sau có thể kéo focus về thông báo cũ.
+
+**Context:** `src/features/advances/advance-list-page.tsx` (`AdvanceRowActions`, effect focus), `src/features/advances/components/salary-advance-decision-dialog.tsx`, `src/features/commissions/data.ts`, các route `staff`/`commissions`/`advances`.
+
+**Effort:** S
+**Priority:** P3
 **Depends on:** None
 
 ## Tin nhắn phụ huynh (Zalo)
