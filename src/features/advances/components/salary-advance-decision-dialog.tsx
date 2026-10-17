@@ -3,36 +3,44 @@
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState, useTransition, type FormEvent } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonSize, type ButtonVariant } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import {
   approveSalaryAdvanceAction,
   reviewSalaryAdvanceAction,
 } from "@/features/advances/actions/advance-actions";
+import type { AdvanceActionOverrides } from "@/features/advances/advance-action-overrides";
+import {
+  describeRelatedAdvance,
+  type AdvanceDecisionStage,
+} from "@/features/advances/advance-directory-models";
 import { AdvanceActionMessage } from "@/features/advances/components/advance-action-message";
+import {
+  advanceFieldClassName,
+  advanceTextareaClassName,
+} from "@/features/advances/components/advance-field";
 import type { AdvanceActionState } from "@/features/advances/forms/advance-action-types";
 import type { SalaryAdvanceDashboardEntry } from "@/features/advances/read-models";
+import { formatMonth, formatShortDateTime, getVietnamToday } from "@/lib/datetime";
+import { formatVnd } from "@/lib/format";
 
-const formInputClassName =
-  "min-h-11 w-full rounded-md border border-border-subtle bg-surface-base px-3 text-control text-text-default outline-none transition focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
-
-type AdvanceDecisionStage = "approve" | "review";
 type AdvanceDecision = "approved" | "rejected" | "review";
 
 interface SalaryAdvanceDecisionDialogProps {
+  /** Server-action overrides for the /dev preview; the real page passes nothing. */
+  actions?: Pick<AdvanceActionOverrides, "approveSalaryAdvance" | "reviewSalaryAdvance">;
   advance: SalaryAdvanceDashboardEntry;
+  /**
+   * Other loaded requests of the same staff member and deduction month, shown
+   * as "Đơn khác cùng kỳ" (a list, never a sum). Omitted: the fact is not shown.
+   */
+  relatedEntries?: readonly SalaryAdvanceDashboardEntry[];
   stage: AdvanceDecisionStage;
-}
-
-function formatCurrency(value: number): string {
-  return `${new Intl.NumberFormat("vi-VN").format(value)} VND`;
-}
-
-function formatMonth(value: string): string {
-  return new Intl.DateTimeFormat("vi-VN", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date(`${value}T00:00:00`));
+  /** Vietnam business date `YYYY-MM-DD`; decides whether short dates carry a year. */
+  today?: string;
+  /** Row placements pass `sm` (table, 32px) or `lg` (cards, 44px). */
+  triggerSize?: ButtonSize;
+  triggerVariant?: ButtonVariant;
 }
 
 const contentByStage: Record<
@@ -40,7 +48,7 @@ const contentByStage: Record<
   {
     confirmedDecision: "approved" | "review";
     confirmedLabel: string;
-    description: string;
+    notePlaceholder: string;
     pendingLabel: string;
     rejectedLabel: string;
     title: string;
@@ -50,8 +58,7 @@ const contentByStage: Record<
   approve: {
     confirmedDecision: "approved",
     confirmedLabel: "Phê duyệt tạm ứng",
-    description:
-      "Khoản được phê duyệt sẽ chờ hệ thống Payroll khấu trừ tại kỳ đã chọn.",
+    notePlaceholder: "VD: Đồng ý, trừ vào kỳ đã chọn",
     pendingLabel: "Đang xử lý phê duyệt…",
     rejectedLabel: "Từ chối yêu cầu",
     title: "Phê duyệt yêu cầu tạm ứng",
@@ -60,8 +67,7 @@ const contentByStage: Record<
   review: {
     confirmedDecision: "review",
     confirmedLabel: "Chuyển bước phê duyệt",
-    description:
-      "Yêu cầu được đối soát sẽ chuyển sang bước phê duyệt cuối cùng.",
+    notePlaceholder: "VD: Đủ chứng từ, chuyển chủ duyệt",
     pendingLabel: "Đang xử lý đối soát…",
     rejectedLabel: "Từ chối yêu cầu",
     title: "Đối soát yêu cầu tạm ứng",
@@ -69,10 +75,23 @@ const contentByStage: Record<
   },
 };
 
+const REJECTION_PLACEHOLDER = "VD: Thiếu chứng từ, nhân sự cần bổ sung";
+
+// The real rules only (migrations): two steps, no self-decision, a reason to reject,
+// deducted when that month's payroll is calculated (a payroll already calculated for that
+// month picks it up only on recalculation). No amount cap exists, so none is stated.
+const DECISION_RULES =
+  "Kế toán đối soát → chủ trung tâm phê duyệt. Không tự đối soát hoặc tự duyệt đơn của chính mình. Từ chối cần lý do. Khoản đã duyệt được trừ khi tính bảng lương kỳ đã chọn; nếu bảng lương kỳ đó đã tính rồi thì phải tính lại mới trừ.";
+
 /** Confirms one explicit, server-owned Salary Advance review or approval outcome. */
 export function SalaryAdvanceDecisionDialog({
+  actions,
   advance,
+  relatedEntries,
   stage,
+  today,
+  triggerSize,
+  triggerVariant = "outline",
 }: SalaryAdvanceDecisionDialogProps) {
   const router = useRouter();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -91,6 +110,8 @@ export function SalaryAdvanceDecisionDialog({
   const isInteractionLocked = isPending && actionState?.status !== "error";
   const noteError = actionState?.status === "error" ? actionState.fieldErrors?.note?.[0] : undefined;
   const isRejected = decision === "rejected";
+  const review = actions?.reviewSalaryAdvance ?? reviewSalaryAdvanceAction;
+  const approve = actions?.approveSalaryAdvance ?? approveSalaryAdvanceAction;
 
   const openDialog = (): void => {
     setDecision(content.confirmedDecision);
@@ -118,12 +139,12 @@ export function SalaryAdvanceDecisionDialog({
     setActionState(null);
     startTransition(async () => {
       const result = stage === "review"
-        ? await reviewSalaryAdvanceAction({
+        ? await review({
             decision: decision as "rejected" | "review",
             note,
             salaryAdvanceId: advance.id,
           })
-        : await approveSalaryAdvanceAction({
+        : await approve({
             decision: decision as "approved" | "rejected",
             note,
             salaryAdvanceId: advance.id,
@@ -141,11 +162,12 @@ export function SalaryAdvanceDecisionDialog({
   return (
     <>
       <Button
-        className="min-h-11"
+        className={triggerSize ? undefined : "min-h-11"}
         onClick={openDialog}
         ref={triggerRef}
+        size={triggerSize}
         type="button"
-        variant="outline"
+        variant={triggerVariant}
       >
         {content.triggerLabel}
       </Button>
@@ -159,72 +181,99 @@ export function SalaryAdvanceDecisionDialog({
         onClose={closeDialog}
         returnFocusRef={triggerRef}
       >
-        <div className="p-4 sm:p-5">
-          <h2 className="text-section-title text-text-strong" id={titleId}>
-            {content.title}
-          </h2>
-          <p className="mt-1 text-secondary text-text-muted" id={descriptionId}>
-            {content.description}
-          </p>
+        {isOpen ? (
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4 px-4 pt-4 sm:px-5 sm:pt-5">
+              <div>
+                <h2 className="text-section-title font-semibold text-text-strong" id={titleId}>
+                  {content.title}
+                </h2>
+                <p className="mt-0.5 text-secondary tabular-nums text-text-muted" id={descriptionId}>
+                  {describeDecisionSubject(advance, today ?? getVietnamToday())}
+                </p>
+              </div>
 
-          <form className="mt-5 grid gap-5" onSubmit={handleSubmit}>
-            <dl className="grid gap-3 rounded-lg border border-border-subtle bg-surface-sunken p-4 text-secondary text-text-default">
-              <DecisionDetail label="Nhân sự" value={advance.staffDisplayName} />
-              <DecisionDetail label="Số tiền" value={formatCurrency(advance.amountVnd)} />
-              <DecisionDetail label="Kỳ khấu trừ" value={formatMonth(advance.deductionPeriodMonth)} />
-              <DecisionDetail label="Lý do" value={advance.requestNote} />
-            </dl>
+              <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 rounded-md bg-surface-sunken p-3 text-secondary">
+                <dt className="text-text-muted">Lý do</dt>
+                <dd className="break-words text-text-strong">{advance.requestNote}</dd>
+                {relatedEntries ? (
+                  <>
+                    <dt className="text-text-muted">Đơn khác cùng kỳ</dt>
+                    <dd className="text-text-strong">
+                      {relatedEntries.length === 0 ? (
+                        "Không có"
+                      ) : (
+                        <ul className="grid gap-0.5 tabular-nums">
+                          {relatedEntries.map((entry) => (
+                            <li key={entry.id}>{describeRelatedAdvance(entry, today ?? getVietnamToday())}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </dd>
+                  </>
+                ) : null}
+                <dt className="text-text-muted">Quy tắc</dt>
+                <dd className="text-text-default">{DECISION_RULES}</dd>
+              </dl>
 
-            <div className="grid gap-1.5">
-              <label className="text-label text-text-default" htmlFor={decisionId}>
-                Quyết định
-              </label>
-              <select
-                className={formInputClassName}
+              <div className="grid gap-1.5">
+                <label className="text-label font-medium text-text-strong" htmlFor={decisionId}>
+                  Quyết định
+                </label>
+                <select
+                  className={advanceFieldClassName}
+                  disabled={isInteractionLocked}
+                  id={decisionId}
+                  onChange={(event) => setDecision(event.target.value as AdvanceDecision)}
+                  ref={decisionRef}
+                  value={decision}
+                >
+                  <option value={content.confirmedDecision}>{content.confirmedLabel}</option>
+                  <option value="rejected">{content.rejectedLabel}</option>
+                </select>
+              </div>
+
+              <div className="grid gap-1.5">
+                <label className="text-label font-medium text-text-strong" htmlFor={noteId}>
+                  {isRejected ? "Lý do từ chối" : "Ghi chú"}
+                </label>
+                <textarea
+                  aria-describedby={noteError ? noteErrorId : undefined}
+                  aria-invalid={Boolean(noteError)}
+                  className={advanceTextareaClassName}
+                  disabled={isInteractionLocked}
+                  id={noteId}
+                  maxLength={2000}
+                  onChange={(event) => setNote(event.target.value)}
+                  placeholder={isRejected ? REJECTION_PLACEHOLDER : content.notePlaceholder}
+                  required={isRejected}
+                  value={note}
+                />
+                {noteError ? <FieldError id={noteErrorId}>{noteError}</FieldError> : null}
+              </div>
+
+              {actionState?.status === "error" ? (
+                <AdvanceActionMessage actionState={actionState} />
+              ) : null}
+            </div>
+
+            <div className="mt-4 flex flex-col-reverse gap-2 border-t border-border-subtle px-4 py-4 sm:flex-row sm:justify-end sm:px-5">
+              <Button
+                className="max-md:h-11"
                 disabled={isInteractionLocked}
-                id={decisionId}
-                onChange={(event) => setDecision(event.target.value as AdvanceDecision)}
-                ref={decisionRef}
-                value={decision}
+                onClick={closeDialog}
+                type="button"
+                variant="secondary"
               >
-                <option value={content.confirmedDecision}>{content.confirmedLabel}</option>
-                <option value="rejected">{content.rejectedLabel}</option>
-              </select>
-            </div>
-
-            <div className="grid gap-1.5">
-              <label className="text-label text-text-default" htmlFor={noteId}>
-                {isRejected ? "Lý do từ chối" : "Ghi chú"}
-              </label>
-              <textarea
-                aria-describedby={noteError ? noteErrorId : undefined}
-                aria-invalid={Boolean(noteError)}
-                className={`${formInputClassName} min-h-28 resize-y py-3`}
-                disabled={isInteractionLocked}
-                id={noteId}
-                maxLength={2000}
-                onChange={(event) => setNote(event.target.value)}
-                required={isRejected}
-                value={note}
-              />
-              {noteError ? <FieldError id={noteErrorId}>{noteError}</FieldError> : null}
-            </div>
-
-            {actionState?.status === "error" ? (
-              <AdvanceActionMessage actionState={actionState} />
-            ) : null}
-
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button className="min-h-11" disabled={isInteractionLocked} onClick={closeDialog} size="lg" type="button" variant="ghost">
                 Hủy
               </Button>
               <Button
-                className="min-h-11"
+                className="max-md:h-11"
                 disabled={isInteractionLocked}
                 isLoading={isInteractionLocked}
-                size="lg"
                 type="submit"
-                variant={isRejected ? "danger" : "primary"}
+                // Rejecting is the explicit decision inside the dialog, never a page primary.
+                variant={isRejected ? "danger-solid" : "primary"}
               >
                 {isInteractionLocked
                   ? content.pendingLabel
@@ -234,19 +283,20 @@ export function SalaryAdvanceDecisionDialog({
               </Button>
             </div>
           </form>
-        </div>
+        ) : null}
       </Dialog>
     </>
   );
 }
 
-function DecisionDetail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-caption font-semibold text-text-muted">{label}</dt>
-      <dd className="mt-1 break-words text-text-strong">{value}</dd>
-    </div>
-  );
+/** "Nguyễn Minh An · 3.000.000 ₫ · trừ vào kỳ 10/2026 · gửi 12/10 09:40" */
+function describeDecisionSubject(advance: SalaryAdvanceDashboardEntry, today: string): string {
+  return [
+    advance.staffDisplayName,
+    formatVnd(advance.amountVnd),
+    `trừ vào kỳ ${formatMonth(advance.deductionPeriodMonth)}`,
+    `gửi ${formatShortDateTime(advance.requestedAt, today)}`,
+  ].join(" · ");
 }
 
 function FieldError({ children, id }: { children: string; id: string }) {

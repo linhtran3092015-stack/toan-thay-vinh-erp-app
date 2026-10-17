@@ -3,6 +3,8 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { AdvanceListPage } from "@/features/advances/advance-list-page";
 import { getSalaryAdvancesDashboardResult } from "@/features/advances/data";
+import { getCachedCurrentAuthUser } from "@/features/auth/current-user";
+import { getVietnamToday } from "@/lib/datetime";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 import { permissionDeniedDescription } from "@/lib/permissions/labels";
@@ -27,7 +29,12 @@ export default async function AdvancesRoute() {
     );
   }
 
-  const advancesResult = await getSalaryAdvancesDashboardResult();
+  // The viewer id only sets their own rows apart (the RPCs refuse a self-decision);
+  // it is the per-request cached user the layout already read.
+  const [advancesResult, authResult] = await Promise.all([
+    getSalaryAdvancesDashboardResult(),
+    getCachedCurrentAuthUser(),
+  ]);
 
   if (!advancesResult.ok) {
     return (
@@ -58,7 +65,10 @@ export default async function AdvancesRoute() {
       canApprove={canApprove}
       canRequest={canRequest}
       canReview={canReview}
+      canViewPayroll={permissionResult.permissions.includes("payroll.view")}
       entries={advancesResult.data}
+      today={getVietnamToday()}
+      viewerId={authResult.ok ? authResult.user.id : null}
     />
   );
 }
