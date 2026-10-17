@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { getButtonClassName } from "@/components/ui/button";
 import { PageHeader } from "@/components/patterns/page-header";
 import { TableHeaderCell } from "@/components/patterns/data-table-frame";
+import { SessionMessageContactCard } from "@/features/parent-messages/components/session-message-contact-card";
+import type { SessionMessageContactState } from "@/features/parent-messages/data";
 import type { AdditionalStudyCandidate } from "@/features/sessions/attendance-data";
 import {
   Card,
@@ -51,6 +53,8 @@ interface SessionDetailPageProps {
   canViewStudents: boolean;
   detail: SessionDetailReadModel;
   directoryQuery?: string;
+  /** Supervisor name + phone for this session's Zalo comment messages (attendance.view / attendance.mark). */
+  messageContact?: SessionMessageContactState | null;
 }
 
 /**
@@ -70,6 +74,7 @@ export function SessionDetailPage({
   canViewStudents,
   detail,
   directoryQuery = "",
+  messageContact = null,
 }: SessionDetailPageProps) {
   // Display counts cover everyone on the page, walk-ins included.
   const participantCount = detail.participants.length;
@@ -206,14 +211,19 @@ export function SessionDetailPage({
         attendancePending={detail.lockedAt ? 0 : participantCount - participantMarkedCount + rosterAdditionalStudy.length}
         results={
           showsResults ? (
-            <SessionResultManagement
-              canManageResults={canManageResults}
-              canViewStudents={canViewStudents}
-              lockedAt={detail.lockedAt}
-              participants={detail.participants}
-              sessionId={detail.id}
-              sessionStatus={detail.status}
-            />
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+              {messageContact && detail.status !== "cancelled" ? (
+                <SessionMessageContactCard canEdit={canMarkAttendance} contact={messageContact} sessionId={detail.id} />
+              ) : null}
+              <SessionResultManagement
+                canManageResults={canManageResults}
+                canViewStudents={canViewStudents}
+                lockedAt={detail.lockedAt}
+                participants={detail.participants}
+                sessionId={detail.id}
+                sessionStatus={detail.status}
+              />
+            </div>
           ) : null
         }
         resultsPending={detail.lockedAt ? 0 : eligible.length - resultCount}

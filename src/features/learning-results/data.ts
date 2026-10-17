@@ -22,6 +22,7 @@ const learningResultRowsSchema = z.array(
     locked_at: z.string().nullable(),
     notebook_score: z.number().min(0).max(10).nullable(),
     notebook_status: z.enum([
+      "pending",
       "submitted",
       "not_submitted",
       "not_required",

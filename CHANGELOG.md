@@ -2,6 +2,25 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.21.0.0] - 2026-10-17
+
+Tin Zalo nhận xét cuối buổi theo mẫu mới cho mọi buổi (kế hoạch chấm bài AI, giai đoạn 2b): tiêu đề có ngày học, họ tên, dòng Kết quả, nhận xét và thông tin liên hệ; mục không có dữ liệu tự ẩn; tin dài tự tách 2–3 tin gửi liền nhau; vở còn chờ chấm hoặc chưa điền trợ giảng giám thị thì chưa gửi được.
+
+### Added
+- **Mẫu tin mới** thay mẫu một dòng cũ cho mọi buổi, kể cả buổi nhập điểm tay: "THẦY VINH VÀ THẦY CÔ CỘNG SỰ KÍNH GỬI PHỤ HUYNH… NGÀY 17/10/2026", Tên học sinh, Kết quả (Điểm luyện tập cuối buổi · Điểm vở · Xếp hạng), Bài làm, Bài chữa chi tiết, Nhận xét và thông tin cuối (chủ nhiệm CLB, trợ giảng giám thị, SĐT thắc mắc bài chấm, SĐT các thầy cô hỗ trợ). Bài làm và bài chữa để trống tới khi có chấm bài AI.
+- **Mục trống tự ẩn cùng nhãn**: buổi không có bài kiểm tra thì dòng Kết quả chỉ còn điểm vở; chưa có bài làm, bài chữa thì không hiện hai mục đó; điểm lẻ ghi kiểu Việt Nam ("8,5").
+- **Xếp hạng theo khoảng điểm**: dưới 5 "Tiến bộ ít", 5–dưới 8 "Tiến bộ vừa", 8–dưới 9 "Tiến bộ", 9–dưới 10 "Tiến bộ nhiều", 10 "Rất tiến bộ" (8,5 là "Tiến bộ"). Chỉ chủ trung tâm đổi được thang này.
+- **Cài đặt → Tin Zalo** `/settings/zalo` (chỉ chủ trung tâm sửa, người có quyền xem cài đặt xem được): sửa mẫu tin và thông tin cuối, danh sách ô dữ liệu và quy tắc ẩn, thang xếp hạng, và ô **xem trước** dựng tin thật từ một học sinh mẫu (bật/tắt điểm luyện tập, điểm vở hoặc chưa nộp vở, trợ giảng giám thị, bài làm và bài chữa) kèm số tin sẽ tách và số ký tự từng tin. Lưu mẫu thì các tin nhận xét đang chờ (chưa sửa tay) cập nhật theo mẫu mới.
+- **Trợ giảng giám thị trên tin Zalo** ở tab "Cuối giờ · Kết quả" của buổi học: trợ giảng điền tên và SĐT thắc mắc bài chấm, ô tự điền sẵn theo lần điền gần nhất của chính trợ giảng đó; lưu xong tin nhận xét đang chờ của buổi cập nhật ngay.
+- **Trạng thái vở "Chờ chấm vở"** làm mặc định khi nhập kết quả, tách khỏi "Chưa nộp" (học sinh không nộp vở). Học sinh chưa nộp vở thì tin ghi "Điểm vở: Chưa nộp vở" và gửi được. Danh sách Kết quả học tập lọc được theo "Chờ chấm". Khi cập nhật, kết quả "Chưa nộp" của các buổi chưa khóa chuyển sang "Chờ chấm vở"; buổi đã khóa giữ nguyên.
+- **Tin dài tự tách**: hàng chờ hiện từng tin "Tin 1/2 · 1.914/2.000 ký tự"; tin thứ hai trở đi mở đầu bằng "(tiếp theo 2/3)"; cắt ở chỗ chuyển mục, mục dài hơn một tin thì cắt theo dòng. Ô sửa tin hiện số ký tự (tối đa 6.000) và chỗ sẽ tách.
+
+### Changed
+- **Khóa nút Gửi** tin nhận xét khi vở còn "Chờ chấm vở" hoặc buổi chưa có trợ giảng giám thị; hàng chờ ghi lý do ("Chưa gửi được: Chưa chấm vở; Chưa điền trợ giảng giám thị"). Tin cần hơn 3 tin Zalo cũng không gửi được và được báo rút gọn.
+- **Gửi nhiều phần**: các phần gửi lần lượt qua ZaloCRM cách nhau 1,5 giây; phần nào lỗi thì "Gửi tiếp từ tin k" đi tiếp từ phần đó, không gửi lại phần đã đi. Trong lúc đang gửi, tin không bị sửa hay gửi trùng bởi người khác; tin đã gửi một phần thì giữ nguyên nội dung.
+- Mẫu tin nhận xét chuyển từ Cài đặt → Chung sang Cài đặt → Tin Zalo; Cài đặt → Chung vẫn giữ nick gửi, bật/tắt từng loại tin và mẫu tin vắng không phép.
+- Tin nhận xét cập nhật cả khi chỉ đổi tình trạng vở; tin đang chờ chuyển sang mẫu mới khi cập nhật hệ thống.
+
 ## [0.20.0.0] - 2026-10-16
 
 Danh sách học vụ dựng lại theo phong cách Stumana (bước 14a): trang Buổi học cho thấy ngay buổi nào chưa điểm danh, buổi nào sẵn sàng khóa; Kết quả học tập và Tín chỉ chấm bài lọc được theo đúng nhu cầu hằng ngày.

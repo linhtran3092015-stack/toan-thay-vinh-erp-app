@@ -1,5 +1,7 @@
 import "server-only";
 
+import { DEFAULT_COMMENT_FOOTER, DEFAULT_COMMENT_TEMPLATE } from "@/features/parent-messages/comment-template";
+
 export const SYSTEM_SETTING_DEFAULTS = {
   "center.display_name": "Trung tâm Toán Thầy Vinh",
   "teacher.display_name": "Toán Thầy Vinh",
@@ -13,7 +15,8 @@ export const SYSTEM_SETTING_DEFAULTS = {
   "zalo.absence_message_enabled": "on",
   "zalo.comment_message_enabled": "on",
   "zalo.absence_template": "{center} thông báo: {student} vắng buổi học {class} ngày {date} ({time}) không phép. Phụ huynh vui lòng phản hồi để trung tâm sắp xếp học bù.",
-  "zalo.comment_template": "{center} - nhận xét buổi {date} lớp {class} của {student}: {comment}{scores}",
+  "zalo.comment_template": DEFAULT_COMMENT_TEMPLATE,
+  "zalo.comment_footer": DEFAULT_COMMENT_FOOTER,
 } as const;
 
 export type SystemSettingKey = keyof typeof SYSTEM_SETTING_DEFAULTS;

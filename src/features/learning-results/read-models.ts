@@ -2,6 +2,7 @@
 export const LEARNING_RESULTS_LIMIT = 500;
 
 export type LearningResultNotebookStatus =
+  | "pending"
   | "submitted"
   | "not_submitted"
   | "not_required";

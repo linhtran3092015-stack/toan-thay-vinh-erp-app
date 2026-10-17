@@ -11,10 +11,18 @@ export interface ParentMessageQueueItem {
   classCode: string | null;
   classSessionId: string | null;
   content: string;
+  /** A TA saved their own text: result changes no longer update it. */
+  contentEdited: boolean;
   createdAt: string;
   errorMessage: string | null;
   eventCode: "attendance.unexcused_absence" | "session.comment";
   id: string;
+  /** Parts already sent; a retry resumes after them. */
+  partsSent: number;
+  /** Fixed at the first send (null before). */
+  partsTotal: number | null;
+  /** Why Gửi is locked (queued/failed only), e.g. "Chưa chấm vở". */
+  sendBlockReason: string | null;
   sentAt: string | null;
   sentByName: string | null;
   sessionDate: string | null;
@@ -34,10 +42,14 @@ const rowSchema = z.object({
   class_code: z.string().nullable(),
   class_session_id: z.string().uuid().nullable(),
   content: z.string(),
+  content_edited: z.boolean(),
   created_at: z.string(),
   error_message: z.string().nullable(),
   event_code: z.enum(["attendance.unexcused_absence", "session.comment"]),
   message_id: z.string().uuid(),
+  parts_sent: z.number().int(),
+  parts_total: z.number().int().nullable(),
+  send_block_reason: z.string().nullable(),
   sent_at: z.string().nullable(),
   sent_by_name: z.string().nullable(),
   session_date: z.string().nullable(),
@@ -67,10 +79,14 @@ export async function getParentMessageQueueResult(status: ParentMessageStatus | 
         classCode: row.class_code,
         classSessionId: row.class_session_id,
         content: row.content,
+        contentEdited: row.content_edited,
         createdAt: row.created_at,
         errorMessage: row.error_message,
         eventCode: row.event_code,
         id: row.message_id,
+        partsSent: row.parts_sent,
+        partsTotal: row.parts_total,
+        sendBlockReason: row.send_block_reason,
         sentAt: row.sent_at,
         sentByName: row.sent_by_name,
         sessionDate: row.session_date,
@@ -115,5 +131,45 @@ export async function getStudentZaloLink(studentId: string): Promise<StudentZalo
     };
   } catch {
     return null;
+  }
+}
+
+export interface SessionMessageContact {
+  phone: string;
+  supervisorName: string;
+}
+
+export interface SessionMessageContactState {
+  /** This session's saved supervisor, if any. */
+  saved: (SessionMessageContact & { updatedAt: string }) | null;
+  /** The signed-in TA's most recent entry on another session, to pre-fill an empty form. */
+  suggestion: SessionMessageContact | null;
+}
+
+/** Supervisor name + grading phone shown in the comment message footer (session_message_contacts). */
+export async function getSessionMessageContact(sessionId: string): Promise<SessionMessageContactState> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("session_message_contacts")
+      .select("supervisor_name, grading_contact_phone, updated_at")
+      .eq("class_session_id", sessionId)
+      .maybeSingle();
+    if (!error && data) {
+      return { saved: { phone: data.grading_contact_phone, supervisorName: data.supervisor_name, updatedAt: data.updated_at }, suggestion: null };
+    }
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) return { saved: null, suggestion: null };
+    const { data: last } = await supabase
+      .from("session_message_contacts")
+      .select("supervisor_name, grading_contact_phone")
+      .eq("updated_by", userId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return { saved: null, suggestion: last ? { phone: last.grading_contact_phone, supervisorName: last.supervisor_name } : null };
+  } catch {
+    return { saved: null, suggestion: null };
   }
 }
