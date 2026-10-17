@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/patterns/page-header";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import type { CenterSessionLedgerEntryReadModel } from "@/features/finance/read-models";
+import { formatDateTime } from "@/lib/datetime";
 
 interface SessionLedgerHistoryProps {
   entries: CenterSessionLedgerEntryReadModel[];
@@ -211,24 +212,10 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
 });
 
-const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-
 function formatDate(value: string): string {
   const parts = value.split("T")[0]?.split("-");
 
   return parts?.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : value;
-}
-
-function formatDateTime(value: string): string {
-  const timestamp = new Date(value);
-
-  return Number.isNaN(timestamp.getTime()) ? value : dateTimeFormatter.format(timestamp);
 }
 
 function formatDeltaSessions(value: number): string {
