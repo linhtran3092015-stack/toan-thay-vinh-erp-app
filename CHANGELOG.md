@@ -2,6 +2,11 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.22.0.3] - 2026-10-17
+
+### Fixed
+- **Giờ trên danh sách Coaching và Sổ cái số buổi theo giờ Việt Nam**, dù máy chủ chạy ở múi giờ nào: cột "Mở phiếu" của danh sách Coaching và dòng "Ghi nhận …" của Sổ cái số buổi. Hai trang này dựng trên máy chủ và trước đây định dạng theo múi giờ của máy, nên trên Vercel (UTC) giờ in lệch 7 tiếng (phiếu mở lúc 01:30 ngày 18/10 hiện "18:30 17/10/2026"). Định dạng hiển thị giữ nguyên.
+
 ## [0.22.0.0] - 2026-10-17
 
 Danh sách nhân sự dựng lại theo phong cách Stumana (bước 14b): Tạm ứng lương cho người xét duyệt thấy ngay đơn nào đang chờ mình, Nhân sự và Hoa hồng lọc được theo đúng nhu cầu hằng ngày.

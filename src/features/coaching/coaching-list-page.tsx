@@ -8,6 +8,7 @@ import type {
   CoachingPriority,
   CoachingRecordDashboardEntry,
 } from "@/features/coaching/read-models";
+import { formatDateTime } from "@/lib/datetime";
 
 interface CoachingListPageProps {
   canManage: boolean;
@@ -17,14 +18,6 @@ interface CoachingListPageProps {
 
 const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-
-const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
   month: "2-digit",
   year: "numeric",
 });
@@ -233,8 +226,4 @@ function MobileField({ label, value }: { label: string; value: string }) {
 
 function formatDate(value: string | null): string {
   return value ? dateFormatter.format(new Date(`${value}T00:00:00`)) : "Chưa đặt lịch";
-}
-
-function formatDateTime(value: string): string {
-  return dateTimeFormatter.format(new Date(value));
 }
