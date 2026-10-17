@@ -1,12 +1,21 @@
 import "server-only";
 
+import { COMMISSIONS_DEFAULT_LIMIT } from "@/features/commissions/commission-directory-models";
 import type {
   SalesCommissionAccrualDashboardEntry,
   SalesCommissionAccrualReadResult,
 } from "@/features/commissions/read-models";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export async function getSalesCommissionAccrualsDashboardResult(): Promise<
+/**
+ * `limit` is the RPC's `p_limit` (1-500, newest first by recognized_on). The
+ * default (`COMMISSIONS_DEFAULT_LIMIT`, 200) is the RPC's own default and the
+ * page's fallback; /commissions asks for 500 (`COMMISSIONS_LIMIT`) and tells
+ * the page so it can flag a possibly cut month.
+ */
+export async function getSalesCommissionAccrualsDashboardResult(
+  limit = COMMISSIONS_DEFAULT_LIMIT,
+): Promise<
   SalesCommissionAccrualReadResult<
     readonly SalesCommissionAccrualDashboardEntry[]
   >
@@ -15,7 +24,7 @@ export async function getSalesCommissionAccrualsDashboardResult(): Promise<
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase.rpc(
       "get_sales_commission_accruals_dashboard",
-      { p_limit: 200 },
+      { p_limit: limit },
     );
 
     if (error || !data) {

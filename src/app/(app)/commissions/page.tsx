@@ -1,6 +1,7 @@
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { CommissionListPage } from "@/features/commissions/commission-list-page";
+import { COMMISSIONS_LIMIT } from "@/features/commissions/commission-directory-models";
 import { getSalesCommissionAccrualsDashboardResult } from "@/features/commissions/data";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
@@ -26,7 +27,7 @@ export default async function CommissionsRoute() {
     );
   }
 
-  const commissionsResult = await getSalesCommissionAccrualsDashboardResult();
+  const commissionsResult = await getSalesCommissionAccrualsDashboardResult(COMMISSIONS_LIMIT);
 
   if (!commissionsResult.ok) {
     return (
@@ -37,10 +38,12 @@ export default async function CommissionsRoute() {
     );
   }
 
+  // Zero rows still renders the page: the list shows its own in-frame empty state.
   return (
     <CommissionListPage
       canManage={permissionResult.permissions.includes("commissions.manage")}
       entries={commissionsResult.data}
+      limit={COMMISSIONS_LIMIT}
     />
   );
 }
