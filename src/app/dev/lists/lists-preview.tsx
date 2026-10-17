@@ -14,12 +14,16 @@ import { SessionListPage } from "@/features/sessions/session-list-page";
 import { DATABASE_PERMISSION_CODES, type PermissionCode } from "@/lib/permissions/types";
 import type { StudentLifecycleStatus } from "@/types/domain";
 
+import { advancePreviewPeople } from "./advance-fixtures";
+import { AdvancesPreviewBody } from "./advances-preview";
+import { CommissionsPreviewBody } from "./commissions-preview";
 import { creditEntries, ownCreditEntries } from "./credit-fixtures";
 import { cappedResultItems, resultItems } from "./result-fixtures";
 import { cappedPreviewSessionQueue, previewSessionQueue, previewSessions, sessionPreviewNowTime, sessionPreviewToday } from "./session-fixtures";
+import { StaffPreviewBody } from "./staff-preview";
 
-export type ListsPreviewView = "students" | "classes" | "sessions" | "results" | "credits";
-export type ListsPreviewRole = "owner" | "ta";
+export type ListsPreviewView = "students" | "classes" | "sessions" | "results" | "credits" | "advances" | "staff" | "commissions";
+export type ListsPreviewRole = "owner" | "ta" | "accountant";
 export type ListsPreviewState = "normal" | "capped" | "empty";
 
 const classNames = [
@@ -154,31 +158,54 @@ const classes: ClassDirectoryItem[] = classRows.map(([name, code, grade, level, 
 }));
 
 const previewPathnames: Record<ListsPreviewView, string> = {
+  advances: "/advances",
   classes: "/classes",
+  commissions: "/commissions",
   credits: "/grading-credits",
   results: "/learning-results",
   sessions: "/sessions",
+  staff: "/staff",
   students: "/students",
 };
 
-// A teaching assistant: own credits only, no student or class pages.
+// A teaching assistant: own credits only, no student or class pages. Like every
+// role in the migrations it may request and view its own salary advances and
+// view its own payroll (the advances preview's TA flags assume the same).
 const taPermissions: PermissionCode[] = [
+  "advances.request",
+  "advances.view",
   "attendance.mark",
   "attendance.view",
   "grading_credits.view",
+  "payroll.view",
   "results.manage",
   "results.view",
   "sessions.view",
 ];
 
+// The accountant (step 14b, design 16c): reviews salary advances, sees payroll, no sessions.
+const accountantPermissions: PermissionCode[] = ["advances.request", "advances.review", "advances.view", "payroll.view"];
+
 function previewPermissions(role: ListsPreviewRole): PermissionCode[] {
-  return role === "ta" ? taPermissions : DATABASE_PERMISSION_CODES.filter((code) => code !== "student_care.view");
+  if (role === "ta") return taPermissions;
+  if (role === "accountant") return accountantPermissions;
+  return DATABASE_PERMISSION_CODES.filter((code) => code !== "student_care.view");
 }
+
+// Shell users; the advances view uses the same people so "Đơn của bạn" is the signed-in user's row.
+const previewShellUsers: Record<ListsPreviewRole, { displayName: string; email: string; id: string; initials: string }> = {
+  accountant: { displayName: advancePreviewPeople.accountant.name, email: "hang@example.com", id: advancePreviewPeople.accountant.id, initials: "LH" },
+  owner: { displayName: "Phạm Thu Hạnh", email: "hanh@example.com", id: "dev-user", initials: "PH" },
+  ta: { displayName: "Trần Thu Hà", email: "ha@example.com", id: "grader-1", initials: "TH" },
+};
 
 export function ListsPreview({ role, state, view }: { role: ListsPreviewRole; state: ListsPreviewState; view: ListsPreviewView }) {
   const permissions = previewPermissions(role);
   const can = (code: PermissionCode) => permissions.includes(code);
-  const credits = state === "empty" ? [] : role === "ta" ? ownCreditEntries : creditEntries;
+  // Only the owner holds grading_credits.view_all; every other role gets the own-scope list
+  // (the accountant holds no grading_credits.view at all, so the real route denies it; the
+  // preview still shows the own-scope layout with the TA's fixture rows, never everyone's).
+  const credits = state === "empty" ? [] : role === "owner" ? creditEntries : ownCreditEntries;
   // "capped": a full queue page (partial), so the newest completed session has no queue facts.
   const sessionQueue = state === "capped" ? cappedPreviewSessionQueue : previewSessionQueue;
   // "capped": the items fill the limit, so the panel says "N+" like the route at a full page;
@@ -189,7 +216,11 @@ export function ListsPreview({ role, state, view }: { role: ListsPreviewRole; st
 
   return (
     <AppShell
-      authUser={role === "ta" ? { displayName: "Trần Thu Hà", email: "ha@example.com", id: "grader-1", initials: "TH" } : { displayName: "Phạm Thu Hạnh", email: "hanh@example.com", id: "dev-user", initials: "PH" }}
+      authUser={
+        view === "advances" && role === "owner"
+          ? { displayName: advancePreviewPeople.owner.name, email: "vinh@example.com", id: advancePreviewPeople.owner.id, initials: "NV" }
+          : previewShellUsers[role]
+      }
       centerDisplayName="Toán Thầy Vinh"
       permissions={permissions}
       previewPathname={previewPathnames[view]}
@@ -234,6 +265,12 @@ export function ListsPreview({ role, state, view }: { role: ListsPreviewRole; st
           canViewStudents={can("students.view")}
           items={state === "empty" ? [] : state === "capped" ? cappedResultItems : resultItems}
         />
+      ) : view === "advances" ? (
+        <AdvancesPreviewBody role={role} state={state} />
+      ) : view === "staff" ? (
+        <StaffPreviewBody role={role} state={state} />
+      ) : view === "commissions" ? (
+        <CommissionsPreviewBody role={role} state={state} />
       ) : view === "credits" ? (
         <GradingCreditListPage
           canViewAll={can("grading_credits.view_all")}
