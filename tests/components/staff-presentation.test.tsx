@@ -66,7 +66,7 @@ describe("Staff 1 presentation", () => {
     expect(table.closest(".staff-directory-work-area")).not.toBeNull();
     expect(list.closest(".staff-directory-work-area")).not.toBeNull();
     expect(globals).toMatch(/\.staff-directory-work-area,[\s\S]*container-type: inline-size/);
-    expect(globals).toMatch(/@container \(min-width: 1120px\)[\s\S]*\.staff-directory-table/);
+    expect(globals).toMatch(/@container \(min-width: 1042px\)[\s\S]*\.staff-directory-table/);
     view.unmount();
 
     render(<StaffDetailPage canManageProfile={false} canManageRateVersions={false} canViewRateVersions canViewRoles detail={detail} />);
@@ -144,5 +144,180 @@ describe("Staff 1 presentation", () => {
     fireEvent.keyDown(dialog, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(trigger).toHaveFocus();
+  });
+});
+
+describe("Staff directory list (design 16a)", () => {
+  const directory = [
+    activeMember,
+    { ...activeMember, displayName: "Trần Bình", email: "binh@example.com", employmentStatus: "inactive" as const, id: "staff-2", leftAt: "2026-09-30" },
+    { ...activeMember, displayName: "Lê Chi", email: "chi@example.com", employmentStatus: "suspended" as const, id: "staff-3" },
+  ];
+
+  function chips() {
+    return screen.getByRole("group", { name: "Lọc nhanh nhân sự" });
+  }
+
+  it("shows the header facts, the accounts link and the design columns without the never-written last login", () => {
+    render(<StaffDirectoryPage canManageRoles={false} canOpenAccounts canViewRoles members={directory} roleOptions={[]} />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Nhân sự" })).toBeInTheDocument();
+    expect(screen.getByText("3 nhân sự · 1 đang làm việc")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tài khoản và lời mời" })).toHaveAttribute("href", "/settings/users");
+
+    const table = screen.getByRole("table", { name: "Danh sách nhân sự" });
+    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["Nhân sự", "Vai trò", "Trạng thái", "Vào làm", "SĐT", "Thao tác"]);
+    expect(screen.queryByText(/Đăng nhập gần nhất|Chưa ghi nhận/)).not.toBeInTheDocument();
+    expect(table.className).toContain("min-w-[1040px]");
+    expect(within(table).getByRole("link", { name: "Mở hồ sơ nhân sự Nguyễn Minh An" })).toHaveAttribute("href", "/staff/staff-1");
+    expect(screen.getAllByRole("link", { name: "Mở hồ sơ nhân sự Nguyễn Minh An" })).toHaveLength(2);
+    expect(within(table).getByText("NS-001 · an@example.com")).toBeInTheDocument();
+    expect(within(table).getAllByText("Giáo viên")[0]).toHaveAttribute("title", "Mã vai trò: teacher");
+    expect(within(table).getByText("nghỉ từ 30/09/2026")).toBeInTheDocument();
+    expect(within(table).getAllByText("01/08/2025")).toHaveLength(3);
+    expect(within(table).getByText("Đang làm việc").className).toContain("rounded-sm");
+    // One page: the frame summary only, no pager buttons.
+    expect(screen.getByText("1–3 trong 3 nhân sự")).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: /Phân trang nhân sự/ })).not.toBeInTheDocument();
+  });
+
+  // Value: protects=the "Tài khoản và lời mời" link only shows to viewers who can open /settings/users (its settings layout also requires settings.view), in both header layouts; fails_when=the link renders without canOpenAccounts, or the prop stops defaulting to false; why_new=the link was unconditional and dead-ended staff.view-only viewers on a permission-denied screen; seam=none (prop); no_claim=the route's permission read (staff-route.test.tsx)
+  it("shows the accounts link only when the viewer can open settings", () => {
+    const view = render(<StaffDirectoryPage canManageRoles={false} canViewRoles members={directory} roleOptions={[]} />);
+    expect(screen.getByRole("heading", { level: 1, name: "Nhân sự" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Tài khoản và lời mời" })).not.toBeInTheDocument();
+    view.unmount();
+
+    const embedded = render(<StaffDirectoryPage canManageRoles={false} canViewRoles headingLevel={2} members={directory} roleOptions={[]} />);
+    expect(screen.getByRole("heading", { level: 2, name: "Nhân sự" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Tài khoản và lời mời" })).not.toBeInTheDocument();
+    embedded.unmount();
+
+    render(<StaffDirectoryPage canManageRoles={false} canOpenAccounts canViewRoles headingLevel={2} members={directory} roleOptions={[]} />);
+    expect(screen.getByRole("link", { name: "Tài khoản và lời mời" })).toHaveAttribute("href", "/settings/users");
+  });
+
+  it("filters by accent-insensitive search and status chips, keeps zero chips hidden and empties inside the frame", () => {
+    render(<StaffDirectoryPage canManageRoles={false} canViewRoles members={directory} roleOptions={[]} />);
+
+    expect(within(chips()).getByRole("button", { name: /^Tất cả\s?3$/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(chips()).getByRole("button", { name: /^Đang làm việc\s?1$/ })).toBeInTheDocument();
+    expect(within(chips()).getByRole("button", { name: /^Tạm khóa\s?1$/ })).toBeInTheDocument();
+    expect(within(chips()).getByRole("button", { name: /^Đã nghỉ\s?1$/ })).toBeInTheDocument();
+    expect(within(chips()).queryByRole("button", { name: /Chưa xác định/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Xóa lọc/ })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Tìm nhân sự" }), { target: { value: "TRAN binh" } });
+    const table = screen.getByRole("table", { name: "Danh sách nhân sự" });
+    expect(within(table).getAllByRole("row")).toHaveLength(2);
+    expect(within(table).getByText("Trần Bình")).toBeInTheDocument();
+    expect(within(chips()).getByRole("button", { name: /^Tất cả\s?1$/ })).toBeInTheDocument();
+    expect(within(chips()).queryByRole("button", { name: /^Đang làm việc/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Xóa lọc (1)" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Tìm nhân sự" }), { target: { value: "" } });
+    fireEvent.click(within(chips()).getByRole("button", { name: /^Tạm khóa/ }));
+    expect(within(chips()).getByRole("button", { name: /^Tạm khóa/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(table).getAllByRole("row")).toHaveLength(2);
+    expect(within(table).getByText("Lê Chi")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Tìm nhân sự" }), { target: { value: "không ai" } });
+    expect(within(table).getAllByRole("row")).toHaveLength(1);
+    expect(screen.getAllByText("Không có nhân sự khớp bộ lọc")).toHaveLength(2);
+    // The active chip stays visible at zero so it can be switched off.
+    expect(within(chips()).getByRole("button", { name: /^Tạm khóa\s?0$/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("list", { name: "Danh sách nhân sự" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Xóa lọc (2)" }));
+    expect(within(table).getAllByRole("row")).toHaveLength(4);
+    expect(screen.getByRole("searchbox", { name: "Tìm nhân sự" })).toHaveValue("");
+  });
+
+  it("offers the role filter only with roles view, from role options and members' roles", () => {
+    const view = render(<StaffDirectoryPage canManageRoles={false} canViewRoles members={directory} roleOptions={[{ code: "manager", description: null, id: "role-2", isSystem: false, name: "Quản lý" }]} />);
+
+    const roleSelect = screen.getByLabelText("Vai trò");
+    expect(within(roleSelect).getAllByRole("option").map((entry) => entry.textContent)).toEqual(["Tất cả vai trò", "Giáo viên", "Quản lý"]);
+    fireEvent.change(roleSelect, { target: { value: "manager" } });
+    const table = screen.getByRole("table", { name: "Danh sách nhân sự" });
+    expect(within(table).getAllByRole("row")).toHaveLength(1);
+    fireEvent.change(roleSelect, { target: { value: "teacher" } });
+    expect(within(table).getAllByRole("row")).toHaveLength(4);
+    view.unmount();
+
+    render(<StaffDirectoryPage canManageRoles={false} canViewRoles={false} members={directory.map((entry) => ({ ...entry, roles: null }))} roleOptions={[]} />);
+    expect(screen.queryByLabelText("Vai trò")).not.toBeInTheDocument();
+    expect(screen.getByText("3 nhân sự · 1 đang làm việc · vai trò ẩn theo quyền hiện tại")).toBeInTheDocument();
+    expect(screen.getAllByText("Ẩn theo phân quyền")).toHaveLength(6);
+  });
+
+  it("pages 20 members at a time in both layouts", () => {
+    const many = Array.from({ length: 25 }, (_, index) => ({ ...activeMember, displayName: `Nhân sự ${String(index + 1).padStart(2, "0")}`, id: `staff-${index + 1}` }));
+    render(<StaffDirectoryPage canManageRoles={false} canViewRoles members={many} roleOptions={[]} />);
+
+    const table = screen.getByRole("table", { name: "Danh sách nhân sự" });
+    expect(within(table).getAllByRole("row")).toHaveLength(21);
+    expect(screen.getAllByText("1–20 trong 25 nhân sự")).toHaveLength(2);
+    expect(screen.getByRole("navigation", { name: "Phân trang nhân sự (danh sách gọn)" })).toBeInTheDocument();
+
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Phân trang nhân sự" })).getByRole("button", { name: "Sau" }));
+    expect(within(table).getAllByRole("row")).toHaveLength(6);
+    expect(within(table).getAllByRole("row")[1]).toHaveTextContent("Nhân sự 21");
+    expect(screen.getAllByText("21–25 trong 25 nhân sự")).toHaveLength(2);
+  });
+
+  // Value: protects=a filter change from page 2 sends the staff list back to page 1, and a role filter whose role the refreshed data no longer offers falls back to every member instead of an empty list; fails_when=updateFilters stops resetting the page, or the page filters with the raw requested role instead of resolveStaffDirectoryFilters' result; why_new=paging and the role fallback were only unit-tested, never through the page; seam=none (rerender with new props stands in for router.refresh); no_claim=the role server actions or the loader's active-role list
+  it("returns to page 1 on a filter change and drops a role the refreshed data no longer offers", () => {
+    const many = Array.from({ length: 25 }, (_, index) => ({ ...activeMember, displayName: `Nhân sự ${String(index + 1).padStart(2, "0")}`, id: `staff-${index + 1}` }));
+    const manager = { code: "manager", description: null, id: "role-2", isSystem: false, name: "Quản lý" };
+    const { rerender } = render(<StaffDirectoryPage canManageRoles={false} canViewRoles members={many} roleOptions={[manager]} />);
+    const table = screen.getByRole("table", { name: "Danh sách nhân sự" });
+
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Phân trang nhân sự" })).getByRole("button", { name: "Sau" }));
+    expect(screen.getAllByText("21–25 trong 25 nhân sự")).toHaveLength(2);
+    // Every member still matches, but a new search starts at the top.
+    fireEvent.change(screen.getByRole("searchbox", { name: "Tìm nhân sự" }), { target: { value: "nhan su" } });
+    expect(screen.getAllByText("1–20 trong 25 nhân sự")).toHaveLength(2);
+    expect(within(table).getAllByRole("row")[1]).toHaveTextContent("Nhân sự 01");
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Tìm nhân sự" }), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Vai trò"), { target: { value: "manager" } });
+    expect(within(table).getAllByRole("row")).toHaveLength(1);
+
+    // The "Quản lý" role was deactivated and nobody holds it: the refreshed data no longer offers it.
+    rerender(<StaffDirectoryPage canManageRoles={false} canViewRoles members={many} roleOptions={[]} />);
+    expect(screen.getByLabelText("Vai trò")).toHaveValue("all");
+    expect(within(table).getAllByRole("row")).toHaveLength(21);
+    expect(screen.queryByText("Không có nhân sự khớp bộ lọc")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Xóa lọc/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps role management mounted inline for every member in both layouts for managers", () => {
+    render(<StaffDirectoryPage canManageRoles canViewRoles members={directory} roleOptions={[]} />);
+
+    // One active member x (table + card); the others get the component's own active-only notice.
+    expect(screen.getAllByRole("heading", { name: "Quản lý vai trò" })).toHaveLength(2);
+    expect(screen.getAllByText("Chỉ có thể cấp vai trò cho nhân sự đang hoạt động.")).toHaveLength(4);
+    expect(within(screen.getByRole("table", { name: "Danh sách nhân sự" })).getByRole("heading", { name: "Quản lý vai trò" })).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Danh sách nhân sự" })).getByRole("heading", { name: "Quản lý vai trò" })).toBeInTheDocument();
+  });
+
+  it("names missing profile facts instead of leaving cells blank", () => {
+    render(<StaffDirectoryPage canManageRoles={false} canViewRoles members={[{ ...activeMember, employeeCode: null, joinedAt: null, phone: null, roles: [] }]} roleOptions={[]} />);
+
+    expect(screen.getAllByText("Chưa có mã nhân sự · an@example.com")).toHaveLength(2);
+    expect(screen.getAllByText("Chưa cập nhật")).toHaveLength(2);
+    expect(screen.getAllByText("Chưa có số điện thoại")).toHaveLength(2);
+    expect(screen.getAllByText("Chưa được cấp vai trò")).toHaveLength(2);
+  });
+
+  it("renders the in-frame empty state when no member is loaded", () => {
+    render(<StaffDirectoryPage canManageRoles canViewRoles members={[]} roleOptions={[]} />);
+
+    expect(within(screen.getByRole("table", { name: "Danh sách nhân sự" })).getAllByRole("row")).toHaveLength(1);
+    expect(screen.getAllByText("Chưa có hồ sơ nhân sự")).toHaveLength(2);
+    expect(screen.getByText("0 nhân sự · 0 đang làm việc")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Tìm nhân sự" })).toBeDisabled();
+    expect(screen.queryByRole("list", { name: "Danh sách nhân sự" })).not.toBeInTheDocument();
   });
 });

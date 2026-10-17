@@ -25,12 +25,31 @@ import type {
   StaffRoleSummary,
 } from "@/features/staff/types";
 
+/**
+ * Optional replacements for the two role server actions. The real pages pass
+ * nothing (the real actions run); the /dev/lists preview passes inert stubs
+ * because it runs on localhost where .env.local may point at production.
+ */
+export interface StaffRoleActionOverrides {
+  assign?: typeof assignStaffRoleAction;
+  revoke?: typeof revokeStaffRoleAction;
+}
+
 interface StaffRoleManagementProps {
+  actions?: StaffRoleActionOverrides;
+  /**
+   * Table rows (design 16a): the heading stays for assistive tech but is
+   * visually hidden and the closed toggle is a 32px line, so a row does not
+   * grow by a whole panel. Cards keep the full 44px version.
+   */
+  compact?: boolean;
   member: StaffDirectoryMember;
   roleOptions: readonly StaffRoleOption[];
 }
 
 export function StaffRoleManagement({
+  actions,
+  compact = false,
   member,
   roleOptions,
 }: StaffRoleManagementProps) {
@@ -67,15 +86,15 @@ export function StaffRoleManagement({
   );
 
   return (
-    <section aria-busy={Boolean(pendingActionId) || undefined} aria-labelledby={headingId} className="mt-3 grid gap-2">
-      <h3 className="text-label text-text-muted" id={headingId}>
+    <section aria-busy={Boolean(pendingActionId) || undefined} aria-labelledby={headingId} className={compact ? "mt-1.5 grid gap-2" : "mt-3 grid gap-2"}>
+      <h3 className={compact ? "sr-only" : "text-label text-text-muted"} id={headingId}>
         Quản lý vai trò
       </h3>
 
       <details className="rounded-lg border border-border-subtle bg-surface-base">
         <summary
           aria-disabled={pendingActionId ? true : undefined}
-          className="flex min-h-11 cursor-pointer select-none items-center px-3 py-2 text-control font-semibold text-action-link focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+          className={`flex cursor-pointer select-none items-center font-semibold text-action-link focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus-ring ${compact ? "min-h-8 px-2.5 py-1 text-secondary" : "min-h-11 px-3 py-2 text-control"}`}
           onClick={(event) => {
             if (pendingActionId) {
               event.preventDefault();
@@ -87,6 +106,7 @@ export function StaffRoleManagement({
 
         <div className="grid gap-4 border-t border-border-subtle p-3">
           <AssignRoleForm
+            action={actions?.assign ?? assignStaffRoleAction}
             availableRoles={availableRoles}
             member={member}
             onPendingChange={onPendingChange}
@@ -100,6 +120,7 @@ export function StaffRoleManagement({
 
               {member.roles.map((role) => (
                 <RevokeRoleForm
+                  action={actions?.revoke ?? revokeStaffRoleAction}
                   key={role.assignmentId}
                   onPendingChange={onPendingChange}
                   role={role}
@@ -114,10 +135,12 @@ export function StaffRoleManagement({
 }
 
 function AssignRoleForm({
+  action,
   availableRoles,
   member,
   onPendingChange,
 }: {
+  action: typeof assignStaffRoleAction;
   availableRoles: readonly StaffRoleOption[];
   member: StaffDirectoryMember;
   onPendingChange: (actionId: string, pending: boolean) => void;
@@ -129,7 +152,7 @@ function AssignRoleForm({
   const reasonErrorId = useId();
 
   const [state, formAction, pending] = useActionState(
-    assignStaffRoleAction,
+    action,
     initialStaffRoleActionState,
   );
 
@@ -227,9 +250,11 @@ function AssignRoleForm({
 }
 
 function RevokeRoleForm({
+  action,
   onPendingChange,
   role,
 }: {
+  action: typeof revokeStaffRoleAction;
   onPendingChange: (actionId: string, pending: boolean) => void;
   role: StaffRoleSummary;
 }) {
@@ -238,7 +263,7 @@ function RevokeRoleForm({
   const reasonErrorId = useId();
 
   const [state, formAction, pending] = useActionState(
-    revokeStaffRoleAction,
+    action,
     initialStaffRoleActionState,
   );
 
@@ -258,7 +283,7 @@ function RevokeRoleForm({
     <details className="rounded-md border border-border-subtle bg-surface-base">
       <summary
         aria-disabled={pending || undefined}
-        className="flex min-h-11 cursor-pointer select-none items-center px-3 py-2 text-control font-semibold text-danger focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring"
+        className="flex min-h-11 cursor-pointer select-none items-center px-3 py-2 text-control font-semibold text-danger focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus-ring"
         onClick={(event) => {
           if (pending) {
             event.preventDefault();

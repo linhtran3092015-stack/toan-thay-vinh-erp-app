@@ -134,6 +134,35 @@ describe("Staff route authority", () => {
     expect(screen.getAllByRole("heading", { name: "Quản lý vai trò" })).not.toHaveLength(0);
   });
 
+  it("renders the client directory with the role filter only for role viewers and role management in both layouts for managers", async () => {
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({ ok: true, permissions: ["staff.view", "settings.view"] });
+    dependencies.getStaffDirectory.mockResolvedValueOnce({ members: [{ ...directoryMember, roles: null }], ok: true, roleOptions: null });
+
+    const viewer = render(await StaffRoute());
+
+    expect(dependencies.getStaffDirectory).toHaveBeenCalledWith({ includeRoles: false });
+    expect(screen.getByRole("table", { name: "Danh sách nhân sự" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tài khoản và lời mời" })).toHaveAttribute("href", "/settings/users");
+    expect(screen.getByRole("searchbox", { name: "Tìm nhân sự" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Vai trò")).not.toBeInTheDocument();
+    viewer.unmount();
+
+    dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
+      ok: true,
+      permissions: ["staff.view", "staff.roles.view", "staff.roles.manage"],
+    });
+    dependencies.getStaffDirectory.mockResolvedValueOnce({ members: [directoryMember], ok: true, roleOptions });
+
+    render(await StaffRoute());
+
+    expect(screen.getByLabelText("Vai trò")).toBeInTheDocument();
+    // No settings.view: /settings/users would deny, so the header link is hidden.
+    expect(screen.queryByRole("link", { name: "Tài khoản và lời mời" })).not.toBeInTheDocument();
+    // The table row and the card both keep the inline role management mounted.
+    expect(screen.getAllByRole("heading", { name: "Quản lý vai trò" })).toHaveLength(2);
+    expect(screen.getAllByText("Mở quản lý vai trò")).toHaveLength(2);
+  });
+
   it("allows a staff member to view their own rate history without granting rate mutation", async () => {
     dependencies.getCachedDatabasePermissions.mockResolvedValueOnce({
       ok: true,

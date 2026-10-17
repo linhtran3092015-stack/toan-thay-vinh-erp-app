@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StaffRoleManagement } from "@/features/staff/components/staff-role-management";
@@ -71,6 +71,19 @@ function deferred<T>() {
 }
 
 describe("Staff role management", () => {
+  it("keeps the heading for assistive tech and the same workflows in the compact table-row mode", () => {
+    render(<StaffRoleManagement compact member={member} roleOptions={roleOptions} />);
+
+    // The heading is visually hidden but still names the section.
+    const heading = screen.getByRole("heading", { name: "Quản lý vai trò" });
+    expect(heading).toHaveClass("sr-only");
+    expect(screen.getByRole("region", { name: "Quản lý vai trò" })).toBeInTheDocument();
+
+    openManagement();
+    expect(screen.getByLabelText(/Vai trò cần cấp/)).toBeInTheDocument();
+    expect(screen.getByText("Thu hồi: Giáo viên")).toBeInTheDocument();
+  });
+
   it("keeps the existing available-role choice and exposes only the inline role workflows", () => {
     renderManagement();
     openManagement();
@@ -191,5 +204,30 @@ describe("Staff role management", () => {
 
     pending.resolve({ message: "Đã thu hồi vai trò thành công.", status: "success" });
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Đã thu hồi vai trò thành công."));
+  });
+
+  it("runs injected actions instead of the real role actions when the preview passes them", async () => {
+    const injected = {
+      assign: vi.fn(async () => ({ message: "Bản xem trước không ghi dữ liệu.", status: "error" as const })),
+      revoke: vi.fn(async () => ({ message: "Bản xem trước không ghi dữ liệu.", status: "error" as const })),
+    };
+    render(<StaffRoleManagement actions={injected} member={member} roleOptions={roleOptions} />);
+    openManagement();
+
+    fireEvent.change(screen.getByLabelText(/Vai trò cần cấp/), { target: { value: "manager" } });
+    fireEvent.change(screen.getByLabelText(/Lý do cấp vai trò/), { target: { value: "Phân công quản lý ca học" } });
+    // Awaited act: a second async form action in one test otherwise stays pending under the sync act of fireEvent.
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Cấp vai trò" })));
+    await waitFor(() => expect(injected.assign).toHaveBeenCalledOnce());
+    expect((injected.assign.mock.calls[0] as unknown[])[1]).toBeInstanceOf(FormData);
+
+    fireEvent.click(screen.getByText("Thu hồi: Giáo viên"));
+    fireEvent.change(screen.getByLabelText(/Lý do thu hồi/), { target: { value: "Điều chỉnh phân công" } });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Xác nhận thu hồi Giáo viên" })));
+    await waitFor(() => expect(injected.revoke).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getAllByRole("alert")).toHaveLength(2));
+
+    expect(actions.assignStaffRoleAction).not.toHaveBeenCalled();
+    expect(actions.revokeStaffRoleAction).not.toHaveBeenCalled();
   });
 });
