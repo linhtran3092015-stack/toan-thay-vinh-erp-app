@@ -1,263 +1,361 @@
 "use client";
 
+import { Bell, CalendarClock, HandCoins, HeartHandshake, PhoneCall, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useId, useState, type MouseEvent, type ReactNode } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { TableState } from "@/components/patterns/data-table-frame";
+import { PageHeader } from "@/components/patterns/page-header";
+import { QuickFilterChips } from "@/components/patterns/quick-filter-chips";
+import { ResultBanner } from "@/components/shared/result-banner";
+import { Button, getButtonClassName } from "@/components/ui/button";
+import { IconTile } from "@/components/ui/icon-tile";
 import {
   markAllNotificationsReadAction,
   markNotificationReadAction,
 } from "@/features/notifications/actions/notification-actions";
-import type {
-  NotificationActionResult,
-  NotificationEntry,
-} from "@/features/notifications/read-models";
+import { useNotificationListState } from "@/features/notifications/components/use-notification-list-state";
+import type { NotificationActionOverrides } from "@/features/notifications/notification-action-overrides";
+import {
+  NOTIFICATIONS_PATH,
+  buildNotificationChips,
+  describeNotificationChipScope,
+  describeNotificationContext,
+  getNotificationEventLabel,
+  getNotificationEventTone,
+  getNotificationFamily,
+  getNotificationPageHref,
+  isNotificationUnread,
+  type NotificationFamily,
+} from "@/features/notifications/notification-models";
+import type { NotificationEntry } from "@/features/notifications/read-models";
+import { formatDateTime, formatShortDateTime, getVietnamToday } from "@/lib/datetime";
+import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-interface NotificationListPageProps {
+export interface NotificationListPageProps {
+  /** Server-action overrides for the /dev preview; the real page passes nothing. */
+  actions?: NotificationActionOverrides;
+  /** The pager's path ("/notifications"; the /dev preview passes "/dev/lists"). */
+  basePath?: string;
   entries: readonly NotificationEntry[];
+  /** The loaded page is full, so an older page may exist (there is no total). */
+  hasNextPage?: boolean;
+  /** 1-based page number of `entries`. */
+  page?: number;
+  /** Query params kept on the pager links (the preview's `view/role/state`). */
+  preservedParams?: Readonly<Record<string, string>>;
+  /** Vietnam business date `YYYY-MM-DD` from the server, so SSR and client agree on short dates. */
+  today?: string;
+  /** Exact unread total of the account over all pages (the topbar bell's read). */
   unreadCount: number;
 }
 
-type NotificationTone =
-  | "danger"
-  | "info"
-  | "neutral"
-  | "success"
-  | "warning";
+const NO_PARAMS: Readonly<Record<string, string>> = {};
+const LIST_LABEL = "Danh sách thông báo";
 
-const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Asia/Ho_Chi_Minh",
-});
+/** One lucide icon per event family (first code segment); unknown families get the bell. */
+const FAMILY_ICONS: Record<NotificationFamily, ReactNode> = {
+  crm: <PhoneCall />,
+  ops: <TriangleAlert />,
+  other: <Bell />,
+  salary_advance: <HandCoins />,
+  session: <CalendarClock />,
+  student_care: <HeartHandshake />,
+};
 
-function formatDateTime(value: string): string {
-  const date = new Date(value);
+const FOCUS_OUTLINE = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus";
+/** Inside the frame's `overflow-hidden`: the ring is drawn inward. */
+const INSET_FOCUS_OUTLINE = "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus";
+const EMPTY_TITLE = cn("rounded-sm text-body font-semibold text-text-strong", FOCUS_OUTLINE);
+/** 32px desktop pager links, 44px touch; the colour is important over the global `a { color: inherit }`. */
+const PAGER_LINK = getButtonClassName({ className: "text-text-strong! max-md:h-11", size: "sm", variant: "secondary" });
 
-  if (Number.isNaN(date.getTime())) {
-    return "Không xác định";
-  }
-
-  return dateTimeFormatter.format(date);
-}
-
-function getEventLabel(eventCode: string): string {
-  const eventName = eventCode.split(".").pop();
-
-  const labels: Record<string, string> = {
-    initialized: "Danh sách chăm sóc đã sẵn sàng",
-    detected: "Học viên cần hỗ trợ",
-    overdue: "Chăm sóc quá hạn",
-    escalated: "Cần điều phối",
-    assigned: "Đã phân công",
-    monthly_due: "Coaching đến hạn",
-    approved: "Đã duyệt",
-    rejected: "Từ chối",
-    requested: "Yêu cầu mới",
-    review: "Chờ duyệt",
-  };
-
-  if (!eventName) {
-    return eventCode;
-  }
-
-  return Object.hasOwn(labels, eventName)
-    ? labels[eventName]
-    : `Sự kiện chưa hỗ trợ: ${eventName}`;
-}
-
-function getEventTone(eventCode: string): NotificationTone {
-  if (eventCode === "student_care.escalated") return "danger";
-  if (eventCode === "student_care.overdue" || eventCode === "student_care.detected") return "warning";
-  if (eventCode.endsWith(".approved")) {
-    return "success";
-  }
-
-  if (eventCode.endsWith(".rejected")) {
-    return "danger";
-  }
-
-  if (eventCode.endsWith(".review")) {
-    return "warning";
-  }
-
-  if (eventCode.endsWith(".requested")) {
-    return "info";
-  }
-
-  return "neutral";
-}
-
+/**
+ * Notifications (design 16a "Thông báo"): header with the exact unread total
+ * and the page's only primary ("Đánh dấu tất cả đã đọc", which marks every
+ * unread notification of the account), local chips over the loaded page, one
+ * framed strip list (icon tile by event family, title, event label, message,
+ * time, unread dot) and the newer/older pager in the frame footer.
+ *
+ * Opening an unread row marks it read, then navigates: a plain click waits for
+ * the existing mark-read action and pushes the link whatever the result (a
+ * failure only leaves the row unread next time); a modified or middle click
+ * lets the browser open its tab and marks read in the background. Read rows
+ * are plain links. Rows without a link get a "Đánh dấu đã đọc" button whose
+ * result stays on the row; "Đánh dấu tất cả đã đọc" reports under the header.
+ * Nothing runs an action while rendering, and `router.push` is only touched
+ * inside click handlers. The races, results and focus rules (stale opens,
+ * page changes, one alert, when a result may move focus) live in
+ * `useNotificationListState`.
+ */
 export function NotificationListPage({
+  actions,
+  basePath = NOTIFICATIONS_PATH,
   entries,
+  hasNextPage = false,
+  page = 1,
+  preservedParams = NO_PARAMS,
+  today,
   unreadCount,
 }: NotificationListPageProps) {
   const router = useRouter();
-  const [feedback, setFeedback] =
-    useState<NotificationActionResult | null>(null);
-  const [pendingTarget, setPendingTarget] = useState<string | null>(
-    null,
-  );
-  const [isPending, startTransition] = useTransition();
+  const [fallbackToday] = useState(getVietnamToday);
+  const businessToday = today ?? fallbackToday;
+  const {
+    bannerRef,
+    chip,
+    counts,
+    emptyRef,
+    isMarkingAll,
+    listRef,
+    locallyRead,
+    markEverythingRead,
+    markRowRead,
+    notePagerClick,
+    openRow,
+    pagerRef,
+    pendingIds,
+    results: { banner, rowError },
+    rootRef,
+    setChip,
+    visible,
+  } = useNotificationListState({
+    entries,
+    markAll: actions?.markAllNotificationsRead ?? markAllNotificationsReadAction,
+    markOne: actions?.markNotificationRead ?? markNotificationReadAction,
+    onNavigate: (href) => router.push(href),
+    onRefresh: () => router.refresh(),
+    page,
+  });
 
-  function handleMarkOne(notificationId: string): void {
-    setFeedback(null);
-    setPendingTarget(notificationId);
-
-    startTransition(async () => {
-      const result =
-        await markNotificationReadAction(notificationId);
-
-      setFeedback(result);
-      setPendingTarget(null);
-
-      if (result.status === "success") {
-        router.refresh();
-      }
-    });
-  }
-
-  function handleMarkAll(): void {
-    setFeedback(null);
-    setPendingTarget("all");
-
-    startTransition(async () => {
-      const result = await markAllNotificationsReadAction();
-
-      setFeedback(result);
-      setPendingTarget(null);
-
-      if (result.status === "success") {
-        router.refresh();
-      }
-    });
-  }
+  const hasPager = page > 1 || hasNextPage;
 
   return (
-    <div className="space-y-5">
-      <header className="flex flex-col gap-4 rounded-xl border border-hairline bg-surface-1 p-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-2xl font-bold tracking-tight text-ink">
-              Thông báo
-            </h1>
-            <Badge tone={unreadCount > 0 ? "info" : "neutral"}>
-              {unreadCount} chưa đọc
-            </Badge>
-          </div>
-          <p className="mt-1 text-sm text-ink-muted">
-            Hiển thị tối đa 50 thông báo mới nhất của tài khoản.
-          </p>
-        </div>
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5" ref={rootRef}>
+      <PageHeader
+        actions={
+          <Button
+            className="max-md:h-11"
+            disabled={unreadCount === 0}
+            disabledReason="Không còn thông báo chưa đọc."
+            isLoading={isMarkingAll}
+            onClick={markEverythingRead}
+          >
+            Đánh dấu tất cả đã đọc
+          </Button>
+        }
+        title="Thông báo"
+      >
+        <p className="mt-1 text-secondary tabular-nums text-text-muted">{describeNotificationContext(unreadCount, page)}</p>
+      </PageHeader>
 
-        <Button
-          disabled={unreadCount === 0}
-          isLoading={isPending && pendingTarget === "all"}
-          onClick={handleMarkAll}
-          size="sm"
-          variant="outline"
-        >
-          Đánh dấu tất cả đã đọc
-        </Button>
-      </header>
-
-      {feedback ? (
-        <div
-          className={cn(
-            "rounded-lg border px-4 py-3 text-sm font-medium",
-            feedback.status === "success"
-              ? "border-success-border bg-success-bg text-success"
-              : "border-danger-border bg-danger-bg text-danger",
-          )}
-          role="status"
-        >
-          {feedback.message}
+      {banner ? (
+        <div className={cn("rounded-md", FOCUS_OUTLINE)} ref={bannerRef} tabIndex={-1}>
+          <ResultBanner title={banner.message} tone={banner.status === "success" ? "success" : "error"} />
         </div>
       ) : null}
 
-      <div className="space-y-3">
-        {entries.map((entry) => {
-          const isUnread = entry.readAt === null;
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
+        {entries.length > 0 ? (
+          <div className="grid gap-1.5">
+            <QuickFilterChips
+              chips={buildNotificationChips(counts)}
+              className="max-md:[&_button]:h-11"
+              label="Lọc nhanh thông báo"
+              onChange={setChip}
+              value={chip}
+            />
+            <p className="text-caption tabular-nums text-text-muted">{describeNotificationChipScope(entries.length)}</p>
+          </div>
+        ) : null}
 
-          return (
-            <Card
-              className={cn(
-                "overflow-hidden",
-                isUnread &&
-                  "border-primary/30 bg-primary-soft/25 shadow-sm",
+        <div className="overflow-hidden rounded-lg border border-border-subtle bg-surface-base shadow-[var(--panel-shadow)]">
+          {visible.length > 0 ? (
+            // Focusable (-1) as the fallback when the focused row leaves the "Chưa đọc" filter.
+            <ul aria-label={LIST_LABEL} className={cn("divide-y divide-border-row", INSET_FOCUS_OUTLINE)} ref={listRef} tabIndex={-1}>
+              {visible.map((entry) => {
+                const isUnread = isNotificationUnread(entry, locallyRead);
+                return (
+                  <NotificationRow
+                    entry={entry}
+                    // Never on a row that already reads as read (mark-all or a refresh got there).
+                    error={rowError?.id === entry.id && isUnread ? rowError.message : null}
+                    isPending={pendingIds.has(entry.id)}
+                    isUnread={isUnread}
+                    key={entry.id}
+                    onMarkRead={markRowRead}
+                    onOpen={openRow}
+                    today={businessToday}
+                  />
+                );
+              })}
+            </ul>
+          ) : (
+            <TableState>
+              {/* The empty message is the focus fallback when there is no list (tabIndex -1). */}
+              {entries.length > 0 ? (
+                <p className={EMPTY_TITLE} ref={emptyRef} tabIndex={-1}>
+                  Không có thông báo chưa đọc trên trang này.
+                </p>
+              ) : page > 1 ? (
+                <p className={EMPTY_TITLE} ref={emptyRef} tabIndex={-1}>
+                  Không còn thông báo cũ hơn.
+                </p>
+              ) : (
+                <>
+                  <p className={EMPTY_TITLE} ref={emptyRef} tabIndex={-1}>
+                    Không có thông báo
+                  </p>
+                  <p className="max-w-xl text-secondary text-text-muted">
+                    Các cập nhật cần chú ý trong quá trình vận hành sẽ xuất hiện tại đây.
+                  </p>
+                </>
               )}
-              key={entry.id}
+            </TableState>
+          )}
+
+          {hasPager ? (
+            <nav
+              aria-label="Phân trang thông báo"
+              className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-border-row px-4 py-2.5"
+              ref={pagerRef}
             >
-              <article className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
-                <div
-                  aria-hidden="true"
-                  className={cn(
-                    "mt-1 h-2.5 w-2.5 flex-none rounded-full",
-                    isUnread ? "bg-primary" : "bg-hairline-strong",
-                  )}
-                />
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2
-                      className={cn(
-                        "font-display text-base tracking-tight text-ink",
-                        isUnread ? "font-bold" : "font-semibold",
-                      )}
-                    >
-                      {entry.title}
-                    </h2>
-
-                    <Badge tone={getEventTone(entry.eventCode)}>
-                      {getEventLabel(entry.eventCode)}
-                    </Badge>
-
-                    {isUnread ? (
-                      <Badge tone="purple">Chưa đọc</Badge>
-                    ) : null}
-                  </div>
-
-                  <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                    {entry.message}
-                  </p>
-
-                  <p className="mt-3 text-xs font-medium text-ink-subtle">
-                    {formatDateTime(entry.createdAt)}
-                  </p>
-                </div>
-
-                <div className="flex flex-none flex-wrap items-center gap-2 sm:justify-end">
-                  {entry.href ? (
-                    <Link
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-hairline bg-surface-1 px-3 text-xs font-semibold text-ink transition-colors hover:border-hairline-strong hover:bg-surface-2"
-                      href={entry.href}
-                    >
-                      Xem chi tiết
-                    </Link>
-                  ) : null}
-
-                  {isUnread ? (
-                    <Button
-                      isLoading={
-                        isPending && pendingTarget === entry.id
-                      }
-                      onClick={() => handleMarkOne(entry.id)}
-                      size="sm"
-                      variant="ghost"
-                    >
-                      Đánh dấu đã đọc
-                    </Button>
-                  ) : null}
-                </div>
-              </article>
-            </Card>
-          );
-        })}
+              <span className="justify-self-start">
+                {page > 1 ? (
+                  <Link className={PAGER_LINK} href={getNotificationPageHref(basePath, preservedParams, page - 1)} onClick={notePagerClick}>
+                    Mới hơn
+                  </Link>
+                ) : null}
+              </span>
+              <span className="text-secondary tabular-nums text-text-muted">Trang {formatNumber(page)}</span>
+              <span className="justify-self-end">
+                {hasNextPage ? (
+                  <Link className={PAGER_LINK} href={getNotificationPageHref(basePath, preservedParams, page + 1)} onClick={notePagerClick}>
+                    Cũ hơn
+                  </Link>
+                ) : null}
+              </span>
+            </nav>
+          ) : null}
+        </div>
       </div>
     </div>
+  );
+}
+
+interface NotificationRowProps {
+  entry: NotificationEntry;
+  /** The row button's failure message (the page's one alert), shown under the button. */
+  error: string | null;
+  isPending: boolean;
+  isUnread: boolean;
+  onMarkRead: (entry: NotificationEntry) => void;
+  onOpen: (event: MouseEvent<HTMLAnchorElement>, entry: NotificationEntry, href: string) => void;
+  today: string;
+}
+
+/**
+ * One strip row (≥ 48px). With a link, the title is a `Link` stretched over
+ * the row (its accessible name is the title; the row draws the focus ring).
+ * The title row is a two-column grid: the title wraps in its column and the
+ * time + unread-dot slot (reserved on read rows) stay top-right, so times line
+ * up on every row and width. The event label is one caption element, never
+ * repeated in a badge. A row without a link can take focus (`tabIndex={-1}`)
+ * once its button marked it read.
+ */
+function NotificationRow({ entry, error, isPending, isUnread, onMarkRead, onOpen, today }: NotificationRowProps) {
+  const { href } = entry;
+  const id = useId();
+  const errorId = `${id}-error`;
+  const unreadId = `${id}-unread`;
+  // Unread rows (and a row still being marked) go through the click handler; read rows are plain links.
+  const handlesOpen = href !== null && (isUnread || isPending);
+
+  return (
+    <li
+      aria-busy={isPending || undefined}
+      className={cn(
+        "relative flex min-h-12 gap-3 px-4 py-3",
+        href !== null
+          ? "hover:bg-surface-hover has-[a:focus-visible]:outline-2 has-[a:focus-visible]:-outline-offset-2 has-[a:focus-visible]:outline-border-focus"
+          : "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus",
+      )}
+      data-notification-id={entry.id}
+      tabIndex={href === null ? -1 : undefined}
+    >
+      <IconTile className="mt-px" tone={getNotificationEventTone(entry.eventCode)}>
+        {FAMILY_ICONS[getNotificationFamily(entry.eventCode)]}
+      </IconTile>
+      <div className="min-w-0 flex-1">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3">
+          <p
+            className={cn(
+              "min-w-0 break-words text-body",
+              isUnread ? "font-semibold text-text-strong" : "font-medium text-text-default",
+            )}
+          >
+            {href !== null ? (
+              <Link
+                // Name = the title; while unread, "Chưa đọc" is its description for anyone tabbing through the links.
+                aria-describedby={isUnread ? unreadId : undefined}
+                className="outline-hidden after:absolute after:inset-0"
+                href={href}
+                onAuxClick={handlesOpen ? (event) => { if (event.button === 1) onOpen(event, entry, href); } : undefined}
+                onClick={handlesOpen ? (event) => onOpen(event, entry, href) : undefined}
+              >
+                {entry.title}
+              </Link>
+            ) : (
+              entry.title
+            )}
+          </p>
+          <span className="flex items-center gap-2">
+            {/*
+              Only the time sits above the stretched link, so its full-timestamp title can be hovered;
+              on touch it lets taps through, so tapping the time still opens the row.
+            */}
+            <time
+              className="relative z-10 text-caption tabular-nums text-text-muted pointer-coarse:pointer-events-none"
+              dateTime={entry.createdAt}
+              title={formatDateTime(entry.createdAt)}
+            >
+              {formatShortDateTime(entry.createdAt, today)}
+            </time>
+            {/* The dot's slot exists on read rows too, so every row's time ends at the same x. */}
+            <span
+              aria-hidden="true"
+              className={cn("h-2 w-2 shrink-0 rounded-full", isUnread ? "bg-action-primary" : "invisible")}
+            />
+            {isUnread ? (
+              <span className="sr-only" id={unreadId}>
+                Chưa đọc
+              </span>
+            ) : null}
+          </span>
+        </div>
+        <p className="text-caption text-text-muted">{getNotificationEventLabel(entry.eventCode)}</p>
+        <p className="mt-1 whitespace-pre-line break-words text-secondary text-text-muted">{entry.message}</p>
+        {href === null && isUnread ? (
+          <Button
+            aria-describedby={error ? errorId : undefined}
+            aria-label={`Đánh dấu đã đọc: ${entry.title}`}
+            className="-ml-3 mt-1 max-md:h-11"
+            isLoading={isPending}
+            onClick={() => onMarkRead(entry)}
+            size="sm"
+            variant="ghost"
+          >
+            Đánh dấu đã đọc
+          </Button>
+        ) : null}
+        {error ? (
+          <p className="mt-1 text-secondary text-danger" id={errorId} role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </li>
   );
 }

@@ -1,18 +1,21 @@
-import { EmptyState } from "@/components/shared/empty-state";
-import Link from "next/link";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
-import { NotificationListPage } from "@/features/notifications/notification-list-page";
 import {
   getCachedUnreadNotificationCountResult,
   getNotificationsResult,
 } from "@/features/notifications/data";
+import { NotificationListPage } from "@/features/notifications/notification-list-page";
+import {
+  NOTIFICATION_PAGE_SIZE,
+  NOTIFICATIONS_ACCESS,
+  parseNotificationPage,
+} from "@/features/notifications/notification-models";
+import { getVietnamToday } from "@/lib/datetime";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
-
 import { permissionDeniedDescription } from "@/lib/permissions/labels";
+
 export default async function NotificationsRoute({ searchParams }: { searchParams?: Promise<{page?: string}> }) {
-  const requestedPage = Number((await searchParams)?.page ?? 1);
-  const page = Number.isInteger(requestedPage) ? Math.max(1, Math.min(100000, requestedPage)) : 1;
+  const page = parseNotificationPage((await searchParams)?.page);
   const permissionResult =
     await getCachedDatabasePermissions();
 
@@ -27,13 +30,13 @@ export default async function NotificationsRoute({ searchParams }: { searchParam
 
   if (
     !permissionResult.permissions.includes(
-      "notifications.view",
+      NOTIFICATIONS_ACCESS.permission,
     )
   ) {
     return (
       <PermissionDeniedState
-        description={permissionDeniedDescription("notifications.view")}
-        title="Không có quyền xem thông báo"
+        description={permissionDeniedDescription(NOTIFICATIONS_ACCESS.permission)}
+        title={NOTIFICATIONS_ACCESS.deniedTitle}
       />
     );
   }
@@ -53,26 +56,16 @@ export default async function NotificationsRoute({ searchParams }: { searchParam
     );
   }
 
-  if (notificationsResult.data.length === 0 && page === 1) {
-    return (
-      <EmptyState
-        description="Các cập nhật cần chú ý trong quá trình vận hành sẽ xuất hiện tại đây."
-        title="Chưa có thông báo"
-      />
-    );
-  }
-
+  // Empty pages (page 1 or past the last one) render inside the list's frame, with the pager.
+  // No key: a pager link keeps the list mounted (and its focused link); the list resets its page state itself.
   return (
-    <div className="space-y-4">
     <NotificationListPage
       entries={notificationsResult.data}
+      // No total exists: a full page may have an older one (an exact multiple ends on an empty page).
+      hasNextPage={notificationsResult.data.length === NOTIFICATION_PAGE_SIZE}
+      page={page}
+      today={getVietnamToday()}
       unreadCount={unreadCountResult.data}
     />
-    <nav className="flex gap-4 text-sm" aria-label="Phân trang thông báo">
-      {page > 1 && <Link className="text-action-link underline" href={`/notifications?page=${page - 1}`}>Mới hơn</Link>}
-      <span>Trang {page}</span>
-      {notificationsResult.data.length === 50 && <Link className="text-action-link underline" href={`/notifications?page=${page + 1}`}>Cũ hơn</Link>}
-    </nav>
-    </div>
   );
 }
