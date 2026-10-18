@@ -1,256 +1,259 @@
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
-import type {
-  AuditFilters,
-  AuditLogEntry,
-  AuditLogReadModel,
-} from "@/features/audit/read-models";
-import type { Json } from "@/types/database.generated";
+import {
+  DataTableFrame,
+  TableState,
+} from "@/components/patterns/data-table-frame";
+import {
+  FilterBar,
+  FilterField,
+  FilterInput,
+  FilterSelect,
+} from "@/components/patterns/filter-bar";
+import { PageHeader } from "@/components/patterns/page-header";
+import { Button, getButtonClassName } from "@/components/ui/button";
+import {
+  AUDIT_FILTER_CAPTION,
+  AUDIT_FILTER_KEYS,
+  AUDIT_OLDER_ROWS_NOTE,
+  AUDIT_READ_ONLY_NOTE,
+  countActiveAuditFilters,
+  getAuditCountLine,
+  getAuditSelectOptions,
+  isAuditDateRangeInverted,
+  type AuditSelectOption,
+} from "@/features/audit/audit-log-models";
+import {
+  AUDIT_CARDS_SWITCH_CLASS,
+  AUDIT_EMPTY_FRAME_CLASS,
+  AUDIT_EMPTY_HEADER_ROW_CLASS,
+  AUDIT_EMPTY_TABLE_CLASS,
+  AUDIT_FILTER_TRACKS_CLASS,
+  AUDIT_TABLE_CLASS,
+  AUDIT_TABLE_SWITCH_CLASS,
+  AuditLogTableHeader,
+} from "@/features/audit/components/audit-log-cells";
+import { AuditLogRecords } from "@/features/audit/components/audit-log-records";
+import { AuditLogTableRows } from "@/features/audit/components/audit-log-table-rows";
+import type { AuditLogReadModel } from "@/features/audit/read-models";
+import { cn } from "@/lib/utils";
 
 interface AuditLogPageProps {
   model: AuditLogReadModel;
+  /** Target of the GET filter form and of "Xóa lọc"; the /dev/lists preview passes "/dev/lists". */
+  formAction?: string;
+  /**
+   * Extra query params the form keeps as hidden inputs and the reset link
+   * keeps in its URL (the preview's `view`/`role`/`state`). Never one of the
+   * seven filter names.
+   */
+  hiddenParams?: Readonly<Record<string, string>>;
 }
 
-const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
-  dateStyle: "short",
-  timeStyle: "medium",
-  timeZone: "Asia/Ho_Chi_Minh",
-});
+const LIST_LABEL = "Nhật ký hệ thống";
 
-function formatDateTime(value: string): string {
-  const date = new Date(value);
+/*
+ * Responsive switch without globals.css: the page root is a Tailwind container
+ * (`@container`); the table/cards switch and the filter tracks are shared with
+ * the loading skeleton (audit-log-cells). Below 880px the filter controls are
+ * 44px tall. Class names are spelled out in full so the scanner sees them.
+ */
+const FILTER_BAR_CLASS = cn(
+  AUDIT_FILTER_TRACKS_CLASS,
+  "@max-[880px]:[&_input]:h-11 @max-[880px]:[&_select]:h-11",
+);
+const TOUCH_BUTTON_CLASS = "@max-[880px]:h-11";
 
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return dateTimeFormatter.format(date);
-}
-
-function humanizeCode(value: string): string {
-  const normalized = value.replaceAll("_", " ").trim();
-
-  if (!normalized) {
-    return "Không xác định";
-  }
-
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
-
-function stringifyJson(value: Json): string {
-  return JSON.stringify(value, null, 2) ?? String(value);
-}
-
-function hasActiveFilters(filters: AuditFilters): boolean {
-  return Object.values(filters).some(Boolean);
-}
-
+/**
+ * /audit (design 16a row "Nhật ký"): a read-only, append-only log. Header with
+ * the exact filtered count and the rows shown, the existing GET filter form
+ * (same seven param names, reset = a link), then a framed table (cards when
+ * narrow) whose before/after JSON stays collapsed until asked for. No primary
+ * action, no row actions, no paging (the read is the newest
+ * AUDIT_LOG_ROW_LIMIT rows). No hooks: it renders as a server component on the
+ * route and inside the client /dev/lists preview alike; only the table rows
+ * (the "Xem / Ẩn" toggle) and each card's `<details>` body are client islands,
+ * both rendering the JSON only once opened.
+ */
 export function AuditLogPage({
+  formAction = "/audit",
+  hiddenParams,
   model,
 }: AuditLogPageProps) {
-  const uniqueModules = new Set(
-    model.entries.map((entry) => entry.module),
-  ).size;
-
-  const actorCount = new Set(
-    model.entries
-      .map((entry) => entry.actorUserId)
-      .filter(Boolean),
-  ).size;
+  const activeFilterCount = countActiveAuditFilters(model.filters);
+  const isFiltered = activeFilterCount > 0;
+  const shown = model.entries.length;
+  const preserved = Object.entries(hiddenParams ?? {});
+  const resetHref = preserved.length > 0
+    ? `${formAction}?${new URLSearchParams(preserved).toString()}`
+    : formAction;
 
   return (
-    <div className="space-y-5">
-      <header className="rounded-xl border border-hairline bg-surface-1 p-5 shadow-card">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
-          Quản trị hệ thống
+    <div className="@container grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
+      <PageHeader title="Nhật ký hệ thống">
+        <p className="mt-1 text-secondary tabular-nums text-text-muted" id="audit-log-result-context">
+          {getAuditCountLine(model.totalCount, shown, isFiltered)}
         </p>
-
-        <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink">
-          Nhật ký hệ thống
-        </h1>
-
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">
-          Theo dõi các thao tác đã được ghi nhận từ workflow và trigger
-          của hệ thống. Nhật ký chỉ đọc, không thể sửa hoặc xóa từ ứng dụng.
+        <p className="mt-0.5 text-caption text-text-muted">
+          {AUDIT_READ_ONLY_NOTE}
+          {model.totalCount > shown ? ` ${AUDIT_OLDER_ROWS_NOTE}` : null}
         </p>
-      </header>
+      </PageHeader>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          label="Kết quả phù hợp"
-          value={model.totalCount}
-        />
-        <SummaryCard
-          label="Đang hiển thị"
-          value={model.entries.length}
-        />
-        <SummaryCard
-          label="Module trong trang"
-          value={uniqueModules}
-        />
-        <SummaryCard
-          label="Người thao tác"
-          value={actorCount}
-        />
+      <AuditFilterForm
+        activeFilterCount={activeFilterCount}
+        formAction={formAction}
+        model={model}
+        preserved={preserved}
+        resetHref={resetHref}
+      />
+
+      <section
+        aria-labelledby="audit-log-result-context"
+        className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3"
+      >
+        {shown === 0 ? (
+          // Rendered once at every width (no table/card switch, no record list); the
+          // table geometry and header row only from the table's own 1042px up.
+          <DataTableFrame
+            body={null}
+            caption={LIST_LABEL}
+            className={AUDIT_EMPTY_FRAME_CLASS}
+            empty={
+              <TableState>
+                <p className="text-body font-semibold text-text-strong">
+                  {isFiltered ? "Không có nhật ký phù hợp" : "Chưa có nhật ký"}
+                </p>
+                <p className="max-w-xl text-secondary text-text-muted">
+                  {isFiltered
+                    ? "Thay đổi hoặc xóa bộ lọc để xem các thao tác khác."
+                    : "Các thao tác được ghi nhận sẽ xuất hiện tại đây."}
+                </p>
+              </TableState>
+            }
+            header={<AuditLogTableHeader className={AUDIT_EMPTY_HEADER_ROW_CLASS} />}
+            status="empty"
+            tableClassName={AUDIT_EMPTY_TABLE_CLASS}
+          />
+        ) : (
+          <>
+            <DataTableFrame
+              body={<AuditLogTableRows entries={model.entries} />}
+              caption={LIST_LABEL}
+              className={AUDIT_TABLE_SWITCH_CLASS}
+              header={<AuditLogTableHeader />}
+              tableClassName={AUDIT_TABLE_CLASS}
+            />
+            <AuditLogRecords
+              className={AUDIT_CARDS_SWITCH_CLASS}
+              entries={model.entries}
+              label={LIST_LABEL}
+            />
+          </>
+        )}
       </section>
-
-      <AuditFilterForm model={model} />
-
-      {model.entries.length === 0 ? (
-        <section className="rounded-xl border border-dashed border-hairline bg-surface-1 px-6 py-12 text-center">
-          <h2 className="font-display text-lg font-bold text-ink">
-            Không có nhật ký phù hợp
-          </h2>
-          <p className="mt-2 text-sm text-ink-muted">
-            Thay đổi hoặc xóa bộ lọc để xem các thao tác khác.
-          </p>
-        </section>
-      ) : (
-        <AuditResults entries={model.entries} />
-      )}
-    </div>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="rounded-lg border border-hairline bg-surface-1 p-4 shadow-card">
-      <p className="text-sm text-ink-muted">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-ink">{value}</p>
     </div>
   );
 }
 
 function AuditFilterForm({
+  activeFilterCount,
+  formAction,
   model,
+  preserved,
+  resetHref,
 }: {
+  activeFilterCount: number;
+  formAction: string;
   model: AuditLogReadModel;
+  preserved: readonly (readonly [string, string])[];
+  resetHref: string;
 }) {
+  const { filters } = model;
+  const options = getAuditSelectOptions(model);
+  const isInverted = isAuditDateRangeInverted(filters);
+
   return (
-    <section className="rounded-xl border border-hairline bg-surface-1 p-5 shadow-card">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="font-display text-base font-bold text-ink">
-            Bộ lọc nhật ký
-          </h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Thời gian được hiểu theo múi giờ Việt Nam.
-          </p>
-        </div>
+    // Keyed by the applied filters: "Xóa lọc" (next/link) and back/forward are soft navigations
+    // that keep this page mounted, and React never re-applies a changed `defaultValue`, so
+    // without a remount the selects would keep (and the next "Áp dụng" re-send) the old values.
+    <form
+      action={formAction}
+      className="grid min-w-0 gap-2"
+      key={AUDIT_FILTER_KEYS.map((key) => filters[key]).join("|")}
+      method="get"
+    >
+      {preserved.map(([name, value]) => (
+        <input key={name} name={name} type="hidden" value={value} />
+      ))}
 
-        {hasActiveFilters(model.filters) ? (
-          <Link
-            className="inline-flex h-9 items-center justify-center rounded-md border border-hairline bg-surface-1 px-3 text-sm font-semibold text-ink transition-colors hover:bg-surface-2"
-            href="/audit"
-          >
-            Xóa bộ lọc
-          </Link>
-        ) : null}
-      </div>
-
-      <form
-        action="/audit"
-        className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
-        method="get"
-      >
-        <FilterSelect
-          label="Module"
-          name="module"
-          options={model.options.modules}
-          value={model.filters.module}
-        />
-
-        <FilterSelect
-          label="Hành động"
-          name="action"
-          options={model.options.actions}
-          value={model.filters.action}
-        />
-
-        <FilterSelect
-          label="Loại đối tượng"
-          name="entityType"
-          options={model.options.entityTypes}
-          value={model.filters.entityType}
-        />
-
-        <label className="grid gap-1.5">
-          <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-            Người thao tác
-          </span>
-
-          <select
-            className="h-10 rounded-md border border-hairline bg-surface-1 px-3 text-sm text-ink outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15"
-            defaultValue={model.filters.actorId}
-            name="actorId"
-          >
-            <option value="">Tất cả</option>
-            {model.options.actors.map((actor) => (
-              <option key={actor.id} value={actor.id}>
-                {actor.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="grid gap-1.5">
-          <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-            Từ ngày
-          </span>
-          <input
-            className="h-10 rounded-md border border-hairline bg-surface-1 px-3 text-sm text-ink outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15"
-            defaultValue={model.filters.fromDate}
+      <FilterBar className={FILTER_BAR_CLASS} label="Bộ lọc nhật ký">
+        <FilterField label="Từ ngày">
+          <FilterInput
+            active={filters.fromDate !== ""}
+            defaultValue={filters.fromDate}
             name="fromDate"
             type="date"
           />
-        </label>
-
-        <label className="grid gap-1.5">
-          <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-            Đến ngày
-          </span>
-          <input
-            className="h-10 rounded-md border border-hairline bg-surface-1 px-3 text-sm text-ink outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15"
-            defaultValue={model.filters.toDate}
+        </FilterField>
+        <FilterField label="Đến ngày">
+          <FilterInput
+            active={filters.toDate !== ""}
+            defaultValue={filters.toDate}
             name="toDate"
             type="date"
           />
-        </label>
-
-        <label className="grid gap-1.5">
-          <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-            Mã đối tượng
-          </span>
-          <input
-            className="h-10 rounded-md border border-hairline bg-surface-1 px-3 text-sm text-ink outline-none placeholder:text-ink-subtle focus:border-primary focus:ring-[3px] focus:ring-primary/15"
-            defaultValue={model.filters.entityId}
+        </FilterField>
+        <AuditSelectField label="Module" name="module" options={options.modules} value={filters.module} />
+        <AuditSelectField label="Hành động" name="action" options={options.actions} value={filters.action} />
+        <AuditSelectField label="Người thực hiện" name="actorId" options={options.actors} value={filters.actorId} />
+        <AuditSelectField
+          label="Loại đối tượng"
+          name="entityType"
+          options={options.entityTypes}
+          value={filters.entityType}
+        />
+        <FilterField label="Mã đối tượng">
+          <FilterInput
+            active={filters.entityId !== ""}
+            autoComplete="off"
+            defaultValue={filters.entityId}
             name="entityId"
             placeholder="UUID hoặc mã nghiệp vụ"
             type="text"
           />
-        </label>
+        </FilterField>
 
-        <div className="flex items-end">
-          <button
-            className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-strong focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25"
-            type="submit"
-          >
-            Áp dụng bộ lọc
-          </button>
+        <div className="flex flex-wrap items-end gap-2">
+          <Button className={TOUCH_BUTTON_CLASS} type="submit" variant="secondary">
+            Áp dụng
+          </Button>
+          {activeFilterCount > 0 ? (
+            <Link
+              className={getButtonClassName({
+                className: cn(TOUCH_BUTTON_CLASS, "text-action-primary! hover:text-action-primary-hover!"),
+                variant: "ghost",
+              })}
+              href={resetHref}
+            >
+              Xóa lọc <span className="font-medium tabular-nums">({activeFilterCount})</span>
+            </Link>
+          ) : null}
         </div>
-      </form>
-    </section>
+      </FilterBar>
+
+      <p className="text-caption text-text-muted">{AUDIT_FILTER_CAPTION}</p>
+
+      {isInverted ? (
+        <p className="rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-secondary text-warning-ink">
+          Từ ngày sau Đến ngày nên không có bản ghi nào khớp.
+        </p>
+      ) : null}
+    </form>
   );
 }
 
-function FilterSelect({
+function AuditSelectField({
   label,
   name,
   options,
@@ -258,261 +261,19 @@ function FilterSelect({
 }: {
   label: string;
   name: string;
-  options: readonly string[];
+  options: readonly AuditSelectOption[];
   value: string;
 }) {
   return (
-    <label className="grid gap-1.5">
-      <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-        {label}
-      </span>
-
-      <select
-        className="h-10 rounded-md border border-hairline bg-surface-1 px-3 text-sm text-ink outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/15"
-        defaultValue={value}
-        name={name}
-      >
+    <FilterField label={label}>
+      <FilterSelect active={value !== ""} defaultValue={value} name={name}>
         <option value="">Tất cả</option>
         {options.map((option) => (
-          <option key={option} value={option}>
-            {humanizeCode(option)}
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
-      </select>
-    </label>
-  );
-}
-
-function AuditResults({
-  entries,
-}: {
-  entries: readonly AuditLogEntry[];
-}) {
-  return (
-    <section className="overflow-hidden rounded-xl border border-hairline bg-surface-1 shadow-card">
-      <div className="border-b border-hairline px-5 py-4">
-        <h2 className="font-display text-base font-bold text-ink">
-          Các thao tác gần nhất
-        </h2>
-        <p className="mt-1 text-sm text-ink-muted">
-          Hiển thị tối đa 100 bản ghi, mới nhất trước.
-        </p>
-      </div>
-
-      <div className="hidden overflow-x-auto xl:block">
-        <table className="min-w-full border-collapse text-left text-sm">
-          <thead className="bg-canvas text-xs uppercase tracking-[0.04em] text-ink-muted">
-            <tr>
-              <th className="px-5 py-3 font-semibold">Thời gian</th>
-              <th className="px-5 py-3 font-semibold">Người thao tác</th>
-              <th className="px-5 py-3 font-semibold">Hành động</th>
-              <th className="px-5 py-3 font-semibold">Đối tượng</th>
-              <th className="px-5 py-3 font-semibold">Lý do</th>
-              <th className="px-5 py-3 font-semibold">Chi tiết</th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-hairline">
-            {entries.map((entry) => (
-              <AuditDesktopRow entry={entry} key={entry.id} />
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="grid gap-3 p-4 xl:hidden">
-        {entries.map((entry) => (
-          <AuditMobileCard entry={entry} key={entry.id} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function AuditDesktopRow({
-  entry,
-}: {
-  entry: AuditLogEntry;
-}) {
-  return (
-    <tr className="align-top hover:bg-canvas/70">
-      <td className="whitespace-nowrap px-5 py-4 text-ink-muted">
-        {formatDateTime(entry.occurredAt)}
-      </td>
-
-      <td className="min-w-[220px] px-5 py-4">
-        <ActorIdentity entry={entry} />
-      </td>
-
-      <td className="min-w-[220px] px-5 py-4">
-        <div className="flex flex-wrap gap-2">
-          <Badge tone="info">{humanizeCode(entry.module)}</Badge>
-          <Badge tone="neutral">{humanizeCode(entry.action)}</Badge>
-        </div>
-        <code className="mt-2 block break-all text-xs text-ink-muted">
-          {entry.action}
-        </code>
-      </td>
-
-      <td className="min-w-[230px] px-5 py-4">
-        <p className="font-semibold text-ink">
-          {entry.entityType
-            ? humanizeCode(entry.entityType)
-            : "Không xác định"}
-        </p>
-        <code className="mt-1 block break-all text-xs text-ink-muted">
-          {entry.entityId ?? "Không có mã"}
-        </code>
-      </td>
-
-      <td className="max-w-[280px] px-5 py-4 text-ink-muted">
-        {entry.reason ?? "Không ghi nhận lý do"}
-      </td>
-
-      <td className="px-5 py-4">
-        <AuditDetails entry={entry} />
-      </td>
-    </tr>
-  );
-}
-
-function AuditMobileCard({
-  entry,
-}: {
-  entry: AuditLogEntry;
-}) {
-  return (
-    <article className="rounded-lg border border-hairline bg-surface-1 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          <Badge tone="info">{humanizeCode(entry.module)}</Badge>
-          <Badge tone="neutral">{humanizeCode(entry.action)}</Badge>
-        </div>
-
-        <time className="text-xs font-medium text-ink-muted">
-          {formatDateTime(entry.occurredAt)}
-        </time>
-      </div>
-
-      <dl className="mt-4 grid gap-3 text-sm">
-        <div>
-          <dt className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-            Người thao tác
-          </dt>
-          <dd className="mt-1">
-            <ActorIdentity entry={entry} />
-          </dd>
-        </div>
-
-        <div>
-          <dt className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-            Đối tượng
-          </dt>
-          <dd className="mt-1 font-semibold text-ink">
-            {entry.entityType
-              ? humanizeCode(entry.entityType)
-              : "Không xác định"}
-          </dd>
-          <code className="mt-1 block break-all text-xs text-ink-muted">
-            {entry.entityId ?? "Không có mã"}
-          </code>
-        </div>
-
-        <div>
-          <dt className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-            Lý do
-          </dt>
-          <dd className="mt-1 text-ink-muted">
-            {entry.reason ?? "Không ghi nhận lý do"}
-          </dd>
-        </div>
-      </dl>
-
-      <div className="mt-4">
-        <AuditDetails entry={entry} />
-      </div>
-    </article>
-  );
-}
-
-function ActorIdentity({
-  entry,
-}: {
-  entry: AuditLogEntry;
-}) {
-  if (!entry.actorUserId) {
-    return (
-      <div>
-        <p className="font-semibold text-ink">Hệ thống / Migration</p>
-        <p className="mt-1 text-xs text-ink-muted">
-          Không có actor_user_id
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <p className="font-semibold text-ink">
-        {entry.actor?.displayName ?? "Không đọc được hồ sơ"}
-      </p>
-      <p className="mt-1 break-all text-xs text-ink-muted">
-        {entry.actor?.email ?? entry.actorUserId}
-      </p>
-    </div>
-  );
-}
-
-function AuditDetails({
-  entry,
-}: {
-  entry: AuditLogEntry;
-}) {
-  return (
-    <details className="min-w-[150px]">
-      <summary className="cursor-pointer text-sm font-semibold text-primary hover:underline">
-        Xem dữ liệu
-      </summary>
-
-      <div className="mt-3 grid max-w-3xl gap-3">
-        <JsonPanel label="Dữ liệu trước" value={entry.oldData} />
-        <JsonPanel label="Dữ liệu sau" value={entry.newData} />
-        <JsonPanel label="Metadata" value={entry.metadata} />
-
-        {entry.requestId ? (
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-              Request ID
-            </p>
-            <code className="mt-1 block break-all rounded-md bg-canvas p-3 text-xs text-ink">
-              {entry.requestId}
-            </code>
-          </div>
-        ) : null}
-      </div>
-    </details>
-  );
-}
-
-function JsonPanel({
-  label,
-  value,
-}: {
-  label: string;
-  value: Json | null;
-}) {
-  if (value === null) {
-    return null;
-  }
-
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-muted">
-        {label}
-      </p>
-      <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-md bg-canvas p-3 text-xs leading-5 text-ink">
-        {stringifyJson(value)}
-      </pre>
-    </div>
+      </FilterSelect>
+    </FilterField>
   );
 }
