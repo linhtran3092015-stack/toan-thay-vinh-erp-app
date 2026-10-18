@@ -2,6 +2,11 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.26.0.1] - 2026-10-19
+
+### Fixed
+- **Bộ lọc trạng thái trên Tin nhắn phụ huynh** `/parent-messages` đọc được rõ: nút đang chọn trước đây chữ tối trên nền xanh đậm (gần như không đọc được), các nút còn lại không hiện chữ xám như thiết kế. Nay dùng kiểu nút lọc nền nhạt giống trang Giao dịch SePay: nút đang chọn nền xanh nhạt, viền và chữ xanh; nút khác chữ xám, rê chuột thì chữ đậm lên. Trên điện thoại nút cao 44px cho dễ bấm.
+
 ## [0.23.0.0] - 2026-10-18
 
 Danh sách Tài chính dựng lại theo phong cách Stumana (bước 14c): Đơn hàng cho kế toán thấy ngay đơn nào chưa xác nhận và quyết toán SB từng đợt, Sổ cái số buổi đọc dễ hơn, Yêu cầu thanh toán lọc nhanh theo trạng thái và ghi giờ đúng giờ Việt Nam.
