@@ -10,6 +10,8 @@ export interface UnmatchedGradingSubmission {
   claimedBirthYear: number;
   claimedClassOption: string | null;
   claimedClassOptionOther: string | null;
+  /** The session picked on the form (untrusted; the matcher checks it). */
+  claimedClassSessionId: string | null;
   claimedFullName: string;
   claimedSessionLabel: string | null;
   claimedStudentCode: string | null;
@@ -44,6 +46,7 @@ const unmatchedRowSchema = z.object({
   claimed_birth_year: z.number().int(),
   claimed_class_option: z.string().nullable(),
   claimed_class_option_other: z.string().nullable(),
+  claimed_class_session_id: z.string().uuid().nullable(),
   claimed_full_name: z.string(),
   claimed_session_label: z.string().nullable(),
   claimed_student_code: z.string().nullable(),
@@ -85,6 +88,7 @@ export async function getUnmatchedGradingSubmissions(limit = 200): Promise<Gradi
         claimedBirthYear: row.claimed_birth_year,
         claimedClassOption: row.claimed_class_option,
         claimedClassOptionOther: row.claimed_class_option_other,
+        claimedClassSessionId: row.claimed_class_session_id,
         claimedFullName: row.claimed_full_name,
         claimedSessionLabel: row.claimed_session_label,
         claimedStudentCode: row.claimed_student_code,

@@ -9999,9 +9999,24 @@ export type Database = {
         Returns: Json
       }
       grading_rank_label: { Args: { p_score: number }; Returns: string }
+      grading_session_is_eligible: {
+        Args: {
+          p_class_session_id: string
+          p_student_id: string
+          p_submission_submitted_at: string
+        }
+        Returns: boolean
+      }
       has_permission: {
         Args: { required_permission: string }
         Returns: boolean
+      }
+      ignore_grading_submission: {
+        Args: { p_reason: string; p_submission_id: string }
+        Returns: {
+          match_status: string
+          submission_id: string
+        }[]
       }
       ingest_sepay_api_v2_sync_page: {
         Args: {
@@ -10110,6 +10125,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      list_grading_match_candidates: {
+        Args: { p_limit?: number; p_query?: string; p_submission_id: string }
+        Returns: {
+          birth_year: number
+          enrolled_on_day: boolean
+          full_name: string
+          lifecycle_status: string
+          nickname: string
+          public_code: string
+          sessions: Json
+          student_id: string
+        }[]
+      }
       list_unmatched_grading_submissions: {
         Args: { p_limit?: number }
         Returns: {
@@ -10118,6 +10146,7 @@ export type Database = {
           claimed_birth_year: number
           claimed_class_option: string
           claimed_class_option_other: string
+          claimed_class_session_id: string
           claimed_full_name: string
           claimed_session_label: string
           claimed_student_code: string
@@ -10312,6 +10341,20 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      match_grading_submission: {
+        Args: {
+          p_class_session_id: string
+          p_reason?: string
+          p_student_id: string
+          p_submission_id: string
+        }
+        Returns: {
+          attempt_no: number
+          counts_for_score: boolean
+          match_status: string
+          submission_id: string
+        }[]
       }
       match_sepay_historical_transaction_to_payment_request: {
         Args: {
@@ -10730,6 +10773,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      rematch_grading_submissions: {
+        Args: { p_decisions: Json }
+        Returns: {
+          counts_for_score: boolean
+          match_status: string
+          outcome: string
+          submission_id: string
+        }[]
       }
       render_comment_message: {
         Args: { p_footer: string; p_template: string; p_vars: Json }
