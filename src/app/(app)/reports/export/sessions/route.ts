@@ -3,6 +3,7 @@ import {
   type NextRequest,
 } from "next/server";
 
+import { SESSION_EXPORT_LIMIT } from "@/features/reports/catalog";
 import {
   createSessionsCsv,
   filterSessionsForExport,
@@ -15,10 +16,6 @@ export const dynamic = "force-dynamic";
 
 const allowedQueryKeys =
   new Set(["dateFrom", "dateTo"]);
-
-// Supabase caps a single response at 1000 rows (supabase/config.toml max_rows);
-// one page is ample for a date-bounded CSV while staying within that cap.
-const SESSION_EXPORT_LIMIT = 1000;
 
 export async function GET(
   request: NextRequest,
