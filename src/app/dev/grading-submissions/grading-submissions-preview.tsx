@@ -3,7 +3,7 @@
 import { AppShell } from "@/components/layout/app-shell";
 import type { GradingReviewActions } from "@/features/grading-submissions/components/review-actions";
 import { UnmatchedSubmissionsPage } from "@/features/grading-submissions/components/unmatched-submissions-page";
-import type { UnmatchedGradingSubmission } from "@/features/grading-submissions/data";
+import type { IgnoredGradingSubmission, UnmatchedGradingSubmission } from "@/features/grading-submissions/data";
 import type { MatchCandidateStudent } from "@/features/grading-submissions/review";
 import { DATABASE_PERMISSION_CODES } from "@/lib/permissions/types";
 
@@ -55,6 +55,60 @@ const items: UnmatchedGradingSubmission[] = [
     receivedAt: "2026-10-17T16:40:00Z",
     student: { fullName: "Lê Hoàng Nam", id: "student-3", publicCode: "TV-2026-00098" },
     submittedAt: "2026-10-17T16:40:00Z",
+  },
+];
+
+const ignoredItems: IgnoredGradingSubmission[] = [
+  {
+    answerText: "asdfgh",
+    answerTruncated: false,
+    claimedBirthYear: 2014,
+    claimedClassOption: null,
+    claimedClassOptionOther: null,
+    claimedClassSessionId: null,
+    claimedFullName: "Ai Đó",
+    claimedSessionLabel: null,
+    claimedStudentCode: null,
+    id: "sub-ignored-1",
+    ignored: { at: "2026-10-18T13:10:00Z", byName: "Lê Bích Ngọc", reason: "Gõ linh tinh, không phải bài làm" },
+    issues: ["student_not_found"],
+    receivedAt: "2026-10-18T12:50:04Z",
+    student: null,
+    submittedAt: "2026-10-18T12:50:00Z",
+  },
+  {
+    answerText: "Câu 1: 54\nCâu 2: 4,7 cm",
+    answerTruncated: false,
+    claimedBirthYear: 2015,
+    claimedClassOption: null,
+    claimedClassOptionOther: null,
+    claimedClassSessionId: "00000000-0000-4000-8000-000000000603",
+    claimedFullName: "Lê Hoàng Nam",
+    claimedSessionLabel: "6B · 15:00",
+    claimedStudentCode: "TV-2026-00098",
+    id: "sub-ignored-2",
+    ignored: { at: "2026-10-17T17:05:00Z", byName: "Trợ Giảng Mẫu", reason: "Nộp nhầm buổi" },
+    issues: ["outside_window"],
+    receivedAt: "2026-10-17T16:45:00Z",
+    student: { fullName: "Lê Hoàng Nam", id: "student-3", publicCode: "TV-2026-00098" },
+    submittedAt: "2026-10-17T16:45:00Z",
+  },
+  {
+    answerText: "xyz",
+    answerTruncated: false,
+    claimedBirthYear: 2013,
+    claimedClassOption: "Khác",
+    claimedClassOptionOther: "thử form",
+    claimedClassSessionId: null,
+    claimedFullName: "Nộp Thử",
+    claimedSessionLabel: null,
+    claimedStudentCode: null,
+    id: "sub-ignored-3",
+    ignored: null,
+    issues: ["student_not_found"],
+    receivedAt: "2026-10-16T09:00:00Z",
+    student: null,
+    submittedAt: "2026-10-16T09:00:00Z",
   },
 ];
 
@@ -134,9 +188,13 @@ const previewActions: GradingReviewActions = {
     const summary = { failed: 0, invalid: 0, matched: 1, skipped: 0, total: 3, unchanged: 2, updated: 0 };
     return { message: "Đã ghép thêm 1 bài. 2 bài vẫn cần chọn tay.", ok: true, summary };
   },
+  restore: async () => {
+    await wait();
+    return { message: "Đã khôi phục bài về danh sách chờ ghép.", ok: true };
+  },
 };
 
-export function GradingSubmissionsPreview({ empty }: { empty: boolean }) {
+export function GradingSubmissionsPreview({ empty, status }: { empty: boolean; status: "ignored" | "needs_review" }) {
   return (
     <AppShell
       authUser={{ displayName: "Lê Bích Ngọc", email: "ngoc@example.com", id: "dev-user", initials: "LN" }}
@@ -146,7 +204,17 @@ export function GradingSubmissionsPreview({ empty }: { empty: boolean }) {
       previewPathname="/grading-submissions"
       unreadNotificationCount={0}
     >
-      <UnmatchedSubmissionsPage actions={previewActions} items={empty ? [] : items} limit={200} />
+      {status === "ignored" ? (
+        <UnmatchedSubmissionsPage
+          actions={previewActions}
+          basePath="/dev/grading-submissions"
+          items={empty ? [] : ignoredItems}
+          limit={200}
+          status="ignored"
+        />
+      ) : (
+        <UnmatchedSubmissionsPage actions={previewActions} basePath="/dev/grading-submissions" items={empty ? [] : items} limit={200} />
+      )}
     </AppShell>
   );
 }

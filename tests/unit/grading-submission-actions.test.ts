@@ -1,5 +1,5 @@
-// Value: protects=only ai_grading.view holders reach the review RPCs, bad input never reaches the database, RPC codes become Vietnamese messages, and "Ghép lại tự động" sends the matcher's decisions in one batch;
-// fails_when=a permission check is dropped, a short reason or bad id hits the RPC, a session/page is not revalidated, a failed candidate load aborts the whole rerun, or decisions skip the matcher;
+// Value: protects=only ai_grading.view holders reach the review RPCs, bad input never reaches the database, RPC codes become Vietnamese messages, "Ghép lại tự động" sends the matcher's decisions in one batch, and "Khôi phục" sends an optional trimmed note;
+// fails_when=a permission check is dropped, a short reason or bad id hits the RPC, a session/page is not revalidated, a failed candidate load aborts the whole rerun, decisions skip the matcher, or a restore sends a blank note or misses the "not ignored" message;
 // why_new=new server actions for the "Bài nộp chưa ghép" write side;
 // seam=supabase rpc + permissions mocked; no_claim=does not prove the SQL guards (pgTAP does)
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,6 +21,7 @@ import {
   loadGradingMatchCandidatesAction,
   matchGradingSubmissionAction,
   rematchGradingSubmissionsAction,
+  restoreGradingSubmissionAction,
 } from "@/features/grading-submissions/actions";
 import type { UnmatchedGradingSubmission } from "@/features/grading-submissions/data";
 
@@ -85,6 +86,7 @@ describe("permission gate", () => {
     ["ignore", () => ignoreGradingSubmissionAction({ reason: "Gõ linh tinh", submissionId: SUBMISSION_ID })],
     ["load candidates", () => loadGradingMatchCandidatesAction({ submissionId: SUBMISSION_ID })],
     ["rematch", () => rematchGradingSubmissionsAction()],
+    ["restore", () => restoreGradingSubmissionAction({ submissionId: SUBMISSION_ID })],
   ])("%s stops without ai_grading.view", async (_name, run) => {
     harness.getDatabasePermissions.mockResolvedValue({ ok: true, permissions: ["attendance.mark"] });
     const result = await run();
@@ -161,6 +163,45 @@ describe("ignoreGradingSubmissionAction", () => {
     });
     expect(harness.rpc).toHaveBeenCalledWith("ignore_grading_submission", { p_reason: "Gõ linh tinh", p_submission_id: SUBMISSION_ID });
     expect(harness.revalidatePath).toHaveBeenCalledWith("/grading-submissions");
+  });
+});
+
+describe("restoreGradingSubmissionAction", () => {
+  it("rejects a bad id or a note over 500 characters without calling the database", async () => {
+    expect(await restoreGradingSubmissionAction({ submissionId: "sub-1" })).toMatchObject({ ok: false });
+    expect(await restoreGradingSubmissionAction({ reason: "x".repeat(501), submissionId: SUBMISSION_ID })).toEqual({
+      message: "Ghi chú tối đa 500 ký tự.",
+      ok: false,
+    });
+    expect(harness.rpc).not.toHaveBeenCalled();
+  });
+
+  it("restores with the trimmed note and revalidates the page", async () => {
+    harness.rpc.mockResolvedValue({ data: [{ match_status: "needs_review", submission_id: SUBMISSION_ID }], error: null });
+    expect(await restoreGradingSubmissionAction({ reason: "  Bỏ qua nhầm  ", submissionId: SUBMISSION_ID })).toEqual({
+      message: "Đã khôi phục bài về danh sách chờ ghép.",
+      ok: true,
+    });
+    expect(harness.rpc).toHaveBeenCalledWith("restore_grading_submission", { p_reason: "Bỏ qua nhầm", p_submission_id: SUBMISSION_ID });
+    expect(harness.revalidatePath).toHaveBeenCalledWith("/grading-submissions");
+  });
+
+  it.each([[undefined], [null], ["   "]])("sends no note for %j", async (reason) => {
+    harness.rpc.mockResolvedValue({ data: [{ match_status: "needs_review", submission_id: SUBMISSION_ID }], error: null });
+    await restoreGradingSubmissionAction({ reason, submissionId: SUBMISSION_ID });
+    expect(harness.rpc).toHaveBeenCalledWith("restore_grading_submission", { p_reason: undefined, p_submission_id: SUBMISSION_ID });
+  });
+
+  it.each([
+    ["GRADING_SUBMISSION_NOT_IGNORED", "Bài này không còn ở danh sách đã bỏ qua"],
+    ["GRADING_SUBMISSION_NOT_FOUND", "Không tìm thấy bài nộp"],
+    ["AI_GRADING_VIEW_PERMISSION_DENIED", "không có quyền"],
+  ])("maps %s", async (code, expected) => {
+    harness.rpc.mockResolvedValue({ data: null, error: { message: code } });
+    const result = await restoreGradingSubmissionAction({ submissionId: SUBMISSION_ID });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain(expected);
+    expect(harness.revalidatePath).not.toHaveBeenCalled();
   });
 });
 

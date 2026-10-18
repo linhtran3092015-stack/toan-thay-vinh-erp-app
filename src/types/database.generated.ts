@@ -10138,6 +10138,31 @@ export type Database = {
           student_id: string
         }[]
       }
+      list_ignored_grading_submissions: {
+        Args: { p_limit?: number }
+        Returns: {
+          answer_text: string
+          answer_truncated: boolean
+          claimed_birth_year: number
+          claimed_class_option: string
+          claimed_class_option_other: string
+          claimed_class_session_id: string
+          claimed_full_name: string
+          claimed_session_label: string
+          claimed_student_code: string
+          ignore_reason: string
+          ignored_at: string
+          ignored_by: string
+          ignored_by_name: string
+          match_issues: string[]
+          received_at: string
+          student_full_name: string
+          student_id: string
+          student_public_code: string
+          submission_id: string
+          submitted_at: string
+        }[]
+      }
       list_unmatched_grading_submissions: {
         Args: { p_limit?: number }
         Returns: {
@@ -11230,6 +11255,13 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      restore_grading_submission: {
+        Args: { p_reason?: string; p_submission_id: string }
+        Returns: {
+          match_status: string
+          submission_id: string
+        }[]
       }
       resume_student_enrollment: {
         Args: {
