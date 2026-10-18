@@ -20,6 +20,9 @@ const views: readonly ListsPreviewView[] = [
   "finance-orders",
   "session-ledger",
   "payment-requests",
+  "notifications",
+  "audit",
+  "reports",
 ];
 const roles: readonly ListsPreviewRole[] = ["owner", "ta", "accountant"];
 const states: readonly ListsPreviewState[] = ["normal", "capped", "empty"];
