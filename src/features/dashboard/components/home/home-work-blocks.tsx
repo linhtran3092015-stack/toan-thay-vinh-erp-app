@@ -15,7 +15,8 @@ import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { getButtonClassName } from "@/components/ui/button";
-import { BlockEmpty, BlockError, HomeBlock, IconTile, homeLinkClassName } from "@/features/dashboard/components/home/home-block";
+import { IconTile } from "@/components/ui/icon-tile";
+import { BlockEmpty, BlockError, HomeBlock, homeLinkClassName } from "@/features/dashboard/components/home/home-block";
 import {
   buildNeedsAction,
   buildSummaryStrip,

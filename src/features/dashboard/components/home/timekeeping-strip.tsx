@@ -1,7 +1,8 @@
 import { CircleCheck, MapPin } from "lucide-react";
 
 import { getButtonClassName } from "@/components/ui/button";
-import { BlockError, IconTile } from "@/features/dashboard/components/home/home-block";
+import { IconTile } from "@/components/ui/icon-tile";
+import { BlockError } from "@/features/dashboard/components/home/home-block";
 import type { DashboardHomeReadModel } from "@/features/dashboard/home-models";
 import { TimekeepingEntryDialog } from "@/features/timekeeping/components/timekeeping-entry-dialog";
 import { getVietnamTime } from "@/lib/datetime";

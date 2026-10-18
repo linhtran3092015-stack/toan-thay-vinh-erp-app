@@ -21,6 +21,7 @@ import type {
   SettingsRole,
   SettingsRolePermissionGrant,
 } from "@/features/settings/types";
+import { formatModuleLabel } from "@/lib/module-labels";
 import { cn } from "@/lib/utils";
 
 interface PermissionMatrixPageProps {
@@ -367,7 +368,7 @@ export function PermissionMatrixPage({
           >
             <option value="">Tất cả nhóm</option>
             {modules.map((module) => (
-              <option key={module} value={module}>{formatModuleName(module)}</option>
+              <option key={module} value={module}>{formatModuleLabel(module)}</option>
             ))}
           </select>
         </label>
@@ -494,7 +495,7 @@ function PermissionGrid({
                   colSpan={roles.length + 1}
                   scope="rowgroup"
                 >
-                  {formatModuleName(module)}
+                  {formatModuleLabel(module)}
                 </th>
               </tr>
               {permissions.map((permission) => (
@@ -589,7 +590,7 @@ function RolePermissionList({
             <section key={module}>
               <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 bg-surface-raised px-4 py-2">
                 <div>
-                  <h4 className="text-caption font-semibold uppercase tracking-[.02em] text-text-muted">{formatModuleName(module)}</h4>
+                  <h4 className="text-caption font-semibold uppercase tracking-[.02em] text-text-muted">{formatModuleLabel(module)}</h4>
                   <p className="text-caption text-text-muted">{selectedCount}/{permissions.length} quyền đang chọn</p>
                 </div>
                 {editable ? (
@@ -712,42 +713,3 @@ function normalizeSearch(value: string): string {
     .trim();
 }
 
-function formatModuleName(value: string): string {
-  const labels: Record<string, string> = {
-    advances: "Tạm ứng lương",
-    app: "Truy cập hệ thống",
-    attendance: "Điểm danh",
-    audit: "Nhật ký hệ thống",
-    cashflow: "Dòng tiền",
-    classes: "Lớp học",
-    coaching: "Coaching",
-    commissions: "Hoa hồng",
-    crm: "Tuyển sinh & CRM",
-    dashboard: "Tổng quan",
-    finance: "Tài chính",
-    grading_credits: "Tín chỉ chấm bài",
-    guardians: "Phụ huynh",
-    imports: "Nhập dữ liệu",
-    notifications: "Thông báo",
-    payments: "Thanh toán",
-    payroll: "Bảng lương",
-    refunds: "Hoàn tiền",
-    reports: "Báo cáo",
-    results: "Kết quả học tập",
-    sepay: "SePay",
-    session_ledger: "Sổ buổi học",
-    sessions: "Buổi học",
-    staff: "Nhân sự",
-    students: "Học viên",
-    timekeeping: "Chấm công",
-  };
-
-  if (labels[value]) {
-    return labels[value];
-  }
-
-  return value
-    .split("_")
-    .map((part) => part.charAt(0).toLocaleUpperCase("vi") + part.slice(1))
-    .join(" ");
-}
