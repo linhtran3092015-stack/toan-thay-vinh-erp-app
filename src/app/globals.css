@@ -1199,9 +1199,12 @@ h1, h2, h3, h4, h5, h6, .font-display {
   font-family: var(--font-display);
 }
 
-/* Handoff 1a: titles sit a touch tighter; every table number lines up. */
-h1, h2, h3 {
-  letter-spacing: -0.01em;
+/* Handoff 1a: titles sit a touch tighter; every table number lines up.
+   Layered so a `tracking-*` utility on a heading wins. */
+@layer base {
+  h1, h2, h3 {
+    letter-spacing: -0.01em;
+  }
 }
 
 table {
@@ -1209,18 +1212,22 @@ table {
 }
 
 /* Handoff 1c: 150ms ease-out state changes on controls; panels rise once on
-   entry; progress bars grow once. Everything stops under reduced motion. */
-button,
-a,
-input,
-select,
-textarea,
-[role="tab"] {
-  transition:
-    background-color 150ms ease-out,
-    border-color 150ms ease-out,
-    color 150ms ease-out,
-    box-shadow 150ms ease-out;
+   entry; progress bars grow once. Everything stops under reduced motion.
+   Layered so `transition-*`/`duration-*` utilities on a control win; the
+   unlayered !important reduced-motion rule below still beats both. */
+@layer base {
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="tab"] {
+    transition:
+      background-color 150ms ease-out,
+      border-color 150ms ease-out,
+      color 150ms ease-out,
+      box-shadow 150ms ease-out;
+  }
 }
 
 @keyframes rise {
@@ -1322,11 +1329,14 @@ textarea,
   }
 }
 
-button,
-input,
-select,
-textarea {
-  font-family: inherit;
+/* Layered so `font-mono` on an input/textarea wins. */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
 }
 
 a {
