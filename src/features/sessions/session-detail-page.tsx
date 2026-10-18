@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { getButtonClassName } from "@/components/ui/button";
 import { PageHeader } from "@/components/patterns/page-header";
 import { TableHeaderCell } from "@/components/patterns/data-table-frame";
+import { SessionSubmissionsCard } from "@/features/grading-submissions/components/session-submissions-card";
+import type { GradingDataResult, SessionGradingSubmission } from "@/features/grading-submissions/data";
 import { SessionMessageContactCard } from "@/features/parent-messages/components/session-message-contact-card";
 import type { SessionMessageContactState } from "@/features/parent-messages/data";
 import type { AdditionalStudyCandidate } from "@/features/sessions/attendance-data";
@@ -53,6 +55,8 @@ interface SessionDetailPageProps {
   canViewStudents: boolean;
   detail: SessionDetailReadModel;
   directoryQuery?: string;
+  /** Form submissions matched to this session (ai_grading.view); null hides the card. */
+  gradingSubmissions?: GradingDataResult<SessionGradingSubmission[]> | null;
   /** Supervisor name + phone for this session's Zalo comment messages (attendance.view / attendance.mark). */
   messageContact?: SessionMessageContactState | null;
 }
@@ -74,6 +78,7 @@ export function SessionDetailPage({
   canViewStudents,
   detail,
   directoryQuery = "",
+  gradingSubmissions = null,
   messageContact = null,
 }: SessionDetailPageProps) {
   // Display counts cover everyone on the page, walk-ins included.
@@ -214,6 +219,13 @@ export function SessionDetailPage({
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
               {messageContact && detail.status !== "cancelled" ? (
                 <SessionMessageContactCard canEdit={canMarkAttendance} contact={messageContact} sessionId={detail.id} />
+              ) : null}
+              {gradingSubmissions ? (
+                <SessionSubmissionsCard
+                  canViewStudents={canViewStudents}
+                  participants={detail.participants}
+                  result={gradingSubmissions}
+                />
               ) : null}
               <SessionResultManagement
                 canManageResults={canManageResults}
