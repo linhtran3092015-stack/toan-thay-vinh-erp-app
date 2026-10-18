@@ -2,6 +2,22 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.25.0.0] - 2026-10-19
+
+Trang "Bài nộp chưa ghép" giờ xử lý được bài, không chỉ để xem (kế hoạch chấm bài AI, Giai đoạn 1b): trợ giảng ghép tay bài vào học sinh và buổi học, bỏ qua bài rác, hoặc bấm ghép lại tự động sau khi thêm học sinh mới hay xếp buổi còn thiếu.
+
+### Added
+- **Ghép tay** trên `/grading-submissions`: chọn học sinh (mặc định các em cùng năm sinh trên form, lọc theo tên không dấu, biệt danh hoặc mã; tìm thêm được các em khác năm sinh có lớp hoặc buổi học ngày nộp), rồi chọn một buổi của em trong ngày nộp (giờ Việt Nam). Mỗi buổi ghi rõ học sinh nộp trong giờ hay ngoài giờ buổi đó, em có chọn buổi này trên form không, em có trong danh sách lớp không và điểm danh ra sao. Em không có buổi nào ngày đó thì trang nhắc điểm danh em vào buổi học bù hoặc học thêm trước. Có ô ghi chú tuỳ chọn.
+- **Bỏ qua (bài rác)**: bắt buộc ghi lý do; bài bỏ qua rời khỏi danh sách và không bao giờ được tính điểm.
+- **Ghép lại tự động**: chạy lại đúng bộ ghép của form trên dữ liệu hiện tại cho 200 bài chưa ghép gần nhất, rồi báo số bài đã ghép thêm và số bài vẫn cần chọn tay. Bài vẫn chưa chắc chắn thì giữ lại để người xem, không đoán.
+- Ghép tay hay ghép lại đều tính lại lần nộp: lần nộp cuối (theo giờ nộp) của em trong buổi đó được tính.
+- Mọi thao tác ghép, bỏ qua, ghép lại đều ghi vào lịch sử thao tác (audit log) kèm người làm, lý do hoặc ghi chú, và cảnh báo cũ của bài.
+
+### Changed
+- Quyền **ai_grading.view** đổi tên thành "Xem và ghép bài nộp chấm bài": vẫn cấp cho chủ trung tâm, quản lý vận hành, quản lý trợ lý và trợ giảng, giờ dùng cho cả ghép tay, bỏ qua và ghép lại. Không thêm quyền mới.
+- Database chỉ cho ghép vào buổi chưa hủy trong ngày nộp có em trong danh sách lớp (kể cả lớp ghép) hoặc có điểm danh của em, và chỉ với bài còn đang chờ xem. Danh sách chọn học sinh không mở thêm học sinh nào ngoài các em có ghi danh hoặc buổi học ngày nộp (trợ giảng không có quyền xem hồ sơ học sinh).
+- Trang xem trước `/dev/grading-submissions` thao tác được với dữ liệu mẫu (không ghi gì).
+
 ## [0.24.0.0] - 2026-10-18
 
 Bài kiểm tra cuối buổi học sinh nộp qua form Apps Script giờ vào thẳng ERP (kế hoạch chấm bài AI, Giai đoạn 1 "Nhận bài vào ERP"): ERP tự ghép bài với học sinh và buổi học, bài chưa ghép chắc chắn được nằm riêng để trợ giảng xem. Chưa chấm bằng AI.
