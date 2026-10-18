@@ -37,13 +37,18 @@ export function tabPanelId(tabsId: string, value: string): string {
 }
 
 const tabClassName =
-  "flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-control font-medium text-text-default hover:text-text-strong focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus disabled:text-text-disabled";
+  "flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-control focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus disabled:text-text-disabled";
+// Weight and colour live in exactly one of these: `cn` does not drop a
+// conflicting class, and CSS order would let the inactive colour win.
+const inactiveTabClassName =
+  "font-medium text-text-default hover:text-text-strong";
 const activeTabClassName =
-  "font-semibold text-action-primary shadow-[inset_0_-2px_0_var(--action-primary)] hover:text-action-primary";
+  "font-semibold text-action-link shadow-[inset_0_-2px_0_var(--action-link)]";
 
 /**
- * Page-level tabs: 40px row, 1px bottom rule, active = 2px inset underline in
- * the primary color. Scrolls horizontally on narrow screens. The component
+ * Page-level tabs: 40px row, 1px bottom rule, active = primary text with a 2px
+ * inset underline (`--action-link`: the primary in light mode, a readable tint
+ * of it in dark). Scrolls horizontally on narrow screens. The component
  * never decides which tabs exist or whether they may be opened.
  */
 export function Tabs({
@@ -113,10 +118,10 @@ export function Tabs({
             {item.pending !== undefined ? (
               <>
                 {" "}
-                <span className="inline-flex items-center gap-1 text-caption font-semibold tabular-nums text-action-primary">
+                <span className="inline-flex items-center gap-1 text-caption font-semibold tabular-nums text-action-link">
                   <span
                     aria-hidden="true"
-                    className="h-1.5 w-1.5 rounded-full bg-action-primary"
+                    className="h-1.5 w-1.5 rounded-full bg-action-link"
                   />
                   {item.pending}{" "}
                   <span className="sr-only">việc tồn</span>
@@ -127,7 +132,10 @@ export function Tabs({
         );
         const shared = {
           "aria-selected": isActive,
-          className: cn(tabClassName, isActive && activeTabClassName),
+          className: cn(
+            tabClassName,
+            isActive ? activeTabClassName : inactiveTabClassName,
+          ),
           id: tabId(tabsId, item.value),
           onKeyDown: (event: KeyboardEvent<HTMLElement>) => moveFocus(event, index),
           role: "tab" as const,

@@ -150,6 +150,28 @@ describe("Tabs", () => {
     expect(active).toHaveAttribute("href", "/students/1");
     expect(screen.getByRole("tab", { name: "Lớp 2" })).toHaveAttribute("aria-selected", "false");
   });
+
+  it("gives only the active tab the accent colour", () => {
+    render(
+      <Tabs
+        items={[
+          { value: "a", label: "Tổng quan" },
+          { value: "b", label: "Học sinh", href: "/classes/1?tab=students" },
+        ]}
+        label="Mục trong lớp học"
+        value="a"
+      />,
+    );
+
+    const active = screen.getByRole("tab", { name: "Tổng quan" });
+    expect(active).toHaveClass("text-action-link");
+    expect(active).not.toHaveClass("text-text-default");
+    expect(active).not.toHaveClass("hover:text-text-strong");
+
+    const inactive = screen.getByRole("tab", { name: "Học sinh" });
+    expect(inactive).toHaveClass("text-text-default");
+    expect(inactive).not.toHaveClass("text-action-link");
+  });
 });
 
 describe("ResultBanner", () => {
