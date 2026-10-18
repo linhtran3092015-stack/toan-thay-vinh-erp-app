@@ -55,15 +55,10 @@ export function getFinanceOrderCostPresentation(
   }
 }
 
+/** `Đợt 2 (11–20)`: the short label and the range, each written once below. */
 export function getSettlementPeriodLabel(period: 1 | 2 | 3): string {
-  return `Đợt ${period} (${period === 1 ? "01–10" : period === 2 ? "11–20" : "21–cuối tháng"})`;
+  return `${getSettlementPeriodShortLabel(period)} (${getSettlementPeriodRange(period)})`;
 }
-
-export const financeCurrencyFormatter = new Intl.NumberFormat("vi-VN", {
-  currency: "VND",
-  maximumFractionDigits: 0,
-  style: "currency",
-});
 
 export const financeDateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit",
@@ -74,11 +69,17 @@ export const financeDateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   year: "numeric",
 });
 
-export function formatFinanceCurrency(value: number): string {
-  return financeCurrencyFormatter.format(value);
-}
-
 export function formatFinanceDateTime(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : financeDateTimeFormatter.format(date);
+}
+
+/** Day range of a settlement period in the Vietnam bank date: `01–10`, `11–20`, `21–cuối tháng`. */
+export function getSettlementPeriodRange(period: 1 | 2 | 3): string {
+  return period === 1 ? "01–10" : period === 2 ? "11–20" : "21–cuối tháng";
+}
+
+/** Compact column text `Đợt 2`; the full `getSettlementPeriodLabel` goes in a `title`. */
+export function getSettlementPeriodShortLabel(period: 1 | 2 | 3): string {
+  return `Đợt ${period}`;
 }

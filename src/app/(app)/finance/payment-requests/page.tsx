@@ -2,9 +2,11 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getPaymentRequestsResult } from "@/features/finance/data";
 import { PaymentRequestDirectory } from "@/features/finance/payment-request-directory";
+import { PAYMENT_REQUESTS_DENIED_TITLE } from "@/features/finance/payment-request-directory-models";
+import { getVietnamToday } from "@/lib/datetime";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
-
 import { permissionDeniedDescription } from "@/lib/permissions/labels";
+
 export default async function PaymentRequestsPage() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -17,14 +19,13 @@ export default async function PaymentRequestsPage() {
     );
   }
 
-  if (
-    !permissionResult.permissions.includes("payments.view") &&
-    !permissionResult.permissions.includes("payments.manage")
-  ) {
+  const permissions = permissionResult.permissions;
+
+  if (!permissions.includes("payments.view") && !permissions.includes("payments.manage")) {
     return (
       <PermissionDeniedState
         description={permissionDeniedDescription("payments.view")}
-        title="Không có quyền xem yêu cầu thanh toán"
+        title={PAYMENT_REQUESTS_DENIED_TITLE}
       />
     );
   }
@@ -39,14 +40,19 @@ export default async function PaymentRequestsPage() {
     );
   }
 
+  const canViewStudents = permissions.includes("students.view");
+
   return (
     <PaymentRequestDirectory
-      canCancelPaymentRequests={permissionResult.permissions.includes("payments.manage")}
+      canCancelPaymentRequests={permissions.includes("payments.manage")}
+      // The create page also refuses without students.view, so the button follows it.
       canCreatePaymentRequests={
-        permissionResult.permissions.includes("payments.create_request") ||
-        permissionResult.permissions.includes("payments.manage")
+        (permissions.includes("payments.create_request") || permissions.includes("payments.manage")) && canViewStudents
       }
+      canViewStudents={canViewStudents}
       items={requestsResult.data}
+      now={new Date().toISOString()}
+      today={getVietnamToday()}
     />
   );
 }

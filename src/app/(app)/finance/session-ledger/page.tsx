@@ -1,10 +1,12 @@
 import { ErrorState } from "@/components/shared/error-state";
-import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
-import { SessionLedgerHistory } from "@/features/finance/components/session-ledger-history";
+import {
+  SessionLedgerHistory,
+  SessionLedgerPermissionDenied,
+} from "@/features/finance/components/session-ledger-history";
 import { getCenterSessionLedgerEntriesResult } from "@/features/finance/data";
+import { getVietnamToday } from "@/lib/datetime";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
-import { permissionDeniedDescription } from "@/lib/permissions/labels";
 export default async function CenterSessionLedgerPage() {
   const permissionResult = await getCachedDatabasePermissions();
 
@@ -17,13 +19,10 @@ export default async function CenterSessionLedgerPage() {
     );
   }
 
-  if (!permissionResult.permissions.includes("session_ledger.view")) {
-    return (
-      <PermissionDeniedState
-        description={permissionDeniedDescription("session_ledger.view")}
-        title="Không có quyền xem Sổ cái số buổi"
-      />
-    );
+  const { permissions } = permissionResult;
+
+  if (!permissions.includes("session_ledger.view")) {
+    return <SessionLedgerPermissionDenied />;
   }
 
   const entriesResult = await getCenterSessionLedgerEntriesResult();
@@ -36,5 +35,16 @@ export default async function CenterSessionLedgerPage() {
     );
   }
 
-  return <SessionLedgerHistory entries={entriesResult.data} />;
+  // Link gates from the permissions already loaded above (no extra read): profile
+  // links need students.view, session links sessions.view, PAY- codes the
+  // payment-request list's own gate.
+  return (
+    <SessionLedgerHistory
+      canViewPaymentRequests={permissions.includes("payments.view") || permissions.includes("payments.manage")}
+      canViewSessions={permissions.includes("sessions.view")}
+      canViewStudents={permissions.includes("students.view")}
+      entries={entriesResult.data}
+      today={getVietnamToday()}
+    />
+  );
 }
