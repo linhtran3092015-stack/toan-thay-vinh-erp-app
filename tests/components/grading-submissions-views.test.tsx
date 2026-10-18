@@ -79,7 +79,7 @@ describe("SessionSubmissionsCard", () => {
     expect(screen.getAllByText(/19:38/).length).toBeGreaterThan(0);
     const cuong = screen.getByText("Phạm Văn Cường").closest("li");
     expect(cuong).not.toBeNull();
-    expect(within(cuong as HTMLElement).getByText("Chưa điểm danh có mặt")).toBeInTheDocument();
+    expect(within(cuong as HTMLElement).getByText("Vắng nhưng có bài")).toBeInTheDocument();
     expect(within(cuong as HTMLElement).getByText("Nộp ngoài giờ buổi học")).toBeInTheDocument();
     expect(screen.getByText("Có mặt nhưng chưa nộp (1)")).toBeInTheDocument();
     expect(screen.getByText("Trần Thị Bình")).toBeInTheDocument();

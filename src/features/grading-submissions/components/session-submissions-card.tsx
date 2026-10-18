@@ -89,7 +89,8 @@ export function SessionSubmissionsCard({
                     <span className="text-caption text-text-muted">{submission.studentCode}</span>
                     <span className="text-caption text-text-muted">· nộp {formatDateTime(submission.submittedAt)}</span>
                     {submission.attemptNo && submission.attemptNo > 1 ? <Badge tone="info">Lần nộp {submission.attemptNo}</Badge> : null}
-                    {attendance === null || !PRESENT.has(attendance) ? <Badge tone="warning">Chưa điểm danh có mặt</Badge> : null}
+                    {attendance === null ? <Badge tone="warning">Chưa điểm danh</Badge> : null}
+                    {attendance !== null && !PRESENT.has(attendance) ? <Badge tone="warning">Vắng nhưng có bài</Badge> : null}
                     {submission.issues.map((issue) => (
                       <Badge key={issue} tone="warning">
                         {matchIssueLabel(issue)}
