@@ -1,6 +1,6 @@
 // Value: protects=the /dev/lists preview of design 16 (sessions, learning results, grading credits) renders the real list pages from fixtures with a fixed clock (16/10/2026 12:00), keeps every URL write on the History API and on /dev/lists itself (the router is never called and the address never becomes /sessions, so neither a click nor a reload reaches the production-backed route), gives the shell the real route as previewPathname, gates links and columns by the role's permissions (owner vs TA), covers the capped (a full lock-queue page: notice and N+ panel naming the same cap, the newest completed session without queue facts) and empty states, keeps the queue panel's "Lọc danh sách" on /dev/lists (pressing "Chờ khóa" there), falls back on unknown params and 404s in production;
 // fails_when=the sessions list goes back to router.replace/push or writes /sessions?… from the preview, a fixture drifts so a state (lock queue readiness, overdue captions, cancelled reason, online link, Vietnam-month credit) disappears, the panel link leaves the preview, state=capped stops showing the partial queue (or its notice and panel disagree on the cap), the TA gets lock actions, class/student links or the grader column, the empty sessions view loses its table frame, the param whitelist stops falling back, or the production guard is removed;
-// why_new=step 14a adds the sessions, results and credits views to /dev/lists; step 14b adds advances, staff and commissions (their bodies are covered by dev-lists-{advances,staff,commissions}-preview tests) and the accountant role;
+// why_new=step 14a adds the sessions, results and credits views to /dev/lists; step 14b adds advances, staff and commissions (their bodies are covered by dev-lists-{advances,staff,commissions}-preview tests) and the accountant role; step 14c adds finance-orders, session-ledger and payment-requests (bodies covered by dev-lists-{finance-orders,session-ledger,payment-requests}-preview tests) and the accountant's finance grants on those views only;
 // seam=next/navigation is mocked (notFound throws a marker, the router is spied, search params are a settable string, `view=sessions` in the sessions cases); AppShell is replaced by a marked wrapper exposing its props; window.history is spied; no_claim=does not prove the real routes' loaders or that /dev is unreachable in production at the proxy (public-coaching-route-access covers that gate)
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
@@ -68,6 +68,11 @@ describe("/dev/lists page", () => {
     for (const view of ["advances", "staff", "commissions"] as const) {
       const step14b = (await DevListsPage({ searchParams: Promise.resolve({ role: "accountant", view }) })) as ReactElement<Record<string, unknown>>;
       expect(step14b.props).toEqual({ role: "accountant", state: "normal", view });
+    }
+
+    for (const view of ["finance-orders", "session-ledger", "payment-requests"] as const) {
+      const step14c = (await DevListsPage({ searchParams: Promise.resolve({ role: "accountant", state: "capped", view }) })) as ReactElement<Record<string, unknown>>;
+      expect(step14c.props).toEqual({ role: "accountant", state: "capped", view });
     }
   });
 });
@@ -266,5 +271,58 @@ describe("/dev/lists step 14b views (design 16a, 16c)", () => {
     // The accountant reviews but never approves.
     expect(screen.queryAllByRole("button", { name: "Phê duyệt" })).toHaveLength(0);
     expect(screen.getAllByRole("button", { name: "Đối soát" }).length).toBeGreaterThan(0);
+  });
+});
+
+describe("/dev/lists step 14c views (design 16a finance rows)", () => {
+  it("renders the orders, ledger and payment-request pages with the real route as previewPathname", () => {
+    const orders = renderPreview("finance-orders");
+    expect(shellProps.last?.previewPathname).toBe("/finance/orders");
+    expect(screen.getByRole("table", { name: "Danh sách đơn hàng tài chính" })).toBeInTheDocument();
+    orders.unmount();
+
+    const ledger = renderPreview("session-ledger");
+    expect(shellProps.last?.previewPathname).toBe("/finance/session-ledger");
+    expect(screen.getByRole("table", { name: "Danh sách mục sổ cái số buổi mới nhất" })).toBeInTheDocument();
+    ledger.unmount();
+
+    renderPreview("payment-requests");
+    expect(shellProps.last?.previewPathname).toBe("/finance/payment-requests");
+    expect(screen.getByRole("table", { name: "Danh sách yêu cầu thanh toán" })).toBeInTheDocument();
+  });
+
+  // Value: protects=the accountant shell on the finance views holds the finance grants the migrations give that role (so the shell nav shows the Tài chính pages the body renders) and still lacks students.view, guardians.view, sessions.view and session_ledger.reverse, while the advances view keeps its exact four codes; fails_when=previewPermissions stops depending on the view (finance codes leak into the advances pin or vanish from the finance views) or grants a name/session/reversal code; why_new=step 14c adds finance views whose accountant needs finance codes; seam=AppShell wrapper (permissions read from its props); no_claim=the production permission matrix (the owner can edit it in Cài đặt)
+  it("gives the accountant finance grants on the finance views only", () => {
+    for (const view of ["finance-orders", "session-ledger", "payment-requests"] as const) {
+      const rendered = renderPreview(view, "accountant");
+      const permissions = shellProps.last?.permissions as string[];
+      expect(permissions).toEqual(
+        expect.arrayContaining(["advances.review", "finance.view", "payments.manage", "payments.view", "session_ledger.view"]),
+      );
+      for (const code of ["guardians.view", "session_ledger.reverse", "sessions.view", "students.view"]) {
+        expect(permissions).not.toContain(code);
+      }
+      rendered.unmount();
+    }
+
+    renderPreview("advances", "accountant");
+    expect(shellProps.last?.permissions).toEqual(["advances.request", "advances.review", "advances.view", "payroll.view"]);
+  });
+
+  it("shows the routes' own denial to the TA, who holds no finance codes", () => {
+    const orders = renderPreview("finance-orders", "ta");
+    expect(screen.getByText("Không có quyền xem Đơn hàng")).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    orders.unmount();
+
+    const ledger = renderPreview("session-ledger", "ta");
+    expect(screen.getByText("Không có quyền xem Sổ cái số buổi")).toBeInTheDocument();
+    ledger.unmount();
+
+    renderPreview("payment-requests", "ta");
+    expect(screen.getByText("Không có quyền xem yêu cầu thanh toán")).toBeInTheDocument();
+    for (const code of ["finance.view", "payments.view", "session_ledger.view"]) {
+      expect(shellProps.last?.permissions as string[]).not.toContain(code);
+    }
   });
 });

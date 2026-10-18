@@ -4,6 +4,9 @@ import {
   formatFinanceDateTime,
   getFinanceOrderCostPresentation,
   getFinanceOrderSourceLabel,
+  getSettlementPeriodLabel,
+  getSettlementPeriodRange,
+  getSettlementPeriodShortLabel,
 } from "@/features/finance/finance-order-presentation";
 
 describe("Finance Order source label", () => {
@@ -52,5 +55,14 @@ describe("Finance Order cost presentation", () => {
       operatingCostStatus: "configured",
       operatingCostVnd: 1_400_000,
     })).toMatchObject({ label: "700.000 + 25%" });
+  });
+});
+
+describe("Finance Order settlement period labels", () => {
+  it("uses the code word Đợt with the Vietnam day ranges", () => {
+    expect(getSettlementPeriodShortLabel(2)).toBe("Đợt 2");
+    expect(getSettlementPeriodRange(1)).toBe("01–10");
+    expect(getSettlementPeriodRange(3)).toBe("21–cuối tháng");
+    expect(getSettlementPeriodLabel(3)).toBe(`Đợt 3 (${getSettlementPeriodRange(3)})`);
   });
 });

@@ -33,4 +33,30 @@ describe("Payment request directory URL view state", () => {
     const items = Array.from({ length: PAYMENT_REQUEST_PAGE_SIZE + 1 }, (_, index) => ({ ...request, id: `request-${index}`, publicCode: `YC-${index}` }));
     expect(paginatePaymentRequests(items, 99)).toMatchObject({ page: 2, pageCount: 2, start: PAYMENT_REQUEST_PAGE_SIZE });
   });
+
+  it("filters created dates on the Vietnam calendar day, not the UTC one", () => {
+    // 18:00 UTC on 09/08 is 01:00 on 10/08 in Vietnam.
+    const lateNight = { ...request, createdAt: "2026-08-09T18:00:00Z" };
+    expect(filterPaymentRequests([lateNight], { ...defaultPaymentRequestFilters, createdFrom: "2026-08-10" })).toEqual([lateNight]);
+    expect(filterPaymentRequests([lateNight], { ...defaultPaymentRequestFilters, createdTo: "2026-08-10" })).toEqual([lateNight]);
+    expect(filterPaymentRequests([lateNight], { ...defaultPaymentRequestFilters, createdTo: "2026-08-09" })).toEqual([]);
+    expect(filterPaymentRequests([lateNight], { ...defaultPaymentRequestFilters, createdFrom: "2026-08-11" })).toEqual([]);
+  });
+
+  it("folds đ and Đ in both the search text and the rows", () => {
+    const dang = { ...request, guardianFullName: "Đỗ Mạnh Cường", studentFullName: "Đặng Hải Đăng" };
+    for (const searchText of ["dang", "DANG", "đăng", "Đăng hải", "do manh"]) {
+      expect(filterPaymentRequests([dang], { ...defaultPaymentRequestFilters, search: searchText })).toEqual([dang]);
+    }
+    expect(filterPaymentRequests([dang], { ...defaultPaymentRequestFilters, search: "dung" })).toEqual([]);
+  });
+
+  it("builds hrefs on an optional base path while keeping unrelated params", () => {
+    const params = new URLSearchParams("view=payment-requests&role=owner&status=pending&page=3");
+    expect(getPaymentRequestDirectoryHref(params, resetPaymentRequestDirectoryViewState(), "/dev/lists")).toBe("/dev/lists?view=payment-requests&role=owner");
+    expect(getPaymentRequestDirectoryHref(params, { filters: { ...defaultPaymentRequestFilters, status: "paid" }, page: 2 }, "/dev/lists")).toBe("/dev/lists?view=payment-requests&role=owner&status=paid&page=2");
+    expect(getPaymentRequestDirectoryHref(new URLSearchParams(), resetPaymentRequestDirectoryViewState(), "/dev/lists")).toBe("/dev/lists");
+    // The two-argument form still targets the real route.
+    expect(getPaymentRequestDirectoryHref(new URLSearchParams("status=paid"), resetPaymentRequestDirectoryViewState())).toBe("/finance/payment-requests");
+  });
 });

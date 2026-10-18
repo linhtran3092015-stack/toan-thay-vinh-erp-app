@@ -2146,6 +2146,90 @@
 **Priority:** P3
 **Depends on:** None
 
+### Hoàn buổi cho một học sinh: chưa có màn thao tác
+
+**What:** Quyết định nơi làm thao tác "Hoàn buổi" (`session_ledger.reverse`, có lý do): trên trang buổi học (nơi đã biết `session_attendance_id`) hay trên Sổ cái số buổi. Cho tới khi có màn này, ẩn link "Hoàn buổi cho một học sinh…" ở khung khóa buổi.
+
+**Why:** Link ở khung khóa buổi dẫn tới `/finance/session-ledger`, nhưng trang này chỉ đọc và không hoàn được buổi nào. `reverseSessionChargeAction` có sẵn nhưng chưa nơi nào gọi; sổ cái không đọc `session_attendance_id`/`reverses_entry_id`, và hợp đồng `WORKFLOW_CONTRACTS_A_E.md` (mục Lock) giữ nguyên việc không có thao tác đảo ngược trên giao diện. Bước 14c giữ sổ cái chỉ đọc.
+
+**Context:** `src/features/sessions/components/session-lock-actions.tsx` (link), `src/features/sessions/actions/session-reversal-actions.ts` (không revalidate `/finance/session-ledger`), `supabase/migrations/20260806100000_*` (`reverse_session_charge`, `effective_on = current_date` theo giờ UTC), `.gstack/briefs/step14c-map-rules-data.md` §B.4. Gộp với mục "Link Hoàn buổi cần cả quyền `session_ledger.view`".
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+### Bộ lọc và phân trang Sổ cái số buổi ở máy chủ
+
+**What:** Đọc sổ cái theo khoảng ngày hiệu lực, học sinh và loại bút toán ngay ở máy chủ, có phân trang (ví dụ 50 dòng/trang có tổng chính xác), rồi thêm bộ lọc theo thiết kế 16a. Cần anh duyệt và ghi vào `docs/redesign/WORKFLOW_CONTRACTS_A_E.md` ("List reads outside A–E") trước khi làm.
+
+**Why:** Trang chỉ tải 100 dòng mới ghi nhận nhất; một buổi khóa đã ghi khoảng 20 dòng, nên lọc trên 100 dòng đó sẽ gây hiểu nhầm. Bước 14c không thêm bộ lọc và giữ nguyên test hợp đồng chỉ đọc.
+
+**Context:** `getCenterSessionLedgerEntriesResult` trong `src/features/finance/data.ts` (`.limit(100)`), `src/features/finance/components/session-ledger-history.tsx`, `tests/components/session-ledger-history.test.tsx` (không nút, không ô nhập: phải sửa test có chủ ý).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Tên người xác nhận trên Đơn hàng
+
+**What:** Trả tên người xác nhận (`checked_by` → `profiles.display_name`) từ `get_finance_orders_dashboard` để cột Xác nhận ghi "người · giờ" như thiết kế 16a.
+
+**Why:** Database chỉ lưu id người xác nhận; RLS `profiles` không cho kế toán đọc tên người khác. Bước 14c chỉ hiện giờ xác nhận ("lúc 12/10 09:40", hoặc "vừa xác nhận" ngay sau khi bấm).
+
+**Context:** `supabase/migrations/20261014100000_finance_orders_student_acquisition_source.sql`, `src/features/finance/finance-orders-models.ts`. Đổi RPC cần migration và bản ghi trong `WORKFLOW_CONTRACTS_A_E.md`. Liên quan: hai đơn tách từ cùng một giao dịch SePay có cùng tên nút "Xác nhận đơn {mã ngân hàng}" (tên này đang được test ghim).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Trang chi tiết yêu cầu thanh toán (QR, mã chuyển khoản)
+
+**What:** Thêm `/finance/payment-requests/[id]` với QR và mã chuyển khoản như lúc tạo, rồi thêm thao tác "Mở" trên danh sách (thiết kế 16a).
+
+**Why:** QR chỉ được dựng một lần lúc tạo, từ tài khoản nhận tiền đang hiệu lực khi đó; dựng lại sau có thể ra tài khoản khác với cái phụ huynh đã nhận. Muốn hiển thị đúng phải lưu (hoặc đọc lại) tài khoản của từng yêu cầu. Bước 14c chỉ hiện mã chuyển khoản trong danh sách.
+
+**Context:** `src/features/finance/actions/finance-actions.ts` (`createPaymentRequestAction`), `src/app/(app)/finance/payment-requests/new/page.tsx` (`get_effective_sepay_receiving_account`). "Hoàn tiền…" thuộc khung 18d (bước 16): RPC hoàn tiền đang tắt.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Tên học sinh và phụ huynh bị ẩn với kế toán trên Sổ cái và Yêu cầu thanh toán
+
+**What:** Kiểm tra ma trận quyền trên production: theo migration chỉ chủ trung tâm có `students.view` và `guardians.view`, nên kế toán thấy "Học viên" / "Chưa cập nhật" trên mọi dòng sổ cái và yêu cầu thanh toán, không tìm được theo tên, và không vào được "Tạo yêu cầu". Quyết định cấp hai quyền đó cho kế toán (ở Cài đặt) hay đọc tên qua một RPC riêng.
+
+**Why:** Bước 14c giữ phần dự phòng và chỉ hiện link hồ sơ / "Tạo yêu cầu" cho người có `students.view`; bản xem trước `/dev/lists` vẫn hiện tên (có ghi chú) để kiểm tra bố cục. Review đối kháng bước 14c (Medium): kế toán vẫn có nút "Hủy phiếu" (`payments.manage`) dù chỉ nhìn thấy mã PAY, số tiền và mã chuyển khoản, nên có thể hủy nhầm phiếu của người khác; hủy không hoàn tác được.
+
+**Context:** `src/features/finance/data.ts` (embed `students`/`guardians`, phần dự phòng), RLS ở `supabase/migrations/20260722130437_*`, `.gstack/briefs/step14c-map-rules-data.md` §0.12 và §D. Đơn hàng không bị ảnh hưởng (RPC `security definer`).
+
+**Effort:** S (kiểm tra) / M (sửa)
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+### Trạng thái "Hết hạn" của yêu cầu thanh toán
+
+**What:** Quyết định có cần trạng thái `expired` thật (job hoặc RPC đặt hạn) hay bỏ nó khỏi bộ lọc. Hiện không có cột hạn và không nơi nào ghi `status = 'expired'`; quy tắc tuổi duy nhất là "chờ quá 14 ngày" (`PAYMENT_REQUEST_OVERDUE_DAYS`).
+
+**Why:** Badge "Hết hạn" và lựa chọn lọc vẫn còn (được test ghim) nhưng không dòng thật nào có trạng thái này. Bước 14c chỉ hiện chip "Hết hạn" khi có dòng, và ghi "chờ quá 14 ngày" dưới badge của yêu cầu đang chờ lâu, không gọi đó là hết hạn.
+
+**Context:** `supabase/migrations/20260726160000_*` (check status), `src/features/students/student-directory-metrics.ts`, `src/features/finance/payment-request-directory-models.ts`.
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** Quyết định của anh
+
+### Dọn sau bước 14c
+
+**What:** Phân trang ở máy chủ cho `/finance/payment-requests` khi số yêu cầu tiến tới 1.000 dòng (hiện trang báo "chỉ gồm 1.000 yêu cầu mới nhất"); kiểm tra trước liên kết kỳ thu để ẩn "Hủy phiếu" với phiếu thuộc kỳ thu đã khóa (hiện server từ chối kèm thông báo); thống nhất nhãn bút toán giữa hồ sơ học sinh ("Tặng buổi", "Hoàn buổi học") và Sổ cái ("Thưởng buổi", "Đảo trừ"); mã `PAY-YYMMDD` lấy ngày theo giờ UTC của database; thêm `loading.tsx` dạng bảng cho `/finance/orders` và một skeleton riêng cho danh sách yêu cầu thanh toán (skeleton hiện dùng chung với `/new` và còn breakpoint `lg:`); ghi lọc của `/finance/payment-requests` bằng History API như `/sessions` (mỗi lần gõ tìm kiếm hiện chạy lại lần đọc 1.000 dòng trên server; lọc vốn chạy trên trình duyệt); báo "có thể chưa đủ" khi khoảng ngày tạo cũ hơn dòng cũ nhất đã tải lúc chạm 1.000 dòng; bỏ `outline-none` trong lớp gốc của `FilterInput`/`FilterSelect` nếu vòng focus đã đủ; chuẩn hóa từ khóa tìm kiếm một lần cho mỗi dòng (useMemo theo danh sách) thay vì mỗi lần gõ ở `/finance/payment-requests`; tăng cỡ chữ mã yêu cầu (đang 12px để mã đầy đủ vừa cột 200px ở bề rộng tối thiểu 1118px) nếu bảng được nới cột; neo regex kiểm tra ngưỡng `@container` của Sổ cái (và Tạm ứng, Nhân sự, Chấm công) vào đúng selector như test Đơn hàng, vì regex hiện tại khớp chéo sang khối 1042px của Học sinh nên không bao giờ fail; giữ dấu xác nhận đang lưu khi người dùng đổi bộ lọc giữa chừng (hiện bản đè cục bộ bị bỏ khi dashboard đổi, dù thông báo đọc màn hình đã báo thành công); giới hạn năm hợp lệ trong `parseMonth` của Đơn hàng (đường link `?month=0000-01` làm RPC lỗi và mất thanh lọc; gõ năm từng chữ số trong ô tháng gọi RPC nhiều lần); cân nhắc bắt buộc prop `canViewStudents` thay vì mặc định `true` (mặc định đang được test ghim của bảng yêu cầu thanh toán và Sổ cái dựa vào).
+
+**Why:** Các điểm nhỏ còn lại từ bản đồ và các lane bước 14c; không cái nào chặn phát hành.
+
+**Context:** `src/features/finance/data.ts`, `src/features/finance/components/payment-request-table.tsx`, `src/features/students/ledger-labels.ts`, `src/features/finance/components/session-ledger-history.tsx`, `src/components/patterns/filter-bar.tsx`.
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** None
+
 ## Tin nhắn phụ huynh (Zalo)
 
 ### Gỡ RPC `record_parent_message_result` cũ sau khi bản 0.21 chạy ổn

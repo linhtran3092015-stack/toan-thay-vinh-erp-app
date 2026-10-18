@@ -70,3 +70,46 @@ function parseMonth(value: string | null): string | null {
   if (!value || !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) return null;
   return value;
 }
+
+/** The real route; `/dev/lists` passes its own path so preview filter writes stay on the preview. */
+export const FINANCE_ORDERS_PATH = "/finance/orders";
+
+/** `YYYY-MM` with a real month: a cleared `<input type="month">` ("") is not written. */
+export function isFinanceOrdersMonth(value: string): boolean {
+  return parseMonth(value) !== null;
+}
+
+/** `basePath?month=…&…`, keeping unrelated params (e.g. `view/role/state` on `/dev/lists`). */
+export function getFinanceOrdersHref(
+  current: SearchParamsLike,
+  filters: FinanceOrderFiltersState,
+  basePath: string = FINANCE_ORDERS_PATH,
+): string {
+  return `${basePath}?${serializeFinanceOrdersFilters(current, filters).toString()}`;
+}
+
+/**
+ * Applied type/source/period filters ("Xóa lọc (n)"). The month is not counted:
+ * it is always set (a month is the unit the RPC loads) and "Xóa lọc" keeps it.
+ */
+export function countActiveFinanceOrdersFilters(filters: FinanceOrderFiltersState): number {
+  return [filters.orderType, filters.source, filters.period].filter(Boolean).length;
+}
+
+/** "Xóa lọc": back to the whole month that is shown. */
+export function resetFinanceOrdersFilters(filters: FinanceOrderFiltersState): FinanceOrderFiltersState {
+  return { month: filters.month, orderType: "", period: "", source: "" };
+}
+
+/**
+ * Composition buffer for quick successive changes: a second change made before
+ * the server answers the first builds on the first instead of the stale props.
+ */
+export function mergePendingFinanceOrdersFilter<K extends keyof FinanceOrderFiltersState>(
+  pending: FinanceOrderFiltersState | null,
+  rendered: FinanceOrderFiltersState,
+  key: K,
+  value: FinanceOrderFiltersState[K],
+): FinanceOrderFiltersState {
+  return { ...(pending ?? rendered), [key]: value };
+}

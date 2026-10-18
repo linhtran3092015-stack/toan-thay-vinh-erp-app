@@ -3,189 +3,305 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Filter } from "lucide-react";
 
+import { TableState } from "@/components/patterns/data-table-frame";
+import { FilterTrigger } from "@/components/patterns/filter-bar";
 import { PageHeader } from "@/components/patterns/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
-import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/patterns/pagination";
+import { QuickFilterChips } from "@/components/patterns/quick-filter-chips";
+import { ResultBanner } from "@/components/shared/result-banner";
+import { Button, getButtonClassName } from "@/components/ui/button";
 import { PaymentRequestFilters } from "@/features/finance/components/payment-request-filters";
 import { PaymentRequestTable } from "@/features/finance/components/payment-request-table";
+import type { PaymentRequestActionOverrides } from "@/features/finance/payment-request-action-overrides";
+import {
+  buildPaymentRequestStatusChips,
+  countActivePaymentRequestFilters,
+  describePaymentRequestDirectoryContext,
+  filterPaymentRequests,
+  getPaymentRequestStatusChipValue,
+  paginatePaymentRequests,
+  summarizePaymentRequests,
+  type PaymentRequestStatusChip,
+  type PaymentRequestSummary,
+} from "@/features/finance/payment-request-directory-models";
 import type { PaymentRequestFiltersState, PaymentRequestReadModel } from "@/features/finance/read-models";
 import {
-  arePaymentRequestFiltersEqual,
-  defaultPaymentRequestFilters,
   getPaymentRequestDirectoryHref,
   getPaymentRequestDirectoryQuery,
   mergePendingPaymentRequestFilter,
   parsePaymentRequestDirectoryViewState,
+  PAYMENT_REQUEST_DIRECTORY_PATH,
   resetPaymentRequestDirectoryViewState,
+  serializePaymentRequestDirectoryViewState,
+  type PaymentRequestDirectoryViewState,
 } from "@/features/finance/payment-request-url-state";
+import { getVietnamToday } from "@/lib/datetime";
+import { formatVnd } from "@/lib/format";
 
-export const PAYMENT_REQUEST_PAGE_SIZE = 20;
+// Pinned exports of this module (route and tests); the logic lives in the models file.
+export {
+  countActivePaymentRequestFilters,
+  filterPaymentRequests,
+  paginatePaymentRequests,
+  PAYMENT_REQUEST_PAGE_SIZE,
+} from "@/features/finance/payment-request-directory-models";
 
-export function PaymentRequestDirectory({ canCancelPaymentRequests = false, canCreatePaymentRequests, items }: { canCancelPaymentRequests?: boolean; canCreatePaymentRequests: boolean; items: PaymentRequestReadModel[] }) {
+export interface PaymentRequestDirectoryProps {
+  /** Server-action override for the /dev preview; the real page passes nothing. */
+  actions?: PaymentRequestActionOverrides;
+  /**
+   * The list's own path for its URL writes (the /dev preview passes `/dev/lists`
+   * so a filter change stays on fixtures). Profile and create links always
+   * point at the real routes.
+   */
+  basePath?: string;
+  /** `payments.manage` */
+  canCancelPaymentRequests?: boolean;
+  /** `(payments.create_request || payments.manage) && students.view` (the /new page needs both). */
+  canCreatePaymentRequests: boolean;
+  /** `students.view`: student names open the profile. Default true. */
+  canViewStudents?: boolean;
+  items: PaymentRequestReadModel[];
+  /** ISO timestamp of the server render, for "chờ quá 14 ngày" (the dashboard's threshold), so SSR and client agree. */
+  now?: string;
+  /** Vietnam business date `YYYY-MM-DD` from the server, so SSR and client agree on short dates. */
+  today?: string;
+}
+
+/**
+ * Payment-request list (design 16a): count line, status chips, filters (bar or
+ * sheet), the loaded-rows money strip, a framed table (cards when narrow) and
+ * pagers. Filtering is client-side over the rows the route loaded (newest
+ * 1000); the state lives in the URL, written with `router.replace` (filters,
+ * back to page 1) and `router.push` (pages). Inputs render local state so a
+ * field never lags behind the navigation; a URL the page did not write itself
+ * (Back/Forward, a link) wins.
+ */
+export function PaymentRequestDirectory({
+  actions,
+  basePath = PAYMENT_REQUEST_DIRECTORY_PATH,
+  canCancelPaymentRequests = false,
+  canCreatePaymentRequests,
+  canViewStudents = true,
+  items,
+  now,
+  today,
+}: PaymentRequestDirectoryProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
-  const pendingFiltersRef = useRef<PaymentRequestFiltersState | null>(null);
-  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
-  const viewState = useMemo(() => parsePaymentRequestDirectoryViewState(searchParams), [searchParams]);
-  const { filters, page } = viewState;
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [fallbackClock] = useState(() => ({ now: new Date().toISOString(), today: getVietnamToday() }));
+  const businessToday = today ?? fallbackClock.today;
+  const renderNow = now ?? fallbackClock.now;
+  /**
+   * "Đã hủy phiếu thu …" after a successful cancel: the row then turns "Đã hủy"
+   * (or leaves a "Chờ thanh toán" list), taking its trigger and focus with it,
+   * so the notice takes focus. Cleared by the next filter, page, chip or dialog.
+   */
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
+  /** Set by a success; consumed once focus has moved to the notice. */
+  const pendingNoticeFocusRef = useRef(false);
 
-  useEffect(() => {
-    if (pendingFiltersRef.current && arePaymentRequestFiltersEqual(pendingFiltersRef.current, filters)) {
-      pendingFiltersRef.current = null;
+  const [viewState, setViewState] = useState<PaymentRequestDirectoryViewState>(() => parsePaymentRequestDirectoryViewState(searchParams));
+  // Queries this page wrote that Next may not have applied yet, so their late arrival is not mistaken for Back/Forward.
+  const [localQueries, setLocalQueries] = useState<readonly string[]>([]);
+  // Compare query strings: useSearchParams may hand out a new object on every render.
+  const urlQuery = searchParams.toString();
+  const [syncedQuery, setSyncedQuery] = useState(urlQuery);
+  if (urlQuery !== syncedQuery) {
+    setSyncedQuery(urlQuery);
+    if (!localQueries.includes(urlQuery)) {
+      setViewState(parsePaymentRequestDirectoryViewState(searchParams));
+      setLocalQueries([]);
+    } else if (localQueries.at(-1) === urlQuery) {
+      setLocalQueries([]);
     }
-  }, [filters]);
+  }
+  // Event handlers merge onto the latest written state, even before the page re-renders.
+  const latestStateRef = useRef(viewState);
+  useEffect(() => {
+    latestStateRef.current = viewState;
+  }, [viewState]);
+  // Runs after the dialog's own focus return (a layout effect of the same commit).
+  useEffect(() => {
+    if (!actionNotice || !pendingNoticeFocusRef.current) return;
+    pendingNoticeFocusRef.current = false;
+    noticeRef.current?.focus();
+  }, [actionNotice]);
 
+  const { filters, page } = viewState;
   const filteredItems = useMemo(() => filterPaymentRequests(items, filters), [filters, items]);
   const pagination = useMemo(() => paginatePaymentRequests(filteredItems, page), [filteredItems, page]);
   const summary = useMemo(() => summarizePaymentRequests(filteredItems), [filteredItems]);
+  const chips = useMemo(() => buildPaymentRequestStatusChips(items, filters), [filters, items]);
   const activeFilterCount = countActivePaymentRequestFilters(filters);
-  const hasActiveFilters = activeFilterCount > 0;
-  const directoryQuery = getPaymentRequestDirectoryQuery(searchParams);
+  const hasNoData = items.length === 0;
+  const isEmptyByFilter = !hasNoData && filteredItems.length === 0;
+  const directoryQuery = getPaymentRequestDirectoryQuery(serializePaymentRequestDirectoryViewState(searchParams, viewState));
   const createHref = directoryQuery ? `/finance/payment-requests/new?${directoryQuery}` : "/finance/payment-requests/new";
 
-  const replaceFilters = (nextFilters: PaymentRequestFiltersState) => {
-    pendingFiltersRef.current = nextFilters;
-    router.replace(getPaymentRequestDirectoryHref(searchParams, { filters: nextFilters, page: 1 }), { scroll: false });
+  const clearActionNotice = () => {
+    setActionNotice(null);
+    pendingNoticeFocusRef.current = false;
   };
-
+  const showCancelNotice = (item: PaymentRequestReadModel) => {
+    setActionNotice(`Đã hủy phiếu thu ${item.publicCode}.`);
+    pendingNoticeFocusRef.current = true;
+  };
+  const writeState = (state: PaymentRequestDirectoryViewState, mode: "push" | "replace") => {
+    const href = getPaymentRequestDirectoryHref(searchParams, state, basePath);
+    clearActionNotice();
+    latestStateRef.current = state;
+    setViewState(state);
+    setLocalQueries((current) => [...current, href.split("?")[1] ?? ""]);
+    if (mode === "push") router.push(href, { scroll: false });
+    else router.replace(href, { scroll: false });
+  };
   const updateFilter = (key: keyof PaymentRequestFiltersState, value: string) => {
-    replaceFilters(mergePendingPaymentRequestFilter(pendingFiltersRef.current, filters, key, value));
+    const nextFilters = mergePendingPaymentRequestFilter(latestStateRef.current.filters, filters, key, value);
+    writeState({ filters: nextFilters, page: 1 }, "replace");
   };
+  const resetFilters = () => writeState(resetPaymentRequestDirectoryViewState(), "replace");
+  const updatePage = (nextPage: number) => writeState({ filters: latestStateRef.current.filters, page: nextPage }, "push");
+  const selectChip = (chip: PaymentRequestStatusChip) => updateFilter("status", chip === "all" ? "" : chip);
 
-  const resetFilters = () => {
-    pendingFiltersRef.current = defaultPaymentRequestFilters;
-    router.replace(getPaymentRequestDirectoryHref(searchParams, resetPaymentRequestDirectoryViewState()), { scroll: false });
-  };
+  const emptyState = hasNoData ? (
+    <TableState>
+      <p className="text-body font-semibold text-text-strong">Chưa có yêu cầu thanh toán</p>
+      <p className="text-secondary text-text-muted">Chưa có yêu cầu nạp học phí nào được tạo.</p>
+    </TableState>
+  ) : (
+    <TableState>
+      <p className="text-body font-semibold text-text-strong">Không tìm thấy yêu cầu</p>
+      <p className="text-secondary text-text-muted">Không có yêu cầu thanh toán nào phù hợp với điều kiện đang chọn.</p>
+      <Button className="mt-2 max-md:h-11" onClick={resetFilters} size="sm" variant="secondary">
+        Xóa lọc
+      </Button>
+    </TableState>
+  );
 
-  const updatePage = (nextPage: number) => {
-    router.push(getPaymentRequestDirectoryHref(searchParams, { filters, page: nextPage }), { scroll: false });
+  const paginationProps = {
+    itemLabel: "yêu cầu",
+    onPageChange: updatePage,
+    page: pagination.page,
+    pageCount: pagination.pageCount,
+    rangeEnd: pagination.end,
+    rangeStart: pagination.start + 1,
+    total: filteredItems.length,
   };
 
   return (
-    <div className="grid min-w-0 gap-5">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
       <PageHeader
         actions={canCreatePaymentRequests ? (
-          <Link className="inline-flex min-h-11 items-center justify-center rounded-md bg-action-primary px-4 text-control font-semibold text-text-on-primary hover:bg-action-primary-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus-ring" href={createHref}>
+          <Link className={getButtonClassName({ className: "max-md:h-11" })} href={createHref}>
             Tạo yêu cầu
           </Link>
         ) : undefined}
         title="Yêu cầu thanh toán"
       >
-        <p className="mt-1 text-secondary text-text-muted">Theo dõi các yêu cầu thanh toán đang tải; trạng thái thanh toán do hệ thống ghi nhận.</p>
+        <p className="mt-1 text-secondary tabular-nums text-text-muted">
+          {describePaymentRequestDirectoryContext(filteredItems.length, items.length)}
+        </p>
       </PageHeader>
 
-      <div className="payment-request-operational-work-area grid min-w-0 gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3" aria-live="polite">
-          <p className="text-secondary text-text-muted">
-            {filteredItems.length}/{items.length} yêu cầu trong danh sách đã tải
-          </p>
-          <Button
-            className="payment-request-filter-trigger min-h-11"
-            onClick={() => setIsFilterDrawerOpen(true)}
-            ref={filterTriggerRef}
-            type="button"
-            variant="outline"
+      <div className="payment-request-operational-work-area grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
+        {actionNotice ? (
+          <div
+            className="rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+            ref={noticeRef}
+            tabIndex={-1}
           >
-            <Filter aria-hidden="true" size={18} strokeWidth={2} />
-            Bộ lọc{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-          </Button>
-        </div>
+            <ResultBanner title={actionNotice} tone="success" />
+          </div>
+        ) : null}
 
-        <PaymentRequestFilters
-          activeFilterCount={activeFilterCount}
-          filters={filters}
-          isDrawerOpen={isFilterDrawerOpen}
-          onChange={updateFilter}
-          onCloseDrawer={() => setIsFilterDrawerOpen(false)}
-          onReset={resetFilters}
-          returnFocusRef={filterTriggerRef}
-        />
-
-        {filteredItems.length === 0 ? (
-          <EmptyState
-            actionLabel={hasActiveFilters ? "Xóa bộ lọc" : undefined}
-            description={hasActiveFilters ? "Không có yêu cầu thanh toán nào phù hợp với điều kiện đang chọn." : "Chưa có yêu cầu nạp học phí nào được tạo."}
-            onAction={hasActiveFilters ? resetFilters : undefined}
-            title={hasActiveFilters ? "Không tìm thấy yêu cầu" : "Chưa có yêu cầu thanh toán"}
-          />
-        ) : (
+        {hasNoData ? null : (
           <>
-            <section aria-label="Tóm tắt danh sách yêu cầu đang tải" className="grid gap-px overflow-hidden rounded-lg border border-border-subtle bg-border-subtle sm:grid-cols-3">
-              <SummaryItem label="Tổng dự kiến" value={formatCurrency(summary.expectedVnd)} />
-              <SummaryItem label="Đã nhận" value={formatCurrency(summary.paidVnd)} />
-              <SummaryItem description="Trong danh sách yêu cầu đang tải" label="Còn chờ nhận" value={formatCurrency(summary.outstandingVnd)} />
-            </section>
-
-            <PaymentRequestTable canCancel={canCancelPaymentRequests} items={pagination.items} />
-
-            <nav aria-label="Phân trang yêu cầu thanh toán" className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-base px-4 py-3 md:flex-row md:items-center md:justify-between">
-              <p className="text-secondary text-text-muted">
-                Hiển thị {pagination.start + 1}-{Math.min(pagination.start + PAYMENT_REQUEST_PAGE_SIZE, filteredItems.length)} của {filteredItems.length} yêu cầu · Trang {pagination.page}/{pagination.pageCount}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button className="min-h-11" disabled={pagination.page === 1} onClick={() => updatePage(pagination.page - 1)} type="button" variant="outline">Trước</Button>
-                {getVisiblePageNumbers(pagination.page, pagination.pageCount).map((pageNumber) => (
-                  <Button aria-current={pageNumber === pagination.page ? "page" : undefined} className="min-h-11 min-w-11" key={pageNumber} onClick={() => updatePage(pageNumber)} type="button" variant={pageNumber === pagination.page ? "secondary" : "ghost"}>{pageNumber}</Button>
-                ))}
-                <Button className="min-h-11" disabled={pagination.page === pagination.pageCount} onClick={() => updatePage(pagination.page + 1)} type="button" variant="outline">Sau</Button>
-              </div>
-            </nav>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <QuickFilterChips
+                chips={chips}
+                className="max-md:[&_button]:h-11"
+                // Status chips at 0 are disabled by the model; this keeps "Tất cả" clickable when a search matches nothing.
+                disableEmpty={false}
+                label="Lọc nhanh yêu cầu thanh toán"
+                onChange={selectChip}
+                value={getPaymentRequestStatusChipValue(filters)}
+              />
+              <FilterTrigger
+                activeCount={activeFilterCount}
+                className="payment-request-filter-trigger"
+                onClick={() => setIsFilterSheetOpen(true)}
+                ref={filterTriggerRef}
+              />
+            </div>
+            <PaymentRequestFilters
+              activeFilterCount={activeFilterCount}
+              filters={filters}
+              isSheetOpen={isFilterSheetOpen}
+              onChange={updateFilter}
+              onCloseSheet={() => setIsFilterSheetOpen(false)}
+              onReset={resetFilters}
+              resultCount={filteredItems.length}
+              returnFocusRef={filterTriggerRef}
+            />
           </>
         )}
+
+        {/* Whenever rows are loaded (0 ₫ for a filter that matches nothing), so the page keeps its geometry. */}
+        {hasNoData ? null : <PaymentRequestSummaryStrip summary={summary} />}
+
+        <p aria-live="polite" className="sr-only">
+          {hasNoData
+            ? ""
+            : isEmptyByFilter
+              ? "0 yêu cầu khớp bộ lọc"
+              : `Hiển thị ${pagination.start + 1}–${pagination.end} của ${filteredItems.length} yêu cầu`}
+        </p>
+
+        <PaymentRequestTable
+          actions={actions}
+          canCancel={canCancelPaymentRequests}
+          canViewStudents={canViewStudents}
+          empty={filteredItems.length === 0 ? emptyState : undefined}
+          footer={filteredItems.length > 0 ? <Pagination label="Phân trang yêu cầu thanh toán" variant="frame" {...paginationProps} /> : undefined}
+          items={pagination.items}
+          listFooter={<Pagination label="Phân trang yêu cầu thanh toán (danh sách gọn)" {...paginationProps} />}
+          now={renderNow}
+          onCancelOpen={clearActionNotice}
+          onCancelled={showCancelNotice}
+          today={businessToday}
+        />
       </div>
     </div>
   );
 }
 
-export function filterPaymentRequests(items: PaymentRequestReadModel[], filters: PaymentRequestFiltersState): PaymentRequestReadModel[] {
-  const search = normalizeSearch(filters.search);
-  return items.filter((item) => {
-    const searchable = normalizeSearch([item.publicCode, item.studentFullName, item.studentPublicCode, item.guardianFullName, item.guardianPhone, item.transferCode].filter(Boolean).join(" "));
-    const createdDate = item.createdAt.slice(0, 10);
-    return (!search || searchable.includes(search))
-      && (!filters.status || item.status === filters.status)
-      && (!filters.topupType || item.topupType === filters.topupType)
-      && (!filters.createdFrom || createdDate >= filters.createdFrom)
-      && (!filters.createdTo || createdDate <= filters.createdTo);
-  });
+/** Money over the filtered loaded rows only (never a centre-wide figure). */
+function PaymentRequestSummaryStrip({ summary }: { summary: PaymentRequestSummary }) {
+  return (
+    <section
+      aria-label="Tóm tắt danh sách yêu cầu đang tải"
+      className="overflow-hidden rounded-lg border border-border-subtle bg-border-subtle shadow-[var(--panel-shadow)]"
+    >
+      <dl className="grid grid-cols-1 gap-px @min-[560px]:grid-cols-3">
+        <SummaryItem caption="Không gồm phiếu đã hủy, hết hạn" label="Phải thu" value={formatVnd(summary.expectedVnd)} />
+        <SummaryItem label="Đã thu" value={formatVnd(summary.paidVnd)} />
+        <SummaryItem caption="Trong danh sách yêu cầu đang tải" label="Còn chờ nhận" value={formatVnd(summary.outstandingVnd)} />
+      </dl>
+    </section>
+  );
 }
 
-export function paginatePaymentRequests(items: PaymentRequestReadModel[], requestedPage: number) {
-  const pageCount = Math.max(1, Math.ceil(items.length / PAYMENT_REQUEST_PAGE_SIZE));
-  const page = Math.min(Math.max(requestedPage, 1), pageCount);
-  const start = (page - 1) * PAYMENT_REQUEST_PAGE_SIZE;
-  return { items: items.slice(start, start + PAYMENT_REQUEST_PAGE_SIZE), page, pageCount, start };
+function SummaryItem({ caption, label, value }: { caption?: string; label: string; value: string }) {
+  return (
+    <div className="bg-surface-base px-4 py-2.5">
+      <dt className="text-label text-text-muted">{label}</dt>
+      <dd className="text-section-title font-semibold tabular-nums text-text-strong">{value}</dd>
+      {caption ? <dd className="text-caption text-text-muted">{caption}</dd> : null}
+    </div>
+  );
 }
-
-export function countActivePaymentRequestFilters(filters: PaymentRequestFiltersState): number {
-  return [filters.search, filters.status, filters.topupType, filters.createdFrom, filters.createdTo].filter(Boolean).length;
-}
-
-function summarizePaymentRequests(items: PaymentRequestReadModel[]) {
-  return items.reduce((summary, item) => {
-    summary.expectedVnd += item.expectedAmountVnd;
-    summary.paidVnd += item.paidAmountVnd;
-    if (item.status === "pending" || item.status === "partially_paid") summary.outstandingVnd += Math.max(item.expectedAmountVnd - item.paidAmountVnd, 0);
-    return summary;
-  }, { expectedVnd: 0, outstandingVnd: 0, paidVnd: 0 });
-}
-
-function SummaryItem({ description, label, value }: { description?: string; label: string; value: string }) {
-  return <div className="bg-surface-base px-4 py-3"><p className="text-label text-text-muted">{label}</p><p className="mt-1 tabular-nums text-numeric text-text-strong">{value}</p>{description ? <p className="mt-1 text-caption text-text-muted">{description}</p> : null}</div>;
-}
-
-function normalizeSearch(value: string): string {
-  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").replaceAll("đ", "d").toLocaleLowerCase("vi").trim();
-}
-
-function getVisiblePageNumbers(currentPage: number, pageCount: number): number[] {
-  const start = Math.max(1, Math.min(currentPage - 2, pageCount - 4));
-  const end = Math.min(pageCount, start + 4);
-  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
-}
-
-const currencyFormatter = new Intl.NumberFormat("vi-VN", { currency: "VND", maximumFractionDigits: 0, style: "currency" });
-function formatCurrency(value: number): string { return currencyFormatter.format(value); }

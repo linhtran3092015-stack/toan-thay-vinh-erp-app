@@ -31,17 +31,6 @@ export function mergePendingPaymentRequestFilter(
   return { ...(pending ?? rendered), [key]: value };
 }
 
-export function arePaymentRequestFiltersEqual(
-  left: PaymentRequestFiltersState,
-  right: PaymentRequestFiltersState,
-): boolean {
-  return left.search === right.search
-    && left.status === right.status
-    && left.topupType === right.topupType
-    && left.createdFrom === right.createdFrom
-    && left.createdTo === right.createdTo;
-}
-
 export function parsePaymentRequestDirectoryViewState(
   params: SearchParamsLike,
 ): PaymentRequestDirectoryViewState {
@@ -77,12 +66,21 @@ export function serializePaymentRequestDirectoryViewState(
   return next;
 }
 
+/** The list's real route; the default of every href built here. */
+export const PAYMENT_REQUEST_DIRECTORY_PATH = "/finance/payment-requests";
+
+/**
+ * `basePath`: the list's own path (the /dev/lists preview passes `/dev/lists`
+ * so filter writes stay on fixtures; unrelated params such as `view` are kept
+ * by the serializer).
+ */
 export function getPaymentRequestDirectoryHref(
   current: SearchParamsLike,
   state: PaymentRequestDirectoryViewState,
+  basePath: string = PAYMENT_REQUEST_DIRECTORY_PATH,
 ): string {
   const query = serializePaymentRequestDirectoryViewState(current, state).toString();
-  return query ? `/finance/payment-requests?${query}` : "/finance/payment-requests";
+  return query ? `${basePath}?${query}` : basePath;
 }
 
 export function getPaymentRequestDirectoryQuery(params: SearchParamsLike): string {
