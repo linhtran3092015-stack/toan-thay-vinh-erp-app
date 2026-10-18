@@ -61,3 +61,6 @@ supabase/.temp/
 next-env.d.ts
 .gstack/
 /.tmp/
+
+# AI grading eval data (student answers, scores): never commit
+/.ai-grading-eval/
