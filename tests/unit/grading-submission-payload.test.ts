@@ -44,6 +44,17 @@ describe("grading submission payload", () => {
     expect(result.data.rawPayload.answerLength).toBe(GRADING_ANSWER_MAX_CHARS + 5);
   });
 
+  it("cuts by code point so an emoji at the limit is never split, and drops NUL characters", () => {
+    const answer = `${"x".repeat(GRADING_ANSWER_MAX_CHARS - 1)}😀😀`;
+    const result = parseGradingSubmissionPayload(JSON.stringify({ ...valid, answerText: answer, fullName: "An\u0000h" }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(Array.from(result.data.answerText)).toHaveLength(GRADING_ANSWER_MAX_CHARS);
+    expect(result.data.answerText.endsWith("😀")).toBe(true);
+    expect(result.data.answerTruncated).toBe(true);
+    expect(result.data.payload.fullName).toBe("Anh");
+  });
+
   it("keeps only key names of unknown fields in raw_payload, never their values or the answer", () => {
     const result = parseGradingSubmissionPayload(JSON.stringify({ ...valid, sdtBoMe: "0912344828" }));
     expect(result.ok).toBe(true);
@@ -58,6 +69,7 @@ describe("grading submission payload", () => {
     ["bad JSON", "{"],
     ["a short external id", JSON.stringify({ ...valid, externalId: "abc" })],
     ["a malformed student code", JSON.stringify({ ...valid, studentCode: "12345" })],
+    ["an over-long student code", JSON.stringify({ ...valid, studentCode: `TV-2015-${"1".repeat(31)}` })],
     ["an empty name", JSON.stringify({ ...valid, fullName: "   " })],
     ["an impossible birth year", JSON.stringify({ ...valid, birthYear: 1890 })],
     ["a time without zone", JSON.stringify({ ...valid, submittedAt: "2026-10-18 19:25:03" })],

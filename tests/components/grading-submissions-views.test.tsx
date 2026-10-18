@@ -85,6 +85,20 @@ describe("SessionSubmissionsCard", () => {
     expect(screen.getByText("Trần Thị Bình")).toBeInTheDocument();
   });
 
+  it("masks names and codes like the rest of the session page without students.view", () => {
+    render(
+      <SessionSubmissionsCard
+        canViewStudents={false}
+        participants={[participant({})]}
+        result={{ data: [submission({}), submission({ id: "sub-x", studentCode: "TV-2026-00077", studentId: "s-x", studentName: "Ngô Văn Ngoài" })], ok: true }}
+      />,
+    );
+    expect(screen.getByText("Học viên 1")).toBeInTheDocument();
+    expect(screen.getByText("Học viên ngoài danh sách")).toBeInTheDocument();
+    expect(screen.queryByText("Lê Văn An")).toBeNull();
+    expect(screen.queryByText("TV-2026-00077")).toBeNull();
+  });
+
   it("shows the load error instead of the list", () => {
     render(<SessionSubmissionsCard canViewStudents participants={[]} result={{ error: "Không tải được bài nộp của buổi học.", ok: false }} />);
     expect(screen.getByText("Không tải được bài nộp của buổi học.")).toBeInTheDocument();

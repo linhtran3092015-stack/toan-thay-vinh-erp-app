@@ -22,7 +22,7 @@ function json(body: Record<string, unknown>, status: number) {
 /**
  * End-of-session test submitted through the Apps Script form (plan §4.2). Apps Script appends
  * the Sheet row first, then posts here; a failed post is resent by its 10-minute trigger, so any
- * non-2xx answer except 400/413/415 means "try again later".
+ * non-2xx answer except 400/413/415/422 means "try again later".
  */
 export async function POST(request: Request) {
   let secret: string;
@@ -82,7 +82,13 @@ export async function POST(request: Request) {
   try {
     result = await ingestGradingSubmission(supabase, parsed.data);
   } catch {
-    result = { error: "unexpected", ok: false };
+    result = { error: "unexpected", kind: "failed", ok: false };
+  }
+
+  if (!result.ok && result.kind === "rejected") {
+    // Apps Script marks 422 as final ("Bị từ chối") instead of resending forever.
+    console.error("GRADING_SUBMISSION_REJECTED:", result.error);
+    return json({ error: result.error, ok: false }, 422);
   }
 
   if (!result.ok) {

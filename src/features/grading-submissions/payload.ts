@@ -1,15 +1,23 @@
 import { z } from "zod";
 
 export const GRADING_ANSWER_MAX_CHARS = 20_000;
-export const GRADING_WEBHOOK_MAX_BODY_BYTES = 64 * 1024;
+/** Room for a 20,000-character Vietnamese answer (up to 3 UTF-8 bytes each) plus JSON escaping. */
+export const GRADING_WEBHOOK_MAX_BODY_BYTES = 256 * 1024;
+const ANSWER_MAX_INPUT_CHARS = 100_000;
 
 const birthYearSchema = z
   .union([z.number(), z.string().trim().regex(/^\d{4}$/)])
   .transform(Number)
   .pipe(z.number().int().min(1990).max(2100));
 
+/** Postgres text cannot hold NUL. */
+const stripNul = (value: unknown) => (typeof value === "string" ? value.replace(/\u0000/g, "") : value);
+
 /** Apps Script sends "" for an empty field; treat it like null. */
-const blankToNull = (value: unknown) => (typeof value === "string" && value.trim() === "" ? null : value);
+const blankToNull = (value: unknown) => {
+  const cleaned = stripNul(value);
+  return typeof cleaned === "string" && cleaned.trim() === "" ? null : cleaned;
+};
 
 const optionalText = (max: number) =>
   z.preprocess(
@@ -27,7 +35,7 @@ const optionalText = (max: number) =>
  * and 7 (parent phone) are deliberately not part of it (owner decision 18/10/2026).
  */
 export const gradingSubmissionPayloadSchema = z.object({
-  answerText: z.string().max(GRADING_WEBHOOK_MAX_BODY_BYTES),
+  answerText: z.preprocess(stripNul, z.string().max(ANSWER_MAX_INPUT_CHARS)),
   birthYear: birthYearSchema,
   classOption: optionalText(200),
   classOptionOther: optionalText(500),
@@ -40,13 +48,13 @@ export const gradingSubmissionPayloadSchema = z.object({
       .transform((value) => value ?? null),
   ),
   externalId: z.string().regex(/^[A-Za-z0-9_-]{8,100}$/, "externalId must be 8–100 letters, digits, - or _"),
-  fullName: z.string().trim().min(1).max(200),
+  fullName: z.preprocess(stripNul, z.string().trim().min(1).max(200)),
   studentCode: z.preprocess(
     blankToNull,
     z
       .string()
       .trim()
-      .regex(/^TV-\d{4}-\d{5,}$/i, "studentCode must look like TV-YYYY-NNNNN")
+      .regex(/^TV-\d{4}-\d{5,30}$/i, "studentCode must look like TV-YYYY-NNNNN")
       .nullish()
       .transform((value) => (value ? value.toUpperCase() : null)),
   ),
@@ -83,8 +91,10 @@ export function parseGradingSubmissionPayload(
   }
 
   const payload = result.data;
-  const answerTruncated = payload.answerText.length > GRADING_ANSWER_MAX_CHARS;
-  const answerText = answerTruncated ? payload.answerText.slice(0, GRADING_ANSWER_MAX_CHARS) : payload.answerText;
+  // Count and cut by code point (what Postgres char_length counts), never inside an emoji.
+  const answerChars = Array.from(payload.answerText);
+  const answerTruncated = answerChars.length > GRADING_ANSWER_MAX_CHARS;
+  const answerText = answerTruncated ? answerChars.slice(0, GRADING_ANSWER_MAX_CHARS).join("") : payload.answerText;
   const knownKeys = new Set(Object.keys(gradingSubmissionPayloadSchema.shape));
   const unknownKeys =
     json && typeof json === "object" ? Object.keys(json).filter((key) => !knownKeys.has(key)).sort() : [];
@@ -94,7 +104,7 @@ export function parseGradingSubmissionPayload(
       answerTruncated,
       payload,
       rawPayload: {
-        answerLength: payload.answerText.length,
+        answerLength: answerChars.length,
         birthYear: payload.birthYear,
         classOption: payload.classOption,
         classOptionOther: payload.classOptionOther,

@@ -51,7 +51,13 @@ export function SessionSubmissionsCard({
     if (submission.countsForScore) continue;
     earlierByStudent.set(submission.studentId, [...(earlierByStudent.get(submission.studentId) ?? []), submission]);
   }
-  const attendanceByStudent = new Map(participants.map((participant) => [participant.studentId, participant.attendanceStatus]));
+  const participantById = new Map(participants.map((participant) => [participant.studentId, participant]));
+  // Same masking as the rest of the session page when the viewer cannot see students.
+  const displayName = (submission: SessionGradingSubmission) => {
+    if (canViewStudents) return submission.studentName;
+    const participant = participantById.get(submission.studentId);
+    return participant ? getParticipantDisplayName(participant, participants, false) : "Học viên ngoài danh sách";
+  };
   const submittedIds = new Set(counted.map((submission) => submission.studentId));
   const missing = participants.filter(
     (participant) => participant.attendanceStatus !== null && PRESENT.has(participant.attendanceStatus) && !submittedIds.has(participant.studentId),
@@ -80,13 +86,13 @@ export function SessionSubmissionsCard({
         ) : (
           <ul className="grid gap-3">
             {counted.map((submission) => {
-              const attendance = attendanceByStudent.get(submission.studentId) ?? null;
+              const attendance = participantById.get(submission.studentId)?.attendanceStatus ?? null;
               const earlier = earlierByStudent.get(submission.studentId) ?? [];
               return (
                 <li className="grid gap-2 rounded-lg border border-border-subtle p-3" key={submission.id}>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-text-strong">{submission.studentName}</span>
-                    <span className="text-caption text-text-muted">{submission.studentCode}</span>
+                    <span className="font-semibold text-text-strong">{displayName(submission)}</span>
+                    {canViewStudents ? <span className="text-caption text-text-muted">{submission.studentCode}</span> : null}
                     <span className="text-caption text-text-muted">· nộp {formatDateTime(submission.submittedAt)}</span>
                     {submission.attemptNo && submission.attemptNo > 1 ? <Badge tone="info">Lần nộp {submission.attemptNo}</Badge> : null}
                     {attendance === null ? <Badge tone="warning">Chưa điểm danh</Badge> : null}

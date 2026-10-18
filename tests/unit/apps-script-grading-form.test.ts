@@ -25,8 +25,16 @@ type Cell = string | number;
 
 class FakeSheet {
   rows: Cell[][];
-  constructor(rows: Cell[][]) {
+  maxColumns: number;
+  constructor(rows: Cell[][], maxColumns = 26) {
     this.rows = rows.map((row) => [...row]);
+    this.maxColumns = maxColumns;
+  }
+  getMaxColumns() {
+    return this.maxColumns;
+  }
+  insertColumnsAfter(_after: number, count: number) {
+    this.maxColumns += count;
   }
   getLastRow() {
     return this.rows.length;
@@ -67,6 +75,7 @@ class FakeSheet {
       getDisplayValues: () => block().map((line) => line.map((value) => String(value).replace(/^'/, ""))),
       getValues: block,
       setValue(value: Cell) {
+        if (column > sheet.maxColumns) throw new Error("Range out of bounds");
         while (sheet.rows.length < row) sheet.rows.push([]);
         const line = sheet.rows[row - 1];
         while (line.length < column) line.push("");
@@ -149,7 +158,7 @@ function loadScript({ data, now, respond }: { data: FakeSheet; now: Date; respon
   };
   vm.createContext(context);
   vm.runInContext(CODE_GS, context);
-  return { context: context as unknown as Record<string, (...args: unknown[]) => unknown>, sent };
+  return { cache, context: context as unknown as Record<string, (...args: unknown[]) => unknown>, sent };
 }
 
 const NOW = new Date("2026-10-18T12:35:00Z"); // 19:35 in Vietnam
@@ -201,7 +210,7 @@ describe("Apps Script grading form (Code.gs)", () => {
     const header = data.rows[0];
     expect(header.slice(16)).toEqual(["Mã HS ERP", "Buổi học ERP", "Mã bài ERP", "Giờ nộp ERP", "Đã gửi ERP"]);
     const row = data.rows[2];
-    expect(row.slice(0, 3)).toEqual(["Nguyễn Minh Anh", "Anh", "13. x=18\n14. 8"]);
+    expect(row.slice(0, 3)).toEqual(["Nguyễn Minh Anh", "Anh", "'13. x=18\n14. 8"]);
     expect(row[5]).toBe("18/10/2026 19:35:00");
     expect(row[9]).toBe("Buổi 7CLC1 · 18:00–19:30");
     expect(row[14]).toBe("'0912344828");
@@ -232,7 +241,7 @@ describe("Apps Script grading form (Code.gs)", () => {
 
   it("still accepts the submission when the ERP is down, and the trigger resends only unsent new rows", () => {
     let erpUp = false;
-    const { context, sent } = loadScript({ data, now: NOW, respond: (request) => (erpUp ? erpAccepts(request) : { body: { ok: false }, status: 503 }) });
+    const { cache, context, sent } = loadScript({ data, now: NOW, respond: (request) => (erpUp ? erpAccepts(request) : { body: { ok: false }, status: 503 }) });
 
     expect(context.processForm({ buoiHoc: "B - Cơ bản - Thầy Vinh", hoTen: "IDX:0", hoTenDayDu: "Lê Văn An", linkBaiThi: "0,5", namSinh: "2014", files: [] })).toBe("OK");
     expect(String(data.rows[2][20])).toMatch(/^Lỗi 503/);
@@ -244,8 +253,52 @@ describe("Apps Script grading form (Code.gs)", () => {
     expect(String(data.rows[2][20])).toMatch(/^OK/);
 
     // Nothing left: the old row has no submission id, the new one is OK.
+    cache.clear();
     context.resendPendingSubmissions();
     expect(sent).toHaveLength(2);
+  });
+
+  it("resends newest rows first and ignores calls made right after a run (form visitors can call it)", () => {
+    let erpUp = false;
+    const { cache, context, sent } = loadScript({ data, now: NOW, respond: (request) => (erpUp ? erpAccepts(request) : { body: { ok: false }, status: 503 }) });
+    context.processForm({ buoiHoc: "Con không rõ", hoTen: "CHUA_CO_TEN", hoTenManual: "Học sinh Một", linkBaiThi: "a", namSinh: "2015", files: [] });
+    context.processForm({ buoiHoc: "Con không rõ", hoTen: "CHUA_CO_TEN", hoTenManual: "Học sinh Hai", linkBaiThi: "b", namSinh: "2015", files: [] });
+
+    erpUp = true;
+    context.resendPendingSubmissions();
+    expect(sent.slice(2).map((request) => JSON.parse(request.body ?? "{}").fullName)).toEqual(["Học sinh Hai", "Học sinh Một"]);
+
+    erpUp = false;
+    data.rows[2][20] = "Lỗi 503";
+    context.resendPendingSubmissions();
+    expect(sent).toHaveLength(4);
+    cache.clear();
+    context.resendPendingSubmissions();
+    expect(sent).toHaveLength(5);
+  });
+
+  it("adds columns when the Data tab is full, and keeps typed text from turning into formulas or dates", () => {
+    const full = new FakeSheet([OLD_HEADERS], 16);
+    const { context, sent } = loadScript({ data: full, now: NOW, respond: erpAccepts });
+    expect(
+      context.processForm({ buoiHoc: "Con không rõ", hoTen: "CHUA_CO_TEN", hoTenManual: "=IMPORTXML(1)", linkBaiThi: "15/4", namSinh: "2015", files: [] }),
+    ).toBe("OK");
+
+    expect(full.maxColumns).toBe(21);
+    expect(full.rows[1].slice(0, 3)).toEqual(["'=IMPORTXML(1)", "", "'15/4"]);
+    expect(JSON.parse(sent[0].body ?? "{}")).toMatchObject({ answerText: "15/4", fullName: "=IMPORTXML(1)" });
+  });
+
+  it("still saves the row like the old form when the ERP columns cannot be added", () => {
+    const broken = new FakeSheet([OLD_HEADERS], 16);
+    broken.insertColumnsAfter = () => {
+      throw new Error("protected range");
+    };
+    const { context, sent } = loadScript({ data: broken, now: NOW, respond: erpAccepts });
+    expect(context.processForm({ buoiHoc: "Con không rõ", hoTen: "CHUA_CO_TEN", hoTenManual: "Học sinh Ba", linkBaiThi: "c", namSinh: "2015", files: [] })).toBe("OK");
+    expect(broken.rows).toHaveLength(2);
+    expect(broken.rows[1][0]).toBe("Học sinh Ba");
+    expect(sent).toHaveLength(0);
   });
 
   it("marks a payload the ERP rejects as final instead of resending it forever", () => {

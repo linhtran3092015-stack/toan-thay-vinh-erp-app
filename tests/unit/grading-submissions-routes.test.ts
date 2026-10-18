@@ -166,11 +166,24 @@ describe("POST /api/webhooks/grading-submissions", () => {
     expect(harness.rpc).not.toHaveBeenCalled();
   });
 
-  it("rejects a body over 64 KB", async () => {
+  it("accepts a long Vietnamese answer (cut later) but rejects a body over 256 KB", async () => {
     mockRpc(happyRpc);
-    const response = await POST(webhookRequest(JSON.stringify({ ...payload, answerText: "x".repeat(70_000) })));
+    const long = await POST(webhookRequest(JSON.stringify({ ...payload, answerText: "Câu ước lượng ".repeat(2_000) })));
+    expect(long.status).toBe(200);
+    expect(harness.rpc).toHaveBeenCalledWith("record_grading_submission", expect.objectContaining({ p_answer_truncated: true }));
+
+    harness.rpc.mockClear();
+    const response = await POST(webhookRequest(JSON.stringify({ ...payload, answerText: "x".repeat(270_000) })));
     expect(response.status).toBe(413);
     expect(harness.rpc).not.toHaveBeenCalled();
+  });
+
+  it("answers 422 without an alert when the database refuses the data itself, so Apps Script stops resending", async () => {
+    mockRpc({ ...happyRpc, record_grading_submission: { data: null, error: { code: "23514", message: "check" } } });
+    const response = await POST(webhookRequest(JSON.stringify(payload)));
+
+    expect(response.status).toBe(422);
+    expect(harness.alert).not.toHaveBeenCalled();
   });
 
   it("answers 500 and raises one ops alert per day when the database fails, so Apps Script resends", async () => {

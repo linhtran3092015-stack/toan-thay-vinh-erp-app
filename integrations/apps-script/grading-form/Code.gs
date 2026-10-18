@@ -25,6 +25,8 @@ const ERP_COLUMNS = {
 };
 const ROSTER_CACHE_SECONDS = 600;
 const RESEND_BATCH = 40;
+// ERP cắt bài làm ở 20.000 ký tự và đánh dấu; gửi tối đa 60.000 để body không quá giới hạn.
+const MAX_ANSWER_CHARS_SENT = 60000;
 const RESEND_LOOKBACK_ROWS = 3000;
 const DEFAULT_BIRTH_YEARS = [2019, 2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011, 2010, 2009, 2008];
 // Lỗi do dữ liệu (không gửi lại); các lỗi khác (mạng, 401, 5xx) được gửi lại.
@@ -140,15 +142,16 @@ function processForm(formObject) {
     const allUrls = saveImages_(formObject, finalHoTen, namSinh);
 
     // 3. Ghi Sheet (khóa để cột ERP không bị tạo hai lần khi nhiều em nộp cùng lúc)
+    const answer = String(formObject.linkBaiThi || '');
     const rowData = [
-      finalHoTen,                       // A
-      formObject.tenHocSinh || '',      // B
-      formObject.linkBaiThi || '',      // C
+      sheetText_(finalHoTen),           // A
+      sheetText_(formObject.tenHocSinh || ''), // B
+      "'" + answer,                     // C (giữ nguyên chữ: "15/4", "007", "=2+3" không bị Sheets đổi)
       '', '',                           // D, E (Điểm thi, Điểm vở: trợ giảng điền)
       timeStamp,                        // F
       '', '',                           // G, H
       namSinh,                          // I
-      buoiHocText,                      // J
+      sheetText_(buoiHocText),          // J
       formObject.troGiang || '',        // K
       formObject.rating || '',          // L
       formObject.caiTien || '',         // M
@@ -159,18 +162,26 @@ function processForm(formObject) {
 
     const lock = LockService.getDocumentLock();
     lock.waitLock(20000);
-    let cols;
+    let cols = null;
     try {
-      cols = ensureErpColumns_(sheet);
-      setCell_(rowData, cols.studentCode, studentCode);
-      setCell_(rowData, cols.sessionId, sessionId);
-      setCell_(rowData, cols.externalId, externalId);
-      setCell_(rowData, cols.submittedAt, "'" + submittedAt);
-      setCell_(rowData, cols.sentStatus, '');
+      try {
+        cols = ensureErpColumns_(sheet);
+      } catch (colErr) {
+        // Không thêm được cột ERP: vẫn ghi bài vào Sheet như bản cũ, chỉ không gửi ERP.
+        console.log('Không thêm được cột ERP: ' + colErr);
+      }
+      if (cols) {
+        setCell_(rowData, cols.studentCode, studentCode);
+        setCell_(rowData, cols.sessionId, sessionId);
+        setCell_(rowData, cols.externalId, externalId);
+        setCell_(rowData, cols.submittedAt, "'" + submittedAt);
+        setCell_(rowData, cols.sentStatus, '');
+      }
       sheet.appendRow(rowData);
     } finally {
       lock.releaseLock();
     }
+    if (!cols) return 'OK';
 
     // 4. Gửi sang ERP. Lỗi ở đây không báo cho học sinh: trigger sẽ gửi lại.
     try {
@@ -178,7 +189,7 @@ function processForm(formObject) {
         version: 1,
         externalId: externalId,
         submittedAt: submittedAt,
-        answerText: String(formObject.linkBaiThi || ''),
+        answerText: limitChars_(answer, MAX_ANSWER_CHARS_SENT),
         studentCode: studentCode || null,
         fullName: finalHoTen,
         birthYear: Number(namSinh),
@@ -233,6 +244,8 @@ function saveImages_(formObject, finalHoTen, namSinh) {
 // Gửi lại các dòng có "Mã bài ERP" mà "Đã gửi ERP" chưa phải "OK…" hay "Bị từ chối…".
 // Dòng cũ (trước khi dùng bản này) không có mã bài nên không bao giờ bị gửi.
 function resendPendingSubmissions() {
+  // Ai mở form cũng gọi được hàm công khai qua google.script.run: chặn chạy dồn dập.
+  if (!runAtMostEvery_('resend', 240)) return;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) return;
   try {
@@ -247,8 +260,9 @@ function resendPendingSubmissions() {
     const width = sheet.getLastColumn();
     const values = sheet.getRange(first, 1, last - first + 1, width).getDisplayValues();
 
+    // Mới nhất trước: dòng lỗi mãi ở phía trên không chặn được bài mới.
     let sent = 0;
-    for (let i = 0; i < values.length && sent < RESEND_BATCH; i++) {
+    for (let i = values.length - 1; i >= 0 && sent < RESEND_BATCH; i--) {
       const row = values[i];
       const externalId = row[cols.externalId - 1];
       const status = row[cols.sentStatus - 1];
@@ -277,7 +291,7 @@ function payloadFromRow_(row, cols) {
     version: 1,
     externalId: row[cols.externalId - 1],
     submittedAt: String(row[cols.submittedAt - 1]).replace(/^'/, ''),
-    answerText: String(row[2] || ''),
+    answerText: limitChars_(String(row[2] || ''), MAX_ANSWER_CHARS_SENT),
     studentCode: cleanStudentCode_(row[cols.studentCode - 1]) || null,
     fullName: String(row[0] || '').trim(),
     birthYear: Number(row[8]),
@@ -288,6 +302,7 @@ function payloadFromRow_(row, cols) {
 }
 
 function installResendTrigger() {
+  if (!runAtMostEvery_('install-trigger', 60)) return;
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'resendPendingSubmissions') ScriptApp.deleteTrigger(t);
   });
@@ -299,6 +314,10 @@ function installResendTrigger() {
 // ---------------------------------------------------------------------------
 
 function testErpConnection() {
+  if (!runAtMostEvery_('test-connection', 30)) {
+    console.log('Vừa chạy xong, đợi 30 giây rồi chạy lại.');
+    return;
+  }
   const cfg = getConfig_();
   if (!cfg.enabled) {
     console.log('Chưa cấu hình: đặt ERP_BASE_URL và ERP_FORM_SECRET (ít nhất 32 ký tự) trong Script Properties.');
@@ -394,6 +413,7 @@ function ensureErpColumns_(sheet) {
     if (index >= 0) {
       cols[key] = index + 1;
     } else {
+      if (next > sheet.getMaxColumns()) sheet.insertColumnsAfter(sheet.getMaxColumns(), next - sheet.getMaxColumns());
       sheet.getRange(1, next).setValue(ERP_COLUMNS[key]);
       cols[key] = next;
       next++;
@@ -409,7 +429,27 @@ function setCell_(rowData, column, value) {
 
 function cleanStudentCode_(value) {
   const code = String(value || '').trim().toUpperCase();
-  return /^TV-\d{4}-\d{5,}$/.test(code) ? code : '';
+  return /^TV-\d{4}-\d{5,30}$/.test(code) ? code : '';
+}
+
+// Chữ do học sinh gõ bắt đầu bằng = + - @ thì Sheets coi là công thức: thêm ' để giữ là chữ.
+function sheetText_(value) {
+  const text = String(value || '');
+  return /^[=+\-@]/.test(text) ? "'" + text : text;
+}
+
+function limitChars_(text, max) {
+  const chars = Array.from(String(text || ''));
+  return chars.length > max ? chars.slice(0, max).join('') : String(text || '');
+}
+
+// true nếu chưa chạy trong `seconds` giây qua (đánh dấu luôn lần chạy này).
+function runAtMostEvery_(name, seconds) {
+  const cache = CacheService.getScriptCache();
+  const key = 'run-' + name;
+  if (cache.get(key)) return false;
+  cache.put(key, '1', seconds);
+  return true;
 }
 
 function cleanUuid_(value) {

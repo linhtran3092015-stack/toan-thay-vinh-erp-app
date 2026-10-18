@@ -49,7 +49,11 @@ const recordResultSchema = z.object({
 
 export type GradingIntakeResult =
   | { duplicate: boolean; match: GradingMatchResult; matchStatus: string; ok: true; submissionId: string }
-  | { error: string; ok: false };
+  /** "rejected": the database refused the data itself (a resend would fail the same way). */
+  | { error: string; kind: "failed" | "rejected"; ok: false };
+
+// check_violation, not_null_violation, string_data_right_truncation, character_not_in_repertoire, untranslatable_character
+const DATA_ERROR_CODES = new Set(["23514", "23502", "22001", "22021", "22P05"]);
 
 /** Loads candidates, matches (plan §4.3) and records one submission. Idempotent on externalId. */
 export async function ingestGradingSubmission(
@@ -65,9 +69,9 @@ export async function ingestGradingSubmission(
     p_on: submittedOn,
     p_student_code: sqlNull(payload.studentCode),
   });
-  if (students.error) return { error: "student_candidates_failed", ok: false };
+  if (students.error) return { error: "student_candidates_failed", kind: "failed", ok: false };
   const studentRows = z.array(studentCandidateSchema).safeParse(students.data ?? []);
-  if (!studentRows.success) return { error: "student_candidates_invalid", ok: false };
+  if (!studentRows.success) return { error: "student_candidates_invalid", kind: "failed", ok: false };
   const studentCandidates: StudentCandidate[] = studentRows.data.map((row) => ({
     birthYear: row.birth_year,
     fullName: row.full_name,
@@ -91,9 +95,9 @@ export async function ingestGradingSubmission(
       p_on: submittedOn,
       p_student_id: match.studentId,
     });
-    if (sessions.error) return { error: "session_candidates_failed", ok: false };
+    if (sessions.error) return { error: "session_candidates_failed", kind: "failed", ok: false };
     const sessionRows = z.array(sessionCandidateSchema).safeParse(sessions.data ?? []);
-    if (!sessionRows.success) return { error: "session_candidates_invalid", ok: false };
+    if (!sessionRows.success) return { error: "session_candidates_invalid", kind: "failed", ok: false };
     const sessionCandidates: SessionCandidate[] = sessionRows.data.map((row) => ({
       attendanceStatus: row.attendance_status,
       classCode: row.class_code,
@@ -126,9 +130,13 @@ export async function ingestGradingSubmission(
     p_student_match_method: sqlNull(match.studentMethod),
     p_submitted_at: submittedAt.toISOString(),
   });
-  if (recorded.error) return { error: "record_failed", ok: false };
+  if (recorded.error) {
+    return DATA_ERROR_CODES.has(recorded.error.code ?? "")
+      ? { error: `record_rejected_${recorded.error.code}`, kind: "rejected", ok: false }
+      : { error: "record_failed", kind: "failed", ok: false };
+  }
   const row = z.array(recordResultSchema).safeParse(recorded.data ?? []);
-  if (!row.success || row.data.length !== 1) return { error: "record_invalid", ok: false };
+  if (!row.success || row.data.length !== 1) return { error: "record_invalid", kind: "failed", ok: false };
 
   return {
     duplicate: !row.data[0].inserted,
