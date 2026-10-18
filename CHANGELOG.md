@@ -2,6 +2,11 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.26.0.3] - 2026-10-19
+
+### Fixed
+- **Tab đang mở trên trang hiện màu xanh rêu** như thiết kế (Lớp học, Hồ sơ học sinh, Giao dịch SePay, Chăm sóc học sinh, Buổi học). Trước đây chữ của tab đang mở cùng màu xám với các tab khác, chỉ phân biệt bằng gạch chân và chữ đậm. Ở giao diện tối, tab đang mở và số việc tồn dùng sắc xanh rêu sáng để đọc rõ trên nền tối.
+
 ## [0.23.0.0] - 2026-10-18
 
 Danh sách Tài chính dựng lại theo phong cách Stumana (bước 14c): Đơn hàng cho kế toán thấy ngay đơn nào chưa xác nhận và quyết toán SB từng đợt, Sổ cái số buổi đọc dễ hơn, Yêu cầu thanh toán lọc nhanh theo trạng thái và ghi giờ đúng giờ Việt Nam.
