@@ -42,13 +42,40 @@ export interface StickySaveBarProps {
    * is often not announced). Empty = nothing visible.
    */
   statusMessage?: string;
+  /**
+   * A second action left of the save button (e.g. "Lưu và thêm tiếp" on a
+   * create form). Rendered as a secondary button whenever the save button is,
+   * and disabled while saving; the feature owns its other disabled rules and
+   * what it does (for a submit bar, typically `form.requestSubmit()` with a
+   * flag of its own).
+   */
+  secondaryAction?: { label: string; onClick: () => void; disabled?: boolean };
+  /**
+   * Replaces the state text ("n thay đổi chưa lưu" / the clean label) in any
+   * state, e.g. "Đang nhập · 1 lỗi cần sửa". The changed labels still follow
+   * it while dirty, and it stays the fallback reason of a disabled save.
+   */
+  stateLabel?: string;
+  /**
+   * Dot colour. `default` (or omitted) keeps the built-in rule: grey when
+   * clean, warning when dirty. `warning` and `danger` force that colour.
+   */
+  stateTone?: "default" | "warning" | "danger";
 }
+
+const dotToneClassName = {
+  clean: "bg-text-subtle",
+  danger: "bg-danger",
+  warning: "bg-warning",
+} as const;
 
 /**
  * Save bar for long settings forms (design 09a, 17a): fixed to the viewport
  * bottom inside the content column (it never covers the sidebar or rail).
  * Clean: grey dot, "Chưa có thay đổi", save disabled. Dirty: warning dot,
  * "n thay đổi chưa lưu", the changed field names, Hủy and the save button.
+ * Long create forms (17a) may add a secondary action ("Lưu và thêm tiếp") and
+ * override the state text and dot (e.g. "Đang nhập · 1 lỗi cần sửa", danger).
  * Presentation only: features decide who sees the bar (render it only for
  * people who can save), what counts as a change and what saving does.
  *
@@ -74,6 +101,9 @@ export function StickySaveBar({
   saveLabel,
   saveType = "button",
   savingLabel,
+  secondaryAction,
+  stateLabel,
+  stateTone = "default",
   statusMessage = "",
 }: StickySaveBarProps) {
   const stateId = useId();
@@ -84,6 +114,8 @@ export function StickySaveBar({
   const isSaveDisabled = saveDisabled ?? !isDirty;
   const showReason = isSaveDisabled && !isSaving && Boolean(saveDisabledReason);
   const describedBy = isSaveDisabled && !isSaving ? (showReason ? reasonId : stateId) : undefined;
+  const dotTone = stateTone === "default" ? (isDirty ? "warning" : "clean") : stateTone;
+  const isSecondaryDisabled = isSaving || Boolean(secondaryAction?.disabled);
 
   useEffect(() => {
     const element = barRef.current;
@@ -123,11 +155,12 @@ export function StickySaveBar({
               aria-hidden="true"
               className={cn(
                 "h-2 w-2 shrink-0 rounded-full transition-colors duration-150",
-                isDirty ? "bg-warning" : "bg-text-subtle",
+                dotToneClassName[dotTone],
               )}
+              data-tone={dotTone}
             />
             <span className="shrink-0 text-body font-semibold text-text-strong" id={stateId}>
-              {isDirty ? `${dirtyCount} thay đổi chưa lưu` : cleanLabel}
+              {stateLabel ?? (isDirty ? `${dirtyCount} thay đổi chưa lưu` : cleanLabel)}
             </span>
             {isDirty && changedLabels.length > 0 ? (
               <span
@@ -155,7 +188,8 @@ export function StickySaveBar({
             >
               {statusMessage}
             </p>
-            <div className="ml-auto flex shrink-0 items-center gap-2">
+            {/* max-w-full + wrap: three buttons (Hủy, a secondary, save) may not fit one 375px line. */}
+            <div className="ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
               {isDirty ? (
                 <Button
                   className="max-md:h-11"
@@ -164,6 +198,18 @@ export function StickySaveBar({
                   variant="secondary"
                 >
                   Hủy
+                </Button>
+              ) : null}
+              {secondaryAction ? (
+                <Button
+                  // The save's reason covers it when both are disabled for the same reason.
+                  aria-describedby={isSecondaryDisabled ? describedBy : undefined}
+                  className="max-md:h-11"
+                  disabled={isSecondaryDisabled}
+                  onClick={secondaryAction.onClick}
+                  variant="secondary"
+                >
+                  {secondaryAction.label}
                 </Button>
               ) : null}
               <Button

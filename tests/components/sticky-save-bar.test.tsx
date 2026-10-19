@@ -197,3 +197,98 @@ describe("StickySaveBar page integration", () => {
     expect(row?.parentElement).toHaveClass("border-t", "bg-surface-base");
   });
 });
+
+// Value: protects=the additive props for long create forms (design 17a): a secondary action renders as a secondary button between Hủy and the save button whenever the save button renders (clean or dirty), calls its handler, and is disabled while saving or when the feature disables it; stateLabel replaces the state text in any state (the changed labels still follow while dirty, and it remains the fallback reason of a disabled save); stateTone colours the dot (danger/warning forced, default keeps grey-when-clean and warning-when-dirty); without the new props nothing changes;
+// fails_when=the secondary action is missing, out of order, clickable while saving, styled as a second primary, or hidden while clean; stateLabel is ignored or drops the changed labels; the dot ignores stateTone or the default rule changes;
+// why_new=step 15a adds "Lưu và thêm tiếp" and "Đang nhập · n lỗi cần sửa" for the student form; seam=none (presentational component rendered directly); no_claim=what the feature's secondary action does or when it disables it (lane tests)
+describe("StickySaveBar secondary action and state overrides", () => {
+  function dot(text: string) {
+    return screen.getByText(text).previousElementSibling as HTMLElement;
+  }
+
+  it("renders the secondary action between Hủy and the save button and calls it", () => {
+    const onSecondary = vi.fn();
+    render(<StickySaveBar dirtyCount={2} onCancel={vi.fn()} onSave={vi.fn()} saveLabel="Lưu học sinh" secondaryAction={{ label: "Lưu và thêm tiếp", onClick: onSecondary }} />);
+    const bar = screen.getByRole("region", { name: "Thanh lưu thay đổi" });
+    const buttons = within(bar).getAllByRole("button");
+
+    expect(buttons.map((button) => button.textContent)).toEqual(["Hủy", "Lưu và thêm tiếp", "Lưu học sinh"]);
+    // One primary: the secondary uses the secondary variant, never the primary fill.
+    expect(buttons[1].className).not.toContain("bg-action-primary");
+    expect(buttons[2].className).toContain("bg-action-primary");
+    fireEvent.click(buttons[1]);
+    expect(onSecondary).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the secondary action next to a disabled save while clean, and lets the feature disable it with the same reason", () => {
+    render(
+      <StickySaveBar dirtyCount={0} onCancel={vi.fn()} onSave={vi.fn()} saveLabel="Lưu học sinh" secondaryAction={{ disabled: true, label: "Lưu và thêm tiếp", onClick: vi.fn() }} />,
+    );
+    const secondary = screen.getByRole("button", { name: "Lưu và thêm tiếp" });
+
+    expect(screen.queryByRole("button", { name: "Hủy" })).not.toBeInTheDocument();
+    expect(secondary).toBeDisabled();
+    expect(secondary).toHaveAccessibleDescription("Chưa có thay đổi");
+    expect(screen.getByRole("button", { name: "Lưu học sinh" })).toBeDisabled();
+  });
+
+  it("enables the secondary action by default, also while clean", () => {
+    render(<StickySaveBar dirtyCount={0} onCancel={vi.fn()} saveLabel="Lưu" secondaryAction={{ label: "Xem trước", onClick: vi.fn() }} />);
+    expect(screen.getByRole("button", { name: "Xem trước" })).toBeEnabled();
+  });
+
+  it("disables the secondary action while saving", () => {
+    render(
+      <StickySaveBar dirtyCount={1} isSaving onCancel={vi.fn()} saveLabel="Lưu học sinh" savingLabel="Đang lưu…" secondaryAction={{ label: "Lưu và thêm tiếp", onClick: vi.fn() }} />,
+    );
+    expect(screen.getByRole("button", { name: "Lưu và thêm tiếp" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Đang lưu…" })).toBeDisabled();
+  });
+
+  it("replaces the state text with stateLabel while dirty and keeps the changed labels", () => {
+    render(
+      <StickySaveBar
+        changedLabels={["Số điện thoại phụ huynh"]}
+        dirtyCount={3}
+        onCancel={vi.fn()}
+        saveLabel="Lưu học sinh"
+        stateLabel="Đang nhập · 1 lỗi cần sửa"
+        stateTone="danger"
+      />,
+    );
+    const bar = screen.getByRole("region", { name: "Thanh lưu thay đổi" });
+
+    expect(bar).toHaveTextContent("Đang nhập · 1 lỗi cần sửa");
+    expect(bar).not.toHaveTextContent("3 thay đổi chưa lưu");
+    expect(bar).toHaveTextContent("Số điện thoại phụ huynh");
+    expect(dot("Đang nhập · 1 lỗi cần sửa")).toHaveClass("bg-danger");
+    expect(dot("Đang nhập · 1 lỗi cần sửa")).toHaveAttribute("data-tone", "danger");
+    // Validation errors do not disable the save: submitting focuses the first invalid field.
+    expect(within(bar).getByRole("button", { name: "Lưu học sinh" })).toBeEnabled();
+  });
+
+  it("replaces the clean text with stateLabel, which stays the disabled save's reason", () => {
+    render(<StickySaveBar dirtyCount={0} onCancel={vi.fn()} saveLabel="Lưu" stateLabel="Chưa nhập gì" stateTone="warning" />);
+    const bar = screen.getByRole("region", { name: "Thanh lưu thay đổi" });
+
+    expect(bar).toHaveTextContent("Chưa nhập gì");
+    expect(bar).not.toHaveTextContent("Chưa có thay đổi");
+    expect(screen.getByRole("button", { name: "Lưu" })).toHaveAccessibleDescription("Chưa nhập gì");
+    expect(dot("Chưa nhập gì")).toHaveClass("bg-warning");
+  });
+
+  it("keeps the default dot rule: grey when clean, warning when dirty", () => {
+    const { rerender } = render(<StickySaveBar dirtyCount={0} onCancel={vi.fn()} saveLabel="Lưu" />);
+    expect(dot("Chưa có thay đổi")).toHaveClass("bg-text-subtle");
+    expect(dot("Chưa có thay đổi")).not.toHaveClass("bg-warning");
+
+    rerender(<StickySaveBar dirtyCount={2} onCancel={vi.fn()} saveLabel="Lưu" stateTone="default" />);
+    expect(dot("2 thay đổi chưa lưu")).toHaveClass("bg-warning");
+    expect(dot("2 thay đổi chưa lưu")).not.toHaveClass("bg-text-subtle");
+  });
+
+  it("lets three buttons wrap instead of overflowing a phone-width bar", () => {
+    render(<StickySaveBar dirtyCount={1} onCancel={vi.fn()} saveLabel="Lưu học sinh" secondaryAction={{ label: "Lưu và thêm tiếp", onClick: vi.fn() }} />);
+    expect(screen.getByRole("button", { name: "Lưu học sinh" }).parentElement).toHaveClass("ml-auto", "max-w-full", "flex-wrap", "justify-end");
+  });
+});
