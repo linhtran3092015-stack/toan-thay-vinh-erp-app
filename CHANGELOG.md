@@ -2,6 +2,13 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.26.0.4] - 2026-10-19
+
+### Fixed
+- **Ô nhập mã và mẫu tin dùng phông chữ đơn cách (monospace) như thiết kế** thay vì phông chữ thường: hai ô mẫu tin nhắn Zalo trong Cài đặt, ô "Mã học viên" trên form hồ sơ học viên, ô liên kết Coaching vừa tạo, ô gõ "GHI SO DU" khi ghi số dư buổi đã nhập.
+- **Tiêu đề hiện đúng khoảng cách chữ đã thiết kế**: các nhãn viết hoa giãn rộng hơn, dễ đọc hơn ("Hoạt động học vụ & vận hành" trên Tổng quan, nhãn trên Tổng quan bảng lương, "Phiếu Lương" và tiêu đề các mục trên phiếu lương, "PHIẾU HỌC PHÍ" trên phiếu học phí và bản in); tiêu đề lớn ở Nhật ký, Thông báo, Báo cáo, Chấm công và các trang nhập dữ liệu khít chữ hơn một chút.
+- Nút "Hủy buổi học" mờ dần khi rê chuột thay vì đổi đột ngột. Máy bật "giảm chuyển động" vẫn không có hiệu ứng nào.
+
 ## [0.26.0.3] - 2026-10-19
 
 ### Fixed
