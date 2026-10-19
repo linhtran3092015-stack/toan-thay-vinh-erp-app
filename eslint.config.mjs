@@ -5,13 +5,15 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // The service-role client bypasses RLS. Only the SePay webhook and the
-  // SePay history sync (both permission-checked) may use it.
+  // The service-role client bypasses RLS. Only the HMAC-signed webhooks, the
+  // signed grading-form roster and the SePay history sync (permission-checked)
+  // may use it.
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: [
       "src/lib/supabase/**",
       "src/app/api/webhooks/**",
+      "src/app/api/integrations/grading-roster/route.ts",
       "src/features/finance/sepay-history-sync-actions.ts",
     ],
     rules: {
