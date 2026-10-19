@@ -1,6 +1,6 @@
 // Value: protects=the /dev/lists preview of design 16 (sessions, learning results, grading credits) renders the real list pages from fixtures with a fixed clock (16/10/2026 12:00), keeps every URL write on the History API and on /dev/lists itself (the router is never called and the address never becomes /sessions, so neither a click nor a reload reaches the production-backed route), gives the shell the real route as previewPathname, gates links and columns by the role's permissions (owner vs TA), covers the capped (a full lock-queue page: notice and N+ panel naming the same cap, the newest completed session without queue facts) and empty states, keeps the queue panel's "Lọc danh sách" on /dev/lists (pressing "Chờ khóa" there), falls back on unknown params and 404s in production;
 // fails_when=the sessions list goes back to router.replace/push or writes /sessions?… from the preview, a fixture drifts so a state (lock queue readiness, overdue captions, cancelled reason, online link, Vietnam-month credit) disappears, the panel link leaves the preview, state=capped stops showing the partial queue (or its notice and panel disagree on the cap), the TA gets lock actions, class/student links or the grader column, the empty sessions view loses its table frame, the param whitelist stops falling back, or the production guard is removed;
-// why_new=step 14a adds the sessions, results and credits views to /dev/lists; step 14b adds advances, staff and commissions (their bodies are covered by dev-lists-{advances,staff,commissions}-preview tests) and the accountant role; step 14c adds finance-orders, session-ledger and payment-requests (bodies covered by dev-lists-{finance-orders,session-ledger,payment-requests}-preview tests) and the accountant's finance grants on those views only;
+// why_new=step 14a adds the sessions, results and credits views to /dev/lists; step 14b adds advances, staff and commissions (their bodies are covered by dev-lists-{advances,staff,commissions}-preview tests) and the accountant role; step 14c adds finance-orders, session-ledger and payment-requests (bodies covered by dev-lists-{finance-orders,session-ledger,payment-requests}-preview tests) and the accountant's finance grants on those views only; step 14d adds notifications, audit and reports (bodies covered by dev-lists-{notifications,audit,reports}-preview tests), the notifications.view/reports.view grants every role holds on those views, and the bell count taken from the notifications fixture;
 // seam=next/navigation is mocked (notFound throws a marker, the router is spied, search params are a settable string, `view=sessions` in the sessions cases); AppShell is replaced by a marked wrapper exposing its props; window.history is spied; no_claim=does not prove the real routes' loaders or that /dev is unreachable in production at the proxy (public-coaching-route-access covers that gate)
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
@@ -73,6 +73,11 @@ describe("/dev/lists page", () => {
     for (const view of ["finance-orders", "session-ledger", "payment-requests"] as const) {
       const step14c = (await DevListsPage({ searchParams: Promise.resolve({ role: "accountant", state: "capped", view }) })) as ReactElement<Record<string, unknown>>;
       expect(step14c.props).toEqual({ role: "accountant", state: "capped", view });
+    }
+
+    for (const view of ["notifications", "audit", "reports"] as const) {
+      const step14d = (await DevListsPage({ searchParams: Promise.resolve({ role: "ta", state: "empty", view }) })) as ReactElement<Record<string, unknown>>;
+      expect(step14d.props).toEqual({ role: "ta", state: "empty", view });
     }
   });
 });
@@ -324,5 +329,85 @@ describe("/dev/lists step 14c views (design 16a finance rows)", () => {
     for (const code of ["finance.view", "payments.view", "session_ledger.view"]) {
       expect(shellProps.last?.permissions as string[]).not.toContain(code);
     }
+  });
+});
+
+describe("/dev/lists step 14d views (design 16a system rows)", () => {
+  it("renders the notifications, audit and reports pages with the real route as previewPathname", () => {
+    const notifications = renderPreview("notifications");
+    expect(shellProps.last?.previewPathname).toBe("/notifications");
+    expect(screen.getByRole("list", { name: "Danh sách thông báo" })).toBeInTheDocument();
+    notifications.unmount();
+
+    const audit = renderPreview("audit");
+    expect(shellProps.last?.previewPathname).toBe("/audit");
+    expect(screen.getByRole("heading", { level: 1, name: "Nhật ký hệ thống" })).toBeInTheDocument();
+    expect(screen.getAllByRole("table").length).toBeGreaterThan(0);
+    audit.unmount();
+
+    renderPreview("reports");
+    expect(shellProps.last?.previewPathname).toBe("/reports");
+    expect(screen.getByRole("heading", { level: 1, name: "Báo cáo & Xuất dữ liệu" })).toBeInTheDocument();
+  });
+
+  // Value: protects=the TA and accountant shells on the system views hold notifications.view and reports.view (every app role does per migrations) but never audit.view, while their other views keep the earlier exact sets, and the bell shows the notifications fixture's own unread total; fails_when=the system grants leak into another view (the advances accountant pin) or vanish from these views (the shell nav would hide pages the body renders), audit.view reaches a non-owner, or the bell keeps a hard-coded count that disagrees with the page header; why_new=step 14d adds three views whose non-owner roles need these codes; seam=AppShell wrapper (permissions and unreadNotificationCount read from its props); no_claim=the production permission matrix (the owner can edit it in Cài đặt)
+  it("grants notifications and reports, never audit, to the TA and the accountant on the system views only", () => {
+    for (const role of ["ta", "accountant"] as const) {
+      for (const view of ["notifications", "audit", "reports"] as const) {
+        const rendered = renderPreview(view, role);
+        const permissions = shellProps.last?.permissions as string[];
+        expect(permissions).toEqual(expect.arrayContaining(["notifications.view", "reports.view"]));
+        expect(permissions).not.toContain("audit.view");
+        rendered.unmount();
+      }
+    }
+
+    const owner = renderPreview("audit");
+    expect(shellProps.last?.permissions as string[]).toContain("audit.view");
+    owner.unmount();
+
+    renderPreview("advances", "accountant");
+    expect(shellProps.last?.permissions).toEqual(["advances.request", "advances.review", "advances.view", "payroll.view"]);
+  });
+
+  // Value: protects=the reports and audit bodies decide from the same permission codes the shell gets (one source, preview-permissions.ts): a reports card shows exactly when the shell holds its module view, and "empty" drops those views from both; fails_when=a body keeps its own copy of the role sets again (the nav and the cards could disagree) or the empty state leaves module views in the shell; why_new=review cycle 1 (testing + maintainability) found the reports body hand-copied the controller's sets; seam=AppShell wrapper (permissions read from its props); no_claim=the production permission matrix
+  it("gives the reports and audit bodies the shell's own permission codes", () => {
+    for (const role of ["owner", "ta", "accountant"] as const) {
+      for (const state of ["normal", "empty"] as const) {
+        const rendered = renderPreview("reports", role, state);
+        const shell = shellProps.last?.permissions as string[];
+        const cards = screen.queryAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
+        expect(cards.includes("Danh sách buổi học")).toBe(shell.includes("sessions.view"));
+        expect(cards.includes("Danh sách học viên")).toBe(shell.includes("students.view"));
+        if (state === "empty") {
+          expect(shell.filter((code) => ["crm.view", "sessions.view", "staff.view", "students.view"].includes(code))).toEqual([]);
+        }
+        rendered.unmount();
+      }
+    }
+  });
+
+  it("shows the audit route's own denial to the TA and the accountant", () => {
+    for (const role of ["ta", "accountant"] as const) {
+      const rendered = renderPreview("audit", role);
+      expect(screen.getByText("Không có quyền xem nhật ký hệ thống")).toBeInTheDocument();
+      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+      rendered.unmount();
+    }
+  });
+
+  it("passes the notifications fixture's unread total to the bell on that view only", () => {
+    const empty = renderPreview("notifications", "owner", "empty");
+    expect(shellProps.last?.unreadNotificationCount).toBe(0);
+    empty.unmount();
+
+    const normal = renderPreview("notifications");
+    const count = shellProps.last?.unreadNotificationCount as number;
+    expect(count).toBeGreaterThan(0);
+    expect(screen.getByText(new RegExp(`^${count} chưa đọc`))).toBeInTheDocument();
+    normal.unmount();
+
+    renderPreview("students");
+    expect(shellProps.last?.unreadNotificationCount).toBe(4);
   });
 });

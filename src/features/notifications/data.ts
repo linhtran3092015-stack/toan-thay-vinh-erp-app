@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 
+import { NOTIFICATION_MAX_PAGE, NOTIFICATION_PAGE_SIZE } from "@/features/notifications/notification-models";
 import type {
   NotificationEntry,
   NotificationReadResult,
@@ -35,7 +36,7 @@ export async function getNotificationsResult(page = 1): Promise<
       .select(NOTIFICATION_COLUMNS)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
-      .range((Math.max(1, Math.min(100000, page)) - 1) * 50, Math.max(1, Math.min(100000, page)) * 50 - 1);
+      .range((Math.max(1, Math.min(NOTIFICATION_MAX_PAGE, page)) - 1) * NOTIFICATION_PAGE_SIZE, Math.max(1, Math.min(NOTIFICATION_MAX_PAGE, page)) * NOTIFICATION_PAGE_SIZE - 1);
 
     if (error || !data) {
       return { ok: false };

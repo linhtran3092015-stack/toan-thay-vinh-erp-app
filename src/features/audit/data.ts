@@ -1,5 +1,14 @@
 import "server-only";
 
+import {
+  AUDIT_FILTER_OPTION_ROW_LIMIT,
+  AUDIT_LOG_ROW_LIMIT,
+  getActorDisplayName,
+  getAuditActorOptionLabel,
+  getNextCalendarDate,
+  normalizeAuditFilters,
+  sortUnique,
+} from "@/features/audit/audit-log-models";
 import type {
   AuditActor,
   AuditActorOption,
@@ -15,72 +24,10 @@ const AUDIT_COLUMNS =
 const AUDIT_CATALOG_COLUMNS =
   "module,action,entity_type,actor_user_id";
 
-const MAX_AUDIT_ROWS = 100;
-const MAX_CATALOG_ROWS = 1000;
-
-function normalizeFilter(
-  value: string | undefined,
-  maximumLength = 120,
-): string {
-  return value?.trim().slice(0, maximumLength) ?? "";
-}
-
-function normalizeDate(value: string | undefined): string {
-  const normalized = normalizeFilter(value, 10);
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-    return "";
-  }
-
-  const [year, month, day] = normalized.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    return "";
-  }
-
-  return normalized;
-}
-
-function getNextCalendarDate(value: string): string {
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  date.setUTCDate(date.getUTCDate() + 1);
-
-  return date.toISOString().slice(0, 10);
-}
-
-function getActorDisplayName(
-  displayName: string | null,
-  email: string,
-): string {
-  const normalizedName = displayName?.trim();
-
-  return normalizedName || email.split("@")[0] || "Nhân sự trung tâm";
-}
-
-function sortUnique(values: readonly (string | null)[]): string[] {
-  return [...new Set(values.filter((value): value is string => Boolean(value)))]
-    .sort((left, right) => left.localeCompare(right, "vi"));
-}
-
 export async function getAuditLogsResult(
   input: Partial<AuditFilters>,
 ): Promise<AuditLogResult> {
-  const filters: AuditFilters = {
-    action: normalizeFilter(input.action),
-    actorId: normalizeFilter(input.actorId, 36),
-    entityId: normalizeFilter(input.entityId, 160),
-    entityType: normalizeFilter(input.entityType),
-    fromDate: normalizeDate(input.fromDate),
-    module: normalizeFilter(input.module),
-    toDate: normalizeDate(input.toDate),
-  };
+  const filters: AuditFilters = normalizeAuditFilters(input);
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -96,7 +43,7 @@ export async function getAuditLogsResult(
       .order("id", {
         ascending: false,
       })
-      .limit(MAX_AUDIT_ROWS);
+      .limit(AUDIT_LOG_ROW_LIMIT);
 
     if (filters.module) {
       auditQuery = auditQuery.eq("module", filters.module);
@@ -140,7 +87,7 @@ export async function getAuditLogsResult(
         .order("occurred_at", {
           ascending: false,
         })
-        .limit(MAX_CATALOG_ROWS),
+        .limit(AUDIT_FILTER_OPTION_ROW_LIMIT),
     ]);
 
     if (
@@ -188,9 +135,7 @@ export async function getAuditLogsResult(
 
         return {
           id: actorId,
-          label: actor
-            ? `${actor.displayName} · ${actor.email ?? actor.id}`
-            : actorId,
+          label: getAuditActorOptionLabel(actorId, actor),
         };
       })
       .sort((left, right) =>

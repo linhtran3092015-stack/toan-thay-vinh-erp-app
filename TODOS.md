@@ -2230,6 +2230,90 @@
 **Priority:** P4
 **Depends on:** None
 
+### Lọc "Chưa đọc" và tổng số thông báo ở máy chủ
+
+**What:** Cho `/notifications` đọc riêng thông báo chưa đọc (`read_at is null`) và đếm tổng để có phân trang đúng (số trang, không còn trang cuối rỗng khi số thông báo là bội của 50). Cần anh quyết vì đổi lần đọc (ghi vào `WORKFLOW_CONTRACTS_A_E.md`).
+
+**Why:** Bước 14d chỉ lọc "Chưa đọc" trong 50 thông báo của trang đang mở và ghi rõ như vậy; số chưa đọc trên đầu trang là tổng thật của tài khoản nên hai con số có thể khác nhau khi thông báo chưa đọc nằm ở trang sau. "Cũ hơn" hiện khi trang đủ 50 dòng nên có thể dẫn tới một trang trống ("Không còn thông báo cũ hơn.").
+
+**Context:** `getNotificationsResult` trong `src/features/notifications/data.ts` (`.range`, không đếm); bản đồ `.gstack/briefs/step14d-map-rules-data.md` §A.5, §I-1.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Nhật ký hệ thống: xem quá 100 dòng và lọc "Hệ thống"
+
+**What:** Phân trang `/audit` quá 100 bản ghi mới nhất; thêm lựa chọn "Hệ thống" (người thực hiện rỗng) trong bộ lọc Người thực hiện; tìm gần đúng "Mã đối tượng" (hiện so khớp chính xác); kiểm tra `actorId` là uuid trước khi gửi truy vấn (sửa tay URL thành chuỗi khác làm cả trang báo lỗi); tùy chọn bộ lọc đang lấy từ 1.000 bản ghi mới nhất nên module, hành động hoặc người cũ hơn không có trong danh sách chọn. Tất cả là đổi lần đọc: cần anh duyệt và ghi vào `WORKFLOW_CONTRACTS_A_E.md`.
+
+**Why:** Bước 14d giữ nguyên lần đọc: trang ghi "n bản ghi khớp bộ lọc · hiển thị 100 mới nhất" và nhắc thu hẹp bộ lọc để xem bản ghi cũ hơn; giá trị đang lọc mà không có trong danh sách chọn được thêm vào với nhãn "(đang lọc)".
+
+**Context:** `getAuditLogsResult` trong `src/features/audit/data.ts`; `parseAuditFilters` trong `src/features/audit/audit-log-models.ts`; bản đồ §B.3, §I-3…5.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Dữ liệu trước / sau của nhật ký chứa nguyên hồ sơ học sinh và phụ huynh
+
+**What:** Cân nhắc che bớt trường nhạy cảm (SĐT, ghi chú nội bộ, địa chỉ) trong `old_data`/`new_data` khi hiển thị, hoặc chỉ hiện các trường đã đổi.
+
+**Why:** Trigger học sinh và phụ huynh ghi nguyên dòng (`to_jsonb(old/new)`). Bước 14d chỉ hiện JSON khi bấm "Xem" và chỉ chủ trung tâm có `audit.view`, nhưng nếu sau này cấp quyền nhật ký cho người khác thì toàn bộ hồ sơ sẽ lộ theo.
+
+**Context:** `AuditDataPanels` trong `src/features/audit/components/audit-log-cells.tsx`; migration `20260722130437` và `20260723155910`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Xuất CSV buổi học: giới hạn 300 hay 1.000 buổi, báo khi bị cắt, khoảng ngày mặc định
+
+**What:** Chốt giới hạn của file xuất buổi học: thiết kế ghi "≤300 buổi", code xuất tới 1.000 buổi từ bản sửa `d537024`. Đồng thời: báo cho người dùng khi danh sách bị cắt (hiện cắt im lặng), cân nhắc khoảng ngày mặc định (để trống thì file lấy 1.000 buổi có ngày mới nhất, gồm cả buổi đã lên lịch trong tương lai), và trả trang lỗi dễ đọc thay cho JSON 400/403 khi đường dẫn sai.
+
+**Why:** Bước 14d chỉ đổi chữ cho đúng code (1.000, lấy từ `SESSION_EXPORT_LIMIT`) và chặn ngày ngược trên trình duyệt; mọi thay đổi khác là đổi hành vi route xuất.
+
+**Context:** `src/app/(app)/reports/export/sessions/route.ts`, `SESSION_EXPORT_LIMIT` trong `src/features/reports/catalog.ts`, hộp thoại `src/features/reports/components/session-export-dialog.tsx`; bản đồ §C.2, §I-2.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Xuất CSV buổi học lỗi 500 với người không có quyền xem lớp
+
+**What:** Kiểm tra trên production xem trợ giảng (hoặc ai có `sessions.view` mà không có `classes.view`) xuất được CSV buổi học không. Theo migration chỉ chủ trung tâm có `classes.view`; loader buổi học coi cả lần đọc là lỗi khi embed lớp rỗng, nên route trả 500 "Không thể đọc dữ liệu buổi học.".
+
+**Why:** Thẻ "Danh sách buổi học" trên `/reports` hiện "Có sẵn" cho trợ giảng (đúng theo quyền `sessions.view`), nhưng nút có thể không chạy được với họ. Cùng nguyên nhân với mục "Ai mở được trang Buổi học" ở trên.
+
+**Context:** `getSessionDirectory` trong `src/features/sessions/data.ts`; route xuất; bản đồ §0.11, §I-6.
+
+**Effort:** S (kiểm tra) / M (sửa)
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+### Xuất học viên, lead CRM và nhân sự (các thẻ "Dự kiến" trên Báo cáo)
+
+**What:** Làm ba bản xuất còn ở trạng thái "Dự kiến" trên `/reports`: danh sách học viên (`students.view`), lead tuyển sinh (`crm.view`), danh sách nhân sự (`staff.view`), mỗi cái với bộ cột đã qua review bảo mật (không phụ huynh/ghi chú nội bộ cho học viên, không ghi chú ngoài CRM cho lead, không lương/đơn giá/tài khoản cho nhân sự). Cũng quyết định có muốn hiện thẻ "Dự kiến" cho người không có quyền module đó như một lộ trình hay không (hiện ẩn, đúng với câu ghi trên đầu trang).
+
+**Why:** Bước 14d chỉ đổi giao diện: ba thẻ hiện nút "Xuất CSV" bị khóa kèm "Chưa phát hành". Mỗi bản xuất mới là một route đọc dữ liệu mới, cần anh duyệt bộ cột.
+
+**Context:** `REPORT_CATALOG` trong `src/features/reports/catalog.ts`; mẫu route `src/app/(app)/reports/export/sessions/route.ts` + `src/features/reports/csv.ts`; bản đồ `.gstack/briefs/step14d-map-rules-data.md` §C.3, §I-7.
+
+**Effort:** M (mỗi bản xuất)
+**Priority:** P4
+**Depends on:** Quyết định của anh
+
+### Dọn sau bước 14d
+
+**What:** Đưa nhãn hành động (`action`) và loại đối tượng của nhật ký sang tiếng Việt (hiện tên mã viết hoa chữ đầu + mã gốc, khoảng 100 mã); bỏ `router.refresh()` thừa sau khi đánh dấu (thao tác đã `revalidatePath`, hành vi có từ trước bước 14d); `normalizeInternalHref` trong `src/features/notifications/data.ts` và ràng buộc `notifications_href_check` nên loại cả ký tự điều khiển (tab, xuống dòng) sau dấu `/` đầu, vì trình duyệt bỏ chúng và có thể thành link `//host` (hiện không ai ngoài hệ thống ghi được `href`, nên chưa khai thác được); khi có thêm báo cáo "Có sẵn" thứ hai, phần cuối thẻ trên `/reports` cần chọn hộp thoại và link theo từng báo cáo (hiện luôn là của Danh sách buổi học); số chưa đọc trên chuông và đầu trang Thông báo chỉ cập nhật khi lần làm mới sau thao tác về tới, một lần đánh dấu ở nền thất bại vẫn để dòng trông như đã đọc trong tab đó tới khi tải lại.
+
+**Why:** Các điểm nhỏ còn lại từ các lane bước 14d; không cái nào chặn phát hành.
+
+**Context:** `src/features/audit/audit-log-models.ts`, `src/features/notifications/notification-list-page.tsx`, `src/features/notifications/data.ts`, `src/features/reports/reports-page.tsx`; review bước 14d (P2, P3, bảo mật, D5) ghi ở `.gstack/ship-records/step14d.md`.
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** None
+
 ## Tin nhắn phụ huynh (Zalo)
 
 ### Gỡ RPC `record_parent_message_result` cũ sau khi bản 0.21 chạy ổn
@@ -2269,6 +2353,20 @@
 **Depends on:** ZaloCRM hỗ trợ khóa chống trùng
 
 ## Completed
+
+### Mở thông báo ngay khi bấm, đánh dấu đã đọc ở nền
+
+**What:** Khi bấm một thông báo chưa đọc, mở trang đích ngay và gửi thao tác đánh dấu đã đọc ở nền, thay vì chờ thao tác (và lần render lại `/notifications` do `revalidatePath`) xong rồi mới `router.push`. Cần anh quyết vì đây là vòng sửa thứ tư sau review (quy định: quá 3 vòng cần anh duyệt). Đề xuất: duyệt, làm trước khi merge PR bước 14d hoặc ngay sau.
+
+**Why:** Review bước 14d (hiệu năng, red team, lượt review chốt và review đối kháng đều chỉ ra cùng một điểm): (1) nếu trong lúc chờ người dùng bấm sang trang khác, khi thao tác xong `router.push` cũ vẫn có thể kéo họ về trang của thông báo; (2) thao tác treo thì bấm thường lên dòng đó không làm gì cho tới khi tải lại; (3) mỗi lần mở chờ thêm một vòng máy chủ. Theo tài liệu Next 16, thao tác vẫn chạy và trang đích được làm mới sau khi điều hướng, nên chuông thông báo vẫn cập nhật.
+
+**Context:** `openRow` trong `src/features/notifications/components/use-notification-list-state.ts` (khoảng dòng 215–250); test `tests/components/notification-list-page.test.tsx` (các ca mở dòng, "only the latest of two opens"); ghi chép review ở `.gstack/ship-records/step14d.md` (P2, R2-5, B1, A1).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+**Completed:** v0.27.0.0 (2026-10-19), PR #44: anh duyệt vòng sửa thứ tư; thông báo mở ngay, đánh dấu đã đọc chạy ở nền.
 
 ### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp
 

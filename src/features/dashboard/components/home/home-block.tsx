@@ -85,26 +85,3 @@ export function BlockError({ className, message, retryHref }: { className?: stri
 export function BlockEmpty({ children }: { children: ReactNode }) {
   return <p className="px-4 py-4 text-secondary text-text-muted">{children}</p>;
 }
-
-/** 24px icon tile on the family's soft surface (handoff 1c); decorative, the row text carries the meaning. */
-export function IconTile({ children, tone }: { children: ReactNode; tone: "danger" | "warning" | "info" | "success" | "neutral" }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "inline-grid h-6 w-6 shrink-0 place-items-center rounded-md [&>svg]:h-3.5 [&>svg]:w-3.5",
-        tone === "danger"
-          ? "bg-danger-bg text-danger"
-          : tone === "warning"
-            ? "bg-warning-bg text-warning"
-            : tone === "info"
-              ? "bg-info-bg text-info"
-              : tone === "success"
-                ? "bg-success-bg text-success"
-                : "bg-neutral-bg text-neutral",
-      )}
-    >
-      {children}
-    </span>
-  );
-}

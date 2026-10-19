@@ -11,15 +11,19 @@ import { LearningResultsPage } from "@/features/learning-results/learning-result
 import { UnlockedSessionQueue } from "@/features/sessions/components/unlocked-session-queue";
 import { SESSION_QUEUE_LIMIT } from "@/features/sessions/session-directory-models";
 import { SessionListPage } from "@/features/sessions/session-list-page";
-import { DATABASE_PERMISSION_CODES, type PermissionCode } from "@/lib/permissions/types";
+import type { PermissionCode } from "@/lib/permissions/types";
 import type { StudentLifecycleStatus } from "@/types/domain";
 
 import { advancePreviewPeople } from "./advance-fixtures";
 import { AdvancesPreviewBody } from "./advances-preview";
+import { AuditPreviewBody } from "./audit-preview";
 import { CommissionsPreviewBody } from "./commissions-preview";
 import { creditEntries, ownCreditEntries } from "./credit-fixtures";
 import { FinanceOrdersPreviewBody } from "./finance-orders-preview";
+import { getNotificationPreviewUnreadCount, NotificationsPreviewBody } from "./notifications-preview";
 import { PaymentRequestsPreviewBody } from "./payment-requests-preview";
+import { getListsPreviewPermissions } from "./preview-permissions";
+import { ReportsPreviewBody } from "./reports-preview";
 import { cappedResultItems, resultItems } from "./result-fixtures";
 import { cappedPreviewSessionQueue, previewSessionQueue, previewSessions, sessionPreviewNowTime, sessionPreviewToday } from "./session-fixtures";
 import { SessionLedgerPreviewBody } from "./session-ledger-preview";
@@ -36,7 +40,10 @@ export type ListsPreviewView =
   | "commissions"
   | "finance-orders"
   | "session-ledger"
-  | "payment-requests";
+  | "payment-requests"
+  | "notifications"
+  | "audit"
+  | "reports";
 export type ListsPreviewRole = "owner" | "ta" | "accountant";
 export type ListsPreviewState = "normal" | "capped" | "empty";
 
@@ -173,62 +180,20 @@ const classes: ClassDirectoryItem[] = classRows.map(([name, code, grade, level, 
 
 const previewPathnames: Record<ListsPreviewView, string> = {
   advances: "/advances",
+  audit: "/audit",
   classes: "/classes",
   commissions: "/commissions",
   credits: "/grading-credits",
   "finance-orders": "/finance/orders",
+  notifications: "/notifications",
   "payment-requests": "/finance/payment-requests",
+  reports: "/reports",
   results: "/learning-results",
   "session-ledger": "/finance/session-ledger",
   sessions: "/sessions",
   staff: "/staff",
   students: "/students",
 };
-
-// A teaching assistant: own credits only, no student or class pages. Like every
-// role in the migrations it may request and view its own salary advances and
-// view its own payroll (the advances preview's TA flags assume the same).
-const taPermissions: PermissionCode[] = [
-  "advances.request",
-  "advances.view",
-  "attendance.mark",
-  "attendance.view",
-  "grading_credits.view",
-  "payroll.view",
-  "results.manage",
-  "results.view",
-  "sessions.view",
-];
-
-// The accountant (step 14b, design 16c): reviews salary advances, sees payroll, no sessions.
-const accountantPermissions: PermissionCode[] = ["advances.request", "advances.review", "advances.view", "payroll.view"];
-
-// Step 14c finance views: the accountant's finance grants per migrations. Still no
-// students.view, guardians.view, sessions.view or session_ledger.reverse.
-const accountantFinancePermissions: PermissionCode[] = [
-  "cashflow.view",
-  "finance.view",
-  "payments.create_request",
-  "payments.manage",
-  "payments.view",
-  "refunds.manage",
-  "sepay.allocate",
-  "sepay.view",
-  "session_ledger.view",
-  "tuition_periods.export",
-  "tuition_periods.manage",
-  "tuition_periods.view",
-];
-
-const financeViews: ReadonlySet<ListsPreviewView> = new Set(["finance-orders", "session-ledger", "payment-requests"]);
-
-function previewPermissions(role: ListsPreviewRole, view: ListsPreviewView): PermissionCode[] {
-  if (role === "ta") return taPermissions;
-  if (role === "accountant") {
-    return financeViews.has(view) ? [...accountantPermissions, ...accountantFinancePermissions] : accountantPermissions;
-  }
-  return DATABASE_PERMISSION_CODES.filter((code) => code !== "student_care.view");
-}
 
 // Shell users; the advances view uses the same people so "Đơn của bạn" is the signed-in user's row.
 const previewShellUsers: Record<ListsPreviewRole, { displayName: string; email: string; id: string; initials: string }> = {
@@ -238,7 +203,7 @@ const previewShellUsers: Record<ListsPreviewRole, { displayName: string; email: 
 };
 
 export function ListsPreview({ role, state, view }: { role: ListsPreviewRole; state: ListsPreviewState; view: ListsPreviewView }) {
-  const permissions = previewPermissions(role, view);
+  const permissions = getListsPreviewPermissions(role, view, state);
   const can = (code: PermissionCode) => permissions.includes(code);
   // Same permission as the page's canViewAll, so rows and the grader column never disagree:
   // only the owner holds grading_credits.view_all. The accountant holds no grading_credits.view
@@ -262,7 +227,8 @@ export function ListsPreview({ role, state, view }: { role: ListsPreviewRole; st
       centerDisplayName="Toán Thầy Vinh"
       permissions={permissions}
       previewPathname={previewPathnames[view]}
-      unreadNotificationCount={4}
+      // The notifications view gives the bell the fixture's own unread total, so the two never disagree.
+      unreadNotificationCount={view === "notifications" ? getNotificationPreviewUnreadCount(role, state) : 4}
     >
       {view === "classes" ? (
         <ClassListPage canCreateClass canImportClasses classes={classes} />
@@ -315,6 +281,13 @@ export function ListsPreview({ role, state, view }: { role: ListsPreviewRole; st
         <SessionLedgerPreviewBody role={role} state={state} />
       ) : view === "payment-requests" ? (
         <PaymentRequestsPreviewBody role={role} state={state} />
+      ) : view === "notifications" ? (
+        <NotificationsPreviewBody role={role} state={state} />
+      ) : view === "audit" ? (
+        // The shell's own codes decide the route's denial, so nav and body never disagree.
+        <AuditPreviewBody permissions={permissions} role={role} state={state} />
+      ) : view === "reports" ? (
+        <ReportsPreviewBody permissions={permissions} role={role} />
       ) : view === "credits" ? (
         <GradingCreditListPage
           canViewAll={can("grading_credits.view_all")}

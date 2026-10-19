@@ -76,6 +76,23 @@ function clickIsHeld(link: HTMLElement): boolean {
 }
 
 describe("PermissionMatrixPage grid", () => {
+  // Value: protects=module group rows and the module filter take their Vietnamese names from the shared formatModuleLabel (src/lib/module-labels.ts), including modules the matrix's old private map lacked (settings, student_care, rbac) and a prototype-safe fallback; fails_when=the matrix goes back to a private label map (the newly named groups read "Settings", "Student Care") or a module code reads an Object prototype member; why_new=step 14d moved the matrix to the shared helper the /audit Module column uses; seam=none; no_claim=which modules production permissions carry
+  it("names module groups with the shared Vietnamese module labels", () => {
+    const withNewModules: SettingsPermissionMatrix = {
+      ...matrix,
+      permissions: [
+        ...matrix.permissions,
+        permission("p-settings", "settings", "settings.manage", "Quản lý cài đặt"),
+        permission("p-care", "student_care", "student_care.view", "Xem chăm sóc học viên"),
+      ],
+    };
+    render(<PermissionMatrixPage canManage matrix={withNewModules} />);
+    const groups = within(grid()).getAllByRole("rowheader").map((header) => header.textContent);
+    expect(groups).toContain("Cài đặt");
+    expect(groups).toContain("Chăm sóc học viên");
+    expect(groups).not.toContain("Settings");
+  });
+
   it("shows roles as columns with Owner first and locked", () => {
     render(<PermissionMatrixPage canManage matrix={matrix} />);
     expect(within(grid().querySelector("thead")!).getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
