@@ -2,6 +2,13 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.26.0.2] - 2026-10-19
+
+### Fixed
+- **Nút xanh dạng link hiện chữ trắng** như thiết kế. Trước đây chữ tối trên nền xanh đậm, gần như không đọc được: "Về trang chính" (trang 404), "Tạo biểu mẫu" (Coaching), "Xem danh sách" sau khi tạo yêu cầu thanh toán, "Xem danh sách buổi học" sau khi tạo buổi hàng loạt, "Mở danh sách học viên" sau khi nhập học sinh, "Mở phiếu lương" trong bảng lương.
+- **Link khắp hệ thống hiện đúng màu và gạch chân đã thiết kế** thay vì luôn lấy màu chữ xung quanh: link hành động ("Xem", "Mở", "Mở kỳ thu", "Tạo buổi hàng loạt cho lớp này"…) màu xanh rêu; tên học sinh, lớp, lead trong bảng đậm hơn; rê chuột lên các link này hiện gạch chân; vài link trong thông báo lỗi, cảnh báo luôn gạch chân như thiết kế.
+- **Thanh bên và dải mô-đun**: mục đang mở chữ xanh rêu trên nền xanh nhạt; các mục khác chữ xám vừa, rê chuột thì đậm lên.
+
 ## [0.26.0.1] - 2026-10-19
 
 ### Fixed
