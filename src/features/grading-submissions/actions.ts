@@ -56,6 +56,7 @@ function rpcErrorMessage(error: { message: string }): string {
     GRADING_SESSION_NOT_ELIGIBLE:
       "Học sinh không có trong buổi này (theo danh sách lớp hoặc điểm danh) vào ngày nộp. Nếu em học bù hoặc học thêm, điểm danh em vào buổi đó trước.",
     GRADING_SUBMISSION_NOT_FOUND: "Không tìm thấy bài nộp. Tải lại trang.",
+    GRADING_SUBMISSION_NOT_IGNORED: "Bài này không còn ở danh sách đã bỏ qua. Tải lại trang để xem danh sách mới.",
     GRADING_SUBMISSION_NOT_PENDING: "Bài này đã được ghép hoặc bỏ qua. Tải lại trang để xem danh sách mới.",
     REASON_REQUIRED: "Vui lòng nhập lý do bỏ qua.",
     REASON_TOO_LONG: "Ghi chú tối đa 500 ký tự.",
@@ -158,6 +159,24 @@ export async function ignoreGradingSubmissionAction(input: { reason: string; sub
 
   revalidatePath(PAGE_PATH);
   return { message: "Đã bỏ qua bài (bài rác).", ok: true };
+}
+
+/** Undoes "Bỏ qua (bài rác)": the submission goes back to the review queue as it was. */
+export async function restoreGradingSubmissionAction(input: { reason?: string | null; submissionId: string }): Promise<GradingReviewActionResult> {
+  const denied = await requireReviewPermission();
+  if (denied) return { message: denied, ok: false };
+  const parsed = z.object({ reason: z.string().trim().max(500).nullish(), submissionId: submissionIdSchema }).safeParse(input);
+  if (!parsed.success) return { message: "Ghi chú tối đa 500 ký tự.", ok: false };
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("restore_grading_submission", {
+    p_reason: parsed.data.reason || undefined,
+    p_submission_id: parsed.data.submissionId,
+  });
+  if (error) return { message: rpcErrorMessage(error), ok: false };
+
+  revalidatePath(PAGE_PATH);
+  return { message: "Đã khôi phục bài về danh sách chờ ghép.", ok: true };
 }
 
 /**

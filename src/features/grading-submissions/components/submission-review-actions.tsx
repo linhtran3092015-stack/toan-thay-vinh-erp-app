@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import type { GradingReviewActions } from "@/features/grading-submissions/components/review-actions";
-import type { UnmatchedGradingSubmission } from "@/features/grading-submissions/data";
+import type { IgnoredGradingSubmission, UnmatchedGradingSubmission } from "@/features/grading-submissions/data";
 import type { SessionCandidate } from "@/features/grading-submissions/matching";
 import {
   filterMatchCandidates,
@@ -381,7 +381,7 @@ function IgnoreSubmissionForm({
 
   return (
     <section aria-label="Bỏ qua bài rác" className="grid gap-3 rounded-md border border-border-subtle bg-surface-subtle p-3">
-      <Field hint="Bài bỏ qua rời khỏi danh sách và không bao giờ được tính điểm." label="Lý do bỏ qua" required>
+      <Field hint="Bài bỏ qua chuyển sang mục Đã bỏ qua và không được tính điểm; bỏ qua nhầm thì khôi phục được." label="Lý do bỏ qua" required>
         {(controlProps) => (
           <Input
             {...controlProps}
@@ -399,6 +399,84 @@ function IgnoreSubmissionForm({
           Xác nhận bỏ qua
         </Button>
         <Button className="flex-1 sm:flex-none" disabled={isPending} onClick={onCancel} size="sm" type="button" variant="ghost">
+          Hủy
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/** "Khôi phục" on a submission marked junk: back to "Chờ ghép" as it was, with an optional note. */
+export function SubmissionRestoreAction({
+  actions,
+  item,
+  onDone,
+}: {
+  actions: GradingReviewActions;
+  item: IgnoredGradingSubmission;
+  onDone: (message: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  if (done) return <ResultBanner title={done} tone="success" />;
+  if (!open) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Button className="flex-1 sm:flex-none" onClick={() => setOpen(true)} size="sm" type="button" variant="outline">
+          Khôi phục
+        </Button>
+      </div>
+    );
+  }
+
+  const confirm = () => {
+    if (isPending) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await actions.restore({ reason: note.trim() || null, submissionId: item.id });
+      if (result.ok) {
+        setDone(result.message);
+        onDone(result.message);
+      } else {
+        setError(result.message);
+      }
+    });
+  };
+
+  return (
+    <section aria-label="Khôi phục bài" className="grid gap-3 rounded-md border border-border-subtle bg-surface-subtle p-3">
+      <Field hint="Bài quay lại mục Chờ ghép để ghép tay hoặc ghép lại tự động. Lưu vào lịch sử thao tác." label="Ghi chú (không bắt buộc)">
+        {(controlProps) => (
+          <Input
+            {...controlProps}
+            disabled={isPending}
+            maxLength={500}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder="Ví dụ: bỏ qua nhầm, đây là bài thật"
+            value={note}
+          />
+        )}
+      </Field>
+      {error ? <ResultBanner title={error} tone="error" /> : null}
+      <div className="flex flex-wrap gap-2">
+        <Button className="flex-1 sm:flex-none" disabled={isPending} isLoading={isPending} onClick={confirm} size="sm" type="button">
+          Xác nhận khôi phục
+        </Button>
+        <Button
+          className="flex-1 sm:flex-none"
+          disabled={isPending}
+          onClick={() => {
+            setOpen(false);
+            setError(null);
+          }}
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
           Hủy
         </Button>
       </div>

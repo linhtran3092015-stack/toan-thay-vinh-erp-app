@@ -2,6 +2,19 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.26.0.0] - 2026-10-19
+
+Bài bỏ qua nhầm giờ lấy lại được ngay trên trang "Bài nộp chưa ghép" (kế hoạch chấm bài AI, Giai đoạn 1b): trước đây bài đánh dấu "Bỏ qua (bài rác)" biến khỏi mọi màn hình và chỉ sửa được bằng SQL.
+
+### Added
+- Bộ lọc **Chờ ghép · Đã bỏ qua** trên `/grading-submissions` (`?status=ignored`). Mục Đã bỏ qua liệt kê bài đã đánh dấu bài rác, bỏ qua gần nhất trước, mỗi bài ghi rõ ai bỏ qua, lúc nào (giờ Việt Nam) và lý do, kèm tên, năm sinh, lớp chọn trên form và bài làm như ở mục Chờ ghép. Bài bỏ qua từ trước khi có lịch sử thao tác ghi "Không có trong lịch sử thao tác".
+- Nút **Khôi phục** trên từng bài đã bỏ qua: xác nhận ngay tại dòng, có ô ghi chú tuỳ chọn. Bài quay lại mục Chờ ghép đúng như trước khi bị bỏ qua (giữ học sinh đã nhận ra và cảnh báo cũ), rồi ghép tay hoặc ghép lại tự động như mọi bài khác. Khôi phục được ghi vào lịch sử thao tác kèm người làm và ghi chú.
+- Trang xem trước `/dev/grading-submissions?status=ignored` với dữ liệu mẫu (không ghi gì).
+
+### Changed
+- Database chỉ cho khôi phục bài đang ở trạng thái bỏ qua; quyền vẫn là **ai_grading.view** (chủ trung tâm, quản lý vận hành, quản lý trợ lý, trợ giảng), không thêm quyền mới.
+- Ô lý do khi bỏ qua bài nói rõ bài chuyển sang mục Đã bỏ qua và khôi phục được.
+
 ## [0.25.0.0] - 2026-10-19
 
 Trang "Bài nộp chưa ghép" giờ xử lý được bài, không chỉ để xem (kế hoạch chấm bài AI, Giai đoạn 1b): trợ giảng ghép tay bài vào học sinh và buổi học, bỏ qua bài rác, hoặc bấm ghép lại tự động sau khi thêm học sinh mới hay xếp buổi còn thiếu.
