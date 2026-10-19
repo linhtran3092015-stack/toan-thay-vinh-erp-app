@@ -153,7 +153,7 @@ export function FormWithToc({
       <div className="relative min-w-0 lg:sticky lg:top-[calc(var(--topbar-h)+24px)]">
         <nav
           aria-label={label}
-          className="-mx-4 overflow-x-auto px-4 md:-mx-5 md:px-5 lg:mx-0 lg:overflow-visible lg:rounded-lg lg:border lg:border-border-subtle lg:bg-surface-base lg:p-2 lg:shadow-[var(--panel-shadow)]"
+          className="relative -mx-4 overflow-x-auto px-4 md:-mx-5 md:px-5 lg:mx-0 lg:overflow-visible lg:rounded-lg lg:border lg:border-border-subtle lg:bg-surface-base lg:p-2 lg:shadow-[var(--panel-shadow)]"
           ref={navRef}
         >
           <ul className="m-0 flex min-w-max list-none gap-1 p-0 lg:min-w-0 lg:flex-col lg:gap-0.5">

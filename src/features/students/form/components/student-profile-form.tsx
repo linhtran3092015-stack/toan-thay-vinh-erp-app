@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Info } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Controller, useForm, useWatch, type FieldErrors, type FieldPath } from "react-hook-form";
 
 import { FormSection, FormWithToc } from "@/components/patterns/form-with-toc";
@@ -115,12 +115,19 @@ export function StudentProfileForm({
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 
+  // Dev previews only: start from a draft on top of the defaults, still dirty against them.
+  const draftValues = useMemo(
+    () => (initialDraft ? { ...defaultValues, ...initialDraft } : undefined),
+    [defaultValues, initialDraft],
+  );
   const form = useForm<StudentProfileFormValues>({
     defaultValues,
     mode: "onBlur",
+    resetOptions: draftValues ? { keepDefaultValues: true } : undefined,
     resolver: zodResolver(studentProfileFormSchema),
     // The form focuses the first invalid field itself, in page order (RHF uses registration order).
     shouldFocusError: false,
+    values: draftValues,
   });
   const { control, register } = form;
   const { dirtyFields, errors, isSubmitting } = form.formState;
@@ -165,16 +172,10 @@ export function StudentProfileForm({
   useLeaveGuard(isDirty && !isSubmitting);
   useSaveInFlightGuard(isSubmitting);
 
-  // Dev previews only: apply the starting draft (dirty) and validate it once after mount.
-  const appliedInitialState = useRef(false);
+  // Dev previews only: validate the starting draft once, as after a submit attempt.
   useEffect(() => {
-    if (appliedInitialState.current) return;
-    appliedInitialState.current = true;
-    for (const [name, value] of Object.entries(initialDraft ?? {})) {
-      form.setValue(name as FieldPath<StudentProfileFormValues>, value as never, { shouldDirty: true });
-    }
     if (initialValidation) void form.trigger();
-  }, [form, initialDraft, initialValidation]);
+  }, [form, initialValidation]);
 
   const fieldError = (name: StudentFormFieldName): string | undefined => {
     const message = errors[name]?.message;
