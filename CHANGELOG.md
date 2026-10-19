@@ -2,6 +2,11 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.26.0.3] - 2026-10-19
+
+### Fixed
+- **Tab đang mở trên trang hiện màu xanh rêu** như thiết kế (Lớp học, Hồ sơ học sinh, Giao dịch SePay, Chăm sóc học sinh, Buổi học). Trước đây chữ của tab đang mở cùng màu xám với các tab khác, chỉ phân biệt bằng gạch chân và chữ đậm. Ở giao diện tối, tab đang mở và số việc tồn dùng sắc xanh rêu sáng để đọc rõ trên nền tối.
+
 ## [0.26.0.2] - 2026-10-19
 
 ### Fixed
