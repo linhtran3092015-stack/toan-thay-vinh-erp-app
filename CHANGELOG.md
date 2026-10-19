@@ -2,6 +2,22 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.24.0.0] - 2026-10-18
+
+Bài kiểm tra cuối buổi học sinh nộp qua form Apps Script giờ vào thẳng ERP (kế hoạch chấm bài AI, Giai đoạn 1 "Nhận bài vào ERP"): ERP tự ghép bài với học sinh và buổi học, bài chưa ghép chắc chắn được nằm riêng để trợ giảng xem. Chưa chấm bằng AI.
+
+### Added
+- **Nhận bài từ form** `POST /api/webhooks/grading-submissions`: Apps Script ghi Sheet xong thì gửi một bản sang ERP, có chữ ký HMAC-SHA256 (lệch giờ tối đa 5 phút, body tối đa 256 KB). Gửi lại cùng mã bài không tạo bài trùng. Bài làm dài quá 20.000 ký tự được cắt và đánh dấu. Ghi lỗi thì báo quản lý (mỗi ngày một lần) và Apps Script tự gửi lại; dữ liệu database từ chối thì trả 422 để Apps Script thôi gửi lại.
+- **Danh sách tên cho form** `GET /api/integrations/grading-roster`: học sinh có ghi danh còn hiệu lực, lọc theo năm sinh, sắp theo tên rồi họ đệm theo thứ tự tiếng Việt, kèm buổi học hôm nay của từng em theo lịch ERP (tính cả lớp ghép và học thêm). Trùng họ tên cùng năm sinh thì hiện 4 số cuối SĐT phụ huynh chính, ví dụ "Nguyễn Minh Anh (PH ***4828)"; số đầy đủ không rời database.
+- **Ghép bài tự động**: học sinh theo mã ERP chọn trên form, không có mã thì theo họ tên (không dấu) và năm sinh; buổi học theo buổi chọn trên form, không có thì theo giờ nộp (từ 15 phút trước giờ học đến 3 giờ sau giờ tan), rồi theo điểm danh, rồi theo lựa chọn lớp A/B/CLC. Trùng tên, không tìm thấy, nộp ngoài giờ hay có nhiều buổi phù hợp thì không đoán mà để người xem. Nộp nhiều lần thì lần nộp cuối (theo giờ nộp) được tính.
+- **Bài nộp chưa ghép** `/grading-submissions` (mục Kết quả học tập): bài nộp chưa ghép chắc chắn, kèm tên, năm sinh, lớp chọn trên form (cả chữ ghi ở "Khác"), lý do và bài làm. Trang này chỉ để xem; chọn học sinh và buổi bằng tay sẽ có ở bước sau.
+- **Bài nộp qua form** ở tab "Cuối giờ · Kết quả" của buổi học: bài của từng em kèm giờ nộp và lần nộp, các lần nộp trước gập lại, cảnh báo "Chưa điểm danh", "Vắng nhưng có bài", "Nộp ngoài giờ buổi học", và danh sách em có mặt nhưng chưa nộp.
+- Quyền mới **ai_grading.view** ("Xem bài nộp chấm bài") cho chủ trung tâm, quản lý vận hành, quản lý trợ lý và trợ giảng.
+- **Form Apps Script mới** trong `integrations/apps-script/grading-form/` (Code.gs, FormHocSinh.html, README cài đặt) để chủ trung tâm dán vào: vẫn ghi tab Data như cũ; danh sách tên và năm sinh lấy từ ERP (lỗi thì dùng tab DanhSachHocSinh); câu "Hôm nay con học buổi" hiện buổi học hôm nay của em; chọn "Khác" thì giữ lại chữ học sinh gõ; bài làm ghi vào Sheet đúng như học sinh gõ (Sheets không còn đổi "15/4" thành ngày hay chạy chữ bắt đầu bằng "=" thành công thức); tab Data hết cột thì tự thêm cột, thêm không được thì vẫn ghi bài như form cũ; thêm cột "Mã HS ERP", "Buổi học ERP", "Mã bài ERP", "Giờ nộp ERP", "Đã gửi ERP"; trigger 10 phút/lần gửi lại bài chưa gửi được, bài mới nhất trước. Câu học thử tiếng Anh và SĐT phụ huynh chỉ ghi vào Sheet, không gửi ERP.
+- Biến môi trường `GRADING_FORM_SECRET` (ít nhất 32 ký tự, trùng với `ERP_FORM_SECRET` trong Script Properties).
+- Dữ liệu thô của bài nộp (`raw_payload`, không chứa bài làm) tự xoá sau 30 ngày.
+- Trang xem trước `/dev/grading-submissions` và thẻ bài nộp trên `/dev/session` (trả 404 trên production).
+
 ## [0.23.0.0] - 2026-10-18
 
 Danh sách Tài chính dựng lại theo phong cách Stumana (bước 14c): Đơn hàng cho kế toán thấy ngay đơn nào chưa xác nhận và quyết toán SB từng đợt, Sổ cái số buổi đọc dễ hơn, Yêu cầu thanh toán lọc nhanh theo trạng thái và ghi giờ đúng giờ Việt Nam.

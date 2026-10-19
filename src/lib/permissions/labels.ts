@@ -6,6 +6,7 @@ const PERMISSION_LABELS: Record<PermissionCode, string> = {
   "advances.request": "gửi yêu cầu tạm ứng lương",
   "advances.review": "đối soát tạm ứng lương",
   "advances.view": "xem tạm ứng lương",
+  "ai_grading.view": "xem bài nộp chấm bài",
   "app.access": "truy cập hệ thống",
   "attendance.mark": "điểm danh buổi học",
   "attendance.view": "xem điểm danh",

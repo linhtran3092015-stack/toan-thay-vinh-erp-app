@@ -2138,6 +2138,115 @@ export type Database = {
           },
         ]
       }
+      grading_submissions: {
+        Row: {
+          answer_text: string
+          answer_truncated: boolean
+          attempt_no: number | null
+          claimed_birth_year: number
+          claimed_class_option: string | null
+          claimed_class_option_other: string | null
+          claimed_class_session_id: string | null
+          claimed_full_name: string
+          claimed_student_code: string | null
+          class_session_id: string | null
+          counts_for_score: boolean
+          created_at: string
+          external_id: string
+          id: string
+          match_issues: string[]
+          match_status: string
+          matched_at: string | null
+          raw_payload: Json | null
+          received_at: string
+          session_match_method: string | null
+          source: string
+          student_id: string | null
+          student_match_method: string | null
+          submitted_at: string
+          superseded_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          answer_text: string
+          answer_truncated?: boolean
+          attempt_no?: number | null
+          claimed_birth_year: number
+          claimed_class_option?: string | null
+          claimed_class_option_other?: string | null
+          claimed_class_session_id?: string | null
+          claimed_full_name: string
+          claimed_student_code?: string | null
+          class_session_id?: string | null
+          counts_for_score?: boolean
+          created_at?: string
+          external_id: string
+          id?: string
+          match_issues?: string[]
+          match_status: string
+          matched_at?: string | null
+          raw_payload?: Json | null
+          received_at?: string
+          session_match_method?: string | null
+          source?: string
+          student_id?: string | null
+          student_match_method?: string | null
+          submitted_at: string
+          superseded_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          answer_text?: string
+          answer_truncated?: boolean
+          attempt_no?: number | null
+          claimed_birth_year?: number
+          claimed_class_option?: string | null
+          claimed_class_option_other?: string | null
+          claimed_class_session_id?: string | null
+          claimed_full_name?: string
+          claimed_student_code?: string | null
+          class_session_id?: string | null
+          counts_for_score?: boolean
+          created_at?: string
+          external_id?: string
+          id?: string
+          match_issues?: string[]
+          match_status?: string
+          matched_at?: string | null
+          raw_payload?: Json | null
+          received_at?: string
+          session_match_method?: string | null
+          source?: string
+          student_id?: string | null
+          student_match_method?: string | null
+          submitted_at?: string
+          superseded_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grading_submissions_class_session_id_fkey"
+            columns: ["class_session_id"]
+            isOneToOne: false
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grading_submissions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grading_submissions_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "grading_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guardians: {
         Row: {
           created_at: string
@@ -9433,6 +9542,48 @@ export type Database = {
           student_public_code: string
         }[]
       }
+      get_grading_form_birth_years: {
+        Args: { p_on: string }
+        Returns: {
+          birth_year: number
+          student_count: number
+        }[]
+      }
+      get_grading_form_roster: {
+        Args: { p_birth_year: number; p_on: string }
+        Returns: {
+          full_name: string
+          guardian_phone_last4: string
+          nickname: string
+          public_code: string
+          sessions: Json
+          student_id: string
+        }[]
+      }
+      get_grading_session_candidates: {
+        Args: { p_on: string; p_student_id: string }
+        Returns: {
+          attendance_status: string
+          class_code: string
+          class_level: string
+          class_session_id: string
+          end_time: string
+          on_roster: boolean
+          session_date: string
+          session_status: string
+          start_time: string
+        }[]
+      }
+      get_grading_student_candidates: {
+        Args: { p_birth_year: number; p_on: string; p_student_code: string }
+        Returns: {
+          birth_year: number
+          candidate_source: string
+          full_name: string
+          public_code: string
+          student_id: string
+        }[]
+      }
       get_learning_results_directory: {
         Args: { p_limit?: number }
         Returns: {
@@ -9696,6 +9847,23 @@ export type Database = {
           unit_price_vnd: number
         }[]
       }
+      get_session_grading_submissions: {
+        Args: { p_class_session_id: string }
+        Returns: {
+          answer_text: string
+          answer_truncated: boolean
+          attempt_no: number
+          counts_for_score: boolean
+          match_issues: string[]
+          session_match_method: string
+          student_full_name: string
+          student_id: string
+          student_match_method: string
+          student_public_code: string
+          submission_id: string
+          submitted_at: string
+        }[]
+      }
       get_staff_monthly_timekeeping_entries: {
         Args: { p_month: number; p_staff_id: string; p_year: number }
         Returns: {
@@ -9941,6 +10109,26 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      list_unmatched_grading_submissions: {
+        Args: { p_limit?: number }
+        Returns: {
+          answer_text: string
+          answer_truncated: boolean
+          claimed_birth_year: number
+          claimed_class_option: string
+          claimed_class_option_other: string
+          claimed_full_name: string
+          claimed_session_label: string
+          claimed_student_code: string
+          match_issues: string[]
+          received_at: string
+          student_full_name: string
+          student_id: string
+          student_public_code: string
+          submission_id: string
+          submitted_at: string
+        }[]
       }
       lock_class_session: {
         Args: { p_class_session_id: string; p_reason: string }
@@ -10275,6 +10463,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      purge_grading_submission_payloads: { Args: never; Returns: number }
       raise_ops_alert: {
         Args: {
           p_code: string
@@ -10349,6 +10538,34 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      record_grading_submission: {
+        Args: {
+          p_answer_text: string
+          p_answer_truncated: boolean
+          p_claimed_birth_year: number
+          p_claimed_class_option: string
+          p_claimed_class_option_other: string
+          p_claimed_class_session_id: string
+          p_claimed_full_name: string
+          p_claimed_student_code: string
+          p_class_session_id: string
+          p_external_id: string
+          p_match_issues: string[]
+          p_match_status: string
+          p_raw_payload: Json
+          p_session_match_method: string
+          p_source?: string
+          p_student_id: string
+          p_student_match_method: string
+          p_submitted_at: string
+        }
+        Returns: {
+          counts_for_score: boolean
+          inserted: boolean
+          match_status: string
+          submission_id: string
+        }[]
       }
       record_parent_message_part: {
         Args: {
@@ -10468,6 +10685,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      refresh_grading_submission_attempts: {
+        Args: { p_class_session_id: string; p_student_id: string }
+        Returns: undefined
       }
       refresh_queued_session_comment_messages: {
         Args: { p_class_session_id?: string }

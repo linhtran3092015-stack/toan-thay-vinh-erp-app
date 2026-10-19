@@ -1,6 +1,7 @@
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
+import { getSessionGradingSubmissions } from "@/features/grading-submissions/data";
 import { getSessionMessageContact } from "@/features/parent-messages/data";
 import { getAdditionalStudyCandidates } from "@/features/sessions/attendance-data";
 import { getSessionDetail } from "@/features/sessions/detail-data";
@@ -168,6 +169,11 @@ export default async function SessionDetailRoute({
       ? await getSessionMessageContact(sessionId)
       : null;
 
+  const gradingSubmissions =
+    permissionResult.permissions.includes("ai_grading.view") && detailResult.detail.status !== "cancelled"
+      ? await getSessionGradingSubmissions(sessionId)
+      : null;
+
   return (
     <SessionDetailPage
       additionalStudyCandidates={
@@ -196,6 +202,7 @@ export default async function SessionDetailRoute({
       canViewStudents={canViewStudents}
       detail={detailResult.detail}
       directoryQuery={directoryQuery}
+      gradingSubmissions={gradingSubmissions}
       messageContact={messageContact}
     />
   );
