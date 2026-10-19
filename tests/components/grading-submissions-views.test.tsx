@@ -1,10 +1,12 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionSubmissionsCard } from "@/features/grading-submissions/components/session-submissions-card";
 import { UnmatchedSubmissionsPage } from "@/features/grading-submissions/components/unmatched-submissions-page";
 import type { SessionGradingSubmission, UnmatchedGradingSubmission } from "@/features/grading-submissions/data";
 import type { SessionParticipantReadModel } from "@/features/sessions/detail-read-models";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 afterEach(() => {
   cleanup();
@@ -112,6 +114,7 @@ describe("UnmatchedSubmissionsPage", () => {
     claimedBirthYear: 2014,
     claimedClassOption: "Khác",
     claimedClassOptionOther: "Lớp cô Hương",
+    claimedClassSessionId: null,
     claimedFullName: "Nguyễn Minh Anh",
     claimedSessionLabel: null,
     claimedStudentCode: null,
