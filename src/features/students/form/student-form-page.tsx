@@ -1,33 +1,14 @@
-import { StudentProfileForm } from "@/features/students/form/components/student-profile-form";
-import type {
-  StudentProfileFormMode,
-} from "@/features/students/form/student-profile-form-helpers";
-import type {
-  StudentProfileFormValues,
-} from "@/features/students/form/student-profile-form-schema";
+import {
+  StudentProfileForm,
+  type StudentProfileFormProps,
+} from "@/features/students/form/components/student-profile-form";
 
-interface StudentFormPageProps {
-  cancelHref: string;
-  defaultValues: StudentProfileFormValues;
-  lifecycleStatus?: string;
-  mode: StudentProfileFormMode;
-  returnQuery?: string;
-}
-
-export function StudentFormPage({
-  cancelHref,
-  defaultValues,
-  lifecycleStatus,
-  mode,
-  returnQuery,
-}: StudentFormPageProps) {
-  return (
-    <StudentProfileForm
-      cancelHref={cancelHref}
-      defaultValues={defaultValues}
-      lifecycleStatus={lifecycleStatus}
-      mode={mode}
-      returnQuery={returnQuery}
-    />
-  );
+/**
+ * /students/new and /students/[studentId]/edit (design 17a). The routes pass
+ * the defaults, the lifecycle status (edit) and the directory return links;
+ * `actions`, the `initial*` props and `studentHref` exist for the /dev/forms
+ * preview only (the routes pass none of them).
+ */
+export function StudentFormPage(props: StudentProfileFormProps) {
+  return <StudentProfileForm {...props} />;
 }
