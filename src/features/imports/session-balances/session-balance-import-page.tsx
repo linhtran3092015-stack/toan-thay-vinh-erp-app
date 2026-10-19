@@ -1,18 +1,19 @@
 "use client";
 
-import type { ChangeEvent } from "react";
-import { useMemo, useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useId, useMemo, useState, useTransition, type ReactNode } from "react";
 
-import { Badge } from "@/components/ui/badge";
+import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
+import { PageHeader } from "@/components/patterns/page-header";
+import type { StepperStep } from "@/components/patterns/stepper";
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import { ImportActionBar } from "@/features/imports/components/import-action-bar";
+import { ImportFileStep } from "@/features/imports/components/import-file-step";
+import { ImportReviewTable, type ImportReviewColumn } from "@/features/imports/components/import-review-table";
+import { ImportSummaryStrip } from "@/features/imports/components/import-summary-strip";
+import { ImportWizardFrame } from "@/features/imports/components/import-wizard-frame";
 import {
   createSessionBalanceImportBatchAction,
   dryRunSessionBalanceImportAction,
@@ -23,6 +24,16 @@ import {
   mapSessionBalanceImportWorkbookRows,
   validateSessionBalanceImportColumnMapping,
 } from "@/features/imports/session-balances/mapping";
+import {
+  getSessionBalanceBatchHref,
+  SessionBalanceBatchList,
+} from "@/features/imports/session-balances/session-balance-batch-list";
+import type { SessionBalanceImportPageActions } from "@/features/imports/session-balances/session-balance-import-action-overrides";
+import {
+  formatSessionBalance,
+  getSessionBalanceRowIssue,
+  getSessionBalanceRowSeverity,
+} from "@/features/imports/session-balances/session-balance-import-labels";
 import { downloadSessionBalanceImportTemplate } from "@/features/imports/session-balances/template-browser";
 import type {
   SessionBalanceImportBatchListItem,
@@ -30,869 +41,728 @@ import type {
   SessionBalanceImportColumnMapping,
   SessionBalanceImportDryRunResult,
   SessionBalanceImportFieldKey,
+  SessionBalanceImportMappingIssue,
   SessionBalanceImportParsedWorkbook,
-  SessionBalanceImportValidationStatus,
+  SessionBalanceImportRowResult,
 } from "@/features/imports/session-balances/types";
 import {
   parseSessionBalanceImportWorkbook,
+  SESSION_BALANCE_IMPORT_MAX_FILE_BYTES,
+  SESSION_BALANCE_IMPORT_MAX_ROWS,
   SessionBalanceImportWorkbookError,
 } from "@/features/imports/session-balances/workbook";
+import { formatIsoDate, getVietnamToday } from "@/lib/datetime";
+import { formatNumber } from "@/lib/format";
 
-const controlClassName =
-  "h-10 w-full rounded-md border border-hairline bg-surface-1 px-3 text-sm text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-subtle";
+export type SessionBalanceImportStep = "file" | "mapping" | "review" | "create";
 
-function getTodayInVietnam(): string {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return formatter.format(new Date());
-}
+const STEP_ORDER: readonly SessionBalanceImportStep[] = ["file", "mapping", "review", "create"];
 
-function formatBatchDateTime(isoString: string | null): string {
-  if (!isoString) return "—";
-  try {
-    const d = new Date(isoString);
-    return new Intl.DateTimeFormat("vi-VN", {
-      dateStyle: "short",
-      timeStyle: "short",
-      timeZone: "Asia/Ho_Chi_Minh",
-    }).format(d);
-  } catch {
-    return isoString;
-  }
-}
+/** Wizard step names (W1): the pipeline's real stages up to the batch; reconcile/approve/post live on the batch page. */
+export const SESSION_BALANCE_IMPORT_STEP_TITLES: Readonly<Record<SessionBalanceImportStep, string>> = {
+  create: "Tạo lô đối soát",
+  file: "Ngày hiệu lực & file",
+  mapping: "Ánh xạ cột",
+  review: "Kiểm tra dòng",
+};
 
-function displayCellValue(
-  value: SessionBalanceImportCellValue | undefined,
-): string {
-  if (value === null || value === undefined || value === "") {
-    return "—";
-  }
-  return String(value);
-}
+const PAGE_TITLE = "Nhập số dư buổi đầu kỳ";
 
-function getStatusTone(
-  status: SessionBalanceImportValidationStatus,
-): "danger" | "neutral" | "success" | "warning" {
-  if (status === "invalid") {
-    return "danger";
-  }
-  if (status === "review") {
-    return "warning";
-  }
-  if (status === "no_change") {
-    return "neutral";
-  }
-  return "success";
-}
+/** What happens after "Tạo lô đối soát" (W3): stages in words, no role names. */
+export const SESSION_BALANCE_CREATE_NEXT_STEPS = "Sau khi tạo lô: đối soát → phê duyệt → ghi sổ; mỗi bước ở trang lô.";
 
-function getStatusLabel(
-  status: SessionBalanceImportValidationStatus,
-): string {
-  if (status === "invalid") {
-    return "Không hợp lệ";
-  }
-  if (status === "review") {
-    return "Cần xem lại";
-  }
-  if (status === "no_change") {
-    return "Không thay đổi";
-  }
-  return "Hợp lệ";
-}
+/** A write whose answer never arrived (W3): the batch may or may not exist. */
+const UNKNOWN_RESULT = "Không rõ kết quả. Mở lại trang (hoặc lô) để kiểm tra trước khi thử lại.";
+
+/** The review table shows at most this many rows (today's cap), with "Hiển thị {n}/{total} dòng". */
+export const SESSION_BALANCE_REVIEW_ROW_CAP = 500;
+
+/** The file step's limits, read from the parser's own constants (.xlsx only, one sheet). */
+export const SESSION_BALANCE_IMPORT_LIMITS_TEXT = `Chỉ nhận .xlsx có đúng một trang tính, tối đa ${formatNumber(
+  SESSION_BALANCE_IMPORT_MAX_FILE_BYTES / (1024 * 1024),
+)} MB và ${formatNumber(SESSION_BALANCE_IMPORT_MAX_ROWS)} dòng dữ liệu.`;
+
+/** Mapped rows shown on the mapping step before the server check. */
+const MAPPING_PREVIEW_ROWS = 20;
+
+const FIELD_LABELS: Readonly<Record<SessionBalanceImportFieldKey, string>> = Object.fromEntries(
+  SESSION_BALANCE_IMPORT_FIELD_DEFINITIONS.map((definition) => [definition.key, definition.label]),
+) as Record<SessionBalanceImportFieldKey, string>;
 
 export interface SessionBalanceImportPageProps {
+  /** Newest batches first (the route loads at most 50). */
   batches?: SessionBalanceImportBatchListItem[];
+  /** imports.session_balances.approve: the list says "Chờ bạn duyệt" and links "Xem & Phê duyệt". */
   canApprove?: boolean;
+  /**
+   * imports.session_balances: may run the wizard (dry-run, create a batch).
+   * Defaults to true; without it the page shows the batch list only.
+   */
+  canImport?: boolean;
   currentUserId?: string | null;
+  /** Replaces the real server actions (the /dev preview passes inert stubs). */
+  actions?: SessionBalanceImportPageActions;
+  /** Batch page link; previews keep it under /dev. */
+  getBatchHref?: (batchId: string) => string;
+  /** Default effective date (`YYYY-MM-DD`); the Vietnam business date when absent. */
+  today?: string;
+  /** Seeding for tests and previews: the step to open (clamped to what the seeded data allows). */
+  initialStep?: SessionBalanceImportStep;
+  initialEffectiveOn?: string;
+  initialWorkbook?: SessionBalanceImportParsedWorkbook | null;
+  /** Defaults to the automatic mapping of `initialWorkbook`. */
+  initialMapping?: SessionBalanceImportColumnMapping;
+  initialDryRun?: SessionBalanceImportDryRunResult | null;
 }
 
+/**
+ * /imports/session-balances (design 17c): the import wizard in the shared
+ * frame, four honest steps "Ngày hiệu lực & file" → "Ánh xạ cột" → "Kiểm tra
+ * dòng" → "Tạo lô đối soát", one step body at a time. The batch list (newest
+ * 50) is the first section of the first step's body; people without
+ * imports.session_balances see the list only. Creating a batch is not gated
+ * by row quality (the server stages every row; the batch page excludes rows):
+ * the action says what happens next instead.
+ */
 export function SessionBalanceImportPage({
   batches = [],
   canApprove = false,
+  canImport = true,
   currentUserId = null,
+  getBatchHref = getSessionBalanceBatchHref,
+  ...wizardProps
 }: SessionBalanceImportPageProps = {}) {
+  const list = (
+    <SessionBalanceBatchList
+      batches={batches}
+      canApprove={canApprove}
+      canImport={canImport}
+      currentUserId={currentUserId}
+      getBatchHref={getBatchHref}
+    />
+  );
+
+  if (!canImport) {
+    return (
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
+        <PageHeader title={PAGE_TITLE}>
+          <p className="mt-1 text-secondary text-text-muted">
+            Tài khoản này xem và duyệt các lô số dư; không có quyền nhập số dư buổi học từ file.
+          </p>
+        </PageHeader>
+        {list}
+      </div>
+    );
+  }
+
+  return (
+    <SessionBalanceImportWizard
+      {...wizardProps}
+      getBatchHref={getBatchHref}
+      list={batches.length > 0 ? list : null}
+    />
+  );
+}
+
+type WizardProps = Omit<SessionBalanceImportPageProps, "batches" | "canApprove" | "canImport" | "currentUserId" | "getBatchHref"> & {
+  getBatchHref: (batchId: string) => string;
+  list: ReactNode;
+};
+
+function clampStep(
+  step: SessionBalanceImportStep,
+  facts: { hasDryRun: boolean; hasWorkbook: boolean; mappingValid: boolean },
+): SessionBalanceImportStep {
+  if (step === "file" || !facts.hasWorkbook) return "file";
+  if (step === "mapping" || !facts.mappingValid || !facts.hasDryRun) return "mapping";
+  return step;
+}
+
+/** The action bar's disabled reason, wired to the primary through `reasonId` only while there is one. */
+function stepReason(
+  reason: string | null,
+  reasonId: string,
+): { reason: string; reasonId: string } | { reason?: undefined; reasonId?: undefined } {
+  return reason ? { reason, reasonId } : {};
+}
+
+function displayCellValue(value: SessionBalanceImportCellValue | undefined): string {
+  if (value === null || value === undefined || value === "") return "—";
+  return String(value);
+}
+
+/** Mapping issues in Vietnamese with the field's label; the module's own message for anything else. */
+function describeMappingIssue(issue: SessionBalanceImportMappingIssue): string {
+  const field = issue.fieldKey ? FIELD_LABELS[issue.fieldKey] : undefined;
+  if (issue.code === "missing_required_field" && field) return `Chưa chọn cột cho trường bắt buộc “${field}”.`;
+  if (issue.code === "duplicate_source_column" && issue.columnKey) {
+    return `Cột ${issue.columnKey} đang được chọn cho nhiều trường; mỗi cột chỉ dùng cho một trường.`;
+  }
+  if (issue.code === "unknown_source_column" && issue.columnKey) return `Không tìm thấy cột ${issue.columnKey} trong file.`;
+  return issue.message;
+}
+
+function SessionBalanceImportWizard({
+  actions,
+  getBatchHref,
+  initialDryRun = null,
+  initialEffectiveOn,
+  initialMapping,
+  initialStep = "file",
+  initialWorkbook = null,
+  list,
+  today,
+}: WizardProps) {
   const router = useRouter();
+  const dryRun = actions?.dryRunSessionBalanceImport ?? dryRunSessionBalanceImportAction;
+  const createBatch = actions?.createSessionBalanceImportBatch ?? createSessionBalanceImportBatchAction;
+  const ids = {
+    confirm: useId(),
+    file: useId(),
+    stepHeading: useId(),
+    stepReason: useId(),
+  };
 
-  const [effectiveOn, setEffectiveOn] = useState<string>(getTodayInVietnam);
-  const [workbook, setWorkbook] =
-    useState<SessionBalanceImportParsedWorkbook | null>(null);
-  const [mapping, setMapping] = useState<SessionBalanceImportColumnMapping>(
-    {},
+  const [initialAutomatic] = useState(() =>
+    initialWorkbook ? buildSessionBalanceImportAutomaticMapping(initialWorkbook.columns).mapping : {},
   );
-  const [dryRunResult, setDryRunResult] =
-    useState<SessionBalanceImportDryRunResult | null>(null);
+  const [step, setStep] = useState<SessionBalanceImportStep>(initialStep);
+  const [effectiveOn, setEffectiveOn] = useState<string>(() => initialEffectiveOn ?? today ?? getVietnamToday());
+  const [workbook, setWorkbook] = useState<SessionBalanceImportParsedWorkbook | null>(initialWorkbook);
+  const [mapping, setMapping] = useState<SessionBalanceImportColumnMapping>(() => initialMapping ?? initialAutomatic);
+  const [autoMappedCount, setAutoMappedCount] = useState<number | null>(() =>
+    initialWorkbook ? Object.keys(initialAutomatic).length : null,
+  );
+  const [dryRunResult, setDryRunResult] = useState<SessionBalanceImportDryRunResult | null>(initialDryRun);
+  const [isReading, setIsReading] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [templateDownloadError, setTemplateDownloadError] = useState<
-    string | null
-  >(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
   const [isTemplateDownloading, setIsTemplateDownloading] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [automaticMappingNotice, setAutomaticMappingNotice] = useState<
-    string | null
-  >(null);
-  const [inputKey, setInputKey] = useState(0);
-
-  // Batch creation states
-  const [createBatchReason, setCreateBatchReason] = useState("");
+  const [dryRunError, setDryRunError] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
   const [isConfirmed, setIsConfirmed] = useState(false);
-  const [createBatchError, setCreateBatchError] = useState<string | null>(
-    null,
-  );
-
-  const [isPending, startTransition] = useTransition();
-  const [isCreatingBatch, startBatchTransition] = useTransition();
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isDryRunning, startDryRun] = useTransition();
+  const [isCreating, startCreate] = useTransition();
 
   const mappingValidation = useMemo(
-    () =>
-      workbook
-        ? validateSessionBalanceImportColumnMapping(
-            workbook.columns,
-            mapping,
-          )
-        : null,
+    () => (workbook ? validateSessionBalanceImportColumnMapping(workbook.columns, mapping) : null),
     [mapping, workbook],
   );
+  const mappedRows = useMemo(
+    () => (workbook && mappingValidation?.isValid ? mapSessionBalanceImportWorkbookRows(workbook, mapping) : []),
+    [mapping, mappingValidation?.isValid, workbook],
+  );
 
-  const mappedRows = useMemo(() => {
-    if (!workbook || !mappingValidation?.isValid) {
-      return [];
+  const currentStep = clampStep(step, {
+    hasDryRun: dryRunResult !== null,
+    hasWorkbook: workbook !== null,
+    mappingValid: mappingValidation?.isValid ?? false,
+  });
+  const currentIndex = STEP_ORDER.indexOf(currentStep);
+  const steps: StepperStep[] = STEP_ORDER.map((key, index) => ({
+    state: index < currentIndex ? "done" : index === currentIndex ? "current" : "upcoming",
+    title: SESSION_BALANCE_IMPORT_STEP_TITLES[key],
+  }));
+
+  /** A new file (or a cleared one) invalidates every later step. */
+  function clearFromFile(): void {
+    setWorkbook(null);
+    setMapping({});
+    setAutoMappedCount(null);
+    setDryRunResult(null);
+    setFileError(null);
+    setDryRunError(null);
+    setReason("");
+    setIsConfirmed(false);
+    setCreateError(null);
+    setStep("file");
+  }
+
+  async function handleFileSelected(file: File): Promise<void> {
+    clearFromFile();
+    setIsReading(true);
+    try {
+      // The parser checks the extension too: a dropped file skips the input's `accept`.
+      const parsed = await parseSessionBalanceImportWorkbook(file);
+      const automatic = buildSessionBalanceImportAutomaticMapping(parsed.columns);
+      setWorkbook(parsed);
+      setMapping(automatic.mapping);
+      setAutoMappedCount(Object.keys(automatic.mapping).length);
+    } catch (error) {
+      setFileError(
+        error instanceof SessionBalanceImportWorkbookError
+          ? error.message
+          : "Không đọc được file Excel. Kiểm tra lại định dạng file.",
+      );
+    } finally {
+      setIsReading(false);
     }
-    return mapSessionBalanceImportWorkbookRows(workbook, mapping);
-  }, [mapping, mappingValidation?.isValid, workbook]);
-
-  const previewRows = mappedRows.slice(0, 20);
-
-  const resultRows = dryRunResult?.rows.slice(0, 500) ?? [];
-
-  const hasFractionalReviewRows = useMemo(() => {
-    if (!dryRunResult) return false;
-    return dryRunResult.rows.some(
-      (r) =>
-        r.validation_status === "review" &&
-        r.validation_code === "BALANCE_HAS_FRACTIONAL_PART",
-    );
-  }, [dryRunResult]);
-
-  const hasZeroNoChangeRows = useMemo(() => {
-    if (!dryRunResult) return false;
-    return dryRunResult.rows.some((r) => r.validation_status === "no_change");
-  }, [dryRunResult]);
+  }
 
   async function handleTemplateDownload(): Promise<void> {
-    setTemplateDownloadError(null);
+    setTemplateError(null);
     setIsTemplateDownloading(true);
-
     try {
       await downloadSessionBalanceImportTemplate();
     } catch (error) {
-      setTemplateDownloadError(
-        error instanceof Error
-          ? error.message
-          : "Không thể tạo file mẫu import số dư buổi.",
-      );
+      setTemplateError(error instanceof Error ? error.message : "Không tạo được file mẫu.");
     } finally {
       setIsTemplateDownloading(false);
     }
   }
 
-  function resetImport(): void {
-    setWorkbook(null);
-    setMapping({});
+  function handleEffectiveOnChange(value: string): void {
+    setEffectiveOn(value);
+    // The check ran for another date: it no longer describes this batch.
     setDryRunResult(null);
-    setFileError(null);
-    setActionError(null);
-    setAutomaticMappingNotice(null);
-    setCreateBatchReason("");
-    setIsConfirmed(false);
-    setCreateBatchError(null);
-    setInputKey((current) => current + 1);
+    setCreateError(null);
   }
 
-  async function handleFileChange(
-    event: ChangeEvent<HTMLInputElement>,
-  ): Promise<void> {
-    const file = event.target.files?.[0];
-
-    setWorkbook(null);
-    setMapping({});
+  function handleMappingChange(fieldKey: SessionBalanceImportFieldKey, columnKey: string): void {
+    // A changed mapping sends other values: the previous check is stale.
     setDryRunResult(null);
-    setFileError(null);
-    setActionError(null);
-    setAutomaticMappingNotice(null);
-    setCreateBatchReason("");
-    setIsConfirmed(false);
-    setCreateBatchError(null);
-
-    if (!file) {
-      return;
-    }
-
-    try {
-      const parsedWorkbook = await parseSessionBalanceImportWorkbook(file);
-      const automaticMapping = buildSessionBalanceImportAutomaticMapping(
-        parsedWorkbook.columns,
-      );
-
-      setWorkbook(parsedWorkbook);
-      setMapping(automaticMapping.mapping);
-
-      const mappedCount = Object.keys(automaticMapping.mapping).length;
-      if (mappedCount > 0) {
-        setAutomaticMappingNotice(
-          `Hệ thống đã tự động nhận diện ${mappedCount}/${SESSION_BALANCE_IMPORT_FIELD_DEFINITIONS.length} cột tiêu đề dựa trên file import.`,
-        );
-      } else {
-        setAutomaticMappingNotice(
-          "Không thể tự động nhận diện tiêu đề cột. Vui lòng chọn ánh xạ thủ công bên dưới.",
-        );
-      }
-    } catch (error) {
-      if (error instanceof SessionBalanceImportWorkbookError) {
-        setFileError(error.message);
-      } else {
-        setFileError(
-          "Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file.",
-        );
-      }
-    }
-  }
-
-  function handleMappingChange(
-    fieldKey: SessionBalanceImportFieldKey,
-    columnKey: string,
-  ): void {
-    // Invalidate stale dry run when mapping changes
-    setDryRunResult(null);
-    setActionError(null);
-    setCreateBatchError(null);
-    setMapping((current) => ({
-      ...current,
-      [fieldKey]: columnKey === "" ? null : columnKey,
-    }));
+    setDryRunError(null);
+    setCreateError(null);
+    setMapping((current) => ({ ...current, [fieldKey]: columnKey === "" ? null : columnKey }));
   }
 
   function handleDryRun(): void {
-    if (!workbook || !mappingValidation?.isValid || mappedRows.length === 0) {
-      return;
-    }
-
-    if (!effectiveOn) {
-      setActionError("Vui lòng chọn ngày hiệu lực số dư.");
-      return;
-    }
-
-    setActionError(null);
+    if (!workbook || !mappingValidation?.isValid || mappedRows.length === 0 || !effectiveOn) return;
+    setDryRunError(null);
     setDryRunResult(null);
-    setCreateBatchError(null);
-
-    startTransition(async () => {
-      const result = await dryRunSessionBalanceImportAction({
-        effective_on: effectiveOn,
-        rows: mappedRows,
-      });
-
-      if (!result.ok) {
-        setActionError(result.message);
+    setCreateError(null);
+    startDryRun(async () => {
+      let result: Awaited<ReturnType<typeof dryRun>>;
+      try {
+        result = await dryRun({ effective_on: effectiveOn, rows: mappedRows });
+      } catch {
+        setDryRunError("Không kết nối được máy chủ để kiểm tra. Bước này không ghi dữ liệu; thử lại sau.");
         return;
       }
-
+      if (!result.ok) {
+        setDryRunError(result.message);
+        return;
+      }
       setDryRunResult(result.data);
+      setStep("review");
     });
   }
 
   function handleCreateBatch(): void {
-    if (
-      !workbook ||
-      !dryRunResult ||
-      !createBatchReason.trim() ||
-      !isConfirmed ||
-      !effectiveOn
-    ) {
-      return;
-    }
-
-    setCreateBatchError(null);
-
-    startBatchTransition(async () => {
-      const result = await createSessionBalanceImportBatchAction({
-        effectiveOn,
-        reason: createBatchReason.trim(),
-        rows: mappedRows,
-        sourceFilename: workbook.sourceFilename,
-        sourceSha256: workbook.sourceSha256,
-      });
-
-      if (!result.ok) {
-        setCreateBatchError(result.message);
+    if (!workbook || !dryRunResult || !reason.trim() || !isConfirmed || !effectiveOn) return;
+    setCreateError(null);
+    startCreate(async () => {
+      let result: Awaited<ReturnType<typeof createBatch>>;
+      try {
+        result = await createBatch({
+          effectiveOn,
+          reason: reason.trim(),
+          rows: mappedRows,
+          sourceFilename: workbook.sourceFilename,
+          sourceSha256: workbook.sourceSha256,
+        });
+      } catch {
+        // The request may have reached the server: reload the list so a created batch shows up.
+        setCreateError(UNKNOWN_RESULT);
+        router.refresh();
         return;
       }
-
-      router.push(`/imports/session-balances/${result.data.id}`);
+      if (!result.ok) {
+        setCreateError(result.message);
+        return;
+      }
+      router.push(getBatchHref(result.data.id));
     });
   }
 
-  return (
-    <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-ink">
-          Import số dư buổi đầu kỳ
-        </h1>
-        <p className="text-sm text-ink-subtle">
-          Kiểm tra dữ liệu số dư buổi đầu kỳ từ file Excel và khởi tạo batch đối soát.
-        </p>
-      </header>
+  const summary = dryRunResult?.summary;
+  const context = workbook ? `${workbook.sourceFilename} · ${formatNumber(workbook.rowCount)} dòng` : undefined;
 
-      {/* Batch History & Pending Approvals List */}
-      {batches.length > 0 ? (
-        <Card className="border-primary/20 shadow-sm">
-          <CardHeader className="pb-3">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="text-base font-bold text-ink flex items-center gap-2">
-                <span>📋 Danh sách Batch đối soát &amp; Phê duyệt ({batches.length})</span>
-              </CardTitle>
-              <p className="text-xs text-ink-subtle">
-                Chọn batch đang chờ duyệt để mở trang phê duyệt chính thức
-              </p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto rounded-md border border-hairline">
-              <table className="w-full text-left text-sm text-ink">
-                <thead className="border-b border-hairline bg-surface-2 text-xs font-semibold uppercase text-ink-subtle">
-                  <tr>
-                    <th className="px-3 py-2.5">Thời gian tạo</th>
-                    <th className="px-3 py-2.5">File nguồn / Lý do</th>
-                    <th className="px-3 py-2.5">Người tạo</th>
-                    <th className="px-3 py-2.5 text-center">Số dòng</th>
-                    <th className="px-3 py-2.5">Trạng thái</th>
-                    <th className="px-3 py-2.5 text-right">Hành động</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-hairline">
-                  {batches.map((b) => {
-                    const isMaker = currentUserId === b.created_by;
-                    const isAwaitingApproval = b.status === "awaiting_approval";
-                    const isAwaitingReconciliation = b.status === "awaiting_reconciliation";
+  let body: ReactNode;
+  let actionBar: ReactNode;
 
-                    let statusTone: "danger" | "neutral" | "success" | "warning" = "neutral";
-                    let statusLabel = b.status as string;
-
-                    if (b.status === "approved" || b.status === "posted") {
-                      statusTone = "success";
-                      statusLabel = b.status === "posted" ? "Đã ghi sổ" : "Đã phê duyệt";
-                    } else if (isAwaitingApproval) {
-                      statusTone = "warning";
-                      statusLabel = isMaker ? "Chờ đối tác duyệt (Maker)" : "Chờ bạn duyệt";
-                    } else if (isAwaitingReconciliation) {
-                      statusTone = "warning";
-                      statusLabel = "Đang chờ đối soát";
-                    } else if (b.status === "rejected") {
-                      statusTone = "danger";
-                      statusLabel = "Đã từ chối";
-                    }
-
-                    return (
-                      <tr className="hover:bg-surface-2/50 transition-colors" key={b.id}>
-                        <td className="px-3 py-2.5 whitespace-nowrap text-xs font-mono text-ink-subtle">
-                          {formatBatchDateTime(b.created_at)}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <p className="font-medium text-ink text-sm">{b.source_filename}</p>
-                          <p className="text-xs text-ink-subtle line-clamp-1">{b.reason}</p>
-                        </td>
-                        <td className="px-3 py-2.5 whitespace-nowrap text-xs text-ink">
-                          {b.creator_name ?? "—"}
-                        </td>
-                        <td className="px-3 py-2.5 text-center whitespace-nowrap font-mono text-xs">
-                          <span className="font-bold text-ink">{b.row_count ?? 0}</span>
-                          {b.valid_count != null ? (
-                            <span className="text-success ml-1">({b.valid_count} hợp lệ)</span>
-                          ) : null}
-                        </td>
-                        <td className="px-3 py-2.5 whitespace-nowrap">
-                          <Badge tone={statusTone}>{statusLabel}</Badge>
-                        </td>
-                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                          <Link href={`/imports/session-balances/${b.id}`}>
-                            {isAwaitingApproval && !isMaker && canApprove ? (
-                              <Button size="sm" variant="primary">
-                                Xem &amp; Phê duyệt →
-                              </Button>
-                            ) : isAwaitingReconciliation ? (
-                              <Button size="sm" variant="outline">
-                                Xem đối soát →
-                              </Button>
-                            ) : (
-                              <Button size="sm" variant="outline">
-                                Xem chi tiết →
-                              </Button>
-                            )}
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-semibold text-ink">
-            Bước 1: Chọn ngày hiệu lực &amp; Tải file Excel
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-1.5">
-              <label
-                className="text-sm font-medium text-ink"
-                htmlFor="effective-date-input"
-              >
-                Ngày hiệu lực số dư <span className="text-danger">*</span>
-              </label>
-              <input
-                className={controlClassName}
-                id="effective-date-input"
-                onChange={(e) => {
-                  setEffectiveOn(e.target.value);
-                  // Invalidate dry run when effective date changes
-                  setDryRunResult(null);
-                  setCreateBatchError(null);
-                }}
-                type="date"
-                value={effectiveOn}
-              />
-              <p className="text-xs text-ink-subtle">
-                Ngày hiệu lực sẽ áp dụng cho tất cả các bút toán sổ buổi được ghi từ batch này.
-              </p>
-            </div>
-
-            <div className="flex flex-col justify-end space-y-1.5">
-              <Button
-                disabled={isTemplateDownloading}
-                onClick={handleTemplateDownload}
-                type="button"
-                variant="outline"
-              >
-                {isTemplateDownloading
-                  ? "Đang tạo file mẫu..."
-                  : "Tải file mẫu Excel (.xlsx)"}
-              </Button>
-            </div>
+  if (currentStep === "file") {
+    const reasonText = isReading ? "Đang đọc file." : !workbook ? "Chọn file Excel trước." : !effectiveOn ? "Chọn ngày hiệu lực trước." : null;
+    body = (
+      <>
+        {list}
+        <section
+          aria-labelledby={ids.stepHeading}
+          className="rounded-lg border border-border-subtle bg-surface-base shadow-[var(--panel-shadow)]"
+        >
+          <div className="border-b border-border-row px-5 py-4">
+            <h2 className="text-section-title font-semibold text-text-strong" id={ids.stepHeading}>
+              Ngày hiệu lực và file Excel
+            </h2>
+            <p className="mt-0.5 text-secondary text-text-muted">
+              File được đọc ngay trên trình duyệt; máy chủ chỉ nhận các cột đã ánh xạ ở bước sau.
+            </p>
           </div>
-
-          {templateDownloadError ? (
-            <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
-              {templateDownloadError}
-            </div>
-          ) : null}
-
-          <div className="space-y-1.5 border-t border-hairline pt-4">
-            <label
-              className="text-sm font-medium text-ink"
-              htmlFor="session-balance-import-file-input"
+          <div className="p-5">
+            <Field
+              className="max-w-xs"
+              hint="Áp dụng cho mọi bút toán sổ buổi ghi từ lô này."
+              label="Ngày hiệu lực số dư"
+              required
             >
-              Chọn file Excel import (.xlsx, tối đa 5 MB, tối đa 5.000 dòng)
-            </label>
-            <input
-              accept=".xlsx"
-              className={controlClassName}
-              id="session-balance-import-file-input"
-              key={inputKey}
-              onChange={handleFileChange}
-              type="file"
-            />
+              {(props) => (
+                <Input
+                  {...props}
+                  className="tabular-nums"
+                  onChange={(event) => handleEffectiveOnChange(event.target.value)}
+                  type="date"
+                  value={effectiveOn}
+                />
+              )}
+            </Field>
           </div>
-
-          {fileError ? (
-            <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
-              {fileError}
-            </div>
-          ) : null}
-
-          {workbook ? (
-            <div className="flex items-center justify-between rounded-md border border-hairline bg-surface-2 p-3 text-sm text-ink">
-              <div>
-                <span className="font-medium">{workbook.sourceFilename}</span>{" "}
-                <span className="text-ink-subtle font-mono text-xs">
-                  (SHA: {workbook.sourceSha256.slice(0, 12)}... • {workbook.rowCount} dòng • Sheet: {workbook.sheetName})
-                </span>
-              </div>
-              <Button onClick={resetImport} size="sm" variant="ghost">
-                Đổi file khác
+        </section>
+        <ImportFileStep
+          accept=".xlsx"
+          error={fileError}
+          file={workbook ? { name: workbook.sourceFilename, rows: workbook.rowCount, sha256: workbook.sourceSha256, sheet: workbook.sheetName } : null}
+          inputId={ids.file}
+          isReading={isReading}
+          label="Chọn file Excel"
+          limitsText={SESSION_BALANCE_IMPORT_LIMITS_TEXT}
+          onFileSelected={(file) => void handleFileSelected(file)}
+          onReset={clearFromFile}
+          templateAction={
+            <>
+              <Button isLoading={isTemplateDownloading} onClick={() => void handleTemplateDownload()} size="sm" variant="secondary">
+                Tải file mẫu (.xlsx)
               </Button>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+              {templateError ? (
+                <p className="text-caption text-danger" role="alert">
+                  {templateError}
+                </p>
+              ) : (
+                <p className="text-caption text-text-muted">Mẫu có các cột Mã học viên, Họ và tên học viên, Số dư buổi.</p>
+              )}
+            </>
+          }
+        />
+      </>
+    );
+    actionBar = (
+      <ImportActionBar
+        {...stepReason(reasonText, ids.stepReason)}
+        primary={
+          <Button aria-describedby={reasonText ? ids.stepReason : undefined} disabled={Boolean(reasonText)} onClick={() => setStep("mapping")}>
+            Tiếp tục: Ánh xạ cột
+          </Button>
+        }
+        text={
+          workbook
+            ? `Đã đọc ${formatNumber(workbook.rowCount)} dòng. Bước tiếp: chọn cột cho từng trường.`
+            : "Chọn ngày hiệu lực số dư và file Excel theo mẫu."
+        }
+      />
+    );
+  } else if (currentStep === "mapping" && workbook) {
+    const issues = mappingValidation?.issues ?? [];
+    const missing = new Set(mappingValidation?.missingRequiredFields ?? []);
+    const previewRows = mappedRows.slice(0, MAPPING_PREVIEW_ROWS);
+    const reasonText = !mappingValidation?.isValid
+      ? "Chọn đủ cột cho các trường bắt buộc trước khi kiểm tra."
+      : !effectiveOn
+        ? "Chọn ngày hiệu lực ở bước 1 trước khi kiểm tra."
+        : null;
 
-      {workbook ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base font-semibold text-ink">
-              Bước 2: Cấu hình ánh xạ cột
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {automaticMappingNotice ? (
-              <div className="rounded-md border border-info/30 bg-info/5 p-3 text-sm text-ink">
-                {automaticMappingNotice}
-              </div>
+    body = (
+      <>
+        <section
+          aria-labelledby={ids.stepHeading}
+          className="@container rounded-lg border border-border-subtle bg-surface-base shadow-[var(--panel-shadow)]"
+        >
+          <div className="border-b border-border-row px-5 py-4">
+            <h2 className="text-section-title font-semibold text-text-strong" id={ids.stepHeading}>
+              Ánh xạ cột trong file
+            </h2>
+            <p className="mt-0.5 text-secondary text-text-muted">Chọn cột của file cho từng trường; mỗi cột chỉ dùng cho một trường.</p>
+          </div>
+          <div className="grid gap-4 p-5">
+            {autoMappedCount !== null ? (
+              <ResultBanner
+                description={
+                  autoMappedCount > 0
+                    ? "Kiểm tra lại trước khi chạy kiểm tra."
+                    : "Chọn cột cho từng trường bên dưới."
+                }
+                title={
+                  autoMappedCount > 0
+                    ? `Đã tự khớp ${autoMappedCount}/${SESSION_BALANCE_IMPORT_FIELD_DEFINITIONS.length} trường theo tiêu đề cột.`
+                    : "Không tự khớp được trường nào theo tiêu đề cột."
+                }
+                tone="info"
+              />
             ) : null}
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              {SESSION_BALANCE_IMPORT_FIELD_DEFINITIONS.map((definition) => {
-                const selectedColumnKey = mapping[definition.key] ?? "";
-                const isMissingRequired =
-                  definition.required &&
-                  mappingValidation?.missingRequiredFields.includes(
-                    definition.key,
-                  );
-
-                return (
-                  <div className="space-y-1.5" key={definition.key}>
-                    <label
-                      className="text-sm font-medium text-ink"
-                      htmlFor={`mapping-select-${definition.key}`}
+            <div className="grid gap-4 @min-[720px]:grid-cols-3">
+              {SESSION_BALANCE_IMPORT_FIELD_DEFINITIONS.map((definition) => (
+                <Field
+                  hint={definition.required ? undefined : "Tùy chọn"}
+                  key={definition.key}
+                  label={definition.label}
+                  required={definition.required}
+                >
+                  {(props) => (
+                    <Select
+                      {...props}
+                      aria-invalid={missing.has(definition.key) || undefined}
+                      onChange={(event) => handleMappingChange(definition.key, event.target.value)}
+                      value={mapping[definition.key] ?? ""}
                     >
-                      {definition.label}{" "}
-                      {definition.required ? (
-                        <span className="text-danger">*</span>
-                      ) : (
-                        <span className="text-xs text-ink-subtle">(Tùy chọn)</span>
-                      )}
-                    </label>
-                    <select
-                      className={`${controlClassName} ${
-                        isMissingRequired
-                          ? "border-danger bg-danger/5"
-                          : ""
-                      }`}
-                      id={`mapping-select-${definition.key}`}
-                      onChange={(event) =>
-                        handleMappingChange(definition.key, event.target.value)
-                      }
-                      value={selectedColumnKey}
-                    >
-                      <option value="">-- Bỏ qua cột này --</option>
+                      <option value="">Không dùng cột nào</option>
                       {workbook.columns.map((column) => (
                         <option key={column.columnKey} value={column.columnKey}>
                           Cột {column.columnKey}
-                          {column.sourceHeader
-                            ? `: ${column.sourceHeader}`
-                            : " (không có tiêu đề)"}
+                          {column.sourceHeader ? `: ${column.sourceHeader}` : " (không có tiêu đề)"}
                         </option>
                       ))}
-                    </select>
-                  </div>
-                );
-              })}
+                    </Select>
+                  )}
+                </Field>
+              ))}
             </div>
-
-            {mappingValidation && !mappingValidation.isValid ? (
-              <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger space-y-1">
-                <p className="font-semibold">Cấu hình ánh xạ chưa hoàn tất:</p>
-                <ul className="list-disc pl-5 space-y-0.5">
-                  {mappingValidation.issues.map((issue, idx) => (
-                    <li key={idx}>{issue.message}</li>
+            {issues.length > 0 ? (
+              <ResultBanner title="Ánh xạ chưa xong." tone="error">
+                <ul className="mt-1 list-disc pl-5">
+                  {issues.map((issue, index) => (
+                    <li key={`${issue.code}-${issue.fieldKey ?? ""}-${index}`}>{describeMappingIssue(issue)}</li>
                   ))}
                 </ul>
-              </div>
+              </ResultBanner>
             ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
+          </div>
+        </section>
 
-      {workbook && mappingValidation?.isValid ? (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-base font-semibold text-ink">
-              Bước 3: Xem trước dữ liệu ({mappedRows.length} dòng)
-            </CardTitle>
-            <Button
-              disabled={isPending || mappedRows.length === 0}
-              onClick={handleDryRun}
-              type="button"
-            >
-              {isPending
-                ? "Đang kiểm tra dry-run..."
-                : "Kiểm tra dữ liệu (Dry-run)"}
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="overflow-x-auto rounded-md border border-hairline">
-              <table className="w-full text-left text-sm text-ink">
-                <thead className="border-b border-hairline bg-surface-2 text-xs font-semibold uppercase text-ink-subtle">
-                  <tr>
-                    <th className="px-3 py-2 text-center w-16">Dòng</th>
-                    <th className="px-3 py-2">Mã học viên *</th>
-                    <th className="px-3 py-2">Họ tên nguồn</th>
-                    <th className="px-3 py-2 text-right">Số dư nguồn *</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-hairline">
-                  {previewRows.map((row, index) => (
-                    <tr className="hover:bg-surface-2/50" key={index}>
-                      <td className="px-3 py-2 text-center text-ink-subtle">
-                        {row.row_number ?? index + 2}
-                      </td>
-                      <td className="px-3 py-2 font-mono font-medium">
-                        {displayCellValue(row.student_public_code)}
-                      </td>
-                      <td className="px-3 py-2">
-                        {displayCellValue(row.source_student_name)}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono">
-                        {displayCellValue(row.source_balance)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        {previewRows.length > 0 ? (
+          <DataTableFrame
+            body={previewRows.map((row, index) => (
+              <TableRow key={row.row_number ?? index}>
+                <TableCell className="text-text-muted" numeric>
+                  {row.row_number ?? index + 2}
+                </TableCell>
+                <TableCell className="font-semibold text-text-strong">{displayCellValue(row.student_public_code)}</TableCell>
+                <TableCell>{displayCellValue(row.source_student_name)}</TableCell>
+                <TableCell numeric>{displayCellValue(row.source_balance)}</TableCell>
+              </TableRow>
+            ))}
+            caption={`Xem trước ${formatNumber(previewRows.length)} dòng đầu theo ánh xạ`}
+            footer={
+              mappedRows.length > previewRows.length ? (
+                <span className="tabular-nums">
+                  Hiển thị {formatNumber(previewRows.length)}/{formatNumber(mappedRows.length)} dòng; máy chủ kiểm tra toàn bộ {formatNumber(mappedRows.length)} dòng.
+                </span>
+              ) : null
+            }
+            header={
+              <tr>
+                <TableHeaderCell className="w-[72px]" numeric>
+                  Dòng
+                </TableHeaderCell>
+                <TableHeaderCell>Mã học viên</TableHeaderCell>
+                <TableHeaderCell>Họ và tên học viên</TableHeaderCell>
+                <TableHeaderCell numeric>Số dư buổi</TableHeaderCell>
+              </tr>
+            }
+          />
+        ) : null}
 
-            {mappedRows.length > 20 ? (
-              <p className="text-xs text-ink-subtle text-center">
-                Đang hiển thị 20 / {mappedRows.length} dòng preview. Đầy đủ dữ liệu sẽ được kiểm tra khi chạy Dry-run.
-              </p>
-            ) : null}
+        {dryRunError ? <ResultBanner description={dryRunError} title="Chưa kiểm tra được." tone="error" /> : null}
+      </>
+    );
+    actionBar = (
+      <ImportActionBar
+        back={{ label: SESSION_BALANCE_IMPORT_STEP_TITLES.file, onClick: () => setStep("file") }}
+        {...stepReason(reasonText, ids.stepReason)}
+        primary={
+          <Button
+            aria-describedby={reasonText ? ids.stepReason : undefined}
+            disabled={Boolean(reasonText) || mappedRows.length === 0}
+            isLoading={isDryRunning}
+            onClick={handleDryRun}
+          >
+            {isDryRunning ? "Đang kiểm tra…" : `Kiểm tra ${formatNumber(mappedRows.length || workbook.rowCount)} dòng`}
+          </Button>
+        }
+        text={`Máy chủ kiểm tra từng dòng với ngày hiệu lực ${formatIsoDate(effectiveOn)}; bước này chưa ghi dữ liệu.`}
+      />
+    );
+  } else if (currentStep === "review" && dryRunResult && summary) {
+    const hasFractional = dryRunResult.rows.some(
+      (row) => row.validation_status === "review" && row.validation_code === "BALANCE_HAS_FRACTIONAL_PART",
+    );
+    const hasZero = dryRunResult.rows.some((row) => row.validation_status === "no_change");
 
-            {actionError ? (
-              <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
-                {actionError}
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
+    body = (
+      <>
+        <h2 className="sr-only" id={ids.stepHeading}>
+          Kết quả kiểm tra
+        </h2>
+        <ImportSummaryStrip
+          cells={[
+            { label: "Tổng dòng", value: summary.total },
+            { label: "Hợp lệ", tone: "success", value: summary.valid },
+            { label: "Cần xem lại", tone: "warning", value: summary.review },
+            { label: "Không hợp lệ", tone: "danger", value: summary.invalid },
+            { label: "Không thay đổi", tone: "muted", value: summary.no_change },
+          ]}
+          label="Kết quả kiểm tra"
+        />
+        {hasFractional ? (
+          <ResultBanner
+            description="Sổ buổi chỉ ghi số nguyên: dòng có phần lẻ (ví dụ 7,5) ở trạng thái Cần xem lại, không được làm tròn và phải được loại khỏi lô ở bước đối soát."
+            title="Có số dư lẻ."
+            tone="warning"
+          />
+        ) : null}
+        {hasZero ? (
+          <ResultBanner
+            description="Dòng có số dư bằng 0 là Không thay đổi: không tạo bút toán sổ buổi."
+            title="Có số dư bằng 0."
+            tone="info"
+          />
+        ) : null}
+        <ImportReviewTable<SessionBalanceImportRowResult>
+          caption={`Kết quả kiểm tra ${formatNumber(summary.total)} dòng`}
+          cardTitle={(row) => `Dòng ${row.source_row_number} · ${row.student_public_code ?? "Thiếu mã học viên"}`}
+          columns={reviewColumns}
+          getRowIssue={(row) => getSessionBalanceRowIssue(row)}
+          getRowKey={(row) => String(row.source_row_number)}
+          getRowSeverity={(row) => getSessionBalanceRowSeverity(row.validation_status)}
+          maxRows={SESSION_BALANCE_REVIEW_ROW_CAP}
+          rows={dryRunResult.rows}
+        />
+      </>
+    );
+    actionBar = (
+      <ImportActionBar
+        back={{ label: SESSION_BALANCE_IMPORT_STEP_TITLES.mapping, onClick: () => setStep("mapping") }}
+        primary={<Button onClick={() => setStep("create")}>Tiếp tục: Tạo lô đối soát</Button>}
+        text={
+          summary.invalid > 0
+            ? `Còn ${formatNumber(summary.invalid)} dòng không hợp lệ: lô có dòng này không đối soát được. Nên sửa file Excel rồi chọn lại file.`
+            : summary.review > 0
+              ? `${formatNumber(summary.review)} dòng cần xem lại sẽ phải được loại khỏi lô ở bước đối soát.`
+              : "Không còn dòng cần xử lý. Bước tiếp: tạo lô đối soát."
+        }
+      />
+    );
+  } else if (dryRunResult && summary && workbook) {
+    const reasonText = !reason.trim() ? "Nhập lý do tạo lô." : !isConfirmed ? "Đánh dấu ô xác nhận." : null;
 
-      {dryRunResult && workbook ? (
-        <Card className="border-primary/30">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold text-ink">
-              Bước 4: Kết quả kiểm tra dữ liệu (Dry-run)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-              <div className="rounded-md border border-hairline bg-surface-2 p-3 text-center">
-                <p className="text-xs text-ink-subtle">Tổng số dòng</p>
-                <p className="text-xl font-bold text-ink">
-                  {dryRunResult.summary.total}
-                </p>
-              </div>
-              <div className="rounded-md border border-success/30 bg-success/5 p-3 text-center">
-                <p className="text-xs text-success">Hợp lệ</p>
-                <p className="text-xl font-bold text-success">
-                  {dryRunResult.summary.valid}
-                </p>
-              </div>
-              <div className="rounded-md border border-warning/30 bg-warning/5 p-3 text-center">
-                <p className="text-xs text-warning">Cần xem lại</p>
-                <p className="text-xl font-bold text-warning">
-                  {dryRunResult.summary.review}
-                </p>
-              </div>
-              <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-center">
-                <p className="text-xs text-danger">Không hợp lệ</p>
-                <p className="text-xl font-bold text-danger">
-                  {dryRunResult.summary.invalid}
-                </p>
-              </div>
-              <div className="rounded-md border border-hairline bg-surface-1 p-3 text-center">
-                <p className="text-xs text-ink-subtle">Không thay đổi</p>
-                <p className="text-xl font-bold text-ink-subtle">
-                  {dryRunResult.summary.no_change}
-                </p>
-              </div>
-            </div>
+    body = (
+      <section
+        aria-labelledby={ids.stepHeading}
+        className="@container rounded-lg border border-border-subtle bg-surface-base shadow-[var(--panel-shadow)]"
+      >
+        <div className="border-b border-border-row px-5 py-4">
+          <h2 className="text-section-title font-semibold text-text-strong" id={ids.stepHeading}>
+            Thông tin lô sẽ tạo
+          </h2>
+          <p className="mt-0.5 text-secondary text-text-muted">Lô ghi lại toàn bộ {formatNumber(summary.total)} dòng của file; chưa có bút toán nào ở bước này.</p>
+        </div>
+        <div className="grid gap-4 p-5">
+          <dl className="m-0 grid gap-3 @min-[640px]:grid-cols-3">
+            <CreateFact label="Ngày hiệu lực">
+              <span className="tabular-nums">{formatIsoDate(effectiveOn)}</span>
+            </CreateFact>
+            <CreateFact label="SHA-256">
+              <span className="font-mono text-secondary font-normal" title={workbook.sourceSha256}>
+                {workbook.sourceSha256.slice(0, 12)}…
+              </span>
+            </CreateFact>
+            <CreateFact label="Các dòng">
+              <span className="tabular-nums">
+                {formatNumber(summary.valid)} hợp lệ · {formatNumber(summary.review)} cần xem lại · {formatNumber(summary.invalid)} không hợp lệ ·{" "}
+                {formatNumber(summary.no_change)} không thay đổi
+              </span>
+            </CreateFact>
+          </dl>
+          {summary.invalid > 0 ? (
+            <ResultBanner
+              description="Trang lô chỉ cho loại dòng cần xem lại; lô còn dòng không hợp lệ sẽ không đối soát được. Sửa file Excel rồi chọn lại file nếu cần."
+              title={`Lô sẽ có ${formatNumber(summary.invalid)} dòng không hợp lệ.`}
+              tone="warning"
+            />
+          ) : null}
+          <Field className="max-w-2xl" hint="Ghi rõ mục đích, ví dụ: số dư buổi đầu kỳ của các lớp đang học." label="Lý do tạo lô" required>
+            {(props) => <Textarea {...props} maxLength={2000} onChange={(event) => setReason(event.target.value)} value={reason} />}
+          </Field>
+          <label className="flex min-h-11 items-center gap-2.5 text-body text-text-strong md:min-h-10" htmlFor={ids.confirm}>
+            <input
+              checked={isConfirmed}
+              className="h-4 w-4 shrink-0 accent-[var(--action-primary)]"
+              id={ids.confirm}
+              onChange={(event) => setIsConfirmed(event.target.checked)}
+              type="checkbox"
+            />
+            Tôi xác nhận kết quả kiểm tra ở bước trước là của đúng file nguồn này.
+          </label>
+          {createError ? <ResultBanner description={createError} title="Chưa tạo được lô." tone="error" /> : null}
+        </div>
+      </section>
+    );
+    actionBar = (
+      <ImportActionBar
+        back={{ disabled: isCreating, label: SESSION_BALANCE_IMPORT_STEP_TITLES.review, onClick: () => setStep("review") }}
+        {...stepReason(reasonText, ids.stepReason)}
+        primary={
+          <Button
+            aria-describedby={reasonText ? ids.stepReason : undefined}
+            disabled={Boolean(reasonText)}
+            isLoading={isCreating}
+            onClick={handleCreateBatch}
+          >
+            {isCreating ? "Đang tạo lô…" : "Tạo lô đối soát"}
+          </Button>
+        }
+        text={SESSION_BALANCE_CREATE_NEXT_STEPS}
+      />
+    );
+  }
 
-            {hasFractionalReviewRows ? (
-              <div className="rounded-md border border-warning/30 bg-warning/5 p-4 text-sm text-ink space-y-1">
-                <p className="font-semibold text-warning">
-                  ⚠️ Lưu ý về số dư có phần lẻ:
-                </p>
-                <p>
-                  Số dư có phần lẻ (ví dụ: 7.5, -2.5). Hệ thống hiện chỉ post số buổi nguyên; dòng này sẽ không được ghi vào sổ buổi và rơi vào trạng thái <strong>Cần xem lại</strong>.
-                </p>
-              </div>
-            ) : null}
+  return (
+    <ImportWizardFrame
+      actionBar={actionBar}
+      context={context}
+      stepperLabel="Các bước nhập số dư buổi"
+      steps={steps}
+      title={PAGE_TITLE}
+    >
+      {body}
+    </ImportWizardFrame>
+  );
+}
 
-            {hasZeroNoChangeRows ? (
-              <div className="rounded-md border border-hairline bg-surface-2 p-4 text-sm text-ink space-y-1">
-                <p className="font-semibold text-ink-subtle">
-                  ℹ️ Lưu ý về dòng không thay đổi:
-                </p>
-                <p>
-                  Dòng có số dư bằng 0 được xếp loại <strong>Không thay đổi</strong>; không cần tạo giao dịch sổ buổi.
-                </p>
-              </div>
-            ) : null}
+const reviewColumns: readonly ImportReviewColumn<SessionBalanceImportRowResult>[] = [
+  {
+    align: "right",
+    header: "Dòng",
+    hideInCard: true,
+    key: "row",
+    render: (row) => <span className="text-text-muted">{row.source_row_number}</span>,
+    width: "64px",
+  },
+  {
+    header: "Mã học viên",
+    hideInCard: true,
+    key: "code",
+    render: (row) => <span className="font-semibold text-text-strong">{row.student_public_code ?? "—"}</span>,
+  },
+  { header: "Họ tên nguồn", key: "name", render: (row) => row.source_student_name ?? "—" },
+  { align: "right", header: "Số dư nguồn", key: "balance", render: (row) => formatSessionBalance(row.source_balance) },
+  { align: "right", header: "Hiện tại", key: "before", render: (row) => formatSessionBalance(row.current_balance_before) },
+  { align: "right", header: "Dự kiến sau", key: "after", render: (row) => formatSessionBalance(row.expected_balance_after) },
+];
 
-            <div className="rounded-md border border-hairline bg-canvas p-4 text-xs text-ink-subtle space-y-1">
-              <p className="font-semibold text-ink">Hướng dẫn xử lý các trạng thái:</p>
-              <p>
-                • <strong>KHÔNG HỢP LỆ (INVALID):</strong> Phải được sửa lại trong file Excel trước khi tiến hành import.
-              </p>
-              <p>
-                • <strong>CẦN XEM LẠI (REVIEW):</strong> Cần đối soát hoặc loại bỏ (exclude) ở bước tạo batch tiếp theo.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-ink">
-                Chi tiết dòng kết quả ({resultRows.length} / {dryRunResult.summary.total} dòng)
-              </h3>
-              <div className="overflow-x-auto rounded-md border border-hairline">
-                <table className="w-full text-left text-sm text-ink">
-                  <thead className="border-b border-hairline bg-surface-2 text-xs font-semibold uppercase text-ink-subtle">
-                    <tr>
-                      <th className="px-3 py-2 text-center w-16">Dòng</th>
-                      <th className="px-3 py-2">Mã học viên</th>
-                      <th className="px-3 py-2">Tên nguồn</th>
-                      <th className="px-3 py-2 text-right">Số dư nguồn</th>
-                      <th className="px-3 py-2 text-right">Hiện tại</th>
-                      <th className="px-3 py-2 text-right">Dự kiến sau</th>
-                      <th className="px-3 py-2">Trạng thái</th>
-                      <th className="px-3 py-2">Thông báo</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-hairline">
-                    {resultRows.map((row) => {
-                      const tone = getStatusTone(row.validation_status);
-                      const label = getStatusLabel(row.validation_status);
-
-                      return (
-                        <tr className="hover:bg-surface-2/50" key={row.source_row_number}>
-                          <td className="px-3 py-2 text-center text-ink-subtle font-mono">
-                            {row.source_row_number}
-                          </td>
-                          <td className="px-3 py-2 font-mono font-medium">
-                            {row.student_public_code ?? "—"}
-                          </td>
-                          <td className="px-3 py-2">
-                            {row.source_student_name ?? "—"}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono font-semibold">
-                            {row.source_balance !== null ? row.source_balance : "—"}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono text-ink-subtle">
-                            {row.current_balance_before !== null
-                              ? row.current_balance_before
-                              : "—"}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono text-ink-subtle">
-                            {row.expected_balance_after !== null
-                              ? row.expected_balance_after
-                              : "—"}
-                          </td>
-                          <td className="px-3 py-2">
-                            <Badge tone={tone}>{label}</Badge>
-                          </td>
-                          <td className="px-3 py-2 text-xs text-ink-subtle">
-                            {row.validation_message ?? "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Bước 5: Tạo batch đối soát */}
-            <div className="border-t border-hairline pt-6 space-y-4">
-              <h3 className="text-base font-semibold text-ink">
-                Bước 5: Tạo batch đối soát
-              </h3>
-              <div className="rounded-md border border-hairline bg-surface-2 p-4 space-y-4">
-                <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
-                  <div>
-                    <span className="text-ink-subtle">File nguồn: </span>
-                    <span className="font-medium text-ink">{workbook.sourceFilename}</span>
-                  </div>
-                  <div>
-                    <span className="text-ink-subtle">SHA-256: </span>
-                    <span className="font-mono text-xs text-ink">{workbook.sourceSha256}</span>
-                  </div>
-                  <div>
-                    <span className="text-ink-subtle">Ngày hiệu lực: </span>
-                    <span className="font-medium text-ink">{effectiveOn}</span>
-                  </div>
-                  <div>
-                    <span className="text-ink-subtle">Tổng kết: </span>
-                    <span className="text-ink">
-                      {dryRunResult.summary.total} dòng (Hợp lệ: {dryRunResult.summary.valid}, Cần xem lại: {dryRunResult.summary.review}, Không hợp lệ: {dryRunResult.summary.invalid}, Không thay đổi: {dryRunResult.summary.no_change})
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    className="text-sm font-medium text-ink"
-                    htmlFor="create-batch-reason"
-                  >
-                    Lý do tạo batch <span className="text-danger">*</span>
-                  </label>
-                  <textarea
-                    className="w-full rounded-md border border-hairline bg-surface-1 p-3 text-sm text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 min-h-[80px]"
-                    id="create-batch-reason"
-                    onChange={(e) => setCreateBatchReason(e.target.value)}
-                    placeholder="Ví dụ: Pilot Data Import Readiness - số dư buổi đầu kỳ 08/08/2026"
-                    value={createBatchReason}
-                  />
-                </div>
-
-                <div className="flex items-start space-x-2">
-                  <input
-                    className="mt-1 h-4 w-4 rounded border-hairline text-primary focus:ring-primary"
-                    id="confirm-dry-run-check"
-                    onChange={(e) => setIsConfirmed(e.target.checked)}
-                    type="checkbox"
-                    checked={isConfirmed}
-                  />
-                  <label
-                    className="text-sm text-ink cursor-pointer"
-                    htmlFor="confirm-dry-run-check"
-                  >
-                    Tôi xác nhận dữ liệu trên là kết quả dry-run của đúng file nguồn này.
-                  </label>
-                </div>
-
-                {createBatchError ? (
-                  <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
-                    {createBatchError}
-                  </div>
-                ) : null}
-
-                <div className="flex justify-end">
-                  <Button
-                    disabled={
-                      isCreatingBatch ||
-                      !createBatchReason.trim() ||
-                      !isConfirmed
-                    }
-                    onClick={handleCreateBatch}
-                    type="button"
-                  >
-                    {isCreatingBatch
-                      ? "Đang tạo batch..."
-                      : "Tạo batch đối soát"}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+function CreateFact({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-caption text-text-muted">{label}</dt>
+      <dd className="m-0 mt-0.5 text-body font-semibold text-text-strong">{children}</dd>
     </div>
   );
 }

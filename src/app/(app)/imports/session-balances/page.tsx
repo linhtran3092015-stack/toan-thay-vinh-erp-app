@@ -43,6 +43,7 @@ export default async function SessionBalanceImportRoute() {
     <SessionBalanceImportPage
       batches={batches}
       canApprove={canApprove}
+      canImport={hasViewPermission}
       currentUserId={user?.id ?? null}
     />
   );

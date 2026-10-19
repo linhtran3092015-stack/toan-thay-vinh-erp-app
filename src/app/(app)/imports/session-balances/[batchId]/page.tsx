@@ -59,6 +59,7 @@ export default async function SessionBalanceBatchDetailRoute({
   return (
     <SessionBalanceBatchDetailPage
       canApprove={canApprove}
+      canReconcile={hasViewPermission}
       currentUserId={user?.id ?? null}
       detail={detail}
     />
