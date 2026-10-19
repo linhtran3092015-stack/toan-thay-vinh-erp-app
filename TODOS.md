@@ -2352,6 +2352,128 @@
 **Priority:** P3
 **Depends on:** ZaloCRM hỗ trợ khóa chống trùng
 
+## Nhập dữ liệu (bước 15b)
+
+### Duyệt lô số dư buổi khi trung tâm chỉ có một chủ
+
+**What:** Quyết định quy tắc "người tạo lô không tự duyệt" cho lô số dư buổi đầu kỳ. Bước 15b giữ nguyên quy tắc trên giao diện: người tạo lô không bấm được "Phê duyệt batch" (test `session-balance-approval-workflow` khóa hành vi này). Ba hướng: (a) theo máy chủ, cho người tạo tự duyệt khi có quyền `imports.session_balances.approve`; (b) thêm lại kiểm tra bốn mắt ở máy chủ và cấp quyền duyệt cho một vai trò thứ hai; (c) giữ như hiện tại.
+
+**Why:** Migration `20260809033000_allow_owner_session_balance_self_approval.sql` đã bỏ kiểm tra bốn mắt ở máy chủ, nên quy tắc chỉ còn ở giao diện. Mọi quyền `imports.*` mặc định chỉ cấp cho vai trò chủ trung tâm, nên khi chỉ có một tài khoản chủ thì lô do chủ tạo không bao giờ duyệt được trên giao diện.
+
+**Context:** `isCreator` trong `src/features/imports/session-balances/session-balance-batch-detail-page.tsx`; quyền mặc định ở `supabase/migrations/20260808100000…` (dòng 80–101), `20260809023000…`, `20260801014500…`; khảo sát `.gstack/briefs/step15-map-ui-tests.md` §0 (7), `.gstack/briefs/step15-map-rules-data.md` §H.1 (O3).
+
+**Effort:** S (giao diện) / M (migration bốn mắt)
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+### Sửa dòng hoặc bỏ dòng ngay trong màn nhập dữ liệu
+
+**What:** Thiết kế 17c cho sửa ô lỗi tại chỗ, chọn lại "Nguồn" và bấm "Bỏ dòng" ở bước Kiểm tra dòng. Bước 15b không làm: bảng kiểm tra chỉ đọc, cách sửa là "Sửa file Excel rồi chọn lại file". Lô số dư buổi vẫn giữ thao tác loại dòng "cần xem lại" ở trang lô (máy chủ ghi lý do).
+
+**Why:** Sửa trên trình duyệt làm dữ liệu được ghi khác với file có SHA-256 đã lưu (máy chủ dùng SHA để chặn nhập trùng). Với nhập học sinh, bỏ một dòng rồi xác nhận thì các dòng đã bỏ không bao giờ nhập lại được từ đúng file đó. Lô lớp và lô ghi danh đã tạo thì không có hàm nào sửa hay loại dòng.
+
+**Context:** `commit_student_import_rows` (`p_source_sha256`, `STUDENT_IMPORT_FILE_ALREADY_COMMITTED`), `exclude_session_balance_import_row`; khảo sát `.gstack/briefs/step15-map-ui-tests.md` §0 (14), `.gstack/briefs/step15-map-rules-data.md` §B.6, §F (F23, F24), §H.1 (O4).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Trang lô cho nhập học sinh và nhập ghi danh, danh sách lô nhập lớp
+
+**What:** Thêm trang chỉ đọc cho một lô nhập học sinh (`student_import_batches`) và một lô nhập ghi danh (`student_enrollment_import_batches`), và một danh sách lô trên `/imports/classes`. Bước 15b không thêm route mới: kết quả nhập học sinh giữ các link "Mở danh sách học viên" và "Xem nhật ký thao tác", kết quả nhập ghi danh là một thẻ số liệu không có link lô; trang lô lớp vẫn quay về màn nhập.
+
+**Why:** Thiết kế 17c ghi "lô (batch) có trang chi tiết" cho cả bốn loại. Hiện mã lô học sinh và ghi danh được trả về nhưng không có chỗ xem lại, nên sau khi rời trang không kiểm tra được lô đã ghi những gì.
+
+**Context:** RLS cho người có `imports.students` / `imports.enrollments` đã đọc được hai bảng lô; khảo sát `.gstack/briefs/step15-map-rules-data.md` §B.2, §B.4, §F (F33), §H.1 (O5).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Số dư buổi lẻ bị làm tròn và dòng trùng trong file số dư
+
+**What:** Kiểm tra lại cách nhận số dư buổi đầu kỳ: cột `source_balance` là `numeric(12,1)` nên số có hai chữ số thập phân bị làm tròn (6,96 thành 7 và được coi là hợp lệ), và chạy thử không báo khi một mã học sinh xuất hiện nhiều lần trong cùng file.
+
+**Why:** Số buổi ghi sổ có thể khác số trong file mà không ai thấy; hai dòng cùng học sinh sẽ cộng hai lần vào sổ buổi khi ghi sổ.
+
+**Context:** `supabase/migrations/20260808100000_session_balance_import_foundation.sql` (cột `source_balance`, hàm `dry_run_session_balance_import_rows`); khảo sát `.gstack/briefs/step15-map-rules-data.md` §B.5, §H.1 (O8).
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Quyết định của anh (sửa hàm máy chủ)
+
+### Lô nhập lớp lỗi làm "cháy" file
+
+**What:** Khi file lớp còn dòng xung đột, máy chủ vẫn tạo lô ở trạng thái "Đã xem trước" (`previewed`); lô này không bao giờ xác nhận được, và vì SHA-256 của file là duy nhất nên không tạo lại lô từ đúng file đó. Dòng không hợp lệ thì thường làm hỏng cả lần tạo lô với lỗi cơ sở dữ liệu thô (23514/23502). Bước 15b chỉ khóa nút "Tạo lô" trên giao diện khi còn dòng xung đột hoặc không hợp lệ; máy chủ chưa đổi.
+
+**Why:** Người nhập phải sửa nội dung file (để có SHA khác) chỉ để thử lại, và không có cách hủy một lô hỏng (trạng thái `rejected` không bao giờ được đặt).
+
+**Context:** `create_class_schedule_import_batch` (`supabase/migrations/20260808110000_class_schedule_import_foundation.sql`), `src/features/imports/classes/actions.ts`; khảo sát `.gstack/briefs/step15-map-rules-data.md` §B.3, §H.1 (O8).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Quyết định của anh (sửa hàm máy chủ)
+
+### Chạy thử nhập ghi danh mang mã ghi danh của dòng trước sang dòng lỗi
+
+**What:** Trong `dry_run_student_enrollment_import`, biến `v_existing_active_enrollment` không được đặt lại ở đầu mỗi dòng, nên một dòng không hợp lệ (thiếu mã, không tìm thấy học sinh hay lớp) trả `resolved_enrollment_id` của dòng hợp lệ trước đó; giá trị này được lưu vào lô khi tạo lô.
+
+**Why:** Dữ liệu lô sai lệch và dễ gây nhầm khi đối chiếu sau này, dù bước xác nhận đã kiểm tra lại từng dòng.
+
+**Context:** `supabase/migrations/20260809023000_student_enrollment_import_foundation.sql` (khoảng dòng 343–347, 419, 475, 643); khảo sát `.gstack/briefs/step15-map-rules-data.md` §B.4, §H.1 (O8).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh (sửa hàm máy chủ)
+
+### Xác nhận nhập lớp không kiểm tra quyền lớp học
+
+**What:** `commit_class_schedule_import_batch` chỉ kiểm tra `imports.classes`, rồi ghi thẳng vào `classes` và `class_schedule_templates`, bỏ qua các quy tắc của tạo lớp và tạo lịch (quyền `classes.create` / `classes.manage_schedule`, lịch chỉ cho lớp đang hoạt động, ngày hiệu lực theo ngày làm việc). Lớp nhập vào mặc định ở trạng thái đang hoạt động.
+
+**Why:** Người chỉ được cấp quyền nhập file có thể tạo lớp và lịch mà vai trò của họ không được tạo bằng tay.
+
+**Context:** `supabase/migrations/20260808110000_class_schedule_import_foundation.sql` (hàm commit), `src/features/imports/classes/actions.ts`; khảo sát `.gstack/briefs/step15-map-rules-data.md` §B.3, §H.1 (O8).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Thao tác nhập ghi danh không kiểm tra quyền và dữ liệu đầu vào
+
+**What:** Ba server action nhập ghi danh (chạy thử, tạo lô, xác nhận) chỉ kiểm tra đã đăng nhập: không kiểm tra `imports.enrollments` ở TypeScript, không kiểm tra dữ liệu bằng zod, không `revalidatePath`. Các hàm máy chủ có kiểm tra `imports.enrollments`, nên đây là lớp bảo vệ thứ hai.
+
+**Why:** Các luồng nhập khác đều kiểm tra quyền và dữ liệu ở server action; thiếu ở đây thì lỗi dữ liệu xấu đi thẳng tới cơ sở dữ liệu và hiện nguyên văn.
+
+**Context:** `src/features/imports/enrollments/actions.ts`; so với `src/features/imports/students/actions.ts`; khảo sát `.gstack/briefs/step15-map-ui-tests.md` §0 (5), `.gstack/briefs/step15-map-rules-data.md` §H.1 (O7, O8).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Quyết định của anh (sửa server action)
+
+### Năm học "2026-2027" viết cứng trong nhập lớp và nhập ghi danh
+
+**What:** Màn nhập ghi danh chỉ có một lựa chọn năm học "2026-2027"; màn nhập lớp lấy năm học từ file và nếu trống thì dùng "2026-2027"; file mẫu lớp cũng ghi sẵn "2026-2027". Nên đọc danh sách năm học đang mở như form tạo lớp.
+
+**Why:** Sang năm học sau, nhập ghi danh không chọn được năm mới, và file lớp thiếu cột năm học sẽ âm thầm nhập vào năm cũ.
+
+**Context:** `src/features/imports/enrollments/enrollment-import-page.tsx`, `src/features/imports/classes/class-schedule-import-page.tsx` (hàm dựng dữ liệu gửi đi), `src/features/imports/classes/template-browser.ts`; khảo sát `.gstack/briefs/step15-map-ui-tests.md` §0 (19), `.gstack/briefs/step15-map-rules-data.md` §B.3, §B.4.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Quyết định của anh (đọc thêm dữ liệu năm học)
+
+### Lỗi cơ sở dữ liệu hiện nguyên văn ở nhập lớp và nhập ghi danh
+
+**What:** Server action nhập lớp và nhập ghi danh ghép thẳng `error.message` của cơ sở dữ liệu vào câu báo lỗi ("Lỗi kiểm tra dữ liệu từ cơ sở dữ liệu: …", "Lỗi tạo batch từ cơ sở dữ liệu: …", "Lỗi thực thi import: …", "Lỗi Commit ghi danh: …"). Nên dịch theo mã lỗi như nhập học sinh và giữ một câu chung cho lỗi lạ.
+
+**Why:** Người dùng thấy câu tiếng Anh kỹ thuật (mã 22P02, 23514…) mà không biết sửa gì trong file; câu thô có thể lộ tên bảng hay ràng buộc.
+
+**Context:** `src/features/imports/classes/actions.ts`, `src/features/imports/enrollments/actions.ts`; khảo sát `.gstack/briefs/step15-map-rules-data.md` §B.3, §B.4, §H.1 (O7).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh (sửa server action)
+
 ## Completed
 
 ### Mở thông báo ngay khi bấm, đánh dấu đã đọc ở nền
