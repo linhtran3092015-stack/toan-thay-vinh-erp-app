@@ -74,7 +74,9 @@ export function ParentMessageQueue({
         {filters.map((filter) => (
           <Link
             aria-current={status === filter.value ? "page" : undefined}
-            className={`inline-flex h-9 items-center rounded-md border px-3 text-control font-semibold transition-colors ${status === filter.value ? "border-action-primary bg-action-primary text-text-on-primary" : "border-border-subtle bg-surface-base text-text-muted hover:bg-interactive-hover hover:text-text-strong"}`}
+            // Soft active chip, same as /finance/sepay. Text colours are important because the
+            // unlayered global `a { color: inherit }` beats utilities on links.
+            className={`inline-flex min-h-11 items-center rounded-md border px-3 text-control font-semibold transition-colors sm:h-9 sm:min-h-9 ${status === filter.value ? "border-action-primary bg-action-primary-soft text-action-primary!" : "border-border-subtle bg-surface-base text-text-muted! hover:bg-interactive-hover hover:text-text-strong!"}`}
             href={filter.value === "queued" ? "/parent-messages" : `/parent-messages?status=${filter.value}`}
             key={filter.value}
           >

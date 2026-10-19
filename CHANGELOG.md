@@ -22,6 +22,82 @@ Thông báo, Nhật ký hệ thống và Báo cáo dựng lại theo phong cách
 ### Fixed
 - Thông báo lead CRM được giao, hẹn theo dõi lead, buổi chưa khóa, buổi chờ khóa và cảnh báo vận hành hiện đúng nhãn thay vì "Sự kiện chưa hỗ trợ".
 
+## [0.26.0.5] - 2026-10-19
+
+Bộ test tự động không còn lúc đạt lúc trượt ở phần thu hồi link phiếu Coaching khi máy bận; giao diện và cách ứng dụng chạy không đổi.
+
+### Fixed
+- Bộ test "Link phiếu công khai" (thu hồi link, bấm Hủy sau khi thu hồi lỗi) chờ nút "Thu hồi"/"Hủy" bật lại rồi mới bấm. Trước đây, khi chạy cả bộ test song song trên máy bận, khoảng 2/7 lần test bấm vào nút còn đang khóa (kết quả thu hồi đã hiện nhưng thao tác chưa xong) nên báo lỗi giả (thu hồi dòng thứ hai: "Unable to find a label … Lý do thu hồi …"; bấm Hủy: ô lý do vẫn còn).
+
+## [0.26.0.4] - 2026-10-19
+
+### Fixed
+- **Ô nhập mã và mẫu tin dùng phông chữ đơn cách (monospace) như thiết kế** thay vì phông chữ thường: hai ô mẫu tin nhắn Zalo trong Cài đặt, ô "Mã học viên" trên form hồ sơ học viên, ô liên kết Coaching vừa tạo, ô gõ "GHI SO DU" khi ghi số dư buổi đã nhập.
+- **Tiêu đề hiện đúng khoảng cách chữ đã thiết kế**: các nhãn viết hoa giãn rộng hơn, dễ đọc hơn ("Hoạt động học vụ & vận hành" trên Tổng quan, nhãn trên Tổng quan bảng lương, "Phiếu Lương" và tiêu đề các mục trên phiếu lương, "PHIẾU HỌC PHÍ" trên phiếu học phí và bản in); tiêu đề lớn ở Nhật ký, Thông báo, Báo cáo, Chấm công và các trang nhập dữ liệu khít chữ hơn một chút.
+- Nút "Hủy buổi học" mờ dần khi rê chuột thay vì đổi đột ngột. Máy bật "giảm chuyển động" vẫn không có hiệu ứng nào.
+
+## [0.26.0.3] - 2026-10-19
+
+### Fixed
+- **Tab đang mở trên trang hiện màu xanh rêu** như thiết kế (Lớp học, Hồ sơ học sinh, Giao dịch SePay, Chăm sóc học sinh, Buổi học). Trước đây chữ của tab đang mở cùng màu xám với các tab khác, chỉ phân biệt bằng gạch chân và chữ đậm. Ở giao diện tối, tab đang mở và số việc tồn dùng sắc xanh rêu sáng để đọc rõ trên nền tối.
+
+## [0.26.0.2] - 2026-10-19
+
+### Fixed
+- **Nút xanh dạng link hiện chữ trắng** như thiết kế. Trước đây chữ tối trên nền xanh đậm, gần như không đọc được: "Về trang chính" (trang 404), "Tạo biểu mẫu" (Coaching), "Xem danh sách" sau khi tạo yêu cầu thanh toán, "Xem danh sách buổi học" sau khi tạo buổi hàng loạt, "Mở danh sách học viên" sau khi nhập học sinh, "Mở phiếu lương" trong bảng lương.
+- **Link khắp hệ thống hiện đúng màu và gạch chân đã thiết kế** thay vì luôn lấy màu chữ xung quanh: link hành động ("Xem", "Mở", "Mở kỳ thu", "Tạo buổi hàng loạt cho lớp này"…) màu xanh rêu; tên học sinh, lớp, lead trong bảng đậm hơn; rê chuột lên các link này hiện gạch chân; vài link trong thông báo lỗi, cảnh báo luôn gạch chân như thiết kế.
+- **Thanh bên và dải mô-đun**: mục đang mở chữ xanh rêu trên nền xanh nhạt; các mục khác chữ xám vừa, rê chuột thì đậm lên.
+
+## [0.26.0.1] - 2026-10-19
+
+### Fixed
+- **Bộ lọc trạng thái trên Tin nhắn phụ huynh** `/parent-messages` đọc được rõ: nút đang chọn trước đây chữ tối trên nền xanh đậm (gần như không đọc được), các nút còn lại không hiện chữ xám như thiết kế. Nay dùng kiểu nút lọc nền nhạt giống trang Giao dịch SePay: nút đang chọn nền xanh nhạt, viền và chữ xanh; nút khác chữ xám, rê chuột thì chữ đậm lên. Trên điện thoại nút cao 44px cho dễ bấm.
+
+## [0.26.0.0] - 2026-10-19
+
+Bài bỏ qua nhầm giờ lấy lại được ngay trên trang "Bài nộp chưa ghép" (kế hoạch chấm bài AI, Giai đoạn 1b): trước đây bài đánh dấu "Bỏ qua (bài rác)" biến khỏi mọi màn hình và chỉ sửa được bằng SQL.
+
+### Added
+- Bộ lọc **Chờ ghép · Đã bỏ qua** trên `/grading-submissions` (`?status=ignored`). Mục Đã bỏ qua liệt kê bài đã đánh dấu bài rác, bỏ qua gần nhất trước, mỗi bài ghi rõ ai bỏ qua, lúc nào (giờ Việt Nam) và lý do, kèm tên, năm sinh, lớp chọn trên form và bài làm như ở mục Chờ ghép. Bài bỏ qua từ trước khi có lịch sử thao tác ghi "Không có trong lịch sử thao tác".
+- Nút **Khôi phục** trên từng bài đã bỏ qua: xác nhận ngay tại dòng, có ô ghi chú tuỳ chọn. Bài quay lại mục Chờ ghép đúng như trước khi bị bỏ qua (giữ học sinh đã nhận ra và cảnh báo cũ), rồi ghép tay hoặc ghép lại tự động như mọi bài khác. Khôi phục được ghi vào lịch sử thao tác kèm người làm và ghi chú.
+- Trang xem trước `/dev/grading-submissions?status=ignored` với dữ liệu mẫu (không ghi gì).
+
+### Changed
+- Database chỉ cho khôi phục bài đang ở trạng thái bỏ qua; quyền vẫn là **ai_grading.view** (chủ trung tâm, quản lý vận hành, quản lý trợ lý, trợ giảng), không thêm quyền mới.
+- Ô lý do khi bỏ qua bài nói rõ bài chuyển sang mục Đã bỏ qua và khôi phục được.
+
+## [0.25.0.0] - 2026-10-19
+
+Trang "Bài nộp chưa ghép" giờ xử lý được bài, không chỉ để xem (kế hoạch chấm bài AI, Giai đoạn 1b): trợ giảng ghép tay bài vào học sinh và buổi học, bỏ qua bài rác, hoặc bấm ghép lại tự động sau khi thêm học sinh mới hay xếp buổi còn thiếu.
+
+### Added
+- **Ghép tay** trên `/grading-submissions`: chọn học sinh (mặc định các em cùng năm sinh trên form, lọc theo tên không dấu, biệt danh hoặc mã; tìm thêm được các em khác năm sinh có lớp hoặc buổi học ngày nộp), rồi chọn một buổi của em trong ngày nộp (giờ Việt Nam). Mỗi buổi ghi rõ học sinh nộp trong giờ hay ngoài giờ buổi đó, em có chọn buổi này trên form không, em có trong danh sách lớp không và điểm danh ra sao. Em không có buổi nào ngày đó thì trang nhắc điểm danh em vào buổi học bù hoặc học thêm trước. Có ô ghi chú tuỳ chọn.
+- **Bỏ qua (bài rác)**: bắt buộc ghi lý do; bài bỏ qua rời khỏi danh sách và không bao giờ được tính điểm.
+- **Ghép lại tự động**: chạy lại đúng bộ ghép của form trên dữ liệu hiện tại cho 200 bài chưa ghép gần nhất, rồi báo số bài đã ghép thêm và số bài vẫn cần chọn tay. Bài vẫn chưa chắc chắn thì giữ lại để người xem, không đoán.
+- Ghép tay hay ghép lại đều tính lại lần nộp: lần nộp cuối (theo giờ nộp) của em trong buổi đó được tính.
+- Mọi thao tác ghép, bỏ qua, ghép lại đều ghi vào lịch sử thao tác (audit log) kèm người làm, lý do hoặc ghi chú, và cảnh báo cũ của bài.
+
+### Changed
+- Quyền **ai_grading.view** đổi tên thành "Xem và ghép bài nộp chấm bài": vẫn cấp cho chủ trung tâm, quản lý vận hành, quản lý trợ lý và trợ giảng, giờ dùng cho cả ghép tay, bỏ qua và ghép lại. Không thêm quyền mới.
+- Database chỉ cho ghép vào buổi chưa hủy trong ngày nộp có em trong danh sách lớp (kể cả lớp ghép) hoặc có điểm danh của em, và chỉ với bài còn đang chờ xem. Danh sách chọn học sinh không mở thêm học sinh nào ngoài các em có ghi danh hoặc buổi học ngày nộp (trợ giảng không có quyền xem hồ sơ học sinh).
+- Trang xem trước `/dev/grading-submissions` thao tác được với dữ liệu mẫu (không ghi gì).
+
+## [0.24.0.0] - 2026-10-18
+
+Bài kiểm tra cuối buổi học sinh nộp qua form Apps Script giờ vào thẳng ERP (kế hoạch chấm bài AI, Giai đoạn 1 "Nhận bài vào ERP"): ERP tự ghép bài với học sinh và buổi học, bài chưa ghép chắc chắn được nằm riêng để trợ giảng xem. Chưa chấm bằng AI.
+
+### Added
+- **Nhận bài từ form** `POST /api/webhooks/grading-submissions`: Apps Script ghi Sheet xong thì gửi một bản sang ERP, có chữ ký HMAC-SHA256 (lệch giờ tối đa 5 phút, body tối đa 256 KB). Gửi lại cùng mã bài không tạo bài trùng. Bài làm dài quá 20.000 ký tự được cắt và đánh dấu. Ghi lỗi thì báo quản lý (mỗi ngày một lần) và Apps Script tự gửi lại; dữ liệu database từ chối thì trả 422 để Apps Script thôi gửi lại.
+- **Danh sách tên cho form** `GET /api/integrations/grading-roster`: học sinh có ghi danh còn hiệu lực, lọc theo năm sinh, sắp theo tên rồi họ đệm theo thứ tự tiếng Việt, kèm buổi học hôm nay của từng em theo lịch ERP (tính cả lớp ghép và học thêm). Trùng họ tên cùng năm sinh thì hiện 4 số cuối SĐT phụ huynh chính, ví dụ "Nguyễn Minh Anh (PH ***4828)"; số đầy đủ không rời database.
+- **Ghép bài tự động**: học sinh theo mã ERP chọn trên form, không có mã thì theo họ tên (không dấu) và năm sinh; buổi học theo buổi chọn trên form, không có thì theo giờ nộp (từ 15 phút trước giờ học đến 3 giờ sau giờ tan), rồi theo điểm danh, rồi theo lựa chọn lớp A/B/CLC. Trùng tên, không tìm thấy, nộp ngoài giờ hay có nhiều buổi phù hợp thì không đoán mà để người xem. Nộp nhiều lần thì lần nộp cuối (theo giờ nộp) được tính.
+- **Bài nộp chưa ghép** `/grading-submissions` (mục Kết quả học tập): bài nộp chưa ghép chắc chắn, kèm tên, năm sinh, lớp chọn trên form (cả chữ ghi ở "Khác"), lý do và bài làm. Trang này chỉ để xem; chọn học sinh và buổi bằng tay sẽ có ở bước sau.
+- **Bài nộp qua form** ở tab "Cuối giờ · Kết quả" của buổi học: bài của từng em kèm giờ nộp và lần nộp, các lần nộp trước gập lại, cảnh báo "Chưa điểm danh", "Vắng nhưng có bài", "Nộp ngoài giờ buổi học", và danh sách em có mặt nhưng chưa nộp.
+- Quyền mới **ai_grading.view** ("Xem bài nộp chấm bài") cho chủ trung tâm, quản lý vận hành, quản lý trợ lý và trợ giảng.
+- **Form Apps Script mới** trong `integrations/apps-script/grading-form/` (Code.gs, FormHocSinh.html, README cài đặt) để chủ trung tâm dán vào: vẫn ghi tab Data như cũ; danh sách tên và năm sinh lấy từ ERP (lỗi thì dùng tab DanhSachHocSinh); câu "Hôm nay con học buổi" hiện buổi học hôm nay của em; chọn "Khác" thì giữ lại chữ học sinh gõ; bài làm ghi vào Sheet đúng như học sinh gõ (Sheets không còn đổi "15/4" thành ngày hay chạy chữ bắt đầu bằng "=" thành công thức); tab Data hết cột thì tự thêm cột, thêm không được thì vẫn ghi bài như form cũ; thêm cột "Mã HS ERP", "Buổi học ERP", "Mã bài ERP", "Giờ nộp ERP", "Đã gửi ERP"; trigger 10 phút/lần gửi lại bài chưa gửi được, bài mới nhất trước. Câu học thử tiếng Anh và SĐT phụ huynh chỉ ghi vào Sheet, không gửi ERP.
+- Biến môi trường `GRADING_FORM_SECRET` (ít nhất 32 ký tự, trùng với `ERP_FORM_SECRET` trong Script Properties).
+- Dữ liệu thô của bài nộp (`raw_payload`, không chứa bài làm) tự xoá sau 30 ngày.
+- Trang xem trước `/dev/grading-submissions` và thẻ bài nộp trên `/dev/session` (trả 404 trên production).
+
 ## [0.23.0.0] - 2026-10-18
 
 Danh sách Tài chính dựng lại theo phong cách Stumana (bước 14c): Đơn hàng cho kế toán thấy ngay đơn nào chưa xác nhận và quyết toán SB từng đợt, Sổ cái số buổi đọc dễ hơn, Yêu cầu thanh toán lọc nhanh theo trạng thái và ghi giờ đúng giờ Việt Nam.
