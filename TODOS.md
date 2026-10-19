@@ -1580,7 +1580,7 @@
 
 ### Test Coaching chập chờn khi chạy cả bộ lúc máy tải cao
 
-**What:** Sửa các test chờ trạng thái thay vì đọc một lần: `coaching-form-builder.test.tsx` ("Tạo bản nháp phiên bản mới" bị từ chối, "Xuất bản" bị từ chối). Đã xong: `coaching-public-link-copy.test.tsx` (thu hồi dòng thứ hai, v0.27.1.0) và `dev-coaching-preview.test.tsx` (lưu và xuất bản bản nháp, b542c46).
+**What:** Sửa các test chờ trạng thái thay vì đọc một lần: `coaching-form-builder.test.tsx` ("Tạo bản nháp phiên bản mới" bị từ chối, "Xuất bản" bị từ chối). Đã xong: `coaching-public-link-copy.test.tsx` (thu hồi dòng thứ hai, v0.26.0.5) và `dev-coaching-preview.test.tsx` (lưu và xuất bản bản nháp, b542c46).
 
 **Why:** Khi tải máy cao các test này đôi khi đỏ (đã gặp 4 lần trong bước 12) dù chạy riêng luôn xanh. Bản sửa đã làm ở bước 12 bị gỡ khỏi nhánh vì nằm ngoài phạm vi và cần đo P(fail|regression) trước/sau.
 

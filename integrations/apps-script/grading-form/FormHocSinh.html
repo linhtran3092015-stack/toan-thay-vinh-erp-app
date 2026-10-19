@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        body {
+            background-color: #f0f2f5;
+            font-family: 'Be Vietnam Pro', sans-serif;
+            padding-bottom: 50px;
+            color: #2d3436;
+        }
+
+        textarea.form-control {
+            overflow: hidden;
+            resize: none;
+            min-height: 100px;
+            transition: height 0.2s ease;
+        }
+
+        .form-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            padding: 35px;
+            margin-top: 25px;
+        }
+
+        .header-logo {
+            color: #0d6efd;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 15px;
+        }
+
+        .form-label {
+            font-size: 1.1rem;
+            margin-bottom: 12px;
+        }
+
+        .form-check {
+            padding-top: 8px;
+            padding-bottom: 8px;
+            margin-bottom: 5px;
+            transition: 0.2s;
+        }
+
+        .form-check-input {
+            cursor: pointer;
+            width: 1.2em;
+            height: 1.2em;
+            margin-top: 0.25em;
+        }
+
+        .form-check-label {
+            cursor: pointer;
+            display: inline-block;
+            width: 100%;
+            padding-left: 8px;
+            font-weight: 500;
+        }
+
+        .form-control,
+        .form-select {
+            border-radius: 12px;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 18px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            border-radius: 15px;
+            text-transform: uppercase;
+            background-color: #0d6efd;
+            border: none;
+            transition: 0.3s;
+            margin-top: 20px;
+        }
+
+        .btn-submit:hover {
+            background-color: #0056b3;
+            box-shadow: 0 8px 15px rgba(13, 110, 253, 0.2);
+        }
+
+        #successMessage {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .loading {
+            display: none;
+        }
+
+        #recoveryNote {
+            display: none;
+            font-size: 0.85rem;
+            color: #0d6efd;
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+
+        .field-hint {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-top: 6px;
+        }
+
+        .alert-screenshot {
+            background-color: #fff8e6;
+            border: 2px dashed #ffc107;
+            border-radius: 15px;
+            padding: 15px;
+            margin: 25px auto;
+            max-width: 500px;
+            color: #856404;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+
+                <div id="mainForm" class="form-container">
+
+                    <div class="header-logo">
+                        <h2>📝 Bài kiểm tra sự tiến bộ lớp Toán Chuyên Sâu A, B, CLC</h2>
+                        <p class="text-muted">Trung Tâm Toán Thầy Vinh</p>
+                    </div>
+
+                    <p id="recoveryNote">
+                        ✨ Đã khôi phục thông tin từ lần trước...
+                    </p>
+
+                    <form
+                        id="graduationForm"
+                        onsubmit="handleFormSubmit(event, this)"
+                    >
+
+                        <!-- Câu 1 -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                1. Nơi nộp bài:
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            <textarea
+                                class="form-control"
+                                name="linkBaiThi"
+                                id="linkBaiThi"
+                                rows="3"
+                                placeholder="Trình bày chi tiết bài làm"
+                                required
+                            ></textarea>
+                        </div>
+
+                        <div class="row">
+
+                            <!-- Câu 2 -->
+                            <div class="col-md-6 mb-4">
+                                <label class="form-label fw-bold">
+                                    2. Năm sinh:
+                                    <span class="text-danger">*</span>
+                                </label>
+
+                                <select
+                                    class="form-select form-select-lg"
+                                    id="namSinh"
+                                    name="namSinh"
+                                    onchange="filterNames()"
+                                    required
+                                >
+                                    <option value="">
+                                        -- Chọn năm sinh --
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Câu 3 -->
+                            <div class="col-md-6 mb-4">
+                                <label class="form-label fw-bold">
+                                    3. Họ và tên học sinh:
+                                    <span class="text-danger">*</span>
+                                </label>
+
+                                <select
+                                    class="form-select form-select-lg"
+                                    id="hoTen"
+                                    name="hoTen"
+                                    onchange="autoFillFirstName()"
+                                    required
+                                >
+                                    <option value="">
+                                        -- Chọn họ tên --
+                                    </option>
+                                </select>
+                            </div>
+
+                        </div>
+
+                        <p id="rosterHint" class="field-hint" style="display: none;"></p>
+
+                        <input type="hidden" id="maHocSinh" name="maHocSinh">
+                        <input type="hidden" id="hoTenDayDu" name="hoTenDayDu">
+
+                        <div
+                            id="manualNameBox"
+                            class="mb-4"
+                            style="display: none;"
+                        >
+                            <label class="form-label fw-bold text-primary">
+                                Con hãy tự điền Họ và tên của mình:
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="hoTenManual"
+                                name="hoTenManual"
+                                placeholder="Ví dụ: Nguyễn Văn An"
+                            >
+                        </div>
+
+                        <!-- Câu 4 -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-muted small">
+                                4. Tên học sinh (Tự động):
+                            </label>
+
+                            <input
+                                type="text"
+                                class="form-control bg-light"
+                                id="tenHocSinh"
+                                name="tenHocSinh"
+                                readonly
+                            >
+                        </div>
+
+                        <!-- Câu 5 -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                5. Hôm nay con học buổi
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            <div id="buoiHocOptions"></div>
+                            <p id="buoiHocHint" class="field-hint" style="display: none;"></p>
+                        </div>
+
+                        <!-- Câu 6 -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                6. Con muốn học thử miễn phí thêm các lớp Tiếng Anh chứ?
+                            </label>
+
+                            <div id="anhVanOptions"></div>
+                        </div>
+
+                        <!-- Câu 7 -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                7. SĐT của bố/mẹ để thầy hướng dẫn học thử
+                            </label>
+
+                            <input
+                                type="tel"
+                                class="form-control"
+                                name="sdtBoMe"
+                                id="sdtBoMe"
+                                placeholder="Số điện thoại..."
+                            >
+                        </div>
+
+                        <button
+                            type="submit"
+                            class="btn btn-primary btn-submit"
+                            id="submitBtn"
+                        >
+                            XÁC NHẬN NỘP BÀI
+                        </button>
+
+                        <div
+                            id="loading"
+                            class="text-center mt-3 loading"
+                        >
+                            <div
+                                class="spinner-border text-primary"
+                                role="status"
+                            ></div>
+
+                            <p class="mt-2 fw-bold text-primary">
+                                Đang nộp bài, con vui lòng đợi tí nhé...
+                            </p>
+                        </div>
+
+                    </form>
+                </div>
+
+                <div id="successMessage" class="form-container">
+
+                    <div class="mb-3">
+                        <i
+                            class="fas fa-check-circle"
+                            style="font-size: 80px; color: #358f55;"
+                        ></i>
+                    </div>
+
+                    <h1
+                        class="fw-bold"
+                        style="color: #358f55;"
+                    >
+                        NỘP BÀI THÀNH CÔNG!
+                    </h1>
+
+                    <p
+                        id="submissionTimeDisplay"
+                        class="fs-6 mt-3 mb-1 fw-bold text-secondary"
+                    ></p>
+
+                    <p class="fs-5 mt-2 text-muted">
+                        Chúc mừng con đã hoàn thành buổi học hôm nay.
+                    </p>
+
+                    <div class="alert-screenshot">
+
+                        <i class="fas fa-camera fa-2x mb-2 text-warning"></i>
+
+                        <h5 class="fw-bold text-dark">
+                            Lưu ý quan trọng:
+                        </h5>
+
+                        <p class="mb-0 text-dark">
+                            Phụ huynh/Học sinh vui lòng
+                            <b>chụp lại màn hình này</b>
+                            và gửi vào Sổ liên lạc (Zalo) để báo cáo thầy cô nhé!
+                        </p>
+
+                    </div>
+
+                    <button
+                        class="btn btn-outline-primary mt-2 px-4 py-2"
+                        onclick="location.reload()"
+                    >
+                        Nộp thêm bài khác
+                    </button>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Danh sách học sinh lấy từ ERP theo năm sinh (qua Code.gs, không gọi thẳng ERP).
+        // Giá trị ô họ tên = mã học sinh ERP; lớp hôm nay = buổi học trong lịch ERP.
+        const PROGRESS_KEY = 'vinhMathProgress_v3';
+        const OLD_CLASS_OPTIONS = [
+            "A - Nâng cao - Thầy Vinh",
+            "B - Cơ bản - Thầy Vinh",
+            "CLC1 - Từ cơ bản đến nâng cao - Thầy Vinh",
+            "CLC2 - Từ cơ bản đến nâng cao - Thầy Vinh",
+            "Con không rõ"
+        ];
+        const rosterByYear = {};
+        let currentStudents = [];
+        let restoring = null;
+
+        window.onload = () => {
+            const tx = document.getElementById("linkBaiThi");
+            tx.addEventListener("input", function () {
+                this.style.height = "auto";
+                this.style.height = this.scrollHeight + "px";
+            }, false);
+
+            fillBirthYears([2019, 2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011, 2010, 2009, 2008]);
+            google.script.run
+                .withSuccessHandler(years => {
+                    fillBirthYears(years);
+                    loadSavedData();
+                })
+                .withFailureHandler(() => loadSavedData())
+                .getBirthYears();
+
+            renderOldClassOptions();
+
+            renderRadios("anhVanOptions", "hocThuAnh", [
+                "Có ạ! Con cảm ơn thầy",
+                "Con đang học tiếng anh cô Hương rồi ạ"
+            ], false, false);
+
+            document.getElementById("graduationForm").addEventListener("input", saveToStorage);
+            document.getElementById("graduationForm").addEventListener("change", saveToStorage);
+        };
+
+        function fillBirthYears(years) {
+            const select = document.getElementById("namSinh");
+            const current = select.value;
+            select.innerHTML = "";
+            select.appendChild(makeOption("", "-- Chọn năm sinh --"));
+            years.forEach(year => select.appendChild(makeOption(String(year), String(year))));
+            if (current) select.value = current;
+        }
+
+        function makeOption(value, text) {
+            const opt = document.createElement("option");
+            opt.value = value;
+            opt.textContent = text;
+            return opt;
+        }
+
+        function filterNames() {
+            const year = document.getElementById("namSinh").value;
+            const select = document.getElementById("hoTen");
+            const hint = document.getElementById("rosterHint");
+
+            select.innerHTML = "";
+            select.appendChild(makeOption("", "-- Chọn họ tên --"));
+            document.getElementById("manualNameBox").style.display = "none";
+            document.getElementById("tenHocSinh").value = "";
+            document.getElementById("maHocSinh").value = "";
+            document.getElementById("hoTenDayDu").value = "";
+            currentStudents = [];
+            renderOldClassOptions();
+
+            if (!year) {
+                hint.style.display = "none";
+                return;
+            }
+
+            if (rosterByYear[year]) {
+                fillNames(rosterByYear[year]);
+                return;
+            }
+
+            select.disabled = true;
+            hint.textContent = "Đang tải danh sách tên...";
+            hint.style.display = "block";
+            google.script.run
+                .withSuccessHandler(result => {
+                    rosterByYear[year] = result;
+                    if (document.getElementById("namSinh").value === year) fillNames(result);
+                })
+                .withFailureHandler(() => {
+                    const fallback = { source: "none", students: [] };
+                    if (document.getElementById("namSinh").value === year) fillNames(fallback);
+                })
+                .getStudentsByBirthYear(year);
+        }
+
+        function fillNames(result) {
+            const select = document.getElementById("hoTen");
+            const hint = document.getElementById("rosterHint");
+            select.disabled = false;
+            currentStudents = result.students || [];
+
+            currentStudents.forEach((student, index) => {
+                // Mã ERP làm giá trị; khi ERP lỗi (danh sách từ Sheet) dùng số thứ tự.
+                select.appendChild(makeOption(student.code || "IDX:" + index, student.label));
+            });
+            select.appendChild(makeOption("CHUA_CO_TEN", "➕ Tên con không có trong danh sách"));
+
+            if (currentStudents.length === 0) {
+                hint.textContent = "Chưa tải được danh sách. Con chọn \"Tên con không có trong danh sách\" và tự điền họ tên nhé.";
+                hint.style.display = "block";
+            } else {
+                hint.style.display = "none";
+            }
+
+            if (restoring && restoring.hoTen) {
+                if ([...select.options].some(opt => opt.value === restoring.hoTen)) {
+                    select.value = restoring.hoTen;
+                    autoFillFirstName();
+                }
+                restoreRadios();
+                restoring = null;
+            }
+        }
+
+        function selectedStudent() {
+            const value = document.getElementById("hoTen").value;
+            if (!value || value === "CHUA_CO_TEN") return null;
+            if (value.indexOf("IDX:") === 0) return currentStudents[Number(value.slice(4))] || null;
+            return currentStudents.find(student => student.code === value) || null;
+        }
+
+        function autoFillFirstName() {
+            const selectedValue = document.getElementById("hoTen").value;
+            const manualNameBox = document.getElementById("manualNameBox");
+            const manualNameInput = document.getElementById("hoTenManual");
+            const firstNameInput = document.getElementById("tenHocSinh");
+            const student = selectedStudent();
+
+            document.getElementById("maHocSinh").value = student ? (student.code || "") : "";
+            document.getElementById("hoTenDayDu").value = student ? student.fullName : "";
+
+            if (selectedValue === "CHUA_CO_TEN") {
+                manualNameBox.style.display = "block";
+                manualNameInput.required = true;
+                firstNameInput.value = "";
+                manualNameInput.oninput = function () {
+                    const fullName = this.value.trim();
+                    if (!fullName) {
+                        firstNameInput.value = "";
+                        return;
+                    }
+                    const nameParts = fullName.split(/\s+/);
+                    firstNameInput.value = nameParts[nameParts.length - 1];
+                };
+                renderOldClassOptions();
+                return;
+            }
+
+            manualNameBox.style.display = "none";
+            manualNameInput.required = false;
+            manualNameInput.value = "";
+            firstNameInput.value = student ? student.givenName : "";
+
+            if (student && student.sessions && student.sessions.length > 0) {
+                renderSessionOptions(student.sessions);
+            } else {
+                renderOldClassOptions();
+            }
+        }
+
+        // Lớp hôm nay theo lịch ERP: 1 buổi thì chọn sẵn, nhiều buổi thì cho chọn.
+        function renderSessionOptions(sessions) {
+            const container = document.getElementById("buoiHocOptions");
+            container.innerHTML = "";
+            sessions.forEach((session, index) => {
+                container.appendChild(makeRadio("buoiHoc", "buoiHoc_erp_" + index, "ERP:" + session.id, "Buổi " + session.label, true));
+            });
+            container.appendChild(makeRadio("buoiHoc", "buoiHoc_khong_ro", "Con không rõ", "Không phải buổi trên / Con không rõ", true));
+            if (sessions.length === 1) document.getElementById("buoiHoc_erp_0").checked = true;
+
+            const hint = document.getElementById("buoiHocHint");
+            hint.textContent = sessions.length === 1
+                ? "Thầy đã chọn sẵn buổi học hôm nay của con."
+                : "Hôm nay con có " + sessions.length + " buổi, con chọn buổi vừa học nhé.";
+            hint.style.display = "block";
+        }
+
+        function renderOldClassOptions() {
+            renderRadios("buoiHocOptions", "buoiHoc", OLD_CLASS_OPTIONS, true, true);
+            document.getElementById("buoiHocHint").style.display = "none";
+        }
+
+        function makeRadio(name, id, value, labelText, required) {
+            const wrapper = document.createElement("div");
+            wrapper.className = "form-check";
+            const input = document.createElement("input");
+            input.className = "form-check-input";
+            input.type = "radio";
+            input.name = name;
+            input.id = id;
+            input.value = value;
+            input.required = required;
+            const label = document.createElement("label");
+            label.className = "form-check-label";
+            label.htmlFor = id;
+            label.textContent = labelText;
+            wrapper.appendChild(input);
+            wrapper.appendChild(label);
+            return wrapper;
+        }
+
+        function renderRadios(divId, name, options, hasOther, isRequired) {
+            const container = document.getElementById(divId);
+            container.innerHTML = "";
+            options.forEach((opt, index) => {
+                container.appendChild(makeRadio(name, name + "_" + index, opt, opt, isRequired));
+            });
+
+            if (hasOther) {
+                const wrapper = document.createElement("div");
+                wrapper.className = "form-check d-flex align-items-center";
+                const input = document.createElement("input");
+                input.className = "form-check-input";
+                input.type = "radio";
+                input.name = name;
+                input.id = name + "_ot";
+                input.value = "Other";
+                input.required = isRequired;
+                const label = document.createElement("label");
+                label.className = "form-check-label ms-2";
+                label.htmlFor = name + "_ot";
+                label.style.width = "auto";
+                label.textContent = "Khác:";
+                const text = document.createElement("input");
+                text.type = "text";
+                text.className = "form-control form-control-sm ms-2";
+                text.name = name + "_other";
+                text.id = name + "_other";
+                text.placeholder = "Ghi rõ...";
+                text.addEventListener("focus", () => { input.checked = true; });
+                wrapper.appendChild(input);
+                wrapper.appendChild(label);
+                wrapper.appendChild(text);
+                container.appendChild(wrapper);
+            }
+        }
+
+        function handleFormSubmit(event) {
+            event.preventDefault();
+
+            const submitBtn = document.getElementById("submitBtn");
+            const loading = document.getElementById("loading");
+            submitBtn.disabled = true;
+            loading.style.display = "block";
+
+            const selectedValue = document.getElementById("hoTen").value;
+            const manualStudentName = document.getElementById("hoTenManual").value.trim();
+
+            if (selectedValue === "CHUA_CO_TEN" && manualStudentName === "") {
+                alert("Con hãy nhập đầy đủ họ và tên của mình.");
+                submitBtn.disabled = false;
+                loading.style.display = "none";
+                document.getElementById("hoTenManual").focus();
+                return;
+            }
+
+            const checkedClass = document.querySelector('input[name="buoiHoc"]:checked');
+            const classValue = checkedClass ? checkedClass.value : "";
+            const isErpSession = classValue.indexOf("ERP:") === 0;
+            const otherInput = document.getElementById("buoiHoc_other");
+            const student = selectedStudent();
+
+            const payload = {
+                linkBaiThi: document.getElementById("linkBaiThi").value,
+                namSinh: document.getElementById("namSinh").value,
+                hoTen: selectedValue,
+                hoTenManual: manualStudentName,
+                hoTenDayDu: student ? student.fullName : "",
+                maHocSinh: student ? (student.code || "") : "",
+                tenHocSinh: document.getElementById("tenHocSinh").value,
+                buoiHoc: isErpSession ? "" : classValue,
+                buoiHocKhac: !isErpSession && classValue === "Other" && otherInput ? otherInput.value : "",
+                buoiHocErp: isErpSession ? classValue.slice(4) : "",
+                buoiHocErpLabel: isErpSession && checkedClass.labels.length > 0 ? checkedClass.labels[0].textContent : "",
+                troGiang: "",
+                rating: "",
+                caiTien: "",
+                hocThuAnh: document.querySelector('input[name="hocThuAnh"]:checked')?.value || "",
+                sdtBoMe: document.getElementById("sdtBoMe").value,
+                files: []
+            };
+
+            google.script.run
+                .withSuccessHandler(res => {
+                    if (res === "OK") {
+                        localStorage.removeItem(PROGRESS_KEY);
+                        const now = new Date();
+                        const timeStr = now.toLocaleTimeString("vi-VN", { hour12: false });
+                        const dateStr = now.toLocaleDateString("vi-VN");
+                        const display = document.getElementById("submissionTimeDisplay");
+                        display.textContent = "⏱ Thời gian nộp: ";
+                        const time = document.createElement("span");
+                        time.className = "text-primary";
+                        time.textContent = timeStr + " - " + dateStr;
+                        display.appendChild(time);
+                        document.getElementById("mainForm").style.display = "none";
+                        document.getElementById("successMessage").style.display = "block";
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                    } else {
+                        alert("Lỗi: " + res);
+                        submitBtn.disabled = false;
+                        loading.style.display = "none";
+                    }
+                })
+                .withFailureHandler(err => {
+                    alert("Kết nối tới máy chủ bị lỗi. Lỗi: " + err);
+                    submitBtn.disabled = false;
+                    loading.style.display = "none";
+                })
+                .processForm(payload);
+        }
+
+        function saveToStorage() {
+            const form = document.getElementById("graduationForm");
+            const data = {};
+            new FormData(form).forEach((value, key) => {
+                data[key] = value;
+            });
+            localStorage.setItem(PROGRESS_KEY, JSON.stringify(data));
+        }
+
+        function loadSavedData() {
+            const savedData = localStorage.getItem(PROGRESS_KEY);
+            if (!savedData) return;
+
+            let data;
+            try {
+                data = JSON.parse(savedData);
+            } catch (e) {
+                return;
+            }
+            document.getElementById("recoveryNote").style.display = "block";
+
+            if (data.linkBaiThi) {
+                const el = document.getElementById("linkBaiThi");
+                el.value = data.linkBaiThi;
+                el.style.height = "auto";
+                el.style.height = el.scrollHeight + "px";
+            }
+            if (data.hoTenManual) document.getElementById("hoTenManual").value = data.hoTenManual;
+            if (data.sdtBoMe) document.getElementById("sdtBoMe").value = data.sdtBoMe;
+
+            restoring = data;
+            const yearSelect = document.getElementById("namSinh");
+            if (data.namSinh) yearSelect.value = data.namSinh;
+            if (data.namSinh && yearSelect.value === data.namSinh) {
+                filterNames();
+            } else {
+                restoreRadios();
+                restoring = null;
+            }
+        }
+
+        function restoreRadios() {
+            const data = restoring || {};
+            document.querySelectorAll('input[type="radio"]').forEach(radio => {
+                if (data[radio.name] === radio.value) radio.checked = true;
+            });
+            const other = document.getElementById("buoiHoc_other");
+            if (other && data.buoiHoc_other) other.value = data.buoiHoc_other;
+        }
+    </script>
+</body>
+</html>

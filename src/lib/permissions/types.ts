@@ -42,6 +42,7 @@ export const DATABASE_PERMISSION_CODES = [
   "attendance.mark",
   "results.view",
   "results.manage",
+  "ai_grading.view",
   "session_ledger.view",
   "session_ledger.reverse",
   "audit.view",
