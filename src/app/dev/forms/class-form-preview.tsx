@@ -1,11 +1,77 @@
+"use client";
+
+import { ErrorState } from "@/components/shared/error-state";
+import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
+import type { ClassFormActionOverrides } from "@/features/classes/management/class-form-action-overrides";
+import { ClassFormPage } from "@/features/classes/management/class-form-page";
+import {
+  CLASS_CREATE_DENIED,
+  CLASS_EDIT_VIEW_DENIED,
+  CLASS_EDIT_YEAR_CLOSED,
+} from "@/features/classes/management/class-form-route-copy";
+
+import {
+  PREVIEW_ACADEMIC_YEARS,
+  PREVIEW_CLASS_CREATE_ERROR,
+  PREVIEW_CLASS_DETAIL,
+  PREVIEW_CLASS_EDIT_ERROR,
+} from "./class-batch-fixtures";
 import type { ClassFormsPreviewProps } from "./forms-preview-params";
 
-// Lane S/K replaces this body.
-/** /dev/forms `view=class|class-edit` body (design 17b, left); rendered inside the AppShell by FormsPreview. */
+const STUB = "Bản xem trước không ghi dữ liệu.";
+
+/**
+ * Inert stand-ins for both writes the class form can reach. The preview runs
+ * on localhost where .env.local may point at production, so saving answers
+ * with the stub message and never navigates.
+ */
+export const previewClassFormActions: Required<ClassFormActionOverrides> = {
+  createClass: async () => ({ message: STUB, status: "error" }),
+  updateClass: async () => ({ message: STUB, status: "error" }),
+};
+
+/**
+ * /dev/forms `view=class|class-edit` body (design 17b, left); rendered inside
+ * the AppShell by FormsPreview. Roles meet what the routes show them: the TA
+ * and the viewer have no classes.create (/classes/new) and no classes.view
+ * (the edit route checks it first). `no-year` is /classes/new without an open
+ * year, and on the edit route the error the route shows when the class's
+ * year is closed.
+ */
 export function ClassFormPreviewBody({ role, state, view }: ClassFormsPreviewProps) {
+  const isEdit = view === "class-edit";
+
+  if (role !== "owner") {
+    const denial = isEdit ? CLASS_EDIT_VIEW_DENIED : CLASS_CREATE_DENIED;
+    return <PermissionDeniedState description={denial.description} title={denial.title} />;
+  }
+
+  if (isEdit) {
+    if (state === "no-year") {
+      return <ErrorState description={CLASS_EDIT_YEAR_CLOSED.description} title={CLASS_EDIT_YEAR_CLOSED.title} />;
+    }
+    const error = state === "error" ? PREVIEW_CLASS_EDIT_ERROR : null;
+    return (
+      <ClassFormPage
+        academicYears={PREVIEW_ACADEMIC_YEARS}
+        actions={previewClassFormActions}
+        classDetail={PREVIEW_CLASS_DETAIL}
+        initialActionState={error?.state}
+        initialReason={error?.reason}
+        initialValues={error?.values}
+        key={`${view}-${state}`}
+      />
+    );
+  }
+
+  const error = state === "error" ? PREVIEW_CLASS_CREATE_ERROR : null;
   return (
-    <p className="text-body text-text-muted" data-role={role} data-state={state} data-view={view}>
-      Đang dựng bản xem trước…
-    </p>
+    <ClassFormPage
+      academicYears={state === "no-year" ? [] : PREVIEW_ACADEMIC_YEARS}
+      actions={previewClassFormActions}
+      initialActionState={error?.state}
+      initialValues={error?.values}
+      key={`${view}-${state}`}
+    />
   );
 }

@@ -2314,6 +2314,92 @@
 **Priority:** P4
 **Depends on:** None
 
+## Form & wizard (bước 15)
+
+### Tạo học sinh một lần kèm nguồn, sale, đơn giá và ghi danh ban đầu
+
+**What:** Thiết kế 17a có thêm các mục "Nguồn & sale" (nguồn học viên, đối tác/người giới thiệu, sale phụ trách), "Đơn giá học phí" (đơn giá/buổi, hiệu lực từ, căn cứ) và "Ghi danh ban đầu" ngay trong form tạo học sinh. Bước 15a chưa làm vì hàm tạo hồ sơ chỉ ghi học sinh, phụ huynh và liên kết giữa hai bên; nguồn, đơn giá và ghi danh là các thao tác riêng trên hồ sơ, mỗi thao tác cần quyền riêng. Hiện form ghi rõ các mục này được thiết lập trên hồ sơ sau khi lưu.
+
+**Why:** Muốn lưu một lần thì cần một hàm mới ghi tất cả trong một giao dịch (hoặc chấp nhận ghi nối tiếp, có thể lỗi giữa chừng). Riêng "đối tác/người giới thiệu" và "sale phụ trách" hiện không có cột nào trong dữ liệu học sinh.
+
+**Context:** `create_student_with_primary_guardian` (`supabase/migrations/20260809021500…`), `src/features/students/tuition-profile-actions.ts`, `enroll_student_in_class`; khảo sát `.gstack/briefs/step15-map-rules-data.md` §A.1, §F (F1, F2), §H.1 (O2).
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Thiết lập lịch tuần ngay khi tạo lớp
+
+**What:** Thiết kế 17b đặt bảng "Lịch tuần" (thứ, giờ, phòng/hình thức, hiệu lực từ) và cảnh báo trùng phòng ngay trong form tạo lớp. Bước 15a chưa làm: lớp mới luôn ở trạng thái Nháp, còn lịch tuần chỉ tạo được cho lớp đang hoạt động, bắt đầu từ hôm nay, cần quyền `classes.manage_schedule` và ghi từng dòng một. Hệ thống cũng chưa có danh mục phòng hay kiểm tra trùng phòng/giờ. Form tạo lớp hiện ghi các bước tiếp theo: lưu lớp (Nháp) → kích hoạt → thiết lập lịch tuần → tạo buổi hàng loạt.
+
+**Why:** Cần một hàm mới "tạo lớp kèm lịch" (quyết định cho lịch của lớp Nháp và ngày hiệu lực trong tương lai), và nếu muốn cảnh báo trùng phòng thì cần danh mục phòng.
+
+**Context:** `create_class` và `create_class_schedule_template` (`supabase/migrations/20260724150000…`, `20260724163000…`); khảo sát `.gstack/briefs/step15-map-rules-data.md` §0.1, §D.3, §F (F11–F13), §H.1 (O1).
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Sửa thông báo lỗi của tạo buổi hàng loạt
+
+**What:** `src/features/sessions/actions/session-batch-actions.ts` dịch mã lỗi theo `SESSIONS_MANAGE_PERMISSION_DENIED` và `INVALID_SESSION_TIME`, nhưng hàm `create_batch_class_sessions` trả `SESSION_MANAGE_PERMISSION_DENIED` và `CLASS_SESSION_TIME_INVALID`, nên hai lỗi này rơi về câu chung "Không thể lưu buổi học vào cơ sở dữ liệu…". Các lỗi của trigger (`CLASS_SESSION_SCHEDULE_NOT_EFFECTIVE`, `CLASS_SESSION_WEEKDAY_MISMATCH`, `CLASS_SESSION_REQUIRES_ACTIVE_ACADEMIC_YEAR`) cũng chưa có câu riêng.
+
+**Why:** Người tạo buổi không biết vì sao cả đợt bị từ chối. Bước 15a đã bỏ chọn sẵn các buổi ngoài hiệu lực lịch ở màn xem trước, nhưng thông báo phía máy chủ vẫn nên đúng.
+
+**Context:** `supabase/migrations/20261014090000…` (dòng 47–51, 96–98), trigger `class_sessions_validate_business_rules` (`20261013090000…`); khảo sát `.gstack/briefs/step15-map-rules-data.md` §0.11, §H.1 (O7).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh (sửa server action)
+
+### Chọn loại buổi và xem trước phía máy chủ khi tạo buổi hàng loạt
+
+**What:** Thiết kế 17b có ô "Loại buổi" để chọn. Hiện loại buổi do hệ thống tự gán: theo lịch cố định là buổi chính, lịch lặp tùy chỉnh là buổi bổ sung; màn hình chỉ hiện loại đó. Màn xem trước cũng chỉ kiểm tra trùng trên 300 buổi gần nhất của lớp ngay trên trình duyệt (máy chủ kiểm tra lại khi tạo). Ngày nghỉ chỉ dùng để bỏ chọn trong lần tạo đó, không lưu.
+
+**Why:** Cho chọn loại buổi là đổi dữ liệu gửi lên máy chủ; xem trước phía máy chủ cần hàm mới; lưu ngày nghỉ cần bảng mới.
+
+**Context:** `src/features/sessions/batch-calculation.ts`, `src/features/sessions/batch-preview-models.ts`; khảo sát `.gstack/briefs/step15-map-rules-data.md` §C, §H.1 (O6).
+
+**Effort:** M
+**Priority:** P4
+**Depends on:** Quyết định của anh
+
+### Nhập ghi danh từ file không chuyển học sinh sang "Đang học"
+
+**What:** Khi xác nhận nhập ghi danh, các dòng được ghi vào `student_enrollments` ở trạng thái đang học, nhưng `students.lifecycle_status` của học sinh vẫn là "Đang quan tâm". Ghi danh thủ công (`enroll_student_in_class`) thì có chuyển sang "Đang học", và điểm danh từ chối học sinh còn ở "Đang quan tâm".
+
+**Why:** Học sinh nhập ghi danh từ file có thể không điểm danh được và bị đếm sai trong danh sách theo trạng thái.
+
+**Context:** `supabase/migrations/20260809023000…` (dòng 695–927), `20260723085911…` (dòng 125–132), `20260817090000…` (dòng 192); khảo sát `.gstack/briefs/step15-map-rules-data.md` §0.9, §H.1 (O8). Cần kiểm tra dữ liệu thật trước khi sửa.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+### Trang tạo buổi hàng loạt nhận `classId` của lớp không hoạt động
+
+**What:** `getBatchSessionCreationContext` (`src/features/sessions/batch-data.ts`) không kiểm tra `?classId=` có nằm trong danh sách lớp đang hoạt động. Với một lớp Nháp (hoặc đã đóng), ô chọn lớp hiện lớp hoạt động đầu tiên nhưng lịch tuần và số buổi lại là của lớp kia, nên lịch lặp tùy chỉnh có thể tạo buổi cho nhầm lớp. Bước 15a chỉ hiện link "Tạo buổi hàng loạt" từ form sửa lớp khi lớp đang hoạt động.
+
+**Why:** Tránh tạo buổi nhầm lớp khi ai đó mở link cũ hoặc gõ tay `classId`.
+
+**Context:** `src/app/(app)/sessions/batch/page.tsx`, `src/features/sessions/batch-data.ts` (dòng 21–138); sửa ở loader (trả lỗi hoặc rơi về lớp đầu tiên cho cả lịch và số buổi) là thay đổi đọc dữ liệu phía máy chủ.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Quyết định của anh (sửa loader)
+
+### Dọn code form học sinh cũ không còn dùng
+
+**What:** `src/features/students/form` còn 16 file của form dạng wizard cũ (khoảng 2.537 dòng, ví dụ `student-form.tsx` và các section của nó), không file nào import.
+
+**Why:** Code chết dùng token giao diện cũ, làm các bài quét mã nguồn theo thư mục phải liệt kê từng file.
+
+**Context:** Khảo sát `.gstack/briefs/step15-map-ui-tests.md` §0 (16).
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** None
+
 ## Tin nhắn phụ huynh (Zalo)
 
 ### Gỡ RPC `record_parent_message_result` cũ sau khi bản 0.21 chạy ổn
