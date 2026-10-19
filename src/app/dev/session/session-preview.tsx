@@ -1,6 +1,7 @@
 "use client";
 
 import { AppShell } from "@/components/layout/app-shell";
+import type { SessionGradingSubmission } from "@/features/grading-submissions/data";
 import type {
   SessionAttendanceStatus,
   SessionDetailReadModel,
@@ -105,6 +106,32 @@ function buildDetail(state: SessionPreviewState): SessionDetailReadModel {
   };
 }
 
+/** Form submissions (AI grading phase 1): a resubmission, a late one, and present students who did not submit. */
+function buildSubmissions(participants: SessionParticipantReadModel[]): SessionGradingSubmission[] {
+  const submission = (index: number, overrides: Partial<SessionGradingSubmission>): SessionGradingSubmission => ({
+    answerText: "13. x = 18\n14. 8 cm\n15. 257",
+    answerTruncated: false,
+    attemptNo: 1,
+    countsForScore: true,
+    id: `sub-${index}`,
+    issues: [],
+    sessionMatchMethod: "claimed_session",
+    studentCode: participants[index].studentCode ?? "",
+    studentId: participants[index].studentId,
+    studentMatchMethod: "student_code",
+    studentName: participants[index].studentName ?? "",
+    submittedAt: "2026-10-12T14:31:00Z",
+    ...overrides,
+  });
+  return [
+    submission(0, { attemptNo: 2, id: "sub-0b", submittedAt: "2026-10-12T14:34:00Z" }),
+    submission(0, { answerText: "13. 17\n14. 8", attemptNo: 1, countsForScore: false, id: "sub-0a" }),
+    submission(2, { answerText: "Câu 13: x=18\nCâu 14: BM = 14:2 = 7 cm\nCâu 15: 257" }),
+    submission(3, { sessionMatchMethod: "time_window", studentMatchMethod: "name_birth_year" }),
+    submission(1, { issues: ["outside_window"], submittedAt: "2026-10-12T17:05:00Z" }),
+  ];
+}
+
 const taPermissions: readonly PermissionCode[] = [
   "app.access",
   "dashboard.view",
@@ -115,6 +142,7 @@ const taPermissions: readonly PermissionCode[] = [
   "attendance.mark",
   "results.view",
   "results.manage",
+  "ai_grading.view",
   "students.view",
   "timekeeping.view",
   "timekeeping.check",
@@ -154,6 +182,9 @@ export function SessionPreview({ role, state }: { role: "owner" | "ta"; state: S
         canViewResults={permissions.includes("results.view")}
         canViewStudents={permissions.includes("students.view")}
         detail={detail}
+        gradingSubmissions={
+          permissions.includes("ai_grading.view") ? { data: buildSubmissions(detail.participants), ok: true } : null
+        }
         messageContact={
           state === "ready" || state === "locked"
             ? { saved: { phone: "0912 345 678", supervisorName: "Cô Lê Bích Ngọc", updatedAt: "2026-10-12T13:00:00Z" }, suggestion: null }

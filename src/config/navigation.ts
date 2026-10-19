@@ -247,6 +247,12 @@ export const navigationGroups: readonly NavigationGroup[] = [
             label: "Kết quả học tập",
             permission: "results.view",
           },
+          {
+            available: true,
+            href: "/grading-submissions",
+            label: "Bài nộp chưa ghép",
+            permission: "ai_grading.view",
+          },
         ],
         key: "results",
         label: "Kết quả học tập",

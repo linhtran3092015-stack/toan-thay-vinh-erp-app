@@ -1329,9 +1329,13 @@ textarea {
   font-family: inherit;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+/* Layered so colour/decoration utilities on a <Link>/<a> win. Unlayered, this
+   beat every `text-*` utility on links (dark text on primary-filled links). */
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
 .dashboard-grid {
