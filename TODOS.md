@@ -2302,21 +2302,9 @@
 **Priority:** P4
 **Depends on:** Quyết định của anh
 
-### Mở thông báo ngay khi bấm, đánh dấu đã đọc ở nền
-
-**What:** Khi bấm một thông báo chưa đọc, mở trang đích ngay và gửi thao tác đánh dấu đã đọc ở nền, thay vì chờ thao tác (và lần render lại `/notifications` do `revalidatePath`) xong rồi mới `router.push`. Cần anh quyết vì đây là vòng sửa thứ tư sau review (quy định: quá 3 vòng cần anh duyệt). Đề xuất: duyệt, làm trước khi merge PR bước 14d hoặc ngay sau.
-
-**Why:** Review bước 14d (hiệu năng, red team, lượt review chốt và review đối kháng đều chỉ ra cùng một điểm): (1) nếu trong lúc chờ người dùng bấm sang trang khác, khi thao tác xong `router.push` cũ vẫn có thể kéo họ về trang của thông báo; (2) thao tác treo thì bấm thường lên dòng đó không làm gì cho tới khi tải lại; (3) mỗi lần mở chờ thêm một vòng máy chủ. Theo tài liệu Next 16, thao tác vẫn chạy và trang đích được làm mới sau khi điều hướng, nên chuông thông báo vẫn cập nhật.
-
-**Context:** `openRow` trong `src/features/notifications/components/use-notification-list-state.ts` (khoảng dòng 215–250); test `tests/components/notification-list-page.test.tsx` (các ca mở dòng, "only the latest of two opens"); ghi chép review ở `.gstack/ship-records/step14d.md` (P2, R2-5, B1, A1).
-
-**Effort:** S
-**Priority:** P2
-**Depends on:** Quyết định của anh
-
 ### Dọn sau bước 14d
 
-**What:** Đưa nhãn hành động (`action`) và loại đối tượng của nhật ký sang tiếng Việt (hiện tên mã viết hoa chữ đầu + mã gốc, khoảng 100 mã); bỏ `router.refresh()` thừa sau khi đánh dấu (thao tác đã `revalidatePath`, hành vi có từ trước bước 14d); `normalizeInternalHref` trong `src/features/notifications/data.ts` và ràng buộc `notifications_href_check` nên loại cả ký tự điều khiển (tab, xuống dòng) sau dấu `/` đầu, vì trình duyệt bỏ chúng và có thể thành link `//host` (hiện không ai ngoài hệ thống ghi được `href`, nên chưa khai thác được); khi có thêm báo cáo "Có sẵn" thứ hai, phần cuối thẻ trên `/reports` cần chọn hộp thoại và link theo từng báo cáo (hiện luôn là của Danh sách buổi học); số chưa đọc trên chuông và đầu trang Thông báo chỉ cập nhật khi lần làm mới sau thao tác về tới, một lần đánh dấu ở nền thất bại vẫn để dòng trông như đã đọc trong tab đó tới khi tải lại; khi `router.refresh()` của một thao tác thay danh sách trong lúc một dòng khác còn đang đánh dấu ở nền, dòng đó tạm hiện lại là chưa đọc (giữ các dòng đang chờ trong tập đã đọc tới khi xong); khóa `key` của form lọc Nhật ký ghép các giá trị bằng "|" nên hai bộ lọc khác nhau (URL sửa tay) có thể trùng khóa: dùng `JSON.stringify`.
+**What:** Đưa nhãn hành động (`action`) và loại đối tượng của nhật ký sang tiếng Việt (hiện tên mã viết hoa chữ đầu + mã gốc, khoảng 100 mã); bỏ `router.refresh()` thừa sau khi đánh dấu (thao tác đã `revalidatePath`, hành vi có từ trước bước 14d); `normalizeInternalHref` trong `src/features/notifications/data.ts` và ràng buộc `notifications_href_check` nên loại cả ký tự điều khiển (tab, xuống dòng) sau dấu `/` đầu, vì trình duyệt bỏ chúng và có thể thành link `//host` (hiện không ai ngoài hệ thống ghi được `href`, nên chưa khai thác được); khi có thêm báo cáo "Có sẵn" thứ hai, phần cuối thẻ trên `/reports` cần chọn hộp thoại và link theo từng báo cáo (hiện luôn là của Danh sách buổi học); số chưa đọc trên chuông và đầu trang Thông báo chỉ cập nhật khi lần làm mới sau thao tác về tới, một lần đánh dấu ở nền thất bại vẫn để dòng trông như đã đọc trong tab đó tới khi tải lại.
 
 **Why:** Các điểm nhỏ còn lại từ các lane bước 14d; không cái nào chặn phát hành.
 
@@ -2365,6 +2353,20 @@
 **Depends on:** ZaloCRM hỗ trợ khóa chống trùng
 
 ## Completed
+
+### Mở thông báo ngay khi bấm, đánh dấu đã đọc ở nền
+
+**What:** Khi bấm một thông báo chưa đọc, mở trang đích ngay và gửi thao tác đánh dấu đã đọc ở nền, thay vì chờ thao tác (và lần render lại `/notifications` do `revalidatePath`) xong rồi mới `router.push`. Cần anh quyết vì đây là vòng sửa thứ tư sau review (quy định: quá 3 vòng cần anh duyệt). Đề xuất: duyệt, làm trước khi merge PR bước 14d hoặc ngay sau.
+
+**Why:** Review bước 14d (hiệu năng, red team, lượt review chốt và review đối kháng đều chỉ ra cùng một điểm): (1) nếu trong lúc chờ người dùng bấm sang trang khác, khi thao tác xong `router.push` cũ vẫn có thể kéo họ về trang của thông báo; (2) thao tác treo thì bấm thường lên dòng đó không làm gì cho tới khi tải lại; (3) mỗi lần mở chờ thêm một vòng máy chủ. Theo tài liệu Next 16, thao tác vẫn chạy và trang đích được làm mới sau khi điều hướng, nên chuông thông báo vẫn cập nhật.
+
+**Context:** `openRow` trong `src/features/notifications/components/use-notification-list-state.ts` (khoảng dòng 215–250); test `tests/components/notification-list-page.test.tsx` (các ca mở dòng, "only the latest of two opens"); ghi chép review ở `.gstack/ship-records/step14d.md` (P2, R2-5, B1, A1).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+**Completed:** v0.27.0.0 (2026-10-19), PR #44: anh duyệt vòng sửa thứ tư; thông báo mở ngay, đánh dấu đã đọc chạy ở nền.
 
 ### Bước 5b đợt 2: tab Học sinh, Kết quả, Học phí của trang lớp
 

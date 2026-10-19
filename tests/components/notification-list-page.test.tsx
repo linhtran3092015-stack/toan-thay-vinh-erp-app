@@ -1,5 +1,5 @@
-// Value: protects=the /notifications list (design 16a "Thông báo"): the header names the exact unread total and the page, the page's only primary marks every unread notification (disabled with a reason at 0), chips count the loaded page and say so, one framed strip list renders each row once with its event label (session/CRM/ops codes now labelled, unknown codes keep the pinned fallback), opening an unread row marks it read before navigating (and navigates even when marking fails, unless the list unmounted meanwhile), modified/middle clicks never block the browser (nor a plain click that follows them), rows without a link get their own button whose result stays on the row (alert in the row, focus on the row), mark-all reports under the header, the page never holds two alerts, empty and past-the-end pages stay in the frame, and the pager keeps the caller's params;
-// fails_when=an action runs during render, a plain click navigates before the action settles, never navigates after a failure or navigates after the list unmounted, a second click starts a second action, a read row calls an action, a chip count stops matching the loaded rows, the empty text renders twice or outside the frame, the pager drops basePath/preservedParams, a second primary appears, the time column loses its grid/dot slot, or a legacy token / outline-none returns to the feature folder;
+// Value: protects=the /notifications list (design 16a "Thông báo"): the header names the exact unread total and the page, the page's only primary marks every unread notification (disabled with a reason at 0), chips count the loaded page and say so, one framed strip list renders each row once with its event label (session/CRM/ops codes now labelled, unknown codes keep the pinned fallback), opening an unread row opens its link at once and marks it read in the background (nothing navigates after the action settles, failed or not), modified/middle clicks never block the browser (nor any click that follows them), rows without a link get their own button whose result stays on the row (alert in the row, focus on the row), mark-all reports under the header, the page never holds two alerts, empty and past-the-end pages stay in the frame, and the pager keeps the caller's params;
+// fails_when=an action runs during render, a plain click on an unread row is held until its mark-read settles or anything pushes after an await (a slow action pulling the user back), a failure shows an alert instead of only leaving the row unread, a second click starts a second action, a read row calls an action, a chip count stops matching the loaded rows, the empty text renders twice or outside the frame, the pager drops basePath/preservedParams, a second primary appears, the time column loses its grid/dot slot, or a legacy token / outline-none returns to the feature folder;
 // why_new=step 14d rewrites the list (the only existing pin is the constructor fallback in prototype-safe-metadata-presentation.test.tsx);
 // seam=next/navigation offers useRouter with push and refresh only (like production code may rely on; no useSearchParams/usePathname); the real actions module is mocked so a default call is observable; no_claim=the server actions, the RPCs, revalidatePath or the topbar badge refresh
 import { readdirSync, readFileSync } from "node:fs";
@@ -210,26 +210,28 @@ describe("NotificationListPage (step 14d)", () => {
     expect(within(rowOf("Bảng lương tháng 9/2026 đã chốt")).queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("plain click on an unread row: marks it read first, then navigates; never twice while pending", async () => {
+  // Value: protects=opening a notification never waits on the server: the link opens at once (next/link handles the unprevented click) while the existing mark-read action runs behind it, once;
+  // fails_when=the click is prevented and navigation waits for the action (a slow action can then pull the user back from where they went meanwhile, a hung one leaves the link dead), the code pushes after an await, or a second click starts a second action;
+  // why_new=step 14d owner-approved fourth review cycle (performance P2, red team R2-5, binding B1, adversarial A1); seam=actions injected with a deferred result, router mocked; no_claim=next/link's own navigation or that Next keeps the action running across it
+  it("plain click on an unread row: opens at once and marks it read in the background; never twice while pending", async () => {
     const actions = actionsReturning();
     const pending = deferred<NotificationActionResult>();
     actions.markNotificationRead.mockReturnValueOnce(pending.promise);
     renderList({ actions });
 
     const link = within(rowOf("Yêu cầu tạm ứng chờ duyệt")).getByRole("link");
-    expect(click(link)).toBe(true);
+    expect(click(link)).toBe(false);
     expect(actions.markNotificationRead).toHaveBeenCalledWith("n-1");
-    expect(router.push).not.toHaveBeenCalled();
     expect(rowOf("Yêu cầu tạm ứng chờ duyệt")).toHaveAttribute("aria-busy", "true");
     // Optimistic: the row reads as read and the chip count follows.
     expect(within(rowOf("Yêu cầu tạm ứng chờ duyệt")).queryByText("Chưa đọc")).not.toBeInTheDocument();
     expect(within(chips()).getByRole("button", { name: "Chưa đọc2" })).toBeInTheDocument();
 
-    expect(click(link)).toBe(true);
+    expect(click(link)).toBe(false);
     expect(actions.markNotificationRead).toHaveBeenCalledTimes(1);
 
     await act(async () => pending.resolve({ message: "ok", status: "success" }));
-    expect(router.push).toHaveBeenCalledExactlyOnceWith("/advances");
+    expect(router.push).not.toHaveBeenCalled();
     expect(rowOf("Yêu cầu tạm ứng chờ duyệt")).not.toHaveAttribute("aria-busy");
     expect(realActions.markNotificationReadAction).not.toHaveBeenCalled();
     // Navigation is the feedback: no banner.
@@ -239,13 +241,14 @@ describe("NotificationListPage (step 14d)", () => {
   it.each([
     ["an error result", () => Promise.resolve<NotificationActionResult>({ message: "Không thể cập nhật trạng thái thông báo.", status: "error" })],
     ["a rejected call", () => Promise.reject(new Error("network"))],
-  ])("still navigates after %s (the row is simply unread next time)", async (_, outcome) => {
+  ])("after %s the link has already opened: no alert, no push (the row is simply unread next time)", async (_, outcome) => {
     const actions = actionsReturning();
     actions.markNotificationRead.mockImplementationOnce(outcome);
     renderList({ actions });
 
-    click(within(rowOf("3 buổi học đã hoàn thành chưa khóa")).getByRole("link"));
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/sessions?status=completed&lock=unlocked"));
+    expect(click(within(rowOf("3 buổi học đã hoàn thành chưa khóa")).getByRole("link"))).toBe(false);
+    await waitFor(() => expect(rowOf("3 buổi học đã hoàn thành chưa khóa")).not.toHaveAttribute("aria-busy"));
+    expect(router.push).not.toHaveBeenCalled();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -494,6 +497,25 @@ describe("NotificationListPage (step 14d)", () => {
     expect(within(chips()).getByRole("button", { name: "Chưa đọc3" })).toBeInTheDocument();
   });
 
+  // Value: protects=a row whose background mark is still running stays read when another action's refresh replaces the entries (the server has not written it yet); once that mark settled, the next fresh entries win again;
+  // fails_when=fresh entries drop every local mark, so a row being opened flips back to "Chưa đọc" mid-flight, or settled marks are kept forever;
+  // why_new=step 14d adversarial A9, fixed in the owner-approved fourth cycle; seam=deferred action + rerender with a new entries array; no_claim=the order Next applies refreshes in
+  it("keeps a row read across a refresh while its background mark is still running", async () => {
+    const actions = actionsReturning();
+    const pending = deferred<NotificationActionResult>();
+    actions.markNotificationRead.mockReturnValueOnce(pending.promise);
+    const { rerender } = renderList({ actions });
+
+    click(within(rowOf("Yêu cầu tạm ứng chờ duyệt")).getByRole("link"));
+    rerender(<NotificationListPage actions={actions} entries={[...allEntries]} today={TODAY} unreadCount={7} />);
+    expect(within(rowOf("Yêu cầu tạm ứng chờ duyệt")).queryByText("Chưa đọc")).not.toBeInTheDocument();
+    expect(within(chips()).getByRole("button", { name: "Chưa đọc2" })).toBeInTheDocument();
+
+    await act(async () => pending.resolve({ message: "ok", status: "success" }));
+    rerender(<NotificationListPage actions={actions} entries={[...allEntries]} today={TODAY} unreadCount={7} />);
+    expect(within(chips()).getByRole("button", { name: "Chưa đọc3" })).toBeInTheDocument();
+  });
+
   // Value: protects=a server action that throws (network failure) ends in exactly one alert "Không thể kết nối tới hệ thống thông báo.", no refresh, the row still unread, and the control enabled again for a retry;
   // fails_when=the try/catch around markAll or markOne is removed (the rejection escapes, "Đánh dấu tất cả đã đọc" stays busy and nothing is said) or a thrown mark-read marks the row read;
   // why_new=the existing failure tests use resolved error results; only the open-row path rejects, and it shows no message by design;
@@ -519,26 +541,26 @@ describe("NotificationListPage (step 14d)", () => {
     await waitFor(() => expect(actions[action]).toHaveBeenCalledTimes(2));
   });
 
-  // Value: protects=a plain click on an unread row never navigates once the list is gone: if the user went elsewhere while the mark-read action ran, the late result must not pull them back to the notification's link;
-  // fails_when=the push after the awaited action stops checking that the list is still mounted;
-  // why_new=red-team R1 (pre-landing review cycle 1): the push ran unconditionally after the await; seam=actions injected through the actions prop, router mocked; no_claim=what Next does with a push from an unmounted tree
+  // Value: protects=a mark-read that settles after the list is gone (the user already left) does nothing: no push, no alert;
+  // fails_when=anything after the awaited action navigates or throws once the list unmounted;
+  // why_new=red-team R1 (pre-landing review cycle 1), kept through the fourth cycle's open-at-once rework; seam=actions injected through the actions prop, router mocked; no_claim=what Next does with an action from an unmounted tree
   it("does not navigate when the list unmounted before the mark-read settled", async () => {
     const actions = actionsReturning();
     const pending = deferred<NotificationActionResult>();
     actions.markNotificationRead.mockReturnValueOnce(pending.promise);
     const { unmount } = renderList({ actions });
 
-    expect(click(within(rowOf("Yêu cầu tạm ứng chờ duyệt")).getByRole("link"))).toBe(true);
+    expect(click(within(rowOf("Yêu cầu tạm ứng chờ duyệt")).getByRole("link"))).toBe(false);
     expect(actions.markNotificationRead).toHaveBeenCalledExactlyOnceWith("n-1");
     unmount();
     await act(async () => pending.resolve({ message: "ok", status: "success" }));
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  // Value: protects=a row whose read mark runs in the background (Ctrl/Cmd/Shift or middle click) still opens normally on a plain click: no prevented default (next/link navigates), no second action; a row whose mark came from a plain click keeps holding a second plain click until it navigates once;
-  // fails_when=any pending mark swallows a plain click (the row cannot be opened until the background action returns), a background mark lets a plain click start a second action, or the plain-click guard stops preventing the duplicate;
-  // why_new=red-team R2 (pre-landing review cycle 1); seam=actions injected through the actions prop; jsdom has no app router context so next/link leaves an unprevented click to the browser; no_claim=next/link's own navigation
-  it("a plain click during a background mark follows the link; during a plain-click mark it is held", async () => {
+  // Value: protects=a row whose read mark is still running (from any open: plain, Ctrl/Cmd/Shift or middle click) opens normally on every later click: no prevented default (next/link navigates), no second action;
+  // fails_when=any pending mark swallows a click (the row cannot be opened until the action returns) or lets a click start a second action;
+  // why_new=red-team R2 (pre-landing review cycle 1), reworked by the fourth cycle (no plain-click hold any more); seam=actions injected through the actions prop; jsdom has no app router context so next/link leaves an unprevented click to the browser; no_claim=next/link's own navigation
+  it("a click while the row's mark is running follows the link without a second action", async () => {
     const actions = actionsReturning();
     const background = deferred<NotificationActionResult>();
     actions.markNotificationRead.mockReturnValueOnce(background.promise);
@@ -557,12 +579,12 @@ describe("NotificationListPage (step 14d)", () => {
     const opening = deferred<NotificationActionResult>();
     actions.markNotificationRead.mockReturnValueOnce(opening.promise);
     const digest = within(rowOf("3 buổi học đã hoàn thành chưa khóa")).getByRole("link");
-    expect(click(digest)).toBe(true);
-    expect(click(digest)).toBe(true);
+    expect(click(digest)).toBe(false);
+    expect(click(digest)).toBe(false);
     expect(click(digest, { ctrlKey: true })).toBe(false);
     expect(actions.markNotificationRead).toHaveBeenCalledTimes(2);
     await act(async () => opening.resolve({ message: "ok", status: "success" }));
-    expect(router.push).toHaveBeenCalledExactlyOnceWith("/sessions?status=completed&lock=unlocked");
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   // Value: protects=a pager link is a soft navigation that keeps the list mounted with a new `page`: the page's own state starts over (no previous page's alert, chip back to "Tất cả") while the activated pager link keeps keyboard focus;
@@ -587,16 +609,16 @@ describe("NotificationListPage (step 14d)", () => {
     expect(older).toHaveAttribute("href", "/notifications?page=3");
   });
 
-  // Value: protects=an opened row's late navigation is dropped once the user moved to another page of the same mounted list (cycle 2 removed the remount that used to end it);
-  // fails_when=the push after the awaited mark-read only checks that the list is mounted, so a slow action pulls the user from page 2 to page 1's notification;
-  // why_new=review cycle 2 R2-1 (no key: the list survives a pager link); seam=actions injected, router mocked; no_claim=Next's navigation queue
+  // Value: protects=a mark-read settling after the user moved to another page of the same mounted list never pulls them back (cycle 2 removed the remount that used to end it);
+  // fails_when=anything navigates after the awaited mark-read, so a slow action moves the user from page 2 to page 1's notification;
+  // why_new=review cycle 2 R2-1 (no key: the list survives a pager link), kept through the fourth cycle; seam=actions injected, router mocked; no_claim=Next's navigation queue
   it("does not navigate when the page changed before the mark-read settled", async () => {
     const actions = actionsReturning();
     const pending = deferred<NotificationActionResult>();
     actions.markNotificationRead.mockReturnValueOnce(pending.promise);
     const { rerender } = renderList({ actions, hasNextPage: true });
 
-    expect(click(within(rowOf("Yêu cầu tạm ứng chờ duyệt")).getByRole("link"))).toBe(true);
+    expect(click(within(rowOf("Yêu cầu tạm ứng chờ duyệt")).getByRole("link"))).toBe(false);
     rerender(<NotificationListPage actions={actions} entries={[readLinked]} page={2} today={TODAY} unreadCount={7} />);
     await act(async () => pending.resolve({ message: "ok", status: "success" }));
     expect(router.push).not.toHaveBeenCalled();
@@ -830,16 +852,16 @@ describe("NotificationListPage (step 14d)", () => {
     expect(document.activeElement).toBe(document.body);
   });
 
-  // Value: protects=an open is tied to the page epoch it started in, not the page number: after 1→2→1 a stale open never pushes; an open carried onto a new page stops being an open, so a plain click on that row follows its link;
-  // fails_when=staleness compares page numbers (1→2→1 pushes page 1's old notification) or the epoch is never advanced, or carried-over opens keep holding plain clicks;
-  // why_new=review cycle 3 (C3-4, R3-6); seam=rerender with new pages; no_claim=Next's navigation
-  it("a stale open never pushes after 1→2→1; a carried-over open lets a plain click follow the link", async () => {
+  // Value: protects=after 1→2→1 an old open still running never pushes, and its row (carried onto the new page) opens on a plain click without a second action;
+  // fails_when=a late mark-read navigates, or a carried-over pending mark holds plain clicks or starts a second action;
+  // why_new=review cycle 3 (C3-4, R3-6), reworked by the fourth cycle (opens no longer navigate after an await); seam=rerender with new pages; no_claim=Next's navigation
+  it("a stale open never pushes after 1→2→1; a carried-over mark lets a plain click follow the link", async () => {
     const actions = actionsReturning();
     const pending = deferred<NotificationActionResult>();
     actions.markNotificationRead.mockReturnValueOnce(pending.promise);
     const { rerender } = renderList({ actions, hasNextPage: true });
 
-    expect(click(within(rowOf("Yêu cầu tạm ứng chờ duyệt")).getByRole("link"))).toBe(true);
+    expect(click(within(rowOf("Yêu cầu tạm ứng chờ duyệt")).getByRole("link"))).toBe(false);
     rerender(<NotificationListPage actions={actions} entries={allEntries} hasNextPage page={2} today={TODAY} unreadCount={7} />);
     expect(click(within(rowOf("Yêu cầu tạm ứng chờ duyệt")).getByRole("link"))).toBe(false);
     expect(actions.markNotificationRead).toHaveBeenCalledTimes(1);
@@ -849,10 +871,10 @@ describe("NotificationListPage (step 14d)", () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  // Value: protects=only the latest plain open navigates: an earlier open whose mark settles later never pushes, and the earlier row then opens as a plain link;
-  // fails_when=every open pushes when its mark settles (two pushes, the last one winning by accident), or the superseded row keeps holding plain clicks;
-  // why_new=review cycle 3 (C3-3); seam=deferred actions; no_claim=Next's navigation queue
-  it("only the latest of two opens in flight navigates", async () => {
+  // Value: protects=two opens in flight each mark their own row once and neither navigates when it settles, whatever order they settle in;
+  // fails_when=a settled mark pushes (two pushes, the last one winning by accident), or a row with a running mark holds plain clicks;
+  // why_new=review cycle 3 (C3-3), reworked by the fourth cycle; seam=deferred actions; no_claim=Next's navigation queue
+  it("two opens in flight: one mark per row, no push when they settle", async () => {
     const actions = actionsReturning();
     const first = deferred<NotificationActionResult>();
     const second = deferred<NotificationActionResult>();
@@ -860,14 +882,14 @@ describe("NotificationListPage (step 14d)", () => {
     renderList({ actions });
 
     const advance = within(rowOf("Yêu cầu tạm ứng chờ duyệt")).getByRole("link");
-    expect(click(advance)).toBe(true);
-    expect(click(within(rowOf("3 buổi học đã hoàn thành chưa khóa")).getByRole("link"))).toBe(true);
+    expect(click(advance)).toBe(false);
+    expect(click(within(rowOf("3 buổi học đã hoàn thành chưa khóa")).getByRole("link"))).toBe(false);
     expect(click(advance)).toBe(false);
     expect(actions.markNotificationRead).toHaveBeenCalledTimes(2);
 
     await act(async () => second.resolve({ message: "ok", status: "success" }));
     await act(async () => first.resolve({ message: "ok", status: "success" }));
-    expect(router.push).toHaveBeenCalledExactlyOnceWith("/sessions?status=completed&lock=unlocked");
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   // Value: protects=times line up on every row and width: the title row is a two-column grid (title wraps in its column, time + dot slot always top-right) and read rows keep an invisible dot slot so their times end where unread rows' do;

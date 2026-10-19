@@ -19,6 +19,7 @@ describe("formatModuleLabel", () => {
     expect(formatModuleLabel("parent_messages")).toBe("Tin nhắn phụ huynh");
     expect(formatModuleLabel("settings")).toBe("Cài đặt");
     expect(formatModuleLabel("student_care")).toBe("Chăm sóc học viên");
+    expect(formatModuleLabel("ai_grading")).toBe("Chấm bài AI");
   });
 
   it("falls back to the capitalised code and never reads the prototype", () => {

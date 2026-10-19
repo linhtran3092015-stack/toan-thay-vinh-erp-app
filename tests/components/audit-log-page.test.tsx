@@ -244,6 +244,18 @@ describe("AuditLogPage filters", () => {
     expect(field("entityId")).toHaveValue("");
     expect(screen.queryByRole("link", { name: /Xóa lọc/ })).not.toBeInTheDocument();
   });
+
+  // Value: protects=two different applied filter sets never share the form's remount key, even when a hand-edited URL puts "|" inside a value;
+  // fails_when=the key goes back to joining the values with a separator ("student|x" + "HS" and "student" + "x|HS" both read "student|x|HS"), so the second set keeps the first set's field values;
+  // why_new=step 14d adversarial A6, fixed in the owner-approved fourth cycle; seam=rerender with the colliding filters; no_claim=which values production URLs carry
+  it("remounts for filter sets whose values would collide under a joined key", () => {
+    const { container, rerender } = render(<AuditLogPage model={model({}, { entityId: "HS", entityType: "student|x" })} />);
+    const entityId = () => container.querySelector('[name="entityId"]') as HTMLInputElement;
+    expect(entityId()).toHaveValue("HS");
+
+    rerender(<AuditLogPage model={model({}, { entityId: "x|HS", entityType: "student" })} />);
+    expect(entityId()).toHaveValue("x|HS");
+  });
 });
 
 describe("AuditLogPage table", () => {

@@ -180,7 +180,7 @@ function AuditFilterForm({
     <form
       action={formAction}
       className="grid min-w-0 gap-2"
-      key={AUDIT_FILTER_KEYS.map((key) => filters[key]).join("|")}
+      key={JSON.stringify(AUDIT_FILTER_KEYS.map((key) => filters[key]))}
       method="get"
     >
       {preserved.map(([name, value]) => (

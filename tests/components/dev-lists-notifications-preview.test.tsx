@@ -140,15 +140,17 @@ describe("/dev/lists notifications preview", () => {
     expect(screen.getByText(`${getNotificationPreviewUnreadCount(role, "normal")} chưa đọc · trang 1`)).toBeInTheDocument();
   });
 
-  it("opening an unread row runs the stub, then navigates inside /dev; nothing real runs", async () => {
+  it("opening an unread row follows its /dev link at once and runs the stub behind it; nothing real runs", async () => {
     const markOne = vi.spyOn(previewNotificationActions, "markNotificationRead");
     search.value = "view=notifications&role=ta";
     render(<NotificationsPreviewBody role="ta" state="normal" />);
 
     const row = rows().find((item) => within(item).queryByText("Yêu cầu tạm ứng đã bị từ chối"));
-    fireEvent.click(within(row!).getByRole("link"));
-    await waitFor(() => expect(router.push).toHaveBeenCalledExactlyOnceWith("/dev/lists?view=advances&role=ta"));
-    expect(markOne).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/^f2000000-/));
+    const link = within(row!).getByRole("link");
+    expect(link).toHaveAttribute("href", "/dev/lists?view=advances&role=ta");
+    fireEvent.click(link);
+    await waitFor(() => expect(markOne).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/^f2000000-/)));
+    expect(router.push).not.toHaveBeenCalled();
     expectNothingReal();
   });
 

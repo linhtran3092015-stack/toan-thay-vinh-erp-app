@@ -79,16 +79,13 @@ const PAGER_LINK = getButtonClassName({ className: "text-text-strong! max-md:h-1
  * framed strip list (icon tile by event family, title, event label, message,
  * time, unread dot) and the newer/older pager in the frame footer.
  *
- * Opening an unread row marks it read, then navigates: a plain click waits for
- * the existing mark-read action and pushes the link whatever the result (a
- * failure only leaves the row unread next time); a modified or middle click
- * lets the browser open its tab and marks read in the background. Read rows
- * are plain links. Rows without a link get a "Đánh dấu đã đọc" button whose
- * result stays on the row; "Đánh dấu tất cả đã đọc" reports under the header.
- * Nothing runs an action while rendering, and `router.push` is only touched
- * inside click handlers. The races, results and focus rules (stale opens,
- * page changes, one alert, when a result may move focus) live in
- * `useNotificationListState`.
+ * Opening an unread row opens its link at once (next/link, or the browser for
+ * a modified or middle click) and marks it read in the background; a failure
+ * only leaves the row unread next time. Read rows are plain links. Rows
+ * without a link get a "Đánh dấu đã đọc" button whose result stays on the
+ * row; "Đánh dấu tất cả đã đọc" reports under the header. Nothing runs an
+ * action while rendering. The results and focus rules (page changes, one
+ * alert, when a result may move focus) live in `useNotificationListState`.
  */
 export function NotificationListPage({
   actions,
@@ -125,7 +122,6 @@ export function NotificationListPage({
     entries,
     markAll: actions?.markAllNotificationsRead ?? markAllNotificationsReadAction,
     markOne: actions?.markNotificationRead ?? markNotificationReadAction,
-    onNavigate: (href) => router.push(href),
     onRefresh: () => router.refresh(),
     page,
   });
@@ -252,7 +248,7 @@ interface NotificationRowProps {
   isPending: boolean;
   isUnread: boolean;
   onMarkRead: (entry: NotificationEntry) => void;
-  onOpen: (event: MouseEvent<HTMLAnchorElement>, entry: NotificationEntry, href: string) => void;
+  onOpen: (event: MouseEvent<HTMLAnchorElement>, entry: NotificationEntry) => void;
   today: string;
 }
 
@@ -302,8 +298,8 @@ function NotificationRow({ entry, error, isPending, isUnread, onMarkRead, onOpen
                 aria-describedby={isUnread ? unreadId : undefined}
                 className="outline-hidden after:absolute after:inset-0"
                 href={href}
-                onAuxClick={handlesOpen ? (event) => { if (event.button === 1) onOpen(event, entry, href); } : undefined}
-                onClick={handlesOpen ? (event) => onOpen(event, entry, href) : undefined}
+                onAuxClick={handlesOpen ? (event) => { if (event.button === 1) onOpen(event, entry); } : undefined}
+                onClick={handlesOpen ? (event) => onOpen(event, entry) : undefined}
               >
                 {entry.title}
               </Link>

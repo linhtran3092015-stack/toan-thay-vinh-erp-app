@@ -7,6 +7,7 @@
  */
 const MODULE_LABELS: Readonly<Record<string, string>> = {
   advances: "Tạm ứng lương",
+  ai_grading: "Chấm bài AI",
   app: "Truy cập hệ thống",
   attendance: "Điểm danh",
   audit: "Nhật ký hệ thống",

@@ -12,14 +12,6 @@ import type { NotificationActionResult, NotificationEntry } from "@/features/not
 const NO_IDS: ReadonlySet<string> = new Set();
 const CONNECTION_ERROR = "Không thể kết nối tới hệ thống thông báo.";
 
-/**
- * What started a row's pending mark-read: the plain click that will navigate
- * when it settles (`open`; at most one, the latest), a mark that will not
- * navigate (`background`: behind a new tab, or an open superseded by a newer
- * open or a page change), or the row's own button (`button`).
- */
-type PendingMark = "open" | "background" | "button";
-
 /** Where a settled result sends focus. `fallback` = the labelled list, else the in-frame empty message. */
 type FocusTarget = { kind: "banner" } | { kind: "fallback" } | { id: string; kind: "row" | "rowButton" };
 
@@ -76,13 +68,6 @@ function mayMoveFocus(root: HTMLElement | null, origin: Element | null): boolean
   return document.activeElement === origin && root !== null && root.contains(origin);
 }
 
-/** Opens that can no longer navigate (a newer open or a page change) become background marks. */
-function demoteOpens(pending: Map<string, PendingMark>): void {
-  for (const [id, mark] of pending) {
-    if (mark === "open") pending.set(id, "background");
-  }
-}
-
 function findRow(list: HTMLElement | null, id: string): HTMLElement | null {
   for (const child of list?.children ?? []) {
     if (child instanceof HTMLElement && child.dataset.notificationId === id) return child;
@@ -94,7 +79,6 @@ interface Options {
   entries: readonly NotificationEntry[];
   markAll: () => Promise<NotificationActionResult>;
   markOne: (id: string) => Promise<NotificationActionResult>;
-  onNavigate: (href: string) => void;
   onRefresh: () => void;
   page: number;
 }
@@ -108,16 +92,16 @@ interface Options {
  *   page's state (chip, results, focus request); `epochRef` follows in a layout
  *   effect. Handlers capture the render's epoch, so anything started on an
  *   earlier page (even 1→2→1) is recognised as stale.
- * - Opens: only the latest plain open, still on its page and mounted, pushes.
- *   An open superseded by a newer one or by a page change becomes `background`,
- *   so a new plain click on that row just follows its link.
+ * - Opens: a linked row opens at once (next/link, or the browser for a new
+ *   tab) and its mark-read runs in the background; nothing navigates after an
+ *   await, so a slow action never pulls the user back. One mark per row at a time.
  * - Results: see `applyNotificationResult`. Row results are page-scoped;
  *   mark-all results are account-wide.
  * - Focus: see `mayMoveFocus`. After a pager click whose link left the page
  *   (2→1 via "Mới hơn", a last page via "Cũ hơn"), focus goes to the
  *   remaining pager link.
  */
-export function useNotificationListState({ entries, markAll, markOne, onNavigate, onRefresh, page }: Options) {
+export function useNotificationListState({ entries, markAll, markOne, onRefresh, page }: Options) {
   const [chip, setChip] = useState<NotificationChip>("all");
   const [results, setResults] = useState<NotificationListResults>(NO_RESULTS);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
@@ -127,16 +111,18 @@ export function useNotificationListState({ entries, markAll, markOne, onNavigate
   /*
    * Rows marked read in this tab, valid only against the entries they were
    * marked on: a successful action revalidates the route, and the refreshed
-   * entries (with `readAt`) then win.
+   * entries (with `readAt`) then win. Rows whose background mark is still
+   * running stay read across a refresh another action triggered meanwhile.
    */
   const [localRead, setLocalRead] = useState<{ base: readonly NotificationEntry[]; ids: ReadonlySet<string> }>({
     base: entries,
     ids: NO_IDS,
   });
+  const stillMarking = [...localRead.ids].filter((id) => pendingIds.has(id));
   if (localRead.base !== entries) {
-    setLocalRead({ base: entries, ids: NO_IDS });
+    setLocalRead({ base: entries, ids: stillMarking.length > 0 ? new Set(stillMarking) : NO_IDS });
   }
-  const locallyRead = localRead.base === entries ? localRead.ids : NO_IDS;
+  const locallyRead = localRead.base === entries ? localRead.ids : new Set(stillMarking);
 
   const [shownPage, setShownPage] = useState({ epoch: 0, page });
   if (shownPage.page !== page) {
@@ -153,26 +139,15 @@ export function useNotificationListState({ entries, markAll, markOne, onNavigate
   const emptyRef = useRef<HTMLParagraphElement>(null);
   const pagerRef = useRef<HTMLElement>(null);
 
-  /** Same ids as `pendingIds` with what started each mark, readable in handlers before the next render. */
-  const pendingRef = useRef(new Map<string, PendingMark>());
+  /** Same ids as `pendingIds`, readable in handlers before the next render. */
+  const pendingRef = useRef(new Set<string>());
   const markingAllRef = useRef(false);
   const epochRef = useRef(epoch);
-  const latestOpenRef = useRef(0);
   const pagerClickRef = useRef<Element | null>(null);
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   useLayoutEffect(() => {
     if (epochRef.current === epoch) return;
     epochRef.current = epoch;
-    // Opens carried over from the previous page will not navigate: a plain click on that row follows its link.
-    demoteOpens(pendingRef.current);
     const pagerClicked = pagerClickRef.current !== null;
     pagerClickRef.current = null;
     if (pagerClicked && focusWasLost()) {
@@ -196,13 +171,13 @@ export function useNotificationListState({ entries, markAll, markOne, onNavigate
   const markLocallyRead = (id: string) => {
     setLocalRead((current) => ({ base: current.base, ids: new Set([...current.ids, id]) }));
   };
-  const startPending = (id: string, mark: PendingMark) => {
-    pendingRef.current.set(id, mark);
-    setPendingIds(new Set(pendingRef.current.keys()));
+  const startPending = (id: string) => {
+    pendingRef.current.add(id);
+    setPendingIds(new Set(pendingRef.current));
   };
   const endPending = (id: string) => {
     pendingRef.current.delete(id);
-    setPendingIds(new Set(pendingRef.current.keys()));
+    setPendingIds(new Set(pendingRef.current));
   };
   const runMarkOne = async (id: string): Promise<NotificationActionResult> => {
     try {
@@ -212,40 +187,23 @@ export function useNotificationListState({ entries, markAll, markOne, onNavigate
     }
   };
 
-  /** Opening an unread linked row: mark read, then (plain click only) navigate. */
-  const openRow = (event: MouseEvent<HTMLAnchorElement>, entry: NotificationEntry, href: string) => {
-    const plain = isPlainClick(event);
-    const pending = pendingRef.current.get(entry.id);
-    if (pending === "background") {
-      // Marked read already, and this row will not navigate by itself: the click just follows the link.
-      return;
-    }
-    if (pending !== undefined) {
-      // The latest open is still marking this row and will navigate: never a second action.
-      if (plain) event.preventDefault();
-      return;
-    }
+  /**
+   * Opening an unread linked row: the link opens at once (next/link for a plain
+   * click, the browser for a new tab or window) and the row is marked read in
+   * the background. The mark completes server-side whatever the page does; a
+   * failure only leaves the row unread next time.
+   */
+  const openRow = (event: MouseEvent<HTMLAnchorElement>, entry: NotificationEntry) => {
+    // Already marking this row: the click just follows the link, never a second action.
+    if (pendingRef.current.has(entry.id)) return;
+    const heldFocus = document.activeElement === event.currentTarget;
     markLocallyRead(entry.id);
-    if (!plain) {
-      // New tab or window: the browser opens it; mark read without holding anything up.
-      const heldFocus = document.activeElement === event.currentTarget;
-      startPending(entry.id, "background");
-      void runMarkOne(entry.id).finally(() => endPending(entry.id));
-      // Under "Chưa đọc" the row and its focused link leave the list.
-      if (heldFocus && chip === "unread") setFocusRequest({ origin: event.currentTarget, target: { kind: "fallback" } });
-      return;
+    startPending(entry.id);
+    void runMarkOne(entry.id).finally(() => endPending(entry.id));
+    // A new tab keeps this page: under "Chưa đọc" the row and its focused link leave the list.
+    if (!isPlainClick(event) && heldFocus && chip === "unread") {
+      setFocusRequest({ origin: event.currentTarget, target: { kind: "fallback" } });
     }
-    event.preventDefault();
-    demoteOpens(pendingRef.current);
-    startPending(entry.id, "open");
-    latestOpenRef.current += 1;
-    const open = latestOpenRef.current;
-    const openedIn = epoch;
-    void runMarkOne(entry.id).then(() => {
-      endPending(entry.id);
-      // Only the latest open, on the page it started on, in a list still shown: never pull the user back.
-      if (mountedRef.current && open === latestOpenRef.current && openedIn === epochRef.current) onNavigate(href);
-    });
   };
 
   /** A row without a link: its "Đánh dấu đã đọc" button. */
@@ -253,7 +211,7 @@ export function useNotificationListState({ entries, markAll, markOne, onNavigate
     if (pendingRef.current.has(entry.id)) return;
     const origin = document.activeElement;
     const startedIn = epoch;
-    startPending(entry.id, "button");
+    startPending(entry.id);
     setResults((current) => (current.rowError?.id === entry.id ? { ...current, rowError: null } : current));
     const result = await runMarkOne(entry.id);
     endPending(entry.id);

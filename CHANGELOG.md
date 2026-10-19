@@ -8,7 +8,7 @@ Thông báo, Nhật ký hệ thống và Báo cáo dựng lại theo phong cách
 
 ### Added
 - **Thông báo** `/notifications`: lọc nhanh Tất cả · Chưa đọc (số trên chip tính trong các thông báo của trang đang xem, có ghi rõ); dòng đầu trang ghi tổng số chưa đọc thật của tài khoản; danh sách dải trong một khung với ô biểu tượng theo loại sự kiện (tạm ứng, chăm sóc, buổi học, CRM, cảnh báo vận hành), tên, nhãn sự kiện, nội dung, giờ Việt Nam và chấm chưa đọc kèm chữ cho trình đọc màn hình.
-- Bấm một thông báo chưa đọc sẽ đánh dấu đã đọc rồi mở trang liên quan; mở bằng tab mới vẫn đánh dấu đã đọc. Thông báo không có link có nút "Đánh dấu đã đọc", kết quả hiện ngay trên dòng đó. "Đánh dấu tất cả đã đọc" là nút chính duy nhất của trang, báo kết quả ngay dưới tiêu đề. "Mới hơn / Cũ hơn" nằm trong khung danh sách và giữ chỗ con trỏ bàn phím khi chuyển trang.
+- Bấm một thông báo chưa đọc mở ngay trang liên quan, việc đánh dấu đã đọc chạy ở nền (thao tác chậm không còn kéo người dùng quay lại trang thông báo); mở bằng tab mới cũng đánh dấu đã đọc. Thông báo không có link có nút "Đánh dấu đã đọc", kết quả hiện ngay trên dòng đó. "Đánh dấu tất cả đã đọc" là nút chính duy nhất của trang, báo kết quả ngay dưới tiêu đề. "Mới hơn / Cũ hơn" nằm trong khung danh sách và giữ chỗ con trỏ bàn phím khi chuyển trang.
 - **Nhật ký hệ thống** `/audit`: dòng đầu trang "n bản ghi khớp bộ lọc · hiển thị 100 mới nhất" kèm nhắc thu hẹp bộ lọc để xem bản ghi cũ hơn; thanh lọc Từ ngày, Đến ngày, Module, Hành động, Người thực hiện, Loại đối tượng, Mã đối tượng (giữ nguyên địa chỉ lọc cũ); bảng Thời điểm (giây, giờ Việt Nam) · Người thực hiện ("Hệ thống" cho dòng ghi tự động, "khóa tự động") · Module (tên tiếng Việt) · Hành động · Đối tượng · Lý do · nút "Xem / Ẩn" mở dữ liệu trước / sau; màn hình hẹp hiện dạng thẻ.
 - **Báo cáo & Xuất dữ liệu** `/reports`: lưới thẻ theo quyền với nhãn Có sẵn / Dự kiến, "Phạm vi", "Cần quyền"; "Xuất CSV" mở hộp thoại chọn khoảng ngày (chặn ngày bắt đầu sau ngày kết thúc, ghi rõ tối đa 1.000 buổi); thẻ dự kiến có nút khóa kèm "Chưa phát hành".
 - Trang xem trước `/dev/lists?view=notifications|audit|reports` với `role=owner|ta|accountant` và `state=normal|capped|empty` (trả 404 trên production; các nút đánh dấu đã đọc chỉ trả lời "Bản xem trước không ghi dữ liệu.", hộp thoại xuất chỉ báo "Bản xem trước không xuất dữ liệu.").
@@ -16,7 +16,7 @@ Thông báo, Nhật ký hệ thống và Báo cáo dựng lại theo phong cách
 ### Changed
 - Thẻ "Danh sách buổi học" và hộp thoại xuất ghi đúng giới hạn 1.000 buổi (trước đây ghi 300).
 - Lọc Nhật ký: giá trị đang lọc không còn trong danh sách chọn vẫn hiện với nhãn "(đang lọc)"; "Xóa lọc" đặt lại cả các ô chọn; báo khi Từ ngày sau Đến ngày; thông báo lỗi không còn nhắc tên bảng dữ liệu.
-- Ma trận phân quyền trong Cài đặt dùng tên tiếng Việt cho các nhóm Phân quyền, Vận hành hệ thống, Cài đặt, Chăm sóc học viên, Tin nhắn phụ huynh.
+- Ma trận phân quyền trong Cài đặt dùng tên tiếng Việt cho các nhóm Phân quyền, Vận hành hệ thống, Cài đặt, Chăm sóc học viên, Tin nhắn phụ huynh; Nhật ký hệ thống ghi nhóm "Chấm bài AI" thay vì mã gốc.
 - Ô biểu tượng trên Tổng quan bo góc 6px đúng thiết kế.
 
 ### Fixed
