@@ -1580,11 +1580,11 @@
 
 ### Test Coaching chập chờn khi chạy cả bộ lúc máy tải cao
 
-**What:** Sửa các test chờ trạng thái thay vì đọc một lần: `coaching-form-builder.test.tsx` ("Tạo bản nháp phiên bản mới" bị từ chối, "Xuất bản" bị từ chối), `coaching-public-link-copy.test.tsx` (thu hồi dòng thứ hai), `dev-coaching-preview.test.tsx` (lưu và xuất bản bản nháp).
+**What:** Sửa các test chờ trạng thái thay vì đọc một lần: `coaching-form-builder.test.tsx` ("Tạo bản nháp phiên bản mới" bị từ chối, "Xuất bản" bị từ chối). Đã xong: `coaching-public-link-copy.test.tsx` (thu hồi dòng thứ hai, v0.27.1.0) và `dev-coaching-preview.test.tsx` (lưu và xuất bản bản nháp, b542c46).
 
 **Why:** Khi tải máy cao các test này đôi khi đỏ (đã gặp 4 lần trong bước 12) dù chạy riêng luôn xanh. Bản sửa đã làm ở bước 12 bị gỡ khỏi nhánh vì nằm ngoài phạm vi và cần đo P(fail|regression) trước/sau.
 
-**Context:** Commit e62b2c0 (đã revert ở 659f845) là điểm bắt đầu; chạy kèm phép thử ép lỗi để chứng minh test vẫn đỏ khi có lỗi thật.
+**Context:** Commit e62b2c0 (đã revert ở 659f845) là điểm bắt đầu; chạy kèm phép thử ép lỗi để chứng minh test vẫn đỏ khi có lỗi thật. Nguyên nhân đã thấy ở bảng link: setState sau `await` trong `startTransition(async)` chạy ngoài transition nên kết quả hiện trước khi `pending` tắt, test bấm vào nút còn khóa; chờ nút `toBeEnabled()` rồi mới bấm. Tái hiện chắc chắn bằng cách mock `cn()` của `@/lib/utils` cho mỗi lần gọi chạy vòng lặp bận 1–6 ms.
 
 **Effort:** S
 **Priority:** P2

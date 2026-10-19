@@ -2,6 +2,13 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.27.1.0] - 2026-10-19
+
+Bộ test tự động không còn lúc đạt lúc trượt ở phần thu hồi link phiếu Coaching khi máy bận; giao diện và cách ứng dụng chạy không đổi.
+
+### Fixed
+- Bộ test "Link phiếu công khai" (thu hồi link, bấm Hủy sau khi thu hồi lỗi) chờ nút "Thu hồi"/"Hủy" bật lại rồi mới bấm. Trước đây, khi chạy cả bộ test song song trên máy bận, khoảng 2/7 lần test bấm vào nút còn đang khóa (kết quả thu hồi đã hiện nhưng thao tác chưa xong) nên báo lỗi giả (thu hồi dòng thứ hai: "Unable to find a label … Lý do thu hồi …"; bấm Hủy: ô lý do vẫn còn).
+
 ## [0.23.0.0] - 2026-10-18
 
 Danh sách Tài chính dựng lại theo phong cách Stumana (bước 14c): Đơn hàng cho kế toán thấy ngay đơn nào chưa xác nhận và quyết toán SB từng đợt, Sổ cái số buổi đọc dễ hơn, Yêu cầu thanh toán lọc nhanh theo trạng thái và ghi giờ đúng giờ Việt Nam.
