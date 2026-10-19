@@ -539,7 +539,8 @@ describe("CoachingPublicLinkPanel revoking", () => {
     expect(reasonField()).toHaveValue("Gửi nhầm học viên");
     expect(reasonField()).not.toHaveAttribute("aria-invalid");
 
-    // The message is set inside the transition; Hủy re-enables (and takes a click) only when it settles.
+    // The message is set after the revoke's await, outside the transition, so it shows before pending clears;
+    // Hủy re-enables (and takes a click) only when the transition settles.
     await waitFor(() => expect(screen.getByRole("button", { name: "Hủy" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Hủy" }));
     expect(screen.queryByLabelText(`Lý do thu hồi ${activeLink.id}`)).not.toBeInTheDocument();
@@ -628,7 +629,7 @@ describe("CoachingPublicLinkPanel revoking", () => {
     expect(screen.getAllByRole("status")).toHaveLength(1);
     expect(screen.getByRole("status")).not.toHaveFocus();
     expect(reasonField()).toHaveValue("Gửi nhầm học viên");
-    // The message is set inside the transition; the button re-enables when the transition settles.
+    // The message is set after the revoke's await, outside the transition; the button re-enables when it settles.
     await waitFor(() => expect(screen.getByRole("button", { name: "Thu hồi" })).toBeEnabled());
     expect(revokeCoachingPublicLinkAction).not.toHaveBeenCalled();
   });
@@ -667,8 +668,8 @@ describe("CoachingPublicLinkPanel revoking", () => {
       />,
     );
     const revokeRow = async (row: HTMLElement, link: CoachingPublicLinkSummary, calls: number) => {
-      // The previous issue or revoke updates the screen inside its transition, before it settles; until then
-      // every Thu hồi is disabled and a click opens no reason field.
+      // The previous issue or revoke updates the screen after its await, outside the transition, so before pending
+      // clears; until then every Thu hồi is disabled and a click opens no reason field.
       await waitFor(() => expect(within(row).getByRole("button", { name: "Thu hồi" })).toBeEnabled());
       fireEvent.click(within(row).getByRole("button", { name: "Thu hồi" }));
       fireEvent.change(within(row).getByLabelText(`Lý do thu hồi ${link.id}`), { target: { value: "Gửi nhầm" } });
