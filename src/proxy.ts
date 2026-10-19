@@ -19,6 +19,9 @@ const PUBLIC_PATHS = new Set([
   "/manifest.webmanifest",
   "/api/health/supabase",
   "/api/webhooks/sepay",
+  // Apps Script submission form: HMAC-signed, no staff session.
+  "/api/webhooks/grading-submissions",
+  "/api/integrations/grading-roster",
 ]);
 
 function isPublicPath(pathname: string, method: string): boolean {

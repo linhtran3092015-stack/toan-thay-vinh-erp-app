@@ -54,6 +54,15 @@ export interface SepayWebhookEnv {
   webhookSecret: string;
 }
 
+// Shared HMAC secret of the Apps Script submission form (webhook + roster).
+const gradingFormEnvSchema = z.object({
+  GRADING_FORM_SECRET: z.string().trim().min(32),
+});
+
+export interface GradingFormEnv {
+  secret: string;
+}
+
 const sepayApiV2EnvSchema = z.object({
   SEPAY_API_BASE_URL: z
     .string()
@@ -131,6 +140,20 @@ export function getSepayWebhookEnv(): SepayWebhookEnv {
 
   return {
     webhookSecret: result.data.SEPAY_WEBHOOK_SECRET,
+  };
+}
+
+export function getGradingFormEnv(): GradingFormEnv {
+  const result = gradingFormEnvSchema.safeParse({
+    GRADING_FORM_SECRET: process.env.GRADING_FORM_SECRET,
+  });
+
+  if (!result.success) {
+    throw new Error("Grading form integration environment is not configured correctly.");
+  }
+
+  return {
+    secret: result.data.GRADING_FORM_SECRET,
   };
 }
 
