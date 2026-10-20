@@ -844,7 +844,7 @@ function EnrollmentReviewTable({ dryRun }: { dryRun: EnrollmentImportDryRunResul
       header: "Mã học sinh",
       hideInCard: true,
       key: "student",
-      render: (row) => <span className="font-semibold text-text-strong tabular-nums">{row.student_public_code || "—"}</span>,
+      render: (row) => <span className="whitespace-nowrap font-semibold text-text-strong tabular-nums">{row.student_public_code || "—"}</span>,
       width: "160px",
     },
     { header: "Mã lớp", key: "class", render: (row) => row.class_code || "—", width: "120px" },

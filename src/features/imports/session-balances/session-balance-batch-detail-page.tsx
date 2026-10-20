@@ -226,7 +226,7 @@ export function SessionBalanceBatchDetailPage({
       header: "Mã học viên",
       hideInCard: true,
       key: "code",
-      render: (row) => <span className="font-semibold text-text-strong">{row.student_public_code}</span>,
+      render: (row) => <span className="whitespace-nowrap font-semibold text-text-strong">{row.student_public_code}</span>,
     },
     { header: "Họ tên nguồn", key: "name", render: (row) => row.source_student_name ?? "—" },
     { align: "right", header: "Số dư nguồn", key: "balance", render: (row) => formatSessionBalance(row.source_balance) },
@@ -277,6 +277,7 @@ export function SessionBalanceBatchDetailPage({
         action={
           canReconcile ? (
             <Button
+              className="max-md:h-11"
               disabled={isReconciling || reconcileBlocked || !reconcileReason.trim()}
               disabledReason={
                 reconcileBlocked
@@ -329,6 +330,7 @@ export function SessionBalanceBatchDetailPage({
       <GuardedActionPanel
         action={
           <Button
+            className="max-md:h-11"
             disabled={isApproving || !canApprove || isCreator || !rowsClear}
             disabledReason={
               isCreator
@@ -397,7 +399,7 @@ export function SessionBalanceBatchDetailPage({
         action={
           // The page's single primary at this stage (HANDOFF §5: danger is never a page primary):
           // primary styling, the irreversible consequence in words, and a danger border once armed.
-          <Button disabled={isPosting || Boolean(postBlockedReason)} disabledReason={postBlockedReason} isLoading={isPosting} onClick={handlePost}>
+          <Button className="max-md:h-11" disabled={isPosting || Boolean(postBlockedReason)} disabledReason={postBlockedReason} isLoading={isPosting} onClick={handlePost}>
             Ghi số dư vào sổ buổi
           </Button>
         }
@@ -460,7 +462,7 @@ export function SessionBalanceBatchDetailPage({
     panel = (
       <ResultBanner
         action={
-          <Link className={getButtonClassName({ size: "sm", variant: "secondary" })} href={ledgerHref}>
+          <Link className={getButtonClassName({ className: "max-md:h-11", size: "sm", variant: "secondary" })} href={ledgerHref}>
             Xem sổ buổi
           </Link>
         }
@@ -475,7 +477,7 @@ export function SessionBalanceBatchDetailPage({
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
       <PageHeader
         actions={
-          <Link className={getButtonClassName({ variant: "secondary" })} href={listHref}>
+          <Link className={getButtonClassName({ className: "max-md:h-11", variant: "secondary" })} href={listHref}>
             <span aria-hidden="true">←</span> Danh sách lô
           </Link>
         }
@@ -635,10 +637,10 @@ function ExcludeCell({
         </p>
       ) : null}
       <div className="flex flex-wrap items-center justify-end gap-1.5">
-        <Button disabled={isExcluding} onClick={onCancel} size="sm" variant="ghost">
+        <Button className="max-md:h-11" disabled={isExcluding} onClick={onCancel} size="sm" variant="ghost">
           Hủy
         </Button>
-        <Button disabled={!reason.trim()} isLoading={isExcluding} onClick={onConfirm} size="sm" variant="danger-outline">
+        <Button className="max-md:h-11" disabled={!reason.trim()} isLoading={isExcluding} onClick={onConfirm} size="sm" variant="danger-outline">
           Xác nhận loại
         </Button>
       </div>

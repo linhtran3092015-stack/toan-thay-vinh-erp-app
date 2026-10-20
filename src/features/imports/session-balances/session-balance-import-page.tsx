@@ -750,7 +750,7 @@ const reviewColumns: readonly ImportReviewColumn<SessionBalanceImportRowResult>[
     header: "Mã học viên",
     hideInCard: true,
     key: "code",
-    render: (row) => <span className="font-semibold text-text-strong">{row.student_public_code ?? "—"}</span>,
+    render: (row) => <span className="whitespace-nowrap font-semibold text-text-strong">{row.student_public_code ?? "—"}</span>,
   },
   { header: "Họ tên nguồn", key: "name", render: (row) => row.source_student_name ?? "—" },
   { align: "right", header: "Số dư nguồn", key: "balance", render: (row) => formatSessionBalance(row.source_balance) },

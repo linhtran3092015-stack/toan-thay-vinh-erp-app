@@ -44,7 +44,8 @@ export function ImportActionBar({ back, primary, reason, reasonId, text }: Impor
     <div className="@container min-w-0">
       <div className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-base px-4 py-3 shadow-[var(--panel-shadow)] @min-[640px]:flex-row @min-[640px]:items-center">
         <div className="min-w-0 flex-1 text-secondary text-text-default">{text}</div>
-        <div className="flex flex-wrap items-center gap-2 @min-[640px]:shrink-0 @min-[640px]:justify-end">
+        {/* 44px touch targets on phones for the back button and whichever primary the feature passes. */}
+        <div className="flex flex-wrap items-center gap-2 max-md:[&_a]:h-11 max-md:[&_button]:h-11 @min-[640px]:shrink-0 @min-[640px]:justify-end">
           {back ? (
             <Button disabled={back.disabled} onClick={back.onClick} variant="secondary">
               <span aria-hidden="true">←</span>

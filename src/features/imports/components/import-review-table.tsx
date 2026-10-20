@@ -232,6 +232,8 @@ export function ImportReviewTable<Row>({
             </TableRow>
           ))}
           caption={caption}
+          // Positioned, so the cells' sr-only text stays inside the frame's horizontal scroll instead of widening the page.
+          className="relative"
           footer={footer}
           header={header}
         />

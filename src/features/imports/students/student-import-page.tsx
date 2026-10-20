@@ -349,7 +349,7 @@ export function StudentImportPage({
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
         <StudentImportCommitResultView result={commitResult} />
         <div>
-          <Button onClick={resetToFile} variant="secondary">
+          <Button className="max-md:h-11" onClick={resetToFile} variant="secondary">
             Nhập file khác
           </Button>
         </div>

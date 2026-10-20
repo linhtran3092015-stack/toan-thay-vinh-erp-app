@@ -73,7 +73,7 @@ export function ImportFileStep({
   const errorId = `${inputId}-error`;
   const labelButtonClassName = getButtonClassName({
     className:
-      "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-border-focus peer-focus-visible:shadow-[0_0_0_5px_var(--focus-ring)]",
+      "max-md:h-11 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-border-focus peer-focus-visible:shadow-[0_0_0_5px_var(--focus-ring)]",
     variant: "secondary",
   });
 
@@ -147,7 +147,7 @@ export function ImportFileStep({
               ) : null}
             </dl>
             {onReset ? (
-              <Button className="self-start" onClick={onReset} variant="secondary">
+              <Button className="self-start max-md:h-11" onClick={onReset} variant="secondary">
                 Chọn file khác
               </Button>
             ) : (
@@ -199,7 +199,7 @@ export function ImportFileStep({
       </div>
 
       {templateAction ? (
-        <div className="flex flex-wrap items-center gap-3 border-t border-border-row px-4 py-2.5">{templateAction}</div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-border-row px-4 py-2.5 max-md:[&_a]:h-11 max-md:[&_button]:h-11">{templateAction}</div>
       ) : null}
     </div>
   );

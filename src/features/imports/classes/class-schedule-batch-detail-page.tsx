@@ -206,7 +206,7 @@ export function ClassScheduleBatchDetailPage({ actions, detail, importHref = "/i
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
       <PageHeader
         actions={
-          <Link className={getButtonClassName({ variant: "secondary" })} href={importHref}>
+          <Link className={getButtonClassName({ className: "max-md:h-11", variant: "secondary" })} href={importHref}>
             <span aria-hidden="true">←</span> Về trang nhập lớp & lịch học
           </Link>
         }
