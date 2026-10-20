@@ -2,14 +2,39 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
-## [0.28.0.1] - 2026-10-20
+## [0.29.0.1] - 2026-10-21
 
-Form nộp bài Apps Script: câu 6 có lại lựa chọn "Khác" như form gốc, và tên tiếng Việt lấy từ ERP luôn hiện đúng dấu.
+Form nộp bài Apps Script: câu 6 có lại lựa chọn "Khác" như form gốc, tên tiếng Việt lấy từ ERP luôn hiện đúng dấu, và hàm kiểm tra kết nối nói rõ vì sao không gọi được ERP.
 
 ### Fixed
 - **Câu 6 "Con muốn học thử miễn phí thêm các lớp Tiếng Anh chứ?"** có lại dòng "Khác: ___" như form gốc (bản Giai đoạn 1 vô tình bỏ đi). Cột N của tab `Data` ghi `Khác: <chữ học sinh gõ>` thay vì `Other`; câu 6 vẫn chỉ ghi Sheet, không gửi ERP. Chữ đã gõ được giữ khi mở lại form.
 - **Tên học sinh và nhãn buổi học từ ERP** được đọc rõ bảng mã UTF-8. ERP trả JSON không ghi charset, nên nếu Apps Script đoán sai bảng mã thì tên bị vỡ chữ kiểu "Nguyá»…n".
+- **`testErpConnection`** in địa chỉ ERP đang dùng và lý do khi gọi ERP thất bại, thay vì chỉ "HTTP 0 (lỗi)". Thiếu quyền gọi ra ngoài thì chỉ rõ cần thêm `script.external_request` vào `appsscript.json`.
 - Cần dán lại `Code.gs` và `FormHocSinh.html` vào dự án Apps Script, rồi Deploy bản web app đang dùng với Version mới.
+
+## [0.29.0.0] - 2026-10-20
+
+Form thêm/sửa học sinh, form tạo/sửa lớp và trang tạo buổi học hàng loạt dựng lại theo phong cách Stumana (bước 15a): form dài có mục lục và thanh lưu luôn hiện, tạo buổi hàng loạt có lưới xem trước bấm chọn từng buổi, bỏ qua ngày nghỉ và giới hạn 100 buổi mỗi đợt.
+
+### Added
+- **Thêm / sửa học sinh** (`/students/new`, sửa hồ sơ): các mục Hồ sơ, Phụ huynh chính, Lý do thao tác nằm trong mục lục bên trái (hàng cuộn ngang trên điện thoại); mỗi mục ghi trạng thái bằng chữ ("5/9 · đủ", "thiếu 2", "1 lỗi"). Thanh lưu dưới đáy luôn hiện: "Đang nhập · n lỗi cần sửa" kèm tên trường lỗi đầu tiên. Khi tạo mới có thêm "Lưu và thêm tiếp" để nhập liền nhiều học sinh.
+- Form học sinh khóa các ô trong lúc đang lưu, đưa con trỏ về trường lỗi đầu tiên (kể cả lỗi máy chủ trả về), về nút vừa bấm hoặc thông báo lỗi khi lưu không được, và hỏi trước khi rời trang nếu còn thay đổi chưa lưu.
+- **Tạo / sửa lớp**: một khung "Thông tin lớp" theo lưới 6 cột và mục "Lịch tuần" ghi rõ các bước tiếp theo (Lưu lớp Nháp → Kích hoạt → Thiết lập lịch tuần → Tạo buổi hàng loạt); lớp ghép ghi rõ lịch và buổi thuộc các lớp thành phần; bước "Tạo buổi hàng loạt" chỉ có link với lớp đang hoạt động và người có quyền tạo buổi. Form lớp hỏi trước khi rời trang nếu còn thay đổi chưa lưu.
+- **Tạo buổi học hàng loạt** `/sessions/batch`: lưới xem trước 6 cột (3 cột trên điện thoại), mỗi ô là một buổi bấm để chọn/bỏ chọn, phím mũi tên di chuyển giữa các ô; "Chọn tất cả / Bỏ chọn tất cả"; ô "Ngày nghỉ (bỏ qua)" bỏ chọn các ngày nghỉ trong lần tạo này; buổi trùng lịch đã có hiện "đã có (bỏ qua)", buổi ngoài thời gian hiệu lực của lịch hiện "ngoài hiệu lực" và đều không được gửi đi; nút chính "Tạo hàng loạt (n buổi học)" khóa kèm lý do khi chưa chọn buổi nào hoặc quá 100 buổi.
+- Trang xem trước `/dev/forms?view=student|student-edit|class|class-edit|batch` với `role` và `state` (trả 404 trên production; mọi nút lưu chỉ trả lời "Bản xem trước không ghi dữ liệu." và không chuyển trang; form học sinh và form lớp chỉ link tới các trang /dev).
+
+### Changed
+- Ô nhập nhiều dòng (ghi chú, lý do, mẫu tin…) giữ đúng chiều cao tối thiểu 80px trên máy tính như thiết kế; trước đây co còn khoảng 40px từ màn hình 768px trở lên. Áp dụng cho mọi form dùng ô nhiều dòng chung, kể cả mẫu phiếu học phí, Cài đặt và màn nhập đáp án chấm bài AI; ô nào tự đặt chiều cao riêng thì giữ chiều cao đó.
+- Nút, ô nhập và link hành động trên ba trang này cao 44px trên điện thoại cho dễ bấm.
+- Trang tạo buổi hàng loạt dùng ngày theo giờ Việt Nam làm ngày bắt đầu mặc định; các nút chọn thứ trong tuần thể hiện trạng thái bằng cả viền, nền và độ đậm chữ.
+- Tạo buổi hàng loạt từ chối mở với một lớp chưa kích hoạt, đã đóng hoặc không tồn tại (link cũ hoặc gõ tay) và yêu cầu chọn một lớp đang hoạt động, thay vì lặng lẽ dùng lớp hoạt động đầu tiên.
+- Lý do "vẫn tạo hoặc cập nhật hồ sơ" khi trùng học sinh chỉ dùng cho đúng hồ sơ trùng đang hiện; đổi tên, năm sinh hoặc số điện thoại sang một học sinh trùng khác thì phải xác nhận lại.
+
+### Fixed
+- Ở "Lịch lặp tùy chỉnh", đổi Hình thức, Phòng học, Link phòng hoặc Mã thành phần sau khi chọn thứ trong tuần giờ được gửi lên đúng (trước đây các buổi vẫn tạo với giá trị cũ).
+- Trang tạo buổi hàng loạt tự làm mới (mỗi phút với quản lý) không còn xóa các buổi đã bỏ chọn, đã sửa giờ/tên hay đã xóa khỏi danh sách.
+- Form lớp không còn mất chữ đã gõ khi mất kết nối lúc lưu: hiện "Không thể kết nối tới hệ thống lưu lớp. Vui lòng thử lại." và giữ nguyên các ô.
+- Ô "Số buổi học cần tạo" và "Số bắt đầu" xóa được để gõ lại trên điện thoại.
 
 ## [0.28.0.0] - 2026-10-20
 

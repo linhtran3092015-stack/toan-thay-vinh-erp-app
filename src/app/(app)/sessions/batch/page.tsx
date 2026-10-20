@@ -3,6 +3,7 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { getSessionDirectoryQuery } from "@/features/sessions/session-directory-url-state";
 import { getBatchSessionCreationContext } from "@/features/sessions/batch-data";
 import { BatchSessionCreateWorkspace } from "@/features/sessions/components/batch-session-create-workspace";
+import { getVietnamToday } from "@/lib/datetime";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 import { permissionDeniedDescription } from "@/lib/permissions/labels";
@@ -72,14 +73,19 @@ export default async function BatchSessionsRoute({ searchParams }: BatchSessions
     );
   }
 
+  const selectedClassId = contextResult.data.targetClassId || contextResult.data.classes[0].id;
+
+  // `key`: switching class remounts the workspace, so no choice of the previous class carries over.
   return (
     <BatchSessionCreateWorkspace
       classes={contextResult.data.classes}
       directoryQuery={directoryQuery}
       existingSessionCount={contextResult.data.existingSessionCount}
       existingSessions={contextResult.data.existingSessions}
+      key={selectedClassId}
       schedules={contextResult.data.schedules}
-      selectedClassId={contextResult.data.targetClassId || contextResult.data.classes[0].id}
+      selectedClassId={selectedClassId}
+      today={getVietnamToday()}
     />
   );
 }
