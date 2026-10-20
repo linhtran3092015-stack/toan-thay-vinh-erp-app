@@ -7,7 +7,7 @@ import { StickySaveBar } from "@/components/patterns/sticky-save-bar";
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
 import { Button, getButtonClassName } from "@/components/ui/button";
-import { controlClassName } from "@/components/ui/field";
+import { controlClassName, textareaClassName } from "@/components/ui/field";
 import { GuardedLink, useLeaveGuard, useSaveInFlightGuard } from "@/features/settings/components/leave-guard";
 import { SettingsCard } from "@/features/settings/components/settings-card";
 import type { SettingsActionOverrides } from "@/features/settings/settings-action-overrides";
@@ -272,7 +272,7 @@ function TextAreaField({ className, hint, label, onChange, value }: { className?
   const id = useId();
   return <div className={cn("grid content-start gap-1.5", className)}>
     <label className="text-label font-medium text-text-strong" htmlFor={id}>{label}</label>
-    <textarea aria-describedby={hint ? `${id}-hint` : undefined} className={cn(controlClassName, "min-h-24 py-2")} id={id} maxLength={1000} onChange={e => onChange(e.target.value)} rows={4} value={value} />
+    <textarea aria-describedby={hint ? `${id}-hint` : undefined} className={cn(textareaClassName, "min-h-24")} id={id} maxLength={1000} onChange={e => onChange(e.target.value)} rows={4} value={value} />
     {hint ? <p className="text-caption text-text-muted" id={`${id}-hint`}>{hint}</p> : null}
   </div>;
 }
