@@ -2138,6 +2138,118 @@ export type Database = {
           },
         ]
       }
+      grading_runs: {
+        Row: {
+          answer_key_version: number | null
+          attempt_count: number
+          cache_read_tokens: number | null
+          cost_usd_est: number | null
+          created_at: string
+          effort: string
+          error_code: string | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          input_tokens: number | null
+          latency_ms: number | null
+          locked_until: string | null
+          model: string
+          next_attempt_at: string
+          output_tokens: number | null
+          prompt_version: string
+          request_id: string | null
+          requested_by: string | null
+          result: Json | null
+          run_type: string
+          started_at: string | null
+          status: string
+          stop_reason: string | null
+          submission_id: string | null
+          test_id: string
+          updated_at: string
+        }
+        Insert: {
+          answer_key_version?: number | null
+          attempt_count?: number
+          cache_read_tokens?: number | null
+          cost_usd_est?: number | null
+          created_at?: string
+          effort: string
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          input_tokens?: number | null
+          latency_ms?: number | null
+          locked_until?: string | null
+          model: string
+          next_attempt_at?: string
+          output_tokens?: number | null
+          prompt_version: string
+          request_id?: string | null
+          requested_by?: string | null
+          result?: Json | null
+          run_type: string
+          started_at?: string | null
+          status?: string
+          stop_reason?: string | null
+          submission_id?: string | null
+          test_id: string
+          updated_at?: string
+        }
+        Update: {
+          answer_key_version?: number | null
+          attempt_count?: number
+          cache_read_tokens?: number | null
+          cost_usd_est?: number | null
+          created_at?: string
+          effort?: string
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          input_tokens?: number | null
+          latency_ms?: number | null
+          locked_until?: string | null
+          model?: string
+          next_attempt_at?: string
+          output_tokens?: number | null
+          prompt_version?: string
+          request_id?: string | null
+          requested_by?: string | null
+          result?: Json | null
+          run_type?: string
+          started_at?: string | null
+          status?: string
+          stop_reason?: string | null
+          submission_id?: string | null
+          test_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grading_runs_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grading_runs_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "grading_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grading_runs_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "session_tests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grading_submissions: {
         Row: {
           answer_text: string
@@ -4507,6 +4619,147 @@ export type Database = {
           {
             foreignKeyName: "session_results_graded_by_fkey"
             columns: ["graded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_test_assets: {
+        Row: {
+          created_at: string
+          height: number
+          id: string
+          mime_type: string
+          page_no: number
+          sha256: string
+          storage_path: string
+          test_id: string
+          uploaded_by: string | null
+          width: number
+        }
+        Insert: {
+          created_at?: string
+          height: number
+          id?: string
+          mime_type: string
+          page_no: number
+          sha256: string
+          storage_path: string
+          test_id: string
+          uploaded_by?: string | null
+          width: number
+        }
+        Update: {
+          created_at?: string
+          height?: number
+          id?: string
+          mime_type?: string
+          page_no?: number
+          sha256?: string
+          storage_path?: string
+          test_id?: string
+          uploaded_by?: string | null
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_test_assets_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "session_tests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_test_assets_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_tests: {
+        Row: {
+          answer_key: Json
+          answer_key_version: number
+          class_session_id: string
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          marking_guide: string | null
+          source_test_id: string | null
+          status: string
+          title: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          answer_key?: Json
+          answer_key_version?: number
+          class_session_id: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          marking_guide?: string | null
+          source_test_id?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          answer_key?: Json
+          answer_key_version?: number
+          class_session_id?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          marking_guide?: string | null
+          source_test_id?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_tests_class_session_id_fkey"
+            columns: ["class_session_id"]
+            isOneToOne: true
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_tests_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_tests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_tests_source_test_id_fkey"
+            columns: ["source_test_id"]
+            isOneToOne: false
+            referencedRelation: "session_tests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_tests_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -7290,6 +7543,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      add_session_test_assets: {
+        Args: { p_assets: Json; p_test_id: string }
+        Returns: {
+          added: boolean
+          asset_id: string
+          page_no: number
+          storage_path: string
+        }[]
+      }
       admin_adjust_time_entry: {
         Args: {
           p_check_in_at: string
@@ -7730,6 +7992,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cancel_queued_key_extractions: {
+        Args: { p_test_id: string }
+        Returns: number
+      }
+      cancel_session_test_key_extraction: {
+        Args: { p_test_id: string }
+        Returns: number
+      }
       change_academic_year_status: {
         Args: {
           p_academic_year_id: string
@@ -8028,6 +8298,20 @@ export type Database = {
         }
         Returns: Json
       }
+      confirm_session_test_key: {
+        Args: {
+          p_answer_key: Json
+          p_expected_version: number
+          p_marking_guide: string
+          p_reason?: string
+          p_test_id: string
+          p_title: string
+        }
+        Returns: {
+          answer_key_version: number
+          confirmed_at: string
+        }[]
+      }
       convert_crm_case_to_official_student: {
         Args: {
           p_checklist_items?: Json
@@ -8065,6 +8349,19 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      copy_session_test_key: {
+        Args: {
+          p_class_session_id: string
+          p_expected_version: number
+          p_reason?: string
+          p_source_test_id: string
+        }
+        Returns: {
+          answer_key_version: number
+          copied_pages: number
+          test_id: string
+        }[]
       }
       correct_student_acquisition_source: {
         Args: {
@@ -8622,6 +8919,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      create_session_test: {
+        Args: { p_class_session_id: string }
+        Returns: string
       }
       create_staff_daily_rate_version: {
         Args: {
@@ -9864,6 +10165,7 @@ export type Database = {
           submitted_at: string
         }[]
       }
+      get_session_test: { Args: { p_class_session_id: string }; Returns: Json }
       get_staff_monthly_timekeeping_entries: {
         Args: { p_month: number; p_staff_id: string; p_year: number }
         Returns: {
@@ -10163,6 +10465,24 @@ export type Database = {
           submitted_at: string
         }[]
       }
+      list_session_test_sources: {
+        Args: { p_class_session_id: string }
+        Returns: {
+          answer_key: Json
+          answer_key_version: number
+          class_code: string
+          class_name: string
+          class_session_id: string
+          confirmed_at: string
+          confirmed_by_name: string
+          end_time: string
+          marking_guide: string
+          page_count: number
+          start_time: string
+          test_id: string
+          title: string
+        }[]
+      }
       list_unmatched_grading_submissions: {
         Args: { p_limit?: number }
         Returns: {
@@ -10270,6 +10590,31 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "class_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      lock_open_session_test: {
+        Args: { p_test_id: string }
+        Returns: {
+          answer_key: Json
+          answer_key_version: number
+          class_session_id: string
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          marking_guide: string | null
+          source_test_id: string | null
+          status: string
+          title: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "session_tests"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -10412,6 +10757,10 @@ export type Database = {
       normalize_sepay_receiving_account_number: {
         Args: { p_account_number: string }
         Returns: string
+      }
+      normalize_session_test_answer_key: {
+        Args: { p_answer_key: Json }
+        Returns: Json
       }
       normalize_student_name: { Args: { name_value: string }; Returns: string }
       normalize_vietnam_phone: {
@@ -10808,6 +11157,13 @@ export type Database = {
           submission_id: string
         }[]
       }
+      remove_session_test_asset: {
+        Args: { p_asset_id: string }
+        Returns: {
+          still_referenced: boolean
+          storage_path: string
+        }[]
+      }
       render_comment_message: {
         Args: { p_footer: string; p_template: string; p_vars: Json }
         Returns: string
@@ -10879,6 +11235,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      reorder_session_test_assets: {
+        Args: { p_asset_ids: string[]; p_test_id: string }
+        Returns: undefined
       }
       replace_class_schedule_template: {
         Args: {
@@ -10992,6 +11352,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      request_session_test_key_extraction: {
+        Args: { p_test_id: string }
+        Returns: string
+      }
       request_time_entry_adjustment: {
         Args: {
           p_request_reason: string
@@ -11027,6 +11391,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      require_session_test_permission: {
+        Args: { p_permission: string }
+        Returns: string
       }
       reserve_student_enrollment: {
         Args: {
@@ -11455,6 +11823,15 @@ export type Database = {
           version_number: number
         }[]
       }
+      save_session_test_draft: {
+        Args: {
+          p_answer_key: Json
+          p_marking_guide: string
+          p_test_id: string
+          p_title: string
+        }
+        Returns: string
+      }
       save_weekly_shift_assignment: {
         Args: {
           p_expected_assignment_id: string
@@ -11498,6 +11875,19 @@ export type Database = {
       session_comment_message_vars: {
         Args: { p_result_id: string }
         Returns: Json
+      }
+      session_test_actor_name: { Args: { p_user_id: string }; Returns: string }
+      session_test_key_confirm_problem: {
+        Args: { p_answer_key: Json }
+        Returns: string
+      }
+      session_test_object_delete_allowed: {
+        Args: { p_bucket_id: string; p_name: string }
+        Returns: boolean
+      }
+      session_test_object_insert_allowed: {
+        Args: { p_bucket_id: string; p_name: string }
+        Returns: boolean
       }
       set_attendance_verification_config: {
         Args: {
