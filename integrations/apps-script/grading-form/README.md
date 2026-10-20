@@ -10,7 +10,7 @@ Bản sửa của form "Nộp bài tốt nghiệp - Thầy Vinh". Chủ trung t�
 | Ô năm sinh | Cố định 2008–2019 | Lấy các năm có học sinh đang học từ ERP (lỗi thì vẫn 2008–2019) |
 | Trùng họ tên | Không phân biệt được | Hiện kèm 4 số cuối SĐT phụ huynh chính, ví dụ "Nguyễn Minh Anh (PH ***4828)" |
 | Câu 5 "Hôm nay con học buổi" | 5 lựa chọn cố định + "Khác" | Buổi học hôm nay của em theo lịch ERP (1 buổi thì chọn sẵn). Không có buổi nào hoặc không có tên thì vẫn là các lựa chọn cũ |
-| Chọn "Khác" | Cột J ghi `Other`, mất chữ học sinh gõ | Cột J ghi `Khác: <chữ học sinh gõ>` |
+| Chọn "Khác" | Cột J (câu 5) và cột N (câu 6) ghi `Other`, mất chữ học sinh gõ | Cột J và cột N ghi `Khác: <chữ học sinh gõ>` |
 | Gửi ERP | Không | Ghi Sheet xong thì gửi một bản sang ERP. Gửi lỗi thì học sinh vẫn nộp thành công, trigger 10 phút/lần gửi lại |
 
 Tab `Data`, cột A–P giữ nguyên ý nghĩa. Lần nộp đầu tiên tự thêm 5 cột vào sau cột cuối cùng: `Mã HS ERP`, `Buổi học ERP`, `Mã bài ERP`, `Giờ nộp ERP`, `Đã gửi ERP`. Nếu có công thức hay tab khác đọc cả vùng `Data!A:Z`, kiểm tra lại sau lần nộp đầu tiên.

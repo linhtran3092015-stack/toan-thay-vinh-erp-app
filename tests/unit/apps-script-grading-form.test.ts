@@ -137,7 +137,13 @@ function loadScript({ data, now, respond }: { data: FakeSheet; now: Date; respon
         const request = { body: options.payload, headers: options.headers, method: options.method, url };
         sent.push(request);
         const answer = respond(request);
-        return { getContentText: () => JSON.stringify(answer.body), getResponseCode: () => answer.status };
+        // The ERP sends "application/json" without a charset; read without one, the bytes would be
+        // decoded as Latin-1 ("Nguyá»…n"), so only an explicit UTF-8 read gets the real text.
+        const text = JSON.stringify(answer.body);
+        return {
+          getContentText: (charset?: string) => (charset?.toUpperCase() === "UTF-8" ? text : Buffer.from(text, "utf8").toString("latin1")),
+          getResponseCode: () => answer.status,
+        };
       },
     },
     Utilities: {
@@ -239,6 +245,17 @@ describe("Apps Script grading form (Code.gs)", () => {
     expect(JSON.parse(sent[0].body ?? "{}")).toMatchObject({ classOption: "Khác", classOptionOther: "Lớp cô Hương", fullName: "Trần Thị Mai", studentCode: null });
   });
 
+  // Value: protects=question 6 "Khác" (restored from the original form) keeps the typed text in column N, which stays Sheet-only; fails_when=N falls back to the old bare "Other" or the text leaks into the ERP payload; why_new=the phase 1 form had dropped the option; seam=none; no_claim=the HTML radio rendering (FormHocSinh.html has no DOM test)
+  it("writes question 6 'Khác' with the typed text in column N and keeps it out of the ERP payload", () => {
+    const { context, sent } = loadScript({ data, now: NOW, respond: erpAccepts });
+    context.processForm({ buoiHoc: "Con không rõ", hocThuAnh: "Other", hocThuAnhKhac: " Để con hỏi bố mẹ ", hoTen: "CHUA_CO_TEN", hoTenManual: "Trần Thị Mai", linkBaiThi: "x", namSinh: "2015", files: [] });
+    context.processForm({ buoiHoc: "Con không rõ", hocThuAnh: "Có ạ! Con cảm ơn thầy", hoTen: "CHUA_CO_TEN", hoTenManual: "Lê Hoa", linkBaiThi: "y", namSinh: "2015", files: [] });
+
+    expect(data.rows[2][13]).toBe("Khác: Để con hỏi bố mẹ");
+    expect(data.rows[3][13]).toBe("Có ạ! Con cảm ơn thầy");
+    expect(sent[0].body).not.toContain("Để con hỏi bố mẹ");
+  });
+
   it("still accepts the submission when the ERP is down, and the trigger resends only unsent new rows", () => {
     let erpUp = false;
     const { cache, context, sent } = loadScript({ data, now: NOW, respond: (request) => (erpUp ? erpAccepts(request) : { body: { ok: false }, status: 503 }) });
@@ -313,7 +330,11 @@ describe("Apps Script grading form (Code.gs)", () => {
   it("signs roster requests the ERP accepts and falls back to the DanhSachHocSinh tab when the ERP fails", () => {
     const up = loadScript({ data, now: NOW, respond: erpAccepts });
     expect(up.context.getBirthYears()).toEqual([2014]);
-    expect(up.context.getStudentsByBirthYear("2014")).toMatchObject({ source: "erp", students: [{ code: "TV-2026-00001", sessions: [{ id: SESSION_ID }] }] });
+    // Vietnamese names and the "–" in session labels survive the trip (UTF-8 read, not Latin-1).
+    expect(up.context.getStudentsByBirthYear("2014")).toMatchObject({
+      source: "erp",
+      students: [{ code: "TV-2026-00001", fullName: "Nguyễn Minh Anh", sessions: [{ id: SESSION_ID, label: "7CLC1 · 18:00–19:30" }] }],
+    });
 
     const down = loadScript({ data, now: NOW, respond: () => ({ body: {}, status: 500 }) });
     expect(down.context.getStudentsByBirthYear(2014)).toEqual({

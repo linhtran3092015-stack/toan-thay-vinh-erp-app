@@ -128,6 +128,10 @@ function processForm(formObject) {
     const khac = String(formObject.buoiHocKhac || '').trim();
     let classOption = sessionId ? '' : String(formObject.buoiHoc || '').trim();
     if (classOption === 'Other') classOption = 'Khác';
+    // Câu 6 (học thử tiếng Anh) chỉ ghi Sheet; "Khác" ghi kèm chữ học sinh gõ như câu 5.
+    const hocThuAnh = String(formObject.hocThuAnh || '').trim();
+    const hocThuAnhKhac = String(formObject.hocThuAnhKhac || '').trim();
+    const hocThuAnhText = hocThuAnh === 'Other' ? (hocThuAnhKhac ? 'Khác: ' + hocThuAnhKhac : 'Khác') : hocThuAnh;
     const buoiHocText = sessionId
       ? String(formObject.buoiHocErpLabel || 'Buổi học ERP')
       : classOption === 'Khác' ? 'Khác: ' + khac : classOption;
@@ -155,7 +159,7 @@ function processForm(formObject) {
       formObject.troGiang || '',        // K
       formObject.rating || '',          // L
       formObject.caiTien || '',         // M
-      formObject.hocThuAnh || '',       // N
+      sheetText_(hocThuAnhText),        // N
       "'" + (formObject.sdtBoMe || ''), // O
       allUrls.join('\n'),               // P
     ];
@@ -366,7 +370,8 @@ function erpFetch_(method, pathAndQuery, body) {
     const res = UrlFetchApp.fetch(cfg.baseUrl + pathAndQuery, options);
     const status = res.getResponseCode();
     let json = null;
-    try { json = JSON.parse(res.getContentText()); } catch (parseErr) { json = null; }
+    // ERP trả JSON không ghi charset: đọc rõ UTF-8 để tên tiếng Việt không bị vỡ chữ.
+    try { json = JSON.parse(res.getContentText('UTF-8')); } catch (parseErr) { json = null; }
     return { ok: status >= 200 && status < 300, status: status, json: json };
   } catch (e) {
     return { ok: false, status: 0, error: String(e) };

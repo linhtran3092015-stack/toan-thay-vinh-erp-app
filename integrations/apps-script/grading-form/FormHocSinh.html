@@ -400,7 +400,7 @@
             renderRadios("anhVanOptions", "hocThuAnh", [
                 "Có ạ! Con cảm ơn thầy",
                 "Con đang học tiếng anh cô Hương rồi ạ"
-            ], false, false);
+            ], true, false);
 
             document.getElementById("graduationForm").addEventListener("input", saveToStorage);
             document.getElementById("graduationForm").addEventListener("change", saveToStorage);
@@ -654,6 +654,9 @@
                 rating: "",
                 caiTien: "",
                 hocThuAnh: document.querySelector('input[name="hocThuAnh"]:checked')?.value || "",
+                hocThuAnhKhac: document.querySelector('input[name="hocThuAnh"]:checked')?.value === "Other"
+                    ? (document.getElementById("hocThuAnh_other")?.value || "")
+                    : "",
                 sdtBoMe: document.getElementById("sdtBoMe").value,
                 files: []
             };
@@ -734,8 +737,10 @@
             document.querySelectorAll('input[type="radio"]').forEach(radio => {
                 if (data[radio.name] === radio.value) radio.checked = true;
             });
-            const other = document.getElementById("buoiHoc_other");
-            if (other && data.buoiHoc_other) other.value = data.buoiHoc_other;
+            ["buoiHoc_other", "hocThuAnh_other"].forEach(id => {
+                const other = document.getElementById(id);
+                if (other && data[id]) other.value = data[id];
+            });
         }
     </script>
 </body>
