@@ -128,6 +128,10 @@ function processForm(formObject) {
     const khac = String(formObject.buoiHocKhac || '').trim();
     let classOption = sessionId ? '' : String(formObject.buoiHoc || '').trim();
     if (classOption === 'Other') classOption = 'Khác';
+    // Câu 6 (học thử tiếng Anh) chỉ ghi Sheet; "Khác" ghi kèm chữ học sinh gõ như câu 5.
+    const hocThuAnh = String(formObject.hocThuAnh || '').trim();
+    const hocThuAnhKhac = String(formObject.hocThuAnhKhac || '').trim();
+    const hocThuAnhText = hocThuAnh === 'Other' ? (hocThuAnhKhac ? 'Khác: ' + hocThuAnhKhac : 'Khác') : hocThuAnh;
     const buoiHocText = sessionId
       ? String(formObject.buoiHocErpLabel || 'Buổi học ERP')
       : classOption === 'Khác' ? 'Khác: ' + khac : classOption;
@@ -155,7 +159,7 @@ function processForm(formObject) {
       formObject.troGiang || '',        // K
       formObject.rating || '',          // L
       formObject.caiTien || '',         // M
-      formObject.hocThuAnh || '',       // N
+      sheetText_(hocThuAnhText),        // N
       "'" + (formObject.sdtBoMe || ''), // O
       allUrls.join('\n'),               // P
     ];
@@ -323,11 +327,21 @@ function testErpConnection() {
     console.log('Chưa cấu hình: đặt ERP_BASE_URL và ERP_FORM_SECRET (ít nhất 32 ký tự) trong Script Properties.');
     return;
   }
+  console.log('Địa chỉ ERP: ' + cfg.baseUrl);
   const years = erpFetch_('GET', '/api/integrations/grading-roster');
-  console.log('Danh sách năm sinh: HTTP ' + years.status + (years.ok ? ' → ' + JSON.stringify(years.json.birthYears) : ' (lỗi)'));
+  console.log('Danh sách năm sinh: HTTP ' + years.status + (years.ok ? ' → ' + JSON.stringify(years.json.birthYears) : ' (lỗi)' + fetchErrorNote_(years)));
   // Body thiếu trường bắt buộc: 400 nghĩa là chữ ký (kể cả chữ có dấu) đúng; 401 là sai khóa hoặc lệch giờ.
   const probe = erpFetch_('POST', '/api/webhooks/grading-submissions', JSON.stringify({ probe: 'Kiểm tra chữ ký' }));
-  console.log('Webhook: HTTP ' + probe.status + (probe.status === 400 ? ' → chữ ký đúng' : probe.status === 401 ? ' → SAI khóa hoặc lệch giờ' : ''));
+  console.log('Webhook: HTTP ' + probe.status + (probe.status === 400 ? ' → chữ ký đúng' : probe.status === 401 ? ' → SAI khóa hoặc lệch giờ' : fetchErrorNote_(probe)));
+}
+
+// HTTP 0 nghĩa là Apps Script không gọi được ERP; in kèm lý do để biết sửa chỗ nào.
+function fetchErrorNote_(res) {
+  if (res.status !== 0 || !res.error) return '';
+  if (/permission|external_request/i.test(res.error)) {
+    return ' → dự án chưa có quyền gọi ra ngoài: trong appsscript.json thêm "https://www.googleapis.com/auth/script.external_request" vào oauthScopes, rồi chạy lại và bấm Cho phép. Chi tiết: ' + res.error;
+  }
+  return ' → ' + res.error;
 }
 
 // ---------------------------------------------------------------------------
@@ -366,7 +380,8 @@ function erpFetch_(method, pathAndQuery, body) {
     const res = UrlFetchApp.fetch(cfg.baseUrl + pathAndQuery, options);
     const status = res.getResponseCode();
     let json = null;
-    try { json = JSON.parse(res.getContentText()); } catch (parseErr) { json = null; }
+    // ERP trả JSON không ghi charset: đọc rõ UTF-8 để tên tiếng Việt không bị vỡ chữ.
+    try { json = JSON.parse(res.getContentText('UTF-8')); } catch (parseErr) { json = null; }
     return { ok: status >= 200 && status < 300, status: status, json: json };
   } catch (e) {
     return { ok: false, status: 0, error: String(e) };

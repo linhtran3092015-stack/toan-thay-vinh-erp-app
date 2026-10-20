@@ -103,11 +103,12 @@ function vietnamParts(date: Date) {
 
 function loadScript({ data, now, respond }: { data: FakeSheet; now: Date; respond: (request: Sent) => { body: unknown; status: number } }) {
   const sent: Sent[] = [];
+  const logs: string[] = [];
   const cache = new Map<string, string>();
   const roster = new FakeSheet([["Năm sinh", "Họ tên", "Tên"], [2014, "Lê Văn An", "An"]]);
   const context = {
     CacheService: { getScriptCache: () => ({ get: (k: string) => cache.get(k) ?? null, put: (k: string, v: string) => cache.set(k, v) }) },
-    console: { log: () => {} },
+    console: { log: (line: string) => logs.push(line) },
     Date: class extends Date {
       constructor(value?: number | string | Date) {
         super(value ?? now.getTime());
@@ -137,7 +138,13 @@ function loadScript({ data, now, respond }: { data: FakeSheet; now: Date; respon
         const request = { body: options.payload, headers: options.headers, method: options.method, url };
         sent.push(request);
         const answer = respond(request);
-        return { getContentText: () => JSON.stringify(answer.body), getResponseCode: () => answer.status };
+        // The ERP sends "application/json" without a charset; read without one, the bytes would be
+        // decoded as Latin-1 ("Nguyá»…n"), so only an explicit UTF-8 read gets the real text.
+        const text = JSON.stringify(answer.body);
+        return {
+          getContentText: (charset?: string) => (charset?.toUpperCase() === "UTF-8" ? text : Buffer.from(text, "utf8").toString("latin1")),
+          getResponseCode: () => answer.status,
+        };
       },
     },
     Utilities: {
@@ -158,7 +165,12 @@ function loadScript({ data, now, respond }: { data: FakeSheet; now: Date; respon
   };
   vm.createContext(context);
   vm.runInContext(CODE_GS, context);
-  return { cache, context: context as unknown as Record<string, (...args: unknown[]) => unknown>, sent };
+  return { cache, context: context as unknown as Record<string, (...args: unknown[]) => unknown>, logs, sent };
+}
+
+/** Apps Script errors print as "Exception: <message>". */
+function appsScriptException(message: string) {
+  return Object.assign(new Error(message), { name: "Exception" });
 }
 
 const NOW = new Date("2026-10-18T12:35:00Z"); // 19:35 in Vietnam
@@ -239,6 +251,17 @@ describe("Apps Script grading form (Code.gs)", () => {
     expect(JSON.parse(sent[0].body ?? "{}")).toMatchObject({ classOption: "Khác", classOptionOther: "Lớp cô Hương", fullName: "Trần Thị Mai", studentCode: null });
   });
 
+  // Value: protects=question 6 "Khác" (restored from the original form) keeps the typed text in column N, which stays Sheet-only; fails_when=N falls back to the old bare "Other" or the text leaks into the ERP payload; why_new=the phase 1 form had dropped the option; seam=none; no_claim=the HTML radio rendering (FormHocSinh.html has no DOM test)
+  it("writes question 6 'Khác' with the typed text in column N and keeps it out of the ERP payload", () => {
+    const { context, sent } = loadScript({ data, now: NOW, respond: erpAccepts });
+    context.processForm({ buoiHoc: "Con không rõ", hocThuAnh: "Other", hocThuAnhKhac: " Để con hỏi bố mẹ ", hoTen: "CHUA_CO_TEN", hoTenManual: "Trần Thị Mai", linkBaiThi: "x", namSinh: "2015", files: [] });
+    context.processForm({ buoiHoc: "Con không rõ", hocThuAnh: "Có ạ! Con cảm ơn thầy", hoTen: "CHUA_CO_TEN", hoTenManual: "Lê Hoa", linkBaiThi: "y", namSinh: "2015", files: [] });
+
+    expect(data.rows[2][13]).toBe("Khác: Để con hỏi bố mẹ");
+    expect(data.rows[3][13]).toBe("Có ạ! Con cảm ơn thầy");
+    expect(sent[0].body).not.toContain("Để con hỏi bố mẹ");
+  });
+
   it("still accepts the submission when the ERP is down, and the trigger resends only unsent new rows", () => {
     let erpUp = false;
     const { cache, context, sent } = loadScript({ data, now: NOW, respond: (request) => (erpUp ? erpAccepts(request) : { body: { ok: false }, status: 503 }) });
@@ -313,7 +336,11 @@ describe("Apps Script grading form (Code.gs)", () => {
   it("signs roster requests the ERP accepts and falls back to the DanhSachHocSinh tab when the ERP fails", () => {
     const up = loadScript({ data, now: NOW, respond: erpAccepts });
     expect(up.context.getBirthYears()).toEqual([2014]);
-    expect(up.context.getStudentsByBirthYear("2014")).toMatchObject({ source: "erp", students: [{ code: "TV-2026-00001", sessions: [{ id: SESSION_ID }] }] });
+    // Vietnamese names and the "–" in session labels survive the trip (UTF-8 read, not Latin-1).
+    expect(up.context.getStudentsByBirthYear("2014")).toMatchObject({
+      source: "erp",
+      students: [{ code: "TV-2026-00001", fullName: "Nguyễn Minh Anh", sessions: [{ id: SESSION_ID, label: "7CLC1 · 18:00–19:30" }] }],
+    });
 
     const down = loadScript({ data, now: NOW, respond: () => ({ body: {}, status: 500 }) });
     expect(down.context.getStudentsByBirthYear(2014)).toEqual({
@@ -321,5 +348,30 @@ describe("Apps Script grading form (Code.gs)", () => {
       students: [{ code: "", fullName: "Lê Văn An", givenName: "An", label: "Lê Văn An", sessions: [] }],
     });
     expect(down.context.getBirthYears()).toContain(2008);
+  });
+
+  it("testErpConnection reports the address and why a call failed, not just HTTP 0", () => {
+    const ok = loadScript({ data, now: NOW, respond: erpAccepts });
+    ok.context.testErpConnection();
+    expect(ok.logs).toEqual([
+      "Địa chỉ ERP: https://erp.example",
+      "Danh sách năm sinh: HTTP 200 → [2014]",
+      "Webhook: HTTP 400 → chữ ký đúng",
+    ]);
+
+    const denied = loadScript({
+      data,
+      now: NOW,
+      respond: () => {
+        throw appsScriptException("You do not have permission to call UrlFetchApp.fetch. Required permissions: https://www.googleapis.com/auth/script.external_request");
+      },
+    });
+    denied.context.testErpConnection();
+    expect(denied.logs[1]).toMatch(/^Danh sách năm sinh: HTTP 0 \(lỗi\) → dự án chưa có quyền gọi ra ngoài: .*oauthScopes.*Chi tiết: Exception: You do not have permission/);
+    expect(denied.logs[2]).toMatch(/^Webhook: HTTP 0 → dự án chưa có quyền gọi ra ngoài/);
+
+    const badUrl = loadScript({ data, now: NOW, respond: () => { throw appsScriptException("DNS error: https://erp.example/api/integrations/grading-roster"); } });
+    badUrl.context.testErpConnection();
+    expect(badUrl.logs[1]).toBe("Danh sách năm sinh: HTTP 0 (lỗi) → Exception: DNS error: https://erp.example/api/integrations/grading-roster");
   });
 });
