@@ -1,6 +1,7 @@
+import type { BadgeTone } from "@/components/ui/badge";
 import { formatIsoDate } from "@/lib/datetime";
 
-import { type BatchScheduleOption, VIETNAMESE_SHORT_WEEKDAYS } from "./batch-calculation";
+import { type BatchScheduleOption, type ExistingSessionSnapshot, VIETNAMESE_SHORT_WEEKDAYS } from "./batch-calculation";
 import { type BatchSessionDraftItem, isValidDateString } from "./forms/session-batch-schema";
 
 /*
@@ -17,6 +18,8 @@ export const BATCH_MAX_SESSIONS_PER_REQUEST = 100;
 export const BATCH_MAX_SESSIONS_MESSAGE = `Mỗi đợt tạo tối đa ${BATCH_MAX_SESSIONS_PER_REQUEST} buổi học.`;
 /** The schema's `.min(1, …)` wording, reused when nothing is selected. */
 export const BATCH_MIN_SESSIONS_MESSAGE = "Cần chọn ít nhất 1 buổi học để tạo.";
+/** Why "Chọn tất cả" is disabled when every draft is blocked (all already exist, fall on a holiday or out of window). */
+export const BATCH_NOTHING_CHOOSABLE_MESSAGE = "Không còn buổi nào chọn được.";
 /** Newest non-cancelled sessions the loader reads for the client duplicate check: `.limit(300)` in batch-data.ts (pinned). */
 export const BATCH_DUPLICATE_CHECK_LIMIT = 300;
 
@@ -25,13 +28,14 @@ export const BATCH_DUPLICATE_CHECK_LIMIT = 300;
  * outside its template's effective window would make the RPC abort the whole
  * batch (CLASS_SESSION_SCHEDULE_NOT_EFFECTIVE); a holiday the user listed; a
  * session the class already has on that date/slot (non-cancelled, newest
- * BATCH_DUPLICATE_CHECK_LIMIT); a date before today (still created).
+ * BATCH_DUPLICATE_CHECK_LIMIT; the server skips it anyway); a date before
+ * today (still created).
  */
 export type BatchPreviewFlag = "outside_window" | "holiday" | "duplicate" | "past" | "none";
 
 /** The word each flag carries on its chip and row (state is never colour alone). */
 export const BATCH_PREVIEW_FLAG_WORDS: Readonly<Record<BatchPreviewFlag, string>> = {
-  duplicate: "đã có",
+  duplicate: "đã có (bỏ qua)",
   holiday: "nghỉ",
   none: "",
   outside_window: "ngoài hiệu lực",
@@ -41,7 +45,11 @@ export const BATCH_PREVIEW_FLAG_WORDS: Readonly<Record<BatchPreviewFlag, string>
 export interface BatchPreviewRow {
   draft: BatchSessionDraftItem;
   flag: BatchPreviewFlag;
-  /** Holiday and out-of-window drafts cannot be chosen until the holiday or the range changes. */
+  /**
+   * Holiday, duplicate and out-of-window drafts cannot be chosen until the
+   * holiday, the draft's time or the range changes; they are never sent nor
+   * counted against the cap.
+   */
   blocked: boolean;
   /** What the request carries: the draft's own tick, never for a blocked draft. */
   selected: boolean;
@@ -78,13 +86,52 @@ export function isDraftOutsideScheduleWindow(
   return draft.sessionDate < from || (to !== null && draft.sessionDate > to);
 }
 
-/** Flags every draft and resolves what the request will carry. Order and drafts are kept as given. */
+/**
+ * True when the class already has a non-cancelled session the server would
+ * skip this draft for — `createBatchSessionsAction`'s own rule, on the
+ * draft's current date, start time and template: same date and either the
+ * same template or the same start time (HH:MM).
+ */
+export function isDraftDuplicateOfExisting(
+  draft: Pick<BatchSessionDraftItem, "scheduleTemplateId" | "sessionDate" | "startTime">,
+  existingSessions: readonly ExistingSessionSnapshot[],
+): boolean {
+  return existingSessions.some((existing) => {
+    if (existing.sessionDate !== draft.sessionDate) return false;
+    if (draft.scheduleTemplateId && existing.scheduleTemplateId === draft.scheduleTemplateId) return true;
+    return existing.startTime.slice(0, 5) === draft.startTime.slice(0, 5);
+  });
+}
+
+/**
+ * Flags every draft and resolves what the request will carry. Order and
+ * drafts are kept as given. Duplicate and past are recomputed from the
+ * draft's current values (an edited start time can make or clear a
+ * duplicate), never read from the calculation's `statusConflict`.
+ */
 export function buildBatchPreviewRows(
   drafts: readonly BatchSessionDraftItem[],
-  { holidays, schedules }: { holidays: readonly string[]; schedules: readonly BatchScheduleOption[] },
+  {
+    existingSessions,
+    holidays,
+    schedules,
+    today,
+  }: {
+    existingSessions: readonly ExistingSessionSnapshot[];
+    holidays: readonly string[];
+    schedules: readonly BatchScheduleOption[];
+    /** Vietnam business date `YYYY-MM-DD`. */
+    today: string;
+  },
 ): BatchPreviewRow[] {
   const holidaySet = new Set(holidays);
   const schedulesById = new Map(schedules.map((schedule) => [schedule.id, schedule]));
+  const existingByDate = new Map<string, ExistingSessionSnapshot[]>();
+  for (const existing of existingSessions) {
+    const onDate = existingByDate.get(existing.sessionDate);
+    if (onDate) onDate.push(existing);
+    else existingByDate.set(existing.sessionDate, [existing]);
+  }
 
   return drafts.map((draft) => {
     const schedule = draft.scheduleTemplateId ? schedulesById.get(draft.scheduleTemplateId) : undefined;
@@ -92,14 +139,39 @@ export function buildBatchPreviewRows(
       ? "outside_window"
       : holidaySet.has(draft.sessionDate)
         ? "holiday"
-        : draft.statusConflict === "duplicate"
+        : isDraftDuplicateOfExisting(draft, existingByDate.get(draft.sessionDate) ?? [])
           ? "duplicate"
-          : draft.statusConflict === "past"
+          : draft.sessionDate < today
             ? "past"
             : "none";
-    const blocked = flag === "outside_window" || flag === "holiday";
+    const blocked = flag === "outside_window" || flag === "holiday" || flag === "duplicate";
     return { blocked, draft, flag, selected: draft.selected && !blocked };
   });
+}
+
+/** A chip's word as a badge label: same words, first letter capitalised. */
+function toBadgeLabel(word: string): string {
+  return word.charAt(0).toLocaleUpperCase("vi") + word.slice(1);
+}
+
+/** The editor badges reuse the chips' words (one wording per state); only the holiday badge says "Ngày nghỉ". */
+const DRAFT_ROW_STATUS: Readonly<Record<BatchPreviewFlag, { label: string; tone: BadgeTone }>> = {
+  duplicate: { label: toBadgeLabel(BATCH_PREVIEW_FLAG_WORDS.duplicate), tone: "warning" },
+  holiday: { label: "Ngày nghỉ", tone: "neutral" },
+  none: { label: "Sẽ tạo", tone: "success" },
+  outside_window: { label: toBadgeLabel(BATCH_PREVIEW_FLAG_WORDS.outside_window), tone: "danger" },
+  past: { label: toBadgeLabel(BATCH_PREVIEW_FLAG_WORDS.past), tone: "neutral" },
+};
+
+/** The status badge of a row in "Chỉnh từng buổi" (a plain draft unticked by hand reads "Bỏ chọn"). */
+export function getBatchDraftRowStatus(row: Pick<BatchPreviewRow, "flag" | "selected">): { label: string; tone: BadgeTone } {
+  if (row.flag === "none" && !row.selected) return { label: "Bỏ chọn", tone: "neutral" };
+  return DRAFT_ROW_STATUS[row.flag];
+}
+
+/** True when two rows render the same (the draft object, its flag and its effective tick). */
+export function isSameBatchPreviewRow(a: BatchPreviewRow, b: BatchPreviewRow): boolean {
+  return a.draft === b.draft && a.flag === b.flag && a.selected === b.selected && a.blocked === b.blocked;
 }
 
 export function summarizeBatchPreview(rows: readonly BatchPreviewRow[], holidays: readonly string[]): BatchPreviewSummary {
@@ -137,8 +209,9 @@ export function getSelectedBatchDrafts(rows: readonly BatchPreviewRow[]): BatchS
 
 /**
  * "Chọn tất cả" when any choosable draft is unticked, else "Bỏ chọn tất cả":
- * sets every choosable draft at once. Blocked drafts keep their own tick so
- * removing a holiday restores what the user had.
+ * sets every choosable draft at once. Blocked drafts (holiday, duplicate,
+ * out of window) keep their own tick so removing a holiday restores what the
+ * user had.
  */
 export function toggleAllChoosableDrafts(
   drafts: readonly BatchSessionDraftItem[],

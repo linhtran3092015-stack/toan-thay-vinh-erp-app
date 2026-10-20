@@ -1,4 +1,4 @@
-// Value: protects=the /dev/forms class form and batch previews (design 17b) are inert and truthful per role: every class/batch write the components can reach has a stub (checked against the components' own imports), saving or creating answers "Bản xem trước không ghi dữ liệu." without calling a real action, refreshing or navigating, the batch class switch swaps fixtures instead of replacing the URL, no preview link points into a live write route (/students/new, /classes/new, /sessions/batch, /imports/*), the TA and the viewer meet the routes' own denials (class: classes.create on create, classes.view on edit; batch: classes.view for the TA, sessions.manage for the viewer), and each state shows what it names (no-year, error, holidays, capped, empty) on the fixed clock;
+// Value: protects=the /dev/forms class form and batch previews (design 17b) are inert and truthful per role: every class/batch write the components can reach has a stub (checked against the components' own imports), saving or creating answers "Bản xem trước không ghi dữ liệu." without calling a real action, refreshing or navigating, the batch class switch swaps fixtures instead of replacing the URL, no preview link points into a live write route (/students/new, any /classes page — the list, /classes/new, /classes/academic-years, a class and its edit page —, /sessions/batch, /imports/*) and every class form link stays under /dev, the TA and the viewer meet the routes' own denials (class: classes.create on create, classes.view on edit; batch: classes.view for the TA, sessions.manage for the viewer), and each state shows what it names (no-year, error, holidays, capped, empty) on the fixed clock;
 // fails_when=a new action is imported by the form or the workspace without a stub, a stub calls through, a preview pushes/replaces/refreshes, a fixture link reaches a live write route, a denial's copy drifts from the route's, or a state stops showing its case (e.g. holidays stop unticking, the cap stops disabling the primary);
 // why_new=step 15a replaces the class and batch preview placeholders of /dev/forms;
 // seam=the class and session-batch action modules are mocked so any real call is observable; next/navigation offers useRouter with push/replace/refresh; bodies render without the AppShell (the controller wraps them); no_claim=the /dev/forms page wiring and production 404 (dev-forms-page.test.tsx), the real actions
@@ -34,7 +34,8 @@ vi.mock("@/features/sessions/actions/session-batch-actions", () => ({
 }));
 
 const STUB = "Bản xem trước không ghi dữ liệu.";
-const LIVE_WRITE_ROUTES = /^\/(students\/new|classes\/new|sessions\/batch|imports)(\/|\?|$)/;
+// /classes covers the list, /classes/new, /classes/academic-years, /classes/{id} and its edit page: all reach writes.
+const LIVE_WRITE_ROUTES = /^\/(students\/new|classes|sessions\/batch|imports)(\/|\?|$)/;
 
 afterEach(() => {
   cleanup();
@@ -53,6 +54,14 @@ function expectNothingReal() {
 function expectNoLiveWriteLinks(container: HTMLElement) {
   const hrefs = Array.from(container.querySelectorAll("a[href]")).map((link) => link.getAttribute("href")!);
   expect(hrefs.filter((href) => LIVE_WRITE_ROUTES.test(href))).toEqual([]);
+  return hrefs;
+}
+
+/** The class form preview links only to /dev pages (and returns its links). */
+function expectOnlyDevLinks(container: HTMLElement) {
+  const hrefs = expectNoLiveWriteLinks(container);
+  expect(hrefs.filter((href) => !href.startsWith("/dev/"))).toEqual([]);
+  return hrefs;
 }
 
 /** Value names a source file imports from a module (type-only imports excluded). */
@@ -98,16 +107,20 @@ describe("/dev/forms class form preview", () => {
 
     await waitFor(() => expect(screen.getByText(STUB)).toBeInTheDocument());
     expectNothingReal();
-    expectNoLiveWriteLinks(container);
+    expect(expectOnlyDevLinks(container)).toEqual(["/dev/lists?view=classes", "/dev/lists?view=classes"]);
   });
 
   it("owner create states: no open year blocks the save; error shows the field error and the message", () => {
-    render(<ClassFormPreviewBody role="owner" state="no-year" view="class" />);
+    const noYear = render(<ClassFormPreviewBody role="owner" state="no-year" view="class" />);
     expect(screen.getByText("Chưa có năm học đang mở")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Lưu lớp (Nháp)" })).toBeDisabled();
+    // The warning's link goes to a /dev page, never the live /classes/academic-years.
+    expect(screen.getByRole("link", { name: "Đi tới quản lý năm học" })).toHaveAttribute("href", "/dev/lists?view=classes");
+    expectOnlyDevLinks(noYear.container);
     cleanup();
 
-    render(<ClassFormPreviewBody role="owner" state="error" view="class" />);
+    const error = render(<ClassFormPreviewBody role="owner" state="error" view="class" />);
+    expectOnlyDevLinks(error.container);
     expect(screen.getByLabelText("Mã lớp")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText("Mã lớp")).toHaveAccessibleDescription("Mã lớp chỉ gồm chữ in hoa, số và các dấu . _ -.");
     expect(screen.getByText("Vui lòng kiểm tra lại thông tin lớp học.")).toBeInTheDocument();
@@ -118,12 +131,15 @@ describe("/dev/forms class form preview", () => {
     const { container } = render(<ClassFormPreviewBody role="owner" state="clean" view="class-edit" />);
     expect(screen.getByRole("heading", { level: 1, name: "Chỉnh sửa lớp học" })).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Lịch tuần" })).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
-      "/classes/cls-preview",
+      "/dev/class?state=draft",
     ]);
-    expectNoLiveWriteLinks(container);
+    expect(screen.getByRole("link", { name: "Hủy" })).toHaveAttribute("href", "/dev/class?state=draft");
+    expect(screen.getByRole("link", { name: "Quay lại chi tiết lớp" })).toHaveAttribute("href", "/dev/class?state=draft");
+    expectOnlyDevLinks(container);
     cleanup();
 
-    render(<ClassFormPreviewBody role="owner" state="error" view="class-edit" />);
+    const error = render(<ClassFormPreviewBody role="owner" state="error" view="class-edit" />);
+    expectOnlyDevLinks(error.container);
     expect(screen.getByText("Không thể đổi năm học, mã lớp, khối hoặc trình độ sau khi lớp đã được sử dụng.")).toBeInTheDocument();
     expect((screen.getByLabelText("Khối") as HTMLSelectElement).value).toBe("7");
     fireEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
@@ -131,21 +147,24 @@ describe("/dev/forms class form preview", () => {
     expectNothingReal();
     cleanup();
 
-    render(<ClassFormPreviewBody role="owner" state="no-year" view="class-edit" />);
+    const closed = render(<ClassFormPreviewBody role="owner" state="no-year" view="class-edit" />);
     expect(screen.getByRole("heading", { name: CLASS_EDIT_YEAR_CLOSED.title })).toBeInTheDocument();
+    expectOnlyDevLinks(closed.container);
     expect(screen.getByText(CLASS_EDIT_YEAR_CLOSED.description)).toBeInTheDocument();
   });
 
   it.each(["ta", "viewer"] as const)("%s meets the routes' denials", (role) => {
-    render(<ClassFormPreviewBody role={role} state="clean" view="class" />);
+    const create = render(<ClassFormPreviewBody role={role} state="clean" view="class" />);
     expect(screen.getByRole("heading", { level: 1, name: CLASS_CREATE_DENIED.title })).toBeInTheDocument();
     expect(screen.getByText(CLASS_CREATE_DENIED.description)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Lưu lớp (Nháp)" })).not.toBeInTheDocument();
+    expectNoLiveWriteLinks(create.container);
     cleanup();
 
-    render(<ClassFormPreviewBody role={role} state="clean" view="class-edit" />);
+    const edit = render(<ClassFormPreviewBody role={role} state="clean" view="class-edit" />);
     expect(screen.getByRole("heading", { level: 1, name: CLASS_EDIT_VIEW_DENIED.title })).toBeInTheDocument();
     expect(screen.getByText(CLASS_EDIT_VIEW_DENIED.description)).toBeInTheDocument();
+    expectNoLiveWriteLinks(edit.container);
   });
 });
 
@@ -159,7 +178,8 @@ describe("/dev/forms batch preview", () => {
       "8 buổi sẽ tạo · 0 ngày nghỉ bỏ qua · 1 trùng buổi đã có (bỏ qua) · 1 buổi ngoài thời gian hiệu lực của lịch (bỏ qua)",
     );
     expect(screen.getByLabelText("Chọn buổi học ngày 23/10/2026")).toBeDisabled();
-    expect(screen.getByLabelText("Chọn buổi học ngày 03/11/2026").closest("label")).toHaveTextContent("đã có");
+    expect(screen.getByLabelText("Chọn buổi học ngày 03/11/2026").closest("label")).toHaveTextContent("đã có (bỏ qua)");
+    expect(screen.getByLabelText("Chọn buổi học ngày 03/11/2026")).toBeDisabled();
     expect(screen.getByText("Đã có 9 buổi")).toBeInTheDocument();
     expectNoLiveWriteLinks(container);
 
@@ -167,6 +187,19 @@ describe("/dev/forms batch preview", () => {
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Xác nhận tạo" }));
     await waitFor(() => expect(screen.getByText(STUB)).toBeInTheDocument());
     expectNothingReal();
+  });
+
+  // Value (extension, review M1 and cycle-2 RT2-1 of step 15a): protects=a re-render of the preview keeps the per-session edits although the preview rebuilds its fixture arrays on every render (as a router.refresh() hands the route's props over again): the workspace resyncs its drafts on the calculation's content, never on its props' identity;
+  // fails_when=the workspace resyncs on the identity of its classes/schedules/existing sessions (every parent re-render wipes "Chỉnh từng buổi" edits);
+  // why_new=cycle 2 found refreshes wiping the edits; seam=rerender with the same props (getPreviewBatchContext builds new arrays); no_claim=the route itself (batch-session-creation.test.tsx rerenders the workspace with cloned props)
+  it("keeps per-session edits when the preview re-renders", async () => {
+    const { rerender } = render(<BatchPreviewBody role="owner" state="default" view="batch" />);
+    fireEvent.click(screen.getByText("Chỉnh từng buổi").closest("details")!.querySelector("summary")!);
+    const names = await screen.findAllByLabelText("Tên hoặc ghi chú buổi học");
+    fireEvent.change(names[0], { target: { value: "Buổi mở đầu" } });
+
+    rerender(<BatchPreviewBody role="owner" state="default" view="batch" />);
+    expect(screen.getAllByLabelText("Tên hoặc ghi chú buổi học")[0]).toHaveValue("Buổi mở đầu");
   });
 
   it("switches class in place instead of navigating to the live route", () => {

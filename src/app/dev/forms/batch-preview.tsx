@@ -42,6 +42,8 @@ export function BatchPreviewBody({ role, state }: BatchFormsPreviewProps) {
 function BatchPreviewWorkspace({ state }: { state: BatchFormsPreviewProps["state"] }) {
   const preset = PREVIEW_BATCH_STATES[state];
   const [classId, setClassId] = useState(preset.classId);
+  // Rebuilt on every render, as a refresh hands the route's props over again: the workspace
+  // resyncs its drafts on the calculation's content, never on the props' identity.
   const context = getPreviewBatchContext(classId);
 
   return (

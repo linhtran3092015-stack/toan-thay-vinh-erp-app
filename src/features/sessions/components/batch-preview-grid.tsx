@@ -1,7 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { memo, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { formatIsoDate } from "@/lib/datetime";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 import {
   BATCH_DUPLICATE_CHECK_LIMIT,
+  BATCH_NOTHING_CHOOSABLE_MESSAGE,
   BATCH_PREVIEW_FLAG_WORDS,
   type BatchPreviewFlag,
   type BatchPreviewRow,
@@ -17,9 +18,11 @@ import {
   getBatchDraftCheckboxLabel,
   getDatesWithSeveralDrafts,
   hasUnselectedChoosableDraft,
+  isSameBatchPreviewRow,
 } from "../batch-preview-models";
 
 interface BatchPreviewGridProps {
+  /** Keep it stable (useCallback): every chip is memoized on it. */
   onToggle: (draftId: string) => void;
   onToggleAll: () => void;
   rows: readonly BatchPreviewRow[];
@@ -53,10 +56,12 @@ function columnCount(list: HTMLElement): number {
  * BatchPreviewGrid (design 17b): every draft of the batch as a chip that IS
  * its selection checkbox (`Chọn buổi học ngày dd/mm/yyyy`), 6 columns on a
  * wide card, 4 then 3 as it narrows. A chip states its condition in words
- * ("đã có", "đã qua", "nghỉ", "ngoài hiệu lực"); holiday and out-of-window
- * chips cannot be ticked. The grid is one tab stop: arrow keys, Home and End
- * move between chips, Space ticks. Above it, the summary of what the request
- * will carry; below it, the caption on the scope of the duplicate check.
+ * ("đã có (bỏ qua)", "đã qua", "nghỉ", "ngoài hiệu lực"); duplicate, holiday
+ * and out-of-window chips cannot be ticked. The grid is one tab stop: arrow
+ * keys, Home and End move between chips, Space ticks; a focus move re-renders
+ * only the two chips whose tab stop changed. Above it, the summary of what
+ * the request will carry; below it, the caption on the scope of the
+ * duplicate check.
  */
 export function BatchPreviewGrid({ onToggle, onToggleAll, rows, summary }: BatchPreviewGridProps) {
   const listRef = useRef<HTMLUListElement>(null);
@@ -64,10 +69,12 @@ export function BatchPreviewGrid({ onToggle, onToggleAll, rows, summary }: Batch
   const baseId = useId();
   const summaryId = `${baseId}-summary`;
   const hintId = `${baseId}-hint`;
-  const severalDraftDates = getDatesWithSeveralDrafts(rows);
-  const choosable = rows.filter((row) => !row.blocked);
+  const severalDraftDates = useMemo(() => getDatesWithSeveralDrafts(rows), [rows]);
+  const choosableIds = useMemo(() => new Set(rows.filter((row) => !row.blocked).map((row) => row.draft.id)), [rows]);
+  const firstChoosableId = useMemo(() => rows.find((row) => !row.blocked)?.draft.id ?? null, [rows]);
+  const canSelectMore = useMemo(() => hasUnselectedChoosableDraft(rows), [rows]);
   // One tab stop: the chip last focused while it can still be ticked, else the first choosable chip.
-  const tabStopId = choosable.some((row) => row.draft.id === focusedId) ? focusedId : (choosable[0]?.draft.id ?? null);
+  const tabStopId = focusedId !== null && choosableIds.has(focusedId) ? focusedId : firstChoosableId;
 
   function onKeyDown(event: KeyboardEvent<HTMLUListElement>) {
     const list = listRef.current;
@@ -134,8 +141,16 @@ export function BatchPreviewGrid({ onToggle, onToggleAll, rows, summary }: Batch
           </p>
         </div>
         {rows.length > 0 ? (
-          <Button onClick={onToggleAll} size="sm" variant="secondary">
-            {hasUnselectedChoosableDraft(rows) ? "Chọn tất cả" : "Bỏ chọn tất cả"}
+          // Every draft blocked (e.g. all created a moment ago): nothing to toggle, and it says why.
+          <Button
+            className="max-md:h-11"
+            disabled={firstChoosableId === null}
+            disabledReason={BATCH_NOTHING_CHOOSABLE_MESSAGE}
+            onClick={onToggleAll}
+            size="sm"
+            variant="secondary"
+          >
+            {canSelectMore || firstChoosableId === null ? "Chọn tất cả" : "Bỏ chọn tất cả"}
           </Button>
         ) : null}
       </div>
@@ -171,50 +186,17 @@ export function BatchPreviewGrid({ onToggle, onToggleAll, rows, summary }: Batch
             onKeyDown={onKeyDown}
             ref={listRef}
           >
-            {rows.map((row) => {
-              const { draft } = row;
-              const withTime = severalDraftDates.has(draft.sessionDate);
-              const word = BATCH_PREVIEW_FLAG_WORDS[row.flag];
-              const stateId = `${baseId}-${draft.id}-state`;
-              return (
-                <li className="min-w-0" key={draft.id}>
-                  <label
-                    className={cn(
-                      "flex min-h-11 flex-col items-center justify-center rounded-sm border px-1.5 py-1.5 text-center text-caption tabular-nums md:min-h-10",
-                      "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-border-focus",
-                      row.blocked ? "cursor-not-allowed" : "cursor-pointer hover:border-border-strong-hover",
-                      chipClassName(row),
-                    )}
-                    data-flag={row.flag}
-                    data-selected={row.selected}
-                  >
-                    <input
-                      aria-describedby={word ? stateId : undefined}
-                      aria-label={getBatchDraftCheckboxLabel(draft, { withTime })}
-                      checked={row.selected}
-                      className="sr-only"
-                      data-draft-id={draft.id}
-                      disabled={row.blocked}
-                      onChange={() => {
-                        if (!row.blocked) onToggle(draft.id);
-                      }}
-                      onFocus={() => setFocusedId(draft.id)}
-                      tabIndex={draft.id === tabStopId ? 0 : -1}
-                      type="checkbox"
-                    />
-                    <span className="flex items-center gap-1 whitespace-nowrap font-medium">
-                      {row.selected ? <Check aria-hidden="true" className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : null}
-                      <span className={cn(row.flag === "holiday" && "line-through")}>{formatBatchChipDate(draft)}</span>
-                    </span>
-                    {withTime || word ? (
-                      <span className="leading-4" id={word ? stateId : undefined}>
-                        {[withTime ? draft.startTime.slice(0, 5) : "", word].filter(Boolean).join(" · ")}
-                      </span>
-                    ) : null}
-                  </label>
-                </li>
-              );
-            })}
+            {rows.map((row) => (
+              <BatchPreviewChip
+                baseId={baseId}
+                isTabStop={row.draft.id === tabStopId}
+                key={row.draft.id}
+                onFocusChip={setFocusedId}
+                onToggle={onToggle}
+                row={row}
+                withTime={severalDraftDates.has(row.draft.sessionDate)}
+              />
+            ))}
           </ul>
         </div>
       )}
@@ -225,3 +207,71 @@ export function BatchPreviewGrid({ onToggle, onToggleAll, rows, summary }: Batch
     </div>
   );
 }
+
+interface BatchPreviewChipProps {
+  baseId: string;
+  isTabStop: boolean;
+  onFocusChip: (draftId: string) => void;
+  onToggle: (draftId: string) => void;
+  row: BatchPreviewRow;
+  withTime: boolean;
+}
+
+/**
+ * One chip: a label around its visually hidden checkbox. Memoized on what it
+ * renders (the draft object, its flag and tick, the tab stop), so a roving
+ * focus move or one toggle re-renders only the chips that changed, even
+ * though the workspace rebuilds every row object on each change.
+ */
+const BatchPreviewChip = memo(
+  function BatchPreviewChip({ baseId, isTabStop, onFocusChip, onToggle, row, withTime }: BatchPreviewChipProps) {
+    const { draft } = row;
+    const word = BATCH_PREVIEW_FLAG_WORDS[row.flag];
+    const stateId = `${baseId}-${draft.id}-state`;
+    return (
+      <li className="min-w-0">
+        <label
+          className={cn(
+            "flex min-h-11 flex-col items-center justify-center rounded-sm border px-1.5 py-1.5 text-center text-caption tabular-nums md:min-h-10",
+            "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-border-focus",
+            row.blocked ? "cursor-not-allowed" : "cursor-pointer hover:border-border-strong-hover",
+            chipClassName(row),
+          )}
+          data-flag={row.flag}
+          data-selected={row.selected}
+        >
+          <input
+            aria-describedby={word ? stateId : undefined}
+            aria-label={getBatchDraftCheckboxLabel(draft, { withTime })}
+            checked={row.selected}
+            className="sr-only"
+            data-draft-id={draft.id}
+            disabled={row.blocked}
+            onChange={() => {
+              if (!row.blocked) onToggle(draft.id);
+            }}
+            onFocus={() => onFocusChip(draft.id)}
+            tabIndex={isTabStop ? 0 : -1}
+            type="checkbox"
+          />
+          <span className="flex items-center gap-1 whitespace-nowrap font-medium">
+            {row.selected ? <Check aria-hidden="true" className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : null}
+            <span className={cn(row.flag === "holiday" && "line-through")}>{formatBatchChipDate(draft)}</span>
+          </span>
+          {withTime || word ? (
+            <span className="leading-4" id={word ? stateId : undefined}>
+              {[withTime ? draft.startTime.slice(0, 5) : "", word].filter(Boolean).join(" · ")}
+            </span>
+          ) : null}
+        </label>
+      </li>
+    );
+  },
+  (previous, next) =>
+    previous.baseId === next.baseId &&
+    previous.isTabStop === next.isTabStop &&
+    previous.onFocusChip === next.onFocusChip &&
+    previous.onToggle === next.onToggle &&
+    previous.withTime === next.withTime &&
+    isSameBatchPreviewRow(previous.row, next.row),
+);

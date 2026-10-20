@@ -3,8 +3,8 @@
 import { ArrowLeft, Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
-import { useState, useTransition } from "react";
+import type { FormEvent, MouseEvent } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { FormSection } from "@/components/patterns/form-with-toc";
 import { PageHeader } from "@/components/patterns/page-header";
@@ -15,6 +15,7 @@ import {
   createClassAction,
   updateClassAction,
 } from "@/features/classes/actions/class-actions";
+import { LeaveConfirmDialog, useLeaveGuard, useSaveInFlightGuard } from "@/features/settings/components/leave-guard";
 import type {
   ClassManagementActionState,
   ClassWriteFields,
@@ -35,15 +36,28 @@ interface ClassFormPageProps {
   academicYears: AcademicYearManagementItem[];
   classDetail?: ClassDetailReadModel;
   directoryQuery?: string;
+  /** The user holds sessions.manage: only then does step 4 link into /sessions/batch (edit route). */
+  canManageSessions?: boolean;
+  /** "Đi tới quản lý năm học" when no year is open; /dev previews pass a /dev page. */
+  academicYearsHref?: string;
+  /** Back link and "Hủy" (default: the class in edit, the list in create, with the directory query); /dev previews pass a /dev page. */
+  cancelHref?: string;
+  /** Step 3 "Thiết lập lịch tuần" in edit (default: the class with the directory query); /dev previews pass a /dev page. */
+  classPageHref?: string;
+  /** Step 4 "Tạo buổi hàng loạt" when it links (default: /sessions/batch for the class, without the class directory query). */
+  batchHref?: string;
   /** /dev preview seam: replaces the real server actions. */
   actions?: ClassFormActionOverrides;
   /** /dev preview and test seeding: a server answer already on screen. */
   initialActionState?: ClassManagementActionState;
-  /** /dev preview and test seeding: an update reason already typed (edit only). */
+  /** /dev preview and test seeding: an update reason already typed (edit only); unsaved like a typed one. */
   initialReason?: string;
-  /** /dev preview and test seeding: values already typed over the defaults. */
+  /** /dev preview and test seeding: values already typed over the defaults; unsaved like typed ones. */
   initialValues?: Partial<ClassWriteFields>;
 }
+
+/** An in-form link click: asks before leaving while the form holds unsaved edits. */
+type LinkClickHandler = (event: MouseEvent<HTMLAnchorElement>, href: string) => void;
 
 const LEVEL_OPTIONS: ReadonlyArray<{ label: string; value: ClassLearningLevel }> = [
   { label: "A — Nâng cao", value: "A" },
@@ -55,6 +69,8 @@ const LEARNING_MODE_OPTIONS: readonly ClassLearningMode[] = ["offline", "online"
 
 const NO_OPEN_YEAR_REASON = "Cần có năm học đang mở để tạo lớp.";
 const MISSING_UPDATE_REASON = "Nhập lý do cập nhật để lưu thay đổi.";
+/** A rejected action (network, a deploy in between): said by the buttons, the typed values stay. */
+const CONNECTION_ERROR_MESSAGE = "Không thể kết nối tới hệ thống lưu lớp. Vui lòng thử lại.";
 
 function createInitialValues(
   academicYears: AcademicYearManagementItem[],
@@ -100,6 +116,25 @@ function withQuery(pathname: string, query: string): string {
   return query ? `${pathname}?${query}` : pathname;
 }
 
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/**
+ * Focuses the first control the server rejected, in page order (only server
+ * field errors set aria-invalid here), after scrolling it to the middle of
+ * the viewport; false when no rejected control is on the page.
+ */
+function focusFirstRejectedControl(form: HTMLFormElement | null): boolean {
+  const control = form?.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled)');
+  if (!control) return false;
+  if (typeof control.scrollIntoView === "function") {
+    control.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "center" });
+  }
+  control.focus({ preventScroll: true });
+  return true;
+}
+
 /**
  * /classes/new and /classes/[classId]/edit (design 17b, left panel without
  * the weekly-schedule editor): "Thông tin lớp" in a 6-column grid, a "Lịch
@@ -108,11 +143,29 @@ function withQuery(pathname: string, query: string): string {
  * then one inline action row: "Hủy" back where the user came from and the
  * page's only primary. Server field errors sit under their control
  * (aria-invalid + aria-describedby); the server message sits by the buttons.
+ *
+ * While a save runs every control is disabled, which drops focus to <body>.
+ * When the save ends without leaving the page: server field errors focus the
+ * first rejected control in page order; otherwise, if focus is still on
+ * <body>, it goes back to the control the save started from (a field on
+ * Enter, or the primary), or to the message by the buttons when that control
+ * is gone or disabled. Focus the user moved elsewhere meanwhile stays put.
+ *
+ * Leave guard (as on the student form): while a value differs from the class
+ * as the page opened it (or today's defaults) or a reason is typed, reload/close warns and the
+ * page's own links (back, "Hủy", the no-year warning, the next steps) ask
+ * before leaving; new-tab clicks pass through. While a save runs those links
+ * wait for it, since the save navigates on its own.
  */
 export function ClassFormPage({
   academicYears,
   classDetail,
   directoryQuery = "",
+  canManageSessions = false,
+  academicYearsHref = "/classes/academic-years",
+  cancelHref,
+  classPageHref,
+  batchHref,
   actions,
   initialActionState,
   initialReason = "",
@@ -125,13 +178,16 @@ export function ClassFormPage({
   const [isPending, startTransition] =
     useTransition();
 
+  // What the leave guard compares against, read once at mount like the form's own values: a
+  // refresh that brings a colleague's edit of the class must not make an untouched form dirty.
+  const [savedValues] = useState<ClassWriteFields>(() =>
+    createInitialValues(academicYears, classDetail),
+  );
+
   const [values, setValues] = useState<
     ClassWriteFields
   >(() => ({
-    ...createInitialValues(
-      academicYears,
-      classDetail,
-    ),
+    ...savedValues,
     ...initialValues,
   }));
 
@@ -141,6 +197,31 @@ export function ClassFormPage({
     );
 
   const [reason, setReason] = useState(initialReason);
+  const [leaveHref, setLeaveHref] = useState<string | null>(null);
+
+  const formRef = useRef<HTMLFormElement>(null);
+  /** Focusable wrapper of the message by the buttons: where focus goes when the control it left is gone or disabled. */
+  const messageRef = useRef<HTMLDivElement>(null);
+  /** The control inside the form that had focus when the save started (a field on Enter, or the primary). */
+  const focusBeforeSave = useRef<HTMLElement | null>(null);
+  /** The answer of a save that ended on this page; focus follows it once the form is enabled again. */
+  const unsavedResult = useRef<ClassManagementActionState | null>(null);
+
+  // Runs after the commit that re-enables the controls and renders the answer (aria-invalid, the message).
+  useEffect(() => {
+    const result = unsavedResult.current;
+    if (isPending || !result || actionState !== result) return;
+    const before = focusBeforeSave.current;
+    unsavedResult.current = null;
+    focusBeforeSave.current = null;
+    if (result.fieldErrors && focusFirstRejectedControl(formRef.current)) return;
+    if (document.activeElement !== null && document.activeElement !== document.body) return;
+    if (before?.isConnected && !before.matches(":disabled")) {
+      before.focus();
+    } else {
+      messageRef.current?.focus();
+    }
+  }, [actionState, isPending]);
 
   const getFieldError = (
     fieldName: string,
@@ -163,16 +244,28 @@ export function ClassFormPage({
     event: FormEvent<HTMLFormElement>,
   ): void => {
     event.preventDefault();
+    const active = document.activeElement;
+    focusBeforeSave.current =
+      active instanceof HTMLElement && event.currentTarget.contains(active) ? active : null;
+    unsavedResult.current = null;
 
     startTransition(async () => {
-      const result = classDetail
-        ? await updateClass({
-            ...values,
-            classId: classDetail.id,
-            reason,
-          })
-        : await createClass(values);
+      let result: ClassManagementActionState;
+      try {
+        result = classDetail
+          ? await updateClass({
+              ...values,
+              classId: classDetail.id,
+              reason,
+            })
+          : await createClass(values);
+      } catch {
+        // Without this the rejection reaches the error boundary and the typed form is lost.
+        result = { message: CONNECTION_ERROR_MESSAGE, status: "error" };
+      }
 
+      // Focus follows an answer that keeps the user on this page (the effect above).
+      unsavedResult.current = result.status === "success" && result.redirectTo ? null : result;
       setActionState(result);
 
       if (
@@ -185,11 +278,34 @@ export function ClassFormPage({
     });
   };
 
+  // Seeded values (/dev preview) count as typed, as on the student form.
+  const isDirty =
+    reason.length > 0 ||
+    (Object.keys(savedValues) as Array<keyof ClassWriteFields>).some((key) => values[key] !== savedValues[key]);
+
+  useLeaveGuard(isDirty && !isPending);
+  useSaveInFlightGuard(isPending);
+
+  /** Plain left clicks on in-form links ask first while there are unsaved edits; new-tab clicks pass through. */
+  const onGuardedLinkClick: LinkClickHandler = (event, href) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    if (isPending) {
+      // Leaving mid-save would let the save navigate afterwards; wait for it.
+      event.preventDefault();
+      return;
+    }
+    if (!isDirty) return;
+    event.preventDefault();
+    setLeaveHref(href);
+  };
+
   const hasAcademicYears =
     academicYears.length > 0;
-  const backHref = classDetail
+  const backHref = cancelHref ?? (classDetail
     ? withQuery(`/classes/${classDetail.id}`, directoryQuery)
-    : withQuery("/classes", directoryQuery);
+    : withQuery("/classes", directoryQuery));
   const saveBlockReason = !hasAcademicYears && !classDetail
     ? NO_OPEN_YEAR_REASON
     : classDetail && reason.trim().length === 0
@@ -200,7 +316,11 @@ export function ClassFormPage({
     <div className="mx-auto grid w-full min-w-0 max-w-5xl gap-5">
       <PageHeader
         actions={
-          <Link className={getButtonClassName({ variant: "ghost" })} href={backHref}>
+          <Link
+            className={getButtonClassName({ className: "max-md:h-11", variant: "ghost" })}
+            href={backHref}
+            onClick={(event) => onGuardedLinkClick(event, backHref)}
+          >
             <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.8} />
             {classDetail ? "Quay lại chi tiết lớp" : "Quay lại danh sách lớp"}
           </Link>
@@ -216,14 +336,23 @@ export function ClassFormPage({
 
       {!hasAcademicYears && !classDetail ? (
         <ResultBanner
-          action={<Link href="/classes/academic-years">Đi tới quản lý năm học</Link>}
+          action={
+            // 44px target below md; inline text from md.
+            <Link
+              className="inline-flex min-h-11 items-center md:min-h-0"
+              href={academicYearsHref}
+              onClick={(event) => onGuardedLinkClick(event, academicYearsHref)}
+            >
+              Đi tới quản lý năm học
+            </Link>
+          }
           description="Cần tạo hoặc kích hoạt năm học trước khi tạo lớp."
           title="Chưa có năm học đang mở"
           tone="warning"
         />
       ) : null}
 
-      <form className="grid min-w-0 gap-5" onSubmit={handleSubmit}>
+      <form className="grid min-w-0 gap-5" onSubmit={handleSubmit} ref={formRef}>
         <FormSection id="thong-tin" title="Thông tin lớp">
           <div className="grid items-start gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-6">
             <Field className="sm:col-span-2 lg:col-span-4" error={getFieldError("name")} label="Tên lớp" required>
@@ -256,7 +385,7 @@ export function ClassFormPage({
               )}
             </Field>
 
-            <Field className="lg:col-span-2" error={getFieldError("academicYearId")} label="Năm học" required>
+            <Field className="lg:col-span-3" error={getFieldError("academicYearId")} label="Năm học" required>
               {(control) => (
                 <Select
                   {...control}
@@ -292,7 +421,7 @@ export function ClassFormPage({
               )}
             </Field>
 
-            <Field className="lg:col-span-1" error={getFieldError("level")} label="Trình độ">
+            <Field className="lg:col-span-2" error={getFieldError("level")} label="Trình độ">
               {(control) => (
                 <Select
                   {...control}
@@ -309,7 +438,7 @@ export function ClassFormPage({
               )}
             </Field>
 
-            <Field className="lg:col-span-2" error={getFieldError("defaultLearningMode")} label="Hình thức mặc định">
+            <Field className="lg:col-span-3" error={getFieldError("defaultLearningMode")} label="Hình thức mặc định">
               {(control) => (
                 <Select
                   {...control}
@@ -327,7 +456,7 @@ export function ClassFormPage({
             </Field>
 
             <Field
-              className="lg:col-span-2"
+              className="lg:col-span-3"
               error={getFieldError("weeklySessionCount")}
               hint="Giới hạn số dòng lịch tuần đang hiệu lực"
               label="Số buổi mỗi tuần"
@@ -377,7 +506,14 @@ export function ClassFormPage({
           </div>
         </FormSection>
 
-        <ClassScheduleNextSteps classDetail={classDetail} directoryQuery={directoryQuery} />
+        <ClassScheduleNextSteps
+          batchHref={batchHref}
+          canManageSessions={canManageSessions}
+          classDetail={classDetail}
+          classPageHref={classPageHref}
+          directoryQuery={directoryQuery}
+          onLinkClick={onGuardedLinkClick}
+        />
 
         {classDetail ? (
           <FormSection
@@ -404,17 +540,28 @@ export function ClassFormPage({
 
         <div className="grid gap-3">
           {actionState.message ? (
-            <ResultBanner
-              title={actionState.message}
-              tone={actionState.status === "error" ? "error" : "success"}
-            />
+            <div
+              className="rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+              ref={messageRef}
+              tabIndex={-1}
+            >
+              <ResultBanner
+                title={actionState.message}
+                tone={actionState.status === "error" ? "error" : "success"}
+              />
+            </div>
           ) : null}
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-start sm:justify-end">
-            <Link className={getButtonClassName({ variant: "secondary" })} href={backHref}>
+            <Link
+              className={getButtonClassName({ className: "max-md:h-11", variant: "secondary" })}
+              href={backHref}
+              onClick={(event) => onGuardedLinkClick(event, backHref)}
+            >
               Hủy
             </Link>
             <Button
+              className="max-md:h-11"
               disabled={isPending || saveBlockReason !== null}
               disabledReason={saveBlockReason ?? undefined}
               isLoading={isPending}
@@ -425,6 +572,16 @@ export function ClassFormPage({
           </div>
         </div>
       </form>
+
+      <LeaveConfirmDialog
+        isOpen={leaveHref !== null}
+        onLeave={() => {
+          const href = leaveHref;
+          setLeaveHref(null);
+          if (href) router.push(href);
+        }}
+        onStay={() => setLeaveHref(null)}
+      />
     </div>
   );
 }
@@ -441,41 +598,67 @@ const NEXT_STEPS = [
  * new class is a draft; a weekly slot needs an active class and starts from
  * today), so the section says where it is set up instead of offering an
  * editor. In edit, the steps the class has passed say so, step 3 links to
- * the class page and step 4 to the batch tool once the class is active (the
- * tool only lists active classes).
+ * the class page, and step 4 links to the batch tool under the class detail
+ * page's own rule: an active class, not a composite parent, and a user with
+ * sessions.manage (the tool only lists active classes and its route denies
+ * everyone else). A composite parent ("lớp ghép") holds neither schedules nor
+ * sessions — the database rejects both — so steps 3 and 4 stay plain text
+ * and the section says they belong to the component classes.
  */
 function ClassScheduleNextSteps({
+  batchHref,
+  canManageSessions,
   classDetail,
+  classPageHref,
   directoryQuery,
+  onLinkClick,
 }: {
+  batchHref?: string;
+  canManageSessions: boolean;
   classDetail?: ClassDetailReadModel;
+  classPageHref?: string;
   directoryQuery: string;
+  onLinkClick: LinkClickHandler;
 }) {
   const isActive = classDetail?.status === "active";
+  const components = classDetail?.componentClasses ?? [];
+  const isCompositeParent = components.length > 0;
   const done = [Boolean(classDetail), isActive, false, false];
   const links: ReadonlyArray<string | null> = [
     null,
     null,
-    classDetail ? withQuery(`/classes/${classDetail.id}`, directoryQuery) : null,
-    classDetail && isActive ? `/sessions/batch?classId=${classDetail.id}` : null,
+    classDetail && !isCompositeParent
+      ? (classPageHref ?? withQuery(`/classes/${classDetail.id}`, directoryQuery))
+      : null,
+    classDetail && isActive && !isCompositeParent && canManageSessions
+      ? // The batch tool reads the session directory's params, never the class directory's.
+        (batchHref ?? `/sessions/batch?classId=${classDetail.id}`)
+      : null,
   ];
 
   return (
     <FormSection id="lich-tuan" title="Lịch tuần">
       <div className="grid gap-4">
-        <p className="text-body text-text-default">
-          Lịch tuần được thiết lập trên trang lớp sau khi kích hoạt lớp.
-          {classDetail
-            ? ` Hiện lớp có ${classDetail.activeScheduleCount} dòng lịch tuần đang hiệu lực.`
-            : null}
-        </p>
+        {isCompositeParent ? (
+          <p className="text-body text-text-default">
+            Lớp ghép không có lịch riêng. Lịch tuần và buổi học thuộc các lớp thành phần:{" "}
+            {components.map((component) => component.code).join(", ")}.
+          </p>
+        ) : (
+          <p className="text-body text-text-default">
+            Lịch tuần được thiết lập trên trang lớp sau khi kích hoạt lớp.
+            {classDetail
+              ? ` Hiện lớp có ${classDetail.activeScheduleCount} dòng lịch tuần đang hiệu lực.`
+              : null}
+          </p>
+        )}
         <ol aria-label="Các bước tiếp theo" className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2 lg:grid-cols-4">
           {NEXT_STEPS.map((label, index) => {
             const href = links[index];
             return (
               <li
                 className={cn(
-                  "flex min-h-11 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border px-3 py-2 text-body",
+                  "flex min-h-11 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border px-3 text-body",
                   done[index]
                     ? "border-success-border bg-success-bg text-success-ink"
                     : "border-border-subtle bg-surface-sunken text-text-default",
@@ -484,14 +667,19 @@ function ClassScheduleNextSteps({
               >
                 <span className="tabular-nums">{index + 1}.</span>
                 {href ? (
-                  <Link className="font-semibold text-action-link hover:underline" href={href}>
+                  // The whole rest of the row is the link: a 44px target on every width.
+                  <Link
+                    className="flex min-h-11 flex-1 items-center font-semibold text-action-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+                    href={href}
+                    onClick={(event) => onLinkClick(event, href)}
+                  >
                     {label}
                   </Link>
                 ) : (
-                  <span>{label}</span>
+                  <span className="py-2">{label}</span>
                 )}
                 {done[index] ? (
-                  <span className="inline-flex items-center gap-1 text-caption font-medium">
+                  <span className="inline-flex items-center gap-1 py-2 text-caption font-medium">
                     <Check aria-hidden="true" size={14} strokeWidth={2.5} />
                     đã xong
                   </span>

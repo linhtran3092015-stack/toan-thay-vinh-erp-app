@@ -141,7 +141,7 @@ const existingByClass: Record<string, ExistingSessionSnapshot[]> = {
   ),
   "cls-6b1": [
     ...tuesdays6b1.map((date) => session(date, "17:30", "19:30", "tpl-6b1-tue")),
-    // Created ahead of time: the batch shows these Tuesdays as "đã có".
+    // Created ahead of time: the batch shows these Tuesdays as "đã có (bỏ qua)" (badge "Đã có (bỏ qua)").
     session("2026-11-03", "17:30", "19:30", "tpl-6b1-tue"),
     session("2026-12-08", "17:30", "19:30", "tpl-6b1-tue"),
   ],

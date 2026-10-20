@@ -163,6 +163,7 @@ export default async function EditClassRoute({
   return (
     <ClassFormPage
       academicYears={openAcademicYears}
+      canManageSessions={permissionResult.permissions.includes("sessions.manage")}
       classDetail={detailResult.detail}
       directoryQuery={directoryQuery}
     />

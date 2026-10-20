@@ -8,8 +8,6 @@ import { ClassFormPreviewBody } from "./class-form-preview";
 import { FORMS_PREVIEW_PATHNAMES, getFormsPreviewPermissions, type FormsPreviewParams, type FormsPreviewRole } from "./forms-preview-params";
 import { StudentFormPreviewBody } from "./student-form-preview";
 
-export type { FormsPreviewRole, FormsPreviewState, FormsPreviewView } from "./forms-preview-params";
-
 // Fixed shell users, one per preview role.
 const previewShellUsers: Record<FormsPreviewRole, AuthUser> = {
   owner: { displayName: "Nguyễn Văn Vinh", email: "vinh@example.com", id: "dev-user", initials: "NV" },

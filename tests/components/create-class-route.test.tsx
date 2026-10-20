@@ -2,9 +2,11 @@
 // fails_when=a gate is dropped or reordered, its copy drifts from class-form-route-copy.ts, closed/archived years reach the form, array params leak into the directory query, or the years load before the permission gates pass;
 // why_new=step 15a restyles the class form and adds a /dev preview that shows these denials; no route test existed;
 // seam=getCachedDatabasePermissions, getAcademicYearManagementData, getClassDetail and ClassFormPage are mocked at module boundaries; the returned element's type and props are inspected; no_claim=the loaders' queries or that ClassFormPage honours the props (class-form-page.test.tsx)
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ComponentProps, ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import CreateClassLoading from "@/app/(app)/classes/new/loading";
 import CreateClassRoute from "@/app/(app)/classes/new/page";
 import EditClassRoute from "@/app/(app)/classes/[classId]/edit/page";
 import { ErrorState } from "@/components/shared/error-state";
@@ -56,6 +58,7 @@ async function renderCreate(
 }
 
 afterEach(() => {
+  cleanup();
   vi.clearAllMocks();
 });
 
@@ -85,6 +88,20 @@ describe("/classes/new route", () => {
     expect(dependencies.getAcademicYearManagementData).not.toHaveBeenCalled();
   });
 
+  // Value (extension, review T2 of step 15a): protects=/classes/new's loading file announces "Đang tải biểu mẫu tạo lớp" as its only status, and its pulsing skeleton is hidden from assistive tech;
+  // fails_when=the LoadingNotice is dropped or renamed, a second status appears, or the skeleton loses aria-hidden (a screen reader walks empty boxes);
+  // why_new=the loading file was added in step 15a without a test; seam=none; no_claim=the skeleton's geometry matching the form
+  it("its loading state announces one status and hides the pulsing skeleton", () => {
+    const { container } = render(<CreateClassLoading />);
+
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(screen.getByRole("status")).toHaveTextContent("Đang tải biểu mẫu tạo lớp");
+    const skeleton = container.querySelector('[class*="animate-pulse"]');
+    expect(skeleton).not.toBeNull();
+    expect(skeleton).toHaveAttribute("aria-hidden", "true");
+    expect(skeleton!.closest('[role="status"]')).toBeNull();
+  });
+
   it("states a year-loading error in the frame", async () => {
     const element = await renderCreate({}, { yearsResult: { error: { code: "academic_years_query_failed", message: "Không tải được danh sách năm học." }, ok: false } });
     expect(element.type).toBe(ErrorState);
@@ -95,15 +112,31 @@ describe("/classes/new route", () => {
 describe("/classes/[classId]/edit route copy reused by the preview", () => {
   const classId = "33333333-3333-4333-8333-333333333333";
 
-  async function renderEdit(permissions: string[], detailYearStatus = "active") {
+  async function renderEdit(permissions: string[], detailYearStatus = "active", params: Record<string, string | string[] | undefined> = {}) {
     dependencies.getCachedDatabasePermissions.mockResolvedValue({ ok: true, permissions });
     dependencies.getClassDetail.mockResolvedValue({
       detail: { academicYear: year("y-x", detailYearStatus), id: classId, status: "active" },
       ok: true,
     });
     dependencies.getAcademicYearManagementData.mockResolvedValue({ academicYears: [year("y-x", detailYearStatus)], ok: true });
-    return (await EditClassRoute({ params: Promise.resolve({ classId }), searchParams: Promise.resolve({}) })) as ReactElement<Record<string, unknown>>;
+    return (await EditClassRoute({ params: Promise.resolve({ classId }), searchParams: Promise.resolve(params) })) as ReactElement<Record<string, unknown>>;
   }
+
+  // Value (extension, review C1 of step 15a): protects=the edit route tells the form whether the user holds sessions.manage, so "Tạo buổi hàng loạt" links into /sessions/batch only for users the batch route lets in; the form gets the class, its open years and the class-directory query;
+  // fails_when=the route stops passing canManageSessions (no one gets the link) or passes it without the permission (a TA meets the batch route's denial);
+  // why_new=step 4's link was not gated on the permission; seam=ClassFormPage is mocked and its props inspected; no_claim=that the form honours the flag (class-form-page.test.tsx)
+  it("passes whether the user may create sessions", async () => {
+    const withManage = (await renderEdit(["classes.view", "classes.create", "sessions.manage"], "active", { page: "2", status: "active" })) as unknown as ReactElement<
+      ComponentProps<typeof ClassFormPage>
+    >;
+    expect(withManage.type).toBe(dependencies.ClassFormPage);
+    expect(withManage.props).toMatchObject({ canManageSessions: true, directoryQuery: "status=active&page=2" });
+    expect(withManage.props.classDetail?.id).toBe(classId);
+
+    const without = (await renderEdit(["classes.view", "classes.create"])) as unknown as ReactElement<ComponentProps<typeof ClassFormPage>>;
+    expect(without.type).toBe(dependencies.ClassFormPage);
+    expect(without.props.canManageSessions).toBe(false);
+  });
 
   it("denies without classes.view first, and refuses a class whose year is closed", async () => {
     const noView = await renderEdit(["sessions.manage"]);

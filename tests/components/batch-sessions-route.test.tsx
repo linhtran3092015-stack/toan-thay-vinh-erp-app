@@ -2,9 +2,11 @@
 // fails_when=a gate is reordered/dropped or its copy drifts from session-batch-route-copy.ts, the key goes missing (state of the previous class carries over), `today` is computed in UTC or not passed, the classId fallback changes, or the loader is called for another class;
 // why_new=step 15a adds `key` and `today` to the route (B6) and the preview reuses its denials; no route test existed;
 // seam=getCachedDatabasePermissions, getBatchSessionCreationContext and the workspace are mocked at module boundaries; the returned element's type/key/props are inspected; the clock is faked; no_claim=the loader's queries (batch-data.ts) or that the workspace honours the props (batch-session-creation.test.tsx)
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ComponentProps, ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import BatchSessionsLoading from "@/app/(app)/sessions/batch/loading";
 import BatchSessionsRoute from "@/app/(app)/sessions/batch/page";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
@@ -51,6 +53,7 @@ async function renderRoute(
 }
 
 afterEach(() => {
+  cleanup();
   vi.clearAllMocks();
   vi.useRealTimers();
 });
@@ -122,5 +125,19 @@ describe("/sessions/batch route", () => {
       description: "Hiện tại không có lớp học nào đang hoạt động (active) để tạo buổi học.",
       title: "Chưa có lớp học hoạt động",
     });
+  });
+
+  // Value (extension, review T2 of step 15a): protects=/sessions/batch's loading file announces "Đang tải dữ liệu tạo buổi học hàng loạt" as its only status, and its pulsing skeleton (form cards and chip grid) is hidden from assistive tech;
+  // fails_when=the LoadingNotice is dropped or renamed, a second status appears, or the skeleton loses aria-hidden;
+  // why_new=the loading file was added in step 15a without a test; seam=none; no_claim=the skeleton's geometry matching the workspace
+  it("its loading state announces one status and hides the pulsing skeleton", () => {
+    const { container } = render(<BatchSessionsLoading />);
+
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(screen.getByRole("status")).toHaveTextContent("Đang tải dữ liệu tạo buổi học hàng loạt");
+    const skeleton = container.querySelector('[class*="animate-pulse"]');
+    expect(skeleton).not.toBeNull();
+    expect(skeleton).toHaveAttribute("aria-hidden", "true");
+    expect(skeleton!.closest('[role="status"]')).toBeNull();
   });
 });

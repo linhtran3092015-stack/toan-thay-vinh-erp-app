@@ -15,7 +15,7 @@ export default function CreateClassLoading() {
             <div className="h-5 w-32 rounded-sm bg-surface-sunken" />
           </div>
           <div className="grid gap-x-6 gap-y-4 p-5 sm:grid-cols-2 lg:grid-cols-6">
-            {["lg:col-span-4", "lg:col-span-2", "lg:col-span-2", "lg:col-span-1", "lg:col-span-1", "lg:col-span-2", "lg:col-span-2"].map(
+            {["sm:col-span-2 lg:col-span-4", "lg:col-span-2", "lg:col-span-3", "lg:col-span-1", "lg:col-span-2", "lg:col-span-3", "lg:col-span-3"].map(
               (span, index) => (
                 <div className={`grid gap-1.5 ${span}`} key={index}>
                   <div className="h-3.5 w-20 rounded-sm bg-surface-sunken" />
