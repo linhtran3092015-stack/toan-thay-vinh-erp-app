@@ -103,11 +103,12 @@ function vietnamParts(date: Date) {
 
 function loadScript({ data, now, respond }: { data: FakeSheet; now: Date; respond: (request: Sent) => { body: unknown; status: number } }) {
   const sent: Sent[] = [];
+  const logs: string[] = [];
   const cache = new Map<string, string>();
   const roster = new FakeSheet([["Năm sinh", "Họ tên", "Tên"], [2014, "Lê Văn An", "An"]]);
   const context = {
     CacheService: { getScriptCache: () => ({ get: (k: string) => cache.get(k) ?? null, put: (k: string, v: string) => cache.set(k, v) }) },
-    console: { log: () => {} },
+    console: { log: (line: string) => logs.push(line) },
     Date: class extends Date {
       constructor(value?: number | string | Date) {
         super(value ?? now.getTime());
@@ -164,7 +165,12 @@ function loadScript({ data, now, respond }: { data: FakeSheet; now: Date; respon
   };
   vm.createContext(context);
   vm.runInContext(CODE_GS, context);
-  return { cache, context: context as unknown as Record<string, (...args: unknown[]) => unknown>, sent };
+  return { cache, context: context as unknown as Record<string, (...args: unknown[]) => unknown>, logs, sent };
+}
+
+/** Apps Script errors print as "Exception: <message>". */
+function appsScriptException(message: string) {
+  return Object.assign(new Error(message), { name: "Exception" });
 }
 
 const NOW = new Date("2026-10-18T12:35:00Z"); // 19:35 in Vietnam
@@ -342,5 +348,30 @@ describe("Apps Script grading form (Code.gs)", () => {
       students: [{ code: "", fullName: "Lê Văn An", givenName: "An", label: "Lê Văn An", sessions: [] }],
     });
     expect(down.context.getBirthYears()).toContain(2008);
+  });
+
+  it("testErpConnection reports the address and why a call failed, not just HTTP 0", () => {
+    const ok = loadScript({ data, now: NOW, respond: erpAccepts });
+    ok.context.testErpConnection();
+    expect(ok.logs).toEqual([
+      "Địa chỉ ERP: https://erp.example",
+      "Danh sách năm sinh: HTTP 200 → [2014]",
+      "Webhook: HTTP 400 → chữ ký đúng",
+    ]);
+
+    const denied = loadScript({
+      data,
+      now: NOW,
+      respond: () => {
+        throw appsScriptException("You do not have permission to call UrlFetchApp.fetch. Required permissions: https://www.googleapis.com/auth/script.external_request");
+      },
+    });
+    denied.context.testErpConnection();
+    expect(denied.logs[1]).toMatch(/^Danh sách năm sinh: HTTP 0 \(lỗi\) → dự án chưa có quyền gọi ra ngoài: .*oauthScopes.*Chi tiết: Exception: You do not have permission/);
+    expect(denied.logs[2]).toMatch(/^Webhook: HTTP 0 → dự án chưa có quyền gọi ra ngoài/);
+
+    const badUrl = loadScript({ data, now: NOW, respond: () => { throw appsScriptException("DNS error: https://erp.example/api/integrations/grading-roster"); } });
+    badUrl.context.testErpConnection();
+    expect(badUrl.logs[1]).toBe("Danh sách năm sinh: HTTP 0 (lỗi) → Exception: DNS error: https://erp.example/api/integrations/grading-roster");
   });
 });

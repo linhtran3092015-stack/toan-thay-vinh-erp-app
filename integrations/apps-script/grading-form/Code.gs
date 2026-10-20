@@ -327,11 +327,21 @@ function testErpConnection() {
     console.log('Chưa cấu hình: đặt ERP_BASE_URL và ERP_FORM_SECRET (ít nhất 32 ký tự) trong Script Properties.');
     return;
   }
+  console.log('Địa chỉ ERP: ' + cfg.baseUrl);
   const years = erpFetch_('GET', '/api/integrations/grading-roster');
-  console.log('Danh sách năm sinh: HTTP ' + years.status + (years.ok ? ' → ' + JSON.stringify(years.json.birthYears) : ' (lỗi)'));
+  console.log('Danh sách năm sinh: HTTP ' + years.status + (years.ok ? ' → ' + JSON.stringify(years.json.birthYears) : ' (lỗi)' + fetchErrorNote_(years)));
   // Body thiếu trường bắt buộc: 400 nghĩa là chữ ký (kể cả chữ có dấu) đúng; 401 là sai khóa hoặc lệch giờ.
   const probe = erpFetch_('POST', '/api/webhooks/grading-submissions', JSON.stringify({ probe: 'Kiểm tra chữ ký' }));
-  console.log('Webhook: HTTP ' + probe.status + (probe.status === 400 ? ' → chữ ký đúng' : probe.status === 401 ? ' → SAI khóa hoặc lệch giờ' : ''));
+  console.log('Webhook: HTTP ' + probe.status + (probe.status === 400 ? ' → chữ ký đúng' : probe.status === 401 ? ' → SAI khóa hoặc lệch giờ' : fetchErrorNote_(probe)));
+}
+
+// HTTP 0 nghĩa là Apps Script không gọi được ERP; in kèm lý do để biết sửa chỗ nào.
+function fetchErrorNote_(res) {
+  if (res.status !== 0 || !res.error) return '';
+  if (/permission|external_request/i.test(res.error)) {
+    return ' → dự án chưa có quyền gọi ra ngoài: trong appsscript.json thêm "https://www.googleapis.com/auth/script.external_request" vào oauthScopes, rồi chạy lại và bấm Cho phép. Chi tiết: ' + res.error;
+  }
+  return ' → ' + res.error;
 }
 
 // ---------------------------------------------------------------------------

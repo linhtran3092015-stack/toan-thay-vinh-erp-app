@@ -29,6 +29,7 @@ Câu 6 (học thử tiếng Anh) và câu 7 (SĐT phụ huynh) chỉ ghi vào Sh
    - `Danh sách năm sinh: HTTP 200 → [...]`: ERP trả danh sách.
    - `Webhook: HTTP 400 → chữ ký đúng`: khóa khớp (400 vì bài thử cố tình thiếu dữ liệu, không tạo bài nào).
    - `HTTP 401`: sai khóa hoặc đồng hồ lệch quá 5 phút. `HTTP 503`: Vercel chưa có `GRADING_FORM_SECRET`.
+   - `HTTP 0 → <lý do>`: Apps Script không gọi được ERP. Lý do có "permission" thì `appsscript.json` đang khai `oauthScopes` mà thiếu `https://www.googleapis.com/auth/script.external_request`: thêm vào rồi chạy lại, bấm Cho phép. Lý do kiểu "DNS", "Address unavailable", "Invalid argument" thì xem lại `ERP_BASE_URL` (dòng `Địa chỉ ERP:` in ngay trên).
 6. **Bật gửi bù:** chọn hàm `installResendTrigger` → Run một lần (cho phép quyền khi được hỏi). Kiểm tra ở mục Triggers: `resendPendingSubmissions`, 10 phút/lần.
 7. **Deploy:** Deploy → Manage deployments → sửa bản web app đang dùng → Version: New version → Deploy, để link form cũ vẫn dùng được.
 8. **Thử thật:** nộp một bài thử từ điện thoại, xem cột `Đã gửi ERP` của dòng mới có `OK ...`, và bài hiện trong ERP: buổi học → "Cuối giờ · Kết quả" → "Bài nộp qua form", hoặc trang "Bài nộp chưa ghép".
