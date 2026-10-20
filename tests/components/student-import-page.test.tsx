@@ -353,7 +353,10 @@ describe("StudentImportPage wizard", () => {
     await waitFor(() => expect(currentStep()).toHaveTextContent("3. Kiểm tra dòng"));
 
     fireEvent.click(screen.getByRole("button", { name: "Quay lại bước Ánh xạ cột" }));
-    fireEvent.click(screen.getByRole("button", { name: "Quay lại bước Tải mẫu & chọn file" }));
+    // The mapping step's back stays disabled until the dry-run transition settles.
+    const backToFile = screen.getByRole("button", { name: "Quay lại bước Tải mẫu & chọn file" });
+    await waitFor(() => expect(backToFile).toBeEnabled());
+    fireEvent.click(backToFile);
     expect(screen.getByText("hoc-sinh.xlsx · 3 dòng")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Chọn file khác" }));
 

@@ -259,8 +259,11 @@ describe("EnrollmentImportPage wizard", () => {
     expect(screen.getByText("GHI DANH 3")).toBeInTheDocument();
     expect(screen.getByText(/^Ghi danh mới:/).textContent).toBe("Ghi danh mới: 2 · Dùng lại: 1");
 
-    // Back to "Tạo lô": the created batch, not a second create button.
-    fireEvent.click(screen.getByRole("button", { name: "Quay lại bước Tạo lô" }));
+    // Back to "Tạo lô": the created batch, not a second create button. The step can
+    // change before the create transition settles, and back stays disabled until it does.
+    const backToBatch = screen.getByRole("button", { name: "Quay lại bước Tạo lô" });
+    await waitFor(() => expect(backToBatch).toBeEnabled());
+    fireEvent.click(backToBatch);
     expect(screen.getByText("Đã tạo lô.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Tạo lô/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Tiếp: Xác nhận ghi danh" }));
