@@ -917,6 +917,8 @@ export function estimateGradeCall({ config, key, answerText }) {
  *   expected: number,
  *   score: number | null,
  *   diff: number | null,
+ *   strictDiff: number | null,
+ *   bonusExplains: boolean,
  *   color: "green" | "yellow" | "red",
  *   runsAgree: boolean,
  *   usedTiebreak: boolean,
@@ -959,12 +961,19 @@ export function scoreConfig({ submissions, keys, results, configId, tiebreakId, 
     const toScore = (/** @type {Record<string, Verdict>} */ v) => finalScore(rawScore(key, v), bonus);
     const expected = Math.min(10, roundHalfUp(submission.ta_score));
     const score = combined.verdicts ? toScore(combined.verdicts) : null;
+    const bonusUnknown = scoreIncludesBonus && submission.bonus === null;
+    const strictDiff = score === null ? null : score - expected;
+    // The Sheet does not record who got the +1 ("tích cực tương tác"), and the AI cannot see it:
+    // a TA score exactly one above the AI's is counted as a match, but kept apart in strictDiff.
+    const bonusExplains = bonusUnknown && score !== null && score !== expected && Math.min(10, score + 1) === expected;
     const voters = [...parsed, ...(combined.usedTiebreak && tiebreak ? [tiebreak] : [])];
     items.push({
       submission,
       expected,
       score,
-      diff: score === null ? null : score - expected,
+      diff: bonusExplains ? 0 : strictDiff,
+      strictDiff,
+      bonusExplains,
       color: combined.color,
       runsAgree: combined.runsAgree,
       usedTiebreak: combined.usedTiebreak,
@@ -979,8 +988,8 @@ export function scoreConfig({ submissions, keys, results, configId, tiebreakId, 
             : [`[${i + 1}] lỗi ${r.error}${r.detail ? ` (${r.detail})` : ""}`],
         )
         .join(" | "),
-      rankMatch: score !== null && rankLabel(score) === rankLabel(expected),
-      bonusUnknown: scoreIncludesBonus && submission.bonus === null,
+      rankMatch: score !== null && rankLabel(bonusExplains ? expected : score) === rankLabel(expected),
+      bonusUnknown,
     });
   }
   return items;
@@ -1007,6 +1016,8 @@ export function summarizeItems(items) {
     usedTiebreak: count((i) => i.usedTiebreak),
     rankMatch: count((i) => i.rankMatch),
     bonusUnknown: count((i) => i.bonusUnknown),
+    bonusExplained: count((i) => i.bonusExplains),
+    exactStrictRate: rate(count((i) => i.strictDiff === 0)),
     exactRate: rate(exact),
     within1Rate: rate(within1),
     greenRate: rate(green),

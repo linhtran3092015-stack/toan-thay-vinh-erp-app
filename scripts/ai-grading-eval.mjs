@@ -595,14 +595,14 @@ async function cmdReport(p) {
   ];
   for (const evaluation of evaluations) {
     for (const item of evaluation.items) {
-      if (item.diff === 0) continue;
+      if (item.strictDiff === 0) continue;
       mismatchRows.push([
         evaluation.name,
         item.submission.submission_id,
         item.submission.test_id,
         item.expected,
         item.score ?? "",
-        item.diff ?? "",
+        item.bonusExplains ? `${item.strictDiff} (+1 chưa rõ)` : item.strictDiff ?? "",
         COLOR_VI[item.color],
         item.runScores.map((s) => s ?? "lỗi").join(" / "),
         item.usedTiebreak ? "có" : "",
@@ -616,11 +616,12 @@ async function cmdReport(p) {
   writeFileSync(p.mismatches, `﻿${lib.toCsv(mismatchRows)}\r\n`);
 
   printTable(
-    ["Cấu hình", "Bài", "Khớp", "Lệch ≤ 1", "Xanh", "Xanh lệch ≥ 2", "USD/tháng ~", "Đạt"],
+    ["Cấu hình", "Bài", "Khớp", "Khớp chặt", "Lệch ≤ 1", "Xanh", "Xanh lệch ≥ 2", "USD/tháng ~", "Đạt"],
     evaluations.map(({ name, summary, monthly }) => [
       name,
       summary.n,
       pct(summary.exactRate),
+      pct(summary.exactStrictRate),
       pct(summary.within1Rate),
       pct(summary.greenRate),
       summary.greenOffBy2,
@@ -647,10 +648,10 @@ function renderReport({ evaluations, keyRows, stats, scoreIncludesBonus, keys, r
     "",
     `**Chuẩn đạt:** ≥ ${pct(lib.CRITERIA.exactRate)} bài khớp tuyệt đối; ≥ ${pct(lib.CRITERIA.within1Rate)} lệch ≤ 1 điểm; không bài xanh nào lệch ≥ 2 điểm.`,
     "",
-    "| Cấu hình | Bài | Khớp | Lệch ≤ 1 | Xanh | Xanh lệch ≥ 2 | Các lần chấm khớp nhau | Dùng trọng tài | Xếp hạng khớp | USD/tháng ~ | Đạt |",
-    "|---|---|---|---|---|---|---|---|---|---|---|",
+    "| Cấu hình | Bài | Khớp | Khớp chặt | Lệch ≤ 1 | Xanh | Xanh lệch ≥ 2 | Các lần chấm khớp nhau | Dùng trọng tài | Xếp hạng khớp | USD/tháng ~ | Đạt |",
+    "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ...evaluations.map(({ name, summary: s, monthly }) =>
-      `| ${name} | ${s.n} | ${pct(s.exactRate)} | ${pct(s.within1Rate)} | ${pct(s.greenRate)} | ${s.greenOffBy2} | ${pct(s.n ? s.runsAgree / s.n : 0)} | ${s.usedTiebreak} | ${pct(s.n ? s.rankMatch / s.n : 0)} | ${usd(monthly)} | ${s.passes ? "ĐẠT" : "chưa"} |`,
+      `| ${name} | ${s.n} | ${pct(s.exactRate)} | ${pct(s.exactStrictRate)} | ${pct(s.within1Rate)} | ${pct(s.greenRate)} | ${s.greenOffBy2} | ${pct(s.n ? s.runsAgree / s.n : 0)} | ${s.usedTiebreak} | ${pct(s.n ? s.rankMatch / s.n : 0)} | ${usd(monthly)} | ${s.passes ? "ĐẠT" : "chưa"} |`,
     ),
     "",
     `USD/tháng ~: ước tính cho ${lib.MONTHLY_PAPERS.toLocaleString("vi-VN")} bài/tháng, tính theo token thật của đợt chạy này nhưng ở **giá thường** (khi chạy thật, bài chấm ngay chứ không qua Batch API, nên gấp đôi giá Batch). Chưa gồm đọc đề.`,
@@ -685,7 +686,7 @@ function renderReport({ evaluations, keyRows, stats, scoreIncludesBonus, keys, r
     "## Ghi chú",
     "",
     `- Lượt lỗi hoặc không dùng được: ${Object.keys(failures).length ? Object.entries(failures).map(([k, v]) => `${k} ${v}`).join(", ") : "không có"}.`,
-    `- Bài không rõ có được cộng điểm không (so như không cộng): ${evaluations[0]?.summary.bonusUnknown ?? 0}.`,
+    `- Bài không rõ có được cộng điểm không: ${evaluations[0]?.summary.bonusUnknown ?? 0}. Bài nào điểm trợ giảng cao hơn AI đúng 1 điểm thì cột "Khớp" coi là khớp (đó là +1 "tích cực tương tác", AI không thấy được); cột "Khớp chặt" không tính như vậy. Khi đề có câu 1 điểm, lệch 1 điểm cũng có thể là AI chấm sai một câu: xem cột \`lech\` ghi "(+1 chưa rõ)" trong \`mismatches.csv\`.`,
     "- Xanh: các lần chấm khớp từng câu (hoặc trọng tài phân xử được), không cờ, không có lần nào tự báo độ tin cậy thấp. Vàng: cần người xem. Đỏ: không có kết quả dùng được.",
     "- Mọi bài lệch nằm trong `mismatches.csv`. Rà tay từng bài: có khi trợ giảng chấm sai, có khi đáp án chốt sai.",
   );

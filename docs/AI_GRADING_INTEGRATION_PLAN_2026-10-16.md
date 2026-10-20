@@ -548,6 +548,15 @@ Mỗi giai đoạn: migration + pgTAP + vitest, tăng VERSION, cập nhật CHAN
 5. ~~Gói Vercel~~: Hobby (đã trả lời 17/10).
 6. ~~Chốt các quyết định ở mục 9~~ (đã chốt 17/10).
 
+### 10.1 Chạy thử Lớp 3 (21/10/2026)
+
+Đề 17/10 Lớp 3 (5 câu, mỗi câu 2 điểm), 11 bài, mỗi cấu hình chấm 2 lần qua Batch API. Tổng chi phí thật **$0.23** (đọc đề $0.04 + chấm 110 lượt $0.19).
+
+- **Opus 5.5 đọc đề:** đúng 5/5 đáp án cuối (54; 8; 257; 7 cm; 12 cm), tự ghi 6 cảnh báo về chữ viết tay khó đọc. Đáp án được Claude chốt tạm vì khớp đáp án đã đối chiếu với điểm trợ giảng ngày 18/10; trợ giảng vẫn cần xác nhận.
+- **Chấm:** từ haiku-medium trở lên, AI cho đúng điểm cả 11/11 bài. Hai bài lệch đều do điểm trợ giảng cao hơn AI đúng 1 điểm, tức +1 "tích cực tương tác", mà Sheet không ghi ai được cộng. Báo cáo giờ tách "Khớp" (coi +1 chưa rõ là khớp) và "Khớp chặt" (81,8%). haiku-low chấm một lần sai bài đánh số câu 1–5 thay cho 13–17, nhưng bài đó đã bị đánh dấu vàng để người xem.
+- **Bài xanh (không cần người xem):** Haiku 63,6%, Sonnet 90,9%. Ước tính chi phí 3.833 bài/tháng ở giá thường: haiku-medium ×2 khoảng $2.9, sonnet-medium ×2 khoảng $55.
+- **Chưa kết luận được:** chỉ 1 đề, đáp án là số, 11 bài. Cần ảnh 10 đề ở mục 4 để chạy khoảng 330 bài (ước tính dưới $5) trước khi chọn cấu hình cho Giai đoạn 3.
+
 ## Phụ lục A. Câu mẫu nhận xét (khởi tạo `grading_comment_phrases`)
 
 Câu đầu tiên của mỗi ô lấy nguyên ý từ bản demo AI Studio (prompt trong `server.ts`). Các câu sau là biến thể đề xuất để xoay vòng, chủ trung tâm sửa hoặc xóa trong Cài đặt.

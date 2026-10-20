@@ -344,12 +344,35 @@ describe("AI grading eval: agreement and report", () => {
   });
 
   // Value: protects=Phase 0 verdict bars: exact >= 90%, within-1 >= 98%, no green item off by 2+; fails_when=a bar flips to >, the green-off-by-2 rule is dropped, or n=0 passes; why_new=only passes:false was asserted; seam=none; no_claim=real model accuracy
+  // Value: protects=Phase 0 accuracy when the Sheet has no "tích cực tương tác" column; fails_when=a TA score one above the AI's (the +1 the AI cannot see) counts as a miss, a known bonus or a 2-point gap gets excused, or the strict rate disappears; why_new=the grade-3 pilot (2026-10-21) had both misses explained by +1; seam=none; no_claim=who really got the bonus
+  it("counts a TA score exactly 1 above the AI as a match only when the bonus is unknown", () => {
+    const allRight = { "1": "correct", "2": "correct", "3": "correct" };
+    const oneWrong = { "1": "correct", "2": "incorrect", "3": "correct" };
+    const ids = ["sub_000000000001", "sub_000000000002", "sub_000000000003", "sub_000000000004"];
+    const verdicts = [oneWrong, oneWrong, allRight, oneWrong];
+    const results = new Map<string, BatchResultSummary>(
+      ids.flatMap((id, i) => [1, 2].map((run) => [customId("haiku-medium", run, id), graded(verdicts[i])] as [string, BatchResultSummary])),
+    );
+    // AI scores: 8, 8, 10, 8. TA: 9 (bonus unknown), 9 (no bonus), 10 (unknown), 10 (unknown, 2 above).
+    const submissions = [sub(ids[0], 9, null), sub(ids[1], 9, false), sub(ids[2], 10, null), sub(ids[3], 10, null)];
+    const items = scoreConfig({ submissions, keys: new Map([["t1", KEY]]), results, configId: "haiku-medium" });
+    expect(items.map((i) => [i.score, i.diff, i.strictDiff, i.bonusExplains, i.rankMatch])).toEqual([
+      [8, 0, -1, true, true],
+      [8, -1, -1, false, false],
+      [10, 0, 0, false, true],
+      [8, -2, -2, false, false],
+    ]);
+    expect(summarizeItems(items)).toMatchObject({ exact: 2, bonusExplained: 1, bonusUnknown: 3, exactStrictRate: 0.25 });
+  });
+
   it("passes only at the exact, within-1 and green-off-by-2 bars, and never on an empty run", () => {
     const item = (diff: number, color: ScoredItem["color"]): ScoredItem => ({
       submission: sub("sub_000000000001", 8),
       expected: 8,
       score: 8 + diff,
       diff,
+      strictDiff: diff,
+      bonusExplains: false,
       color,
       runsAgree: color === "green",
       usedTiebreak: false,
