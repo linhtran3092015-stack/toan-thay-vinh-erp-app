@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { kickGradingWorker } from "@/features/ai-grading/kick";
 import { ingestGradingSubmission } from "@/features/grading-submissions/intake";
 import { GRADING_WEBHOOK_MAX_BODY_BYTES, parseGradingSubmissionPayload } from "@/features/grading-submissions/payload";
 import {
@@ -14,6 +15,8 @@ import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// A matched submission of a session with a confirmed key is graded by after() below.
+export const maxDuration = 300;
 
 function json(body: Record<string, unknown>, status: number) {
   return NextResponse.json(body, { headers: { "Cache-Control": "no-store" }, status });
@@ -103,5 +106,6 @@ export async function POST(request: Request) {
     return json({ ok: false }, 500);
   }
 
+  if (!result.duplicate && result.matchStatus === "matched") kickGradingWorker("submission");
   return json({ duplicate: result.duplicate, matchStatus: result.matchStatus, ok: true }, 200);
 }

@@ -1,0 +1,35 @@
+name: AI grading worker
+
+# Safety net for the AI grading queue (docs/AI_GRADING_INTEGRATION_PLAN_2026-10-16.md §4.6):
+# the ERP grades from after() as soon as work arrives; this schedule picks up anything left.
+# Needs repo secrets CRON_SECRET (same value as on Vercel) and AI_GRADING_WORKER_URL
+# (https://<production domain>/api/internal/ai-grading/worker); without them it does nothing.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ai-grading-worker
+  cancel-in-progress: false
+
+jobs:
+  kick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Run one worker batch
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          WORKER_URL: ${{ secrets.AI_GRADING_WORKER_URL }}
+        run: |
+          if [ -z "$CRON_SECRET" ] || [ -z "$WORKER_URL" ]; then
+            echo "CRON_SECRET or AI_GRADING_WORKER_URL is not set; skipping."
+            exit 0
+          fi
+          status=$(curl -sS -o response.json -w "%{http_code}" --max-time 320 -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" "$WORKER_URL") || status="curl_failed"
+          echo "HTTP $status"
+          cat response.json 2>/dev/null || true

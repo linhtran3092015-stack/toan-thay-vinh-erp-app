@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const views: SettingsPreviewView[] = ["general", "zalo", "branding", "website", "permissions"];
+const views: SettingsPreviewView[] = ["general", "zalo", "ai-grading", "branding", "website", "permissions"];
 const roles: SettingsPreviewRole[] = ["owner", "manager", "viewer"];
 const states: SettingsPreviewState[] = ["normal", "dirty", "error"];
 
@@ -24,7 +24,7 @@ function first(value: string | string[] | undefined): string | undefined {
 /**
  * Settings hub preview mirroring `09-cai-dat.dc.html` (frames 9a, 9b) with
  * fixture data inside the shell.
- * `?view=general|zalo|branding|website|permissions&role=owner|manager|viewer&state=normal|dirty|error`.
+ * `?view=general|zalo|ai-grading|branding|website|permissions&role=owner|manager|viewer&state=normal|dirty|error`.
  * Every write (system settings, website/branding save and publish, role
  * permissions, the personal palette) and the ZaloCRM nick list are inert
  * stubs (previewSettingsActions): the preview never calls a server action.

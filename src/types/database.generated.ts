@@ -169,6 +169,51 @@ export type Database = {
           },
         ]
       }
+      ai_grading_daily_spend: {
+        Row: {
+          cost_usd: number
+          runs: number
+          spend_date: string
+          updated_at: string
+        }
+        Insert: {
+          cost_usd?: number
+          runs?: number
+          spend_date: string
+          updated_at?: string
+        }
+        Update: {
+          cost_usd?: number
+          runs?: number
+          spend_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_grading_worker_state: {
+        Row: {
+          id: boolean
+          pause_reason: string | null
+          paused_at: string | null
+          paused_until: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          pause_reason?: string | null
+          paused_at?: string | null
+          paused_until?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          pause_reason?: string | null
+          paused_at?: string | null
+          paused_until?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       attendance_exception_reviews: {
         Row: {
           check_in_reason: string | null
@@ -2142,6 +2187,7 @@ export type Database = {
         Row: {
           answer_key_version: number | null
           attempt_count: number
+          cache_creation_tokens: number | null
           cache_read_tokens: number | null
           cost_usd_est: number | null
           created_at: string
@@ -2171,6 +2217,7 @@ export type Database = {
         Insert: {
           answer_key_version?: number | null
           attempt_count?: number
+          cache_creation_tokens?: number | null
           cache_read_tokens?: number | null
           cost_usd_est?: number | null
           created_at?: string
@@ -2200,6 +2247,7 @@ export type Database = {
         Update: {
           answer_key_version?: number | null
           attempt_count?: number
+          cache_creation_tokens?: number | null
           cache_read_tokens?: number | null
           cost_usd_est?: number | null
           created_at?: string
@@ -2252,6 +2300,14 @@ export type Database = {
       }
       grading_submissions: {
         Row: {
+          ai_answer_key_version: number | null
+          ai_color: string | null
+          ai_confidence: string | null
+          ai_flags: string[]
+          ai_graded_at: string | null
+          ai_question_results: Json | null
+          ai_raw_score: number | null
+          ai_run_id: string | null
           answer_text: string
           answer_truncated: boolean
           attempt_no: number | null
@@ -2280,6 +2336,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_answer_key_version?: number | null
+          ai_color?: string | null
+          ai_confidence?: string | null
+          ai_flags?: string[]
+          ai_graded_at?: string | null
+          ai_question_results?: Json | null
+          ai_raw_score?: number | null
+          ai_run_id?: string | null
           answer_text: string
           answer_truncated?: boolean
           attempt_no?: number | null
@@ -2308,6 +2372,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_answer_key_version?: number | null
+          ai_color?: string | null
+          ai_confidence?: string | null
+          ai_flags?: string[]
+          ai_graded_at?: string | null
+          ai_question_results?: Json | null
+          ai_raw_score?: number | null
+          ai_run_id?: string | null
           answer_text?: string
           answer_truncated?: boolean
           attempt_no?: number | null
@@ -2336,6 +2408,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "grading_submissions_ai_run_id_fkey"
+            columns: ["ai_run_id"]
+            isOneToOne: false
+            referencedRelation: "grading_runs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "grading_submissions_class_session_id_fkey"
             columns: ["class_session_id"]
@@ -7674,6 +7753,9 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      ai_grading_day_start: { Args: never; Returns: string }
+      ai_grading_settings: { Args: never; Returns: Json }
+      ai_grading_today: { Args: never; Returns: string }
       allocate_payment_to_students: {
         Args: {
           p_allocations: Json
@@ -8000,6 +8082,10 @@ export type Database = {
         Args: { p_test_id: string }
         Returns: number
       }
+      cancel_submission_grading: {
+        Args: { p_reason: string; p_submission_id: string }
+        Returns: number
+      }
       change_academic_year_status: {
         Args: {
           p_academic_year_id: string
@@ -8119,6 +8205,21 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      claim_grading_runs: {
+        Args: { p_limit?: number; p_lock_seconds?: number }
+        Returns: {
+          answer_key_version: number
+          attempt_count: number
+          effort: string
+          model: string
+          payload: Json
+          prompt_version: string
+          run_id: string
+          run_type: string
+          submission_id: string
+          test_id: string
+        }[]
       }
       close_payroll_feedback: {
         Args: { p_payroll_period_id: string }
@@ -8277,6 +8378,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      complete_grading_run: {
+        Args: {
+          p_error_code?: string
+          p_error_message?: string
+          p_outcome: string
+          p_result?: Json
+          p_retry_after_seconds?: number
+          p_run_id: string
+          p_usage?: Json
+        }
+        Returns: string
       }
       compute_payroll_projection: {
         Args: {
@@ -9465,6 +9578,10 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_submission_grading: {
+        Args: { p_submission_id: string }
+        Returns: string
+      }
       enroll_student_in_class: {
         Args: {
           p_class_id: string
@@ -9576,6 +9693,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_ai_grading_overview: { Args: never; Returns: Json }
       get_attendance_exception_reviews: { Args: never; Returns: Json }
       get_attendance_verification_config: { Args: never; Returns: Json }
       get_attendance_verification_policy: { Args: never; Returns: Json }
@@ -10151,6 +10269,14 @@ export type Database = {
       get_session_grading_submissions: {
         Args: { p_class_session_id: string }
         Returns: {
+          ai_answer_key_version: number
+          ai_color: string
+          ai_confidence: string
+          ai_flags: string[]
+          ai_graded_at: string
+          ai_question_results: Json
+          ai_raw_score: number
+          ai_state: string
           answer_text: string
           answer_truncated: boolean
           attempt_no: number
@@ -10301,6 +10427,10 @@ export type Database = {
         Returns: Json
       }
       grading_rank_label: { Args: { p_score: number }; Returns: string }
+      grading_raw_score: {
+        Args: { p_answer_key: Json; p_verdicts: Json }
+        Returns: number
+      }
       grading_session_is_eligible: {
         Args: {
           p_class_session_id: string
@@ -11103,6 +11233,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_submission_ai_failure: {
+        Args: { p_run: Database["public"]["Tables"]["grading_runs"]["Row"] }
+        Returns: undefined
+      }
       refresh_grading_submission_attempts: {
         Args: { p_class_session_id: string; p_student_id: string }
         Returns: undefined
@@ -11631,6 +11765,7 @@ export type Database = {
           submission_id: string
         }[]
       }
+      resume_ai_grading: { Args: never; Returns: undefined }
       resume_student_enrollment: {
         Args: {
           p_effective_from: string
@@ -11800,6 +11935,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      run_ai_grading_health_check: { Args: never; Returns: undefined }
       run_class_session_auto_lock_worker: { Args: never; Returns: number }
       run_class_session_lock_reminders: { Args: never; Returns: number }
       run_crm_follow_up_reminders: { Args: never; Returns: number }

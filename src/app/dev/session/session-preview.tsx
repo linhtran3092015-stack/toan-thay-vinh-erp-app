@@ -125,12 +125,38 @@ function buildSubmissions(participants: SessionParticipantReadModel[]): SessionG
     submittedAt: "2026-10-12T14:31:00Z",
     ...overrides,
   });
+  // AI results (phase 3a): green, yellow with a flag, still grading, red.
+  const question = (label: string, verdict: "correct" | "incorrect", answer: string, reason: string, errorLocation = "") => ({
+    errorLocation,
+    extractedFinalAnswer: answer,
+    label,
+    noteForParent: "",
+    reasonForTeacher: reason,
+    verdict,
+  });
+  const graded = {
+    color: "green" as const,
+    confidence: "high" as const,
+    flags: [],
+    gradedAt: "2026-10-12T14:35:00Z",
+    keyVersion: 1,
+    questions: [
+      question("13", "incorrect", "x = 18", "Đáp số 18 sai, đúng là x = 54.", "dòng 1: lấy 36 - 18 thay vì 36 + 18"),
+      question("14", "correct", "8 cm", "Đúng đáp án."),
+      question("15", "correct", "257", "Đúng đáp án."),
+    ],
+    rawScore: 6,
+    state: "graded" as const,
+  };
   return [
-    submission(0, { attemptNo: 2, id: "sub-0b", submittedAt: "2026-10-12T14:34:00Z" }),
-    submission(0, { answerText: "13. 17\n14. 8", attemptNo: 1, countsForScore: false, id: "sub-0a" }),
-    submission(2, { answerText: "Câu 13: x=18\nCâu 14: BM = 14:2 = 7 cm\nCâu 15: 257" }),
-    submission(3, { sessionMatchMethod: "time_window", studentMatchMethod: "name_birth_year" }),
-    submission(1, { issues: ["outside_window"], submittedAt: "2026-10-12T17:05:00Z" }),
+    submission(0, { ai: graded, attemptNo: 2, id: "sub-0b", submittedAt: "2026-10-12T14:34:00Z" }),
+    submission(0, { ai: { ...graded, state: "not_counted" }, answerText: "13. 17\n14. 8", attemptNo: 1, countsForScore: false, id: "sub-0a" }),
+    submission(2, {
+      ai: { ...graded, color: "yellow", confidence: "low", flags: ["ambiguous_notation"], rawScore: 7.5 },
+      answerText: "Câu 13: x=18\nCâu 14: BM = 14:2 = 7 cm\nCâu 15: 257",
+    }),
+    submission(3, { ai: { ...graded, color: null, questions: [], rawScore: null, state: "grading" }, sessionMatchMethod: "time_window", studentMatchMethod: "name_birth_year" }),
+    submission(1, { ai: { ...graded, color: "red", questions: [], rawScore: null, state: "failed" }, issues: ["outside_window"], submittedAt: "2026-10-12T17:05:00Z" }),
   ];
 }
 
