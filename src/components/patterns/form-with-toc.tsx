@@ -10,7 +10,7 @@ export interface FormTocItem {
   /** Id of the `FormSection` this item points at; the link is `#{id}`. */
   id: string;
   label: string;
-  /** Short state text on the right, e.g. "5/7", "1 lỗi", "tùy chọn". Feature-owned. */
+  /** Short state text on the right, e.g. "5/9 · đủ", "thiếu 2", "1 lỗi", "tùy chọn". Feature-owned; the words carry the state, the tone only repeats it. */
   status?: string;
   /** Colour of the status text: danger (600) for errors, success when complete, muted otherwise. */
   tone?: FormTocTone;
@@ -40,8 +40,8 @@ function topbarHeight(): number {
  * Long form with an in-page table of contents (design 17a): a 240px sticky
  * card beside the sections at lg+, a horizontally scrolling row of 44px
  * anchors above them below lg. Each item links to its `FormSection` (`#id`)
- * and may show a short status on the right ("5/7", "1 lỗi", "tùy chọn") in a
- * tone. Activating an item scrolls to the section (instantly with reduced
+ * and may show a short status on the right ("5/9 · đủ", "1 lỗi", "tùy chọn") in a
+ * tone that repeats what the words say. Activating an item scrolls to the section (instantly with reduced
  * motion), puts its id in the URL hash and moves focus to the section
  * heading, so keyboard users continue from there. The item of the section at
  * the top of the viewport is marked `aria-current="location"` (scroll-spy;
@@ -153,7 +153,7 @@ export function FormWithToc({
       <div className="relative min-w-0 lg:sticky lg:top-[calc(var(--topbar-h)+24px)]">
         <nav
           aria-label={label}
-          className="-mx-4 overflow-x-auto px-4 md:-mx-5 md:px-5 lg:mx-0 lg:overflow-visible lg:rounded-lg lg:border lg:border-border-subtle lg:bg-surface-base lg:p-2 lg:shadow-[var(--panel-shadow)]"
+          className="relative -mx-4 overflow-x-auto px-4 md:-mx-5 md:px-5 lg:mx-0 lg:overflow-visible lg:rounded-lg lg:border lg:border-border-subtle lg:bg-surface-base lg:p-2 lg:shadow-[var(--panel-shadow)]"
           ref={navRef}
         >
           <ul className="m-0 flex min-w-max list-none gap-1 p-0 lg:min-w-0 lg:flex-col lg:gap-0.5">
@@ -165,7 +165,8 @@ export function FormWithToc({
                   <a
                     aria-current={active ? "location" : undefined}
                     className={cn(
-                      "flex min-h-11 items-center justify-between gap-3 whitespace-nowrap rounded-md px-3 text-body transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus lg:min-h-10 lg:px-2.5",
+                      // Below lg the row scrolls (overflow clips vertically too), so the focus ring sits inside the item.
+                      "flex min-h-11 items-center justify-between gap-3 whitespace-nowrap rounded-md px-3 text-body transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus max-lg:focus-visible:-outline-offset-2 lg:min-h-10 lg:px-2.5",
                       active
                         ? "bg-surface-selected font-semibold text-action-primary!"
                         : "text-text-default! hover:bg-interactive-hover hover:text-text-strong!",

@@ -2,6 +2,46 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.29.0.0] - 2026-10-20
+
+Form thêm/sửa học sinh, form tạo/sửa lớp và trang tạo buổi học hàng loạt dựng lại theo phong cách Stumana (bước 15a): form dài có mục lục và thanh lưu luôn hiện, tạo buổi hàng loạt có lưới xem trước bấm chọn từng buổi, bỏ qua ngày nghỉ và giới hạn 100 buổi mỗi đợt.
+
+### Added
+- **Thêm / sửa học sinh** (`/students/new`, sửa hồ sơ): các mục Hồ sơ, Phụ huynh chính, Lý do thao tác nằm trong mục lục bên trái (hàng cuộn ngang trên điện thoại); mỗi mục ghi trạng thái bằng chữ ("5/9 · đủ", "thiếu 2", "1 lỗi"). Thanh lưu dưới đáy luôn hiện: "Đang nhập · n lỗi cần sửa" kèm tên trường lỗi đầu tiên. Khi tạo mới có thêm "Lưu và thêm tiếp" để nhập liền nhiều học sinh.
+- Form học sinh khóa các ô trong lúc đang lưu, đưa con trỏ về trường lỗi đầu tiên (kể cả lỗi máy chủ trả về), về nút vừa bấm hoặc thông báo lỗi khi lưu không được, và hỏi trước khi rời trang nếu còn thay đổi chưa lưu.
+- **Tạo / sửa lớp**: một khung "Thông tin lớp" theo lưới 6 cột và mục "Lịch tuần" ghi rõ các bước tiếp theo (Lưu lớp Nháp → Kích hoạt → Thiết lập lịch tuần → Tạo buổi hàng loạt); lớp ghép ghi rõ lịch và buổi thuộc các lớp thành phần; bước "Tạo buổi hàng loạt" chỉ có link với lớp đang hoạt động và người có quyền tạo buổi. Form lớp hỏi trước khi rời trang nếu còn thay đổi chưa lưu.
+- **Tạo buổi học hàng loạt** `/sessions/batch`: lưới xem trước 6 cột (3 cột trên điện thoại), mỗi ô là một buổi bấm để chọn/bỏ chọn, phím mũi tên di chuyển giữa các ô; "Chọn tất cả / Bỏ chọn tất cả"; ô "Ngày nghỉ (bỏ qua)" bỏ chọn các ngày nghỉ trong lần tạo này; buổi trùng lịch đã có hiện "đã có (bỏ qua)", buổi ngoài thời gian hiệu lực của lịch hiện "ngoài hiệu lực" và đều không được gửi đi; nút chính "Tạo hàng loạt (n buổi học)" khóa kèm lý do khi chưa chọn buổi nào hoặc quá 100 buổi.
+- Trang xem trước `/dev/forms?view=student|student-edit|class|class-edit|batch` với `role` và `state` (trả 404 trên production; mọi nút lưu chỉ trả lời "Bản xem trước không ghi dữ liệu." và không chuyển trang; form học sinh và form lớp chỉ link tới các trang /dev).
+
+### Changed
+- Ô nhập nhiều dòng (ghi chú, lý do, mẫu tin…) giữ đúng chiều cao tối thiểu 80px trên máy tính như thiết kế; trước đây co còn khoảng 40px từ màn hình 768px trở lên. Áp dụng cho mọi form dùng ô nhiều dòng chung, kể cả mẫu phiếu học phí, Cài đặt và màn nhập đáp án chấm bài AI; ô nào tự đặt chiều cao riêng thì giữ chiều cao đó.
+- Nút, ô nhập và link hành động trên ba trang này cao 44px trên điện thoại cho dễ bấm.
+- Trang tạo buổi hàng loạt dùng ngày theo giờ Việt Nam làm ngày bắt đầu mặc định; các nút chọn thứ trong tuần thể hiện trạng thái bằng cả viền, nền và độ đậm chữ.
+- Tạo buổi hàng loạt từ chối mở với một lớp chưa kích hoạt, đã đóng hoặc không tồn tại (link cũ hoặc gõ tay) và yêu cầu chọn một lớp đang hoạt động, thay vì lặng lẽ dùng lớp hoạt động đầu tiên.
+- Lý do "vẫn tạo hoặc cập nhật hồ sơ" khi trùng học sinh chỉ dùng cho đúng hồ sơ trùng đang hiện; đổi tên, năm sinh hoặc số điện thoại sang một học sinh trùng khác thì phải xác nhận lại.
+
+### Fixed
+- Ở "Lịch lặp tùy chỉnh", đổi Hình thức, Phòng học, Link phòng hoặc Mã thành phần sau khi chọn thứ trong tuần giờ được gửi lên đúng (trước đây các buổi vẫn tạo với giá trị cũ).
+- Trang tạo buổi hàng loạt tự làm mới (mỗi phút với quản lý) không còn xóa các buổi đã bỏ chọn, đã sửa giờ/tên hay đã xóa khỏi danh sách.
+- Form lớp không còn mất chữ đã gõ khi mất kết nối lúc lưu: hiện "Không thể kết nối tới hệ thống lưu lớp. Vui lòng thử lại." và giữ nguyên các ô.
+- Ô "Số buổi học cần tạo" và "Số bắt đầu" xóa được để gõ lại trên điện thoại.
+
+## [0.28.0.0] - 2026-10-20
+
+Buổi học có khu **Bài kiểm tra** để trợ giảng tải ảnh đề, nhập đáp án từng câu và chốt đáp án (kế hoạch chấm bài AI, Giai đoạn 2 "Đề & đáp án"). AI sẽ chỉ chấm theo đáp án đã chốt; chưa có bước chấm bằng AI và chưa gọi Claude.
+
+### Added
+- **Bài kiểm tra** ở tab "Cuối giờ · Kết quả" của buổi học, ngay trên các thẻ cũ: dòng trạng thái Chưa có đề / Chờ chốt đáp án / Đã chốt đáp án (kèm số trang, số câu, tổng điểm, hoặc phiên bản, người chốt, giờ chốt). Màn hình lớn: ảnh đề bên trái (giữ nguyên khi cuộn), đáp án bên phải; điện thoại: một cột.
+- **Ảnh đề nhiều trang**: chụp hoặc chọn nhiều ảnh một lần (JPEG, PNG, WebP, GIF). Trình duyệt thu nhỏ ảnh còn cạnh dài tối đa 2.576 px, lưu JPEG chất lượng 0,9, xoay đúng chiều và bỏ thông tin EXIF (vị trí GPS) trước khi tải lên. Ảnh HEIC từ iPhone: chọn từ Thư viện ảnh trên iPhone thì máy tự đổi sang JPEG; HEIC đến từ nơi khác bị từ chối kèm hướng dẫn đổi sang JPEG. Ảnh trùng một trang đã có thì bỏ qua. Tối đa 20 trang mỗi đề. Đổi thứ tự trang bằng nút lên/xuống, bỏ trang có bước xác nhận. Bấm vào trang để mở ảnh đầy đủ (phóng to trên điện thoại).
+- **Nhập đáp án tay**: mỗi câu có số câu, điểm, đáp án cuối, cách viết khác được chấp nhận (mỗi dòng một cách, ví dụ 1/2 và 0,5), đề bài và lời giải chi tiết (mỗi dòng một bước, dùng cho mục "Bài chữa chi tiết" của tin Zalo) cùng ghi chú chấm. Tổng điểm hiện trực tiếp (đủ 10 / còn thiếu / thừa); điểm mỗi câu từ 0,25 đến 10 theo bước 0,25; nút "Chia đều 10 điểm"; "Lưu nháp" khi chưa xong.
+- **Chốt đáp án**: chỉ chốt được khi câu nào cũng có điểm và đáp án cuối, tổng điểm đúng bằng 10; nút bị khóa thì ghi rõ lý do. Mỗi câu đúng trọn điểm hoặc sai, không có điểm từng phần. Sửa đáp án đã chốt bắt buộc ghi lý do và tạo phiên bản mới; người khác vừa chốt hoặc sửa thì báo tải lại thay vì ghi đè. Chốt, sửa và dùng lại đề đều ghi Nhật ký hệ thống (kèm bản đáp án cũ khi sửa).
+- **Dùng đề có sẵn**: chọn đề đã chốt của buổi khác cùng ngày, cùng khối (xem trước đáp án), chép đáp án và chốt luôn cho buổi này; buổi này chưa có ảnh thì chép cả ảnh đề (dùng chung file, không nhân bản). Sửa đề gốc sau đó không tự cập nhật buổi này.
+- **AI đọc đề**: nút xếp một lượt đọc đề (Claude Opus 5.5, mức suy luận cao) vào hàng chờ, có thể hủy khi còn chờ. Khi chưa cấu hình `ANTHROPIC_API_KEY` thì nút khóa với lời nhắn "Chưa cấu hình khóa AI — nhập đáp án tay". Tiến trình nền gọi Claude thuộc Giai đoạn 3; không đặt khóa này trên Vercel trước khi Giai đoạn 3 phát hành.
+- Bảng `session_tests` (đề của buổi), `session_test_assets` (ảnh đề), `grading_runs` (mỗi lần gọi AI; giai đoạn này chỉ dùng loại `extract_key`), đều bật RLS và chỉ ghi qua RPC kiểm tra quyền. Buổi đã khóa hoặc đã hủy thì đề chỉ để xem.
+- **Supabase Storage lần đầu dùng trong ERP**: bucket riêng tư `session-tests` (chỉ nhận ảnh, tối đa 10 MB/ảnh); tải lên, xem và xoá theo quyền; ảnh chỉ xem qua link ký sống 15 phút; ảnh đã tải không ghi đè được, và chỉ xoá được ảnh không còn trang đề nào dùng.
+- Quyền mới **ai_grading.manage_tests** ("Quản lý đề kiểm tra") và **ai_grading.confirm_key** ("Chốt đáp án") cho chủ trung tâm, quản lý vận hành, quản lý trợ lý và trợ giảng (trợ giảng được chốt đáp án theo quyết định 17/10).
+- Trang xem trước `/dev/session?test=none|pending|confirmed|ai` cho khu Bài kiểm tra (trả 404 trên production; các nút chỉ trả lời "Bản xem trước không ghi dữ liệu.").
+
 ## [0.27.0.0] - 2026-10-19
 
 Thông báo, Nhật ký hệ thống và Báo cáo dựng lại theo phong cách Stumana (bước 14d): thông báo đọc nhanh theo loại sự kiện và mở thẳng trang liên quan, nhật ký lọc và xem dữ liệu trước/sau gọn trong một bảng, báo cáo hiện rõ cái nào xuất được và cần quyền gì.

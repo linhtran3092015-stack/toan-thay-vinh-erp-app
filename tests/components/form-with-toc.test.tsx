@@ -205,6 +205,8 @@ describe("FormWithToc", () => {
     expect(within(nav).getByRole("list")).toHaveClass("flex", "min-w-max", "lg:flex-col");
     for (const link of within(nav).getAllByRole("link")) {
       expect(link).toHaveClass("min-h-11", "lg:min-h-10", "rounded-md", "whitespace-nowrap");
+      // The scrolling row clips anything outside it, so below lg the focus ring is drawn inset.
+      expect(link).toHaveClass("focus-visible:outline-offset-2", "max-lg:focus-visible:-outline-offset-2");
     }
     // The sections column follows the navigation (20px between sections).
     expect(nav.parentElement?.nextElementSibling).toHaveClass("flex", "flex-col", "gap-5");

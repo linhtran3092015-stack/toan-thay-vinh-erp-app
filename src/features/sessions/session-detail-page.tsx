@@ -9,6 +9,9 @@ import { SessionSubmissionsCard } from "@/features/grading-submissions/component
 import type { GradingDataResult, SessionGradingSubmission } from "@/features/grading-submissions/data";
 import { SessionMessageContactCard } from "@/features/parent-messages/components/session-message-contact-card";
 import type { SessionMessageContactState } from "@/features/parent-messages/data";
+import type { SessionTestActions } from "@/features/session-tests/components/session-test-actions";
+import { SessionTestCard } from "@/features/session-tests/components/session-test-card";
+import type { SessionTestState } from "@/features/session-tests/types";
 import type { AdditionalStudyCandidate } from "@/features/sessions/attendance-data";
 import {
   Card,
@@ -59,6 +62,10 @@ interface SessionDetailPageProps {
   gradingSubmissions?: GradingDataResult<SessionGradingSubmission[]> | null;
   /** Supervisor name + phone for this session's Zalo comment messages (attendance.view / attendance.mark). */
   messageContact?: SessionMessageContactState | null;
+  /** "Bài kiểm tra": test photos and answer key (ai_grading.view or ai_grading.manage_tests); null hides the card. */
+  sessionTest?: GradingDataResult<SessionTestState> | null;
+  /** Stand-ins for the dev preview; the real page uses the server actions. */
+  sessionTestActions?: SessionTestActions;
 }
 
 /**
@@ -80,6 +87,8 @@ export function SessionDetailPage({
   directoryQuery = "",
   gradingSubmissions = null,
   messageContact = null,
+  sessionTest = null,
+  sessionTestActions,
 }: SessionDetailPageProps) {
   // Display counts cover everyone on the page, walk-ins included.
   const participantCount = detail.participants.length;
@@ -217,6 +226,7 @@ export function SessionDetailPage({
         results={
           showsResults ? (
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+              {sessionTest ? <SessionTestCard actions={sessionTestActions} result={sessionTest} /> : null}
               {messageContact && detail.status !== "cancelled" ? (
                 <SessionMessageContactCard canEdit={canMarkAttendance} contact={messageContact} sessionId={detail.id} />
               ) : null}

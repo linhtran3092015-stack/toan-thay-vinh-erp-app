@@ -10,7 +10,7 @@ import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { controlClassName } from "@/components/ui/field";
+import { controlClassName, textareaClassName } from "@/components/ui/field";
 import type { SettingsActionState } from "@/features/settings/action-types";
 import { setRolePermissionsAction } from "@/features/settings/actions";
 import { useLeaveGuard } from "@/features/settings/components/leave-guard";
@@ -679,7 +679,7 @@ function SaveReasonDialog({
           <label className="text-label font-medium text-text-strong" htmlFor={reasonId}>Lý do thay đổi</label>
           <textarea
             aria-describedby={`${reasonId}-hint`}
-            className={cn(controlClassName, "min-h-20 resize-y py-2")}
+            className={cn(textareaClassName, "resize-y")}
             id={reasonId}
             maxLength={2000}
             onChange={(event) => onReasonChange(event.target.value)}

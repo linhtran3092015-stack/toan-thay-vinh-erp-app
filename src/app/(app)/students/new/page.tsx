@@ -4,12 +4,12 @@ import {
   getStudentProfileFormDefaults,
 } from "@/features/students/form/student-profile-form-helpers";
 import { StudentFormPage } from "@/features/students/form/student-form-page";
+import { STUDENT_CREATE_DENIED } from "@/features/students/form/student-form-route-copy";
 import { getStudentDirectoryQuery, withStudentDirectoryQuery } from "@/features/students/student-directory-url-state";
 import {
   getCachedDatabasePermissions,
 } from "@/lib/permissions/database-permissions";
 
-import { permissionDeniedDescription } from "@/lib/permissions/labels";
 interface NewStudentRouteProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
@@ -40,8 +40,8 @@ export default async function NewStudentRoute({ searchParams }: NewStudentRouteP
   ) {
     return (
       <PermissionDeniedState
-        description={permissionDeniedDescription("students.create")}
-        title="Không có quyền tạo học viên"
+        description={STUDENT_CREATE_DENIED.description}
+        title={STUDENT_CREATE_DENIED.title}
       />
     );
   }

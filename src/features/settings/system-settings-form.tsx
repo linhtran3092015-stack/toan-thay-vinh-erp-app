@@ -6,7 +6,7 @@ import { useRef, useState, useTransition, type FormEvent, type ReactNode } from 
 import { StickySaveBar } from "@/components/patterns/sticky-save-bar";
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
-import { controlClassName, Field } from "@/components/ui/field";
+import { controlClassName, Field, textareaClassName } from "@/components/ui/field";
 import type { SettingsActionState } from "@/features/settings/action-types";
 import { updateSystemSettingsAction } from "@/features/settings/actions";
 import { useLeaveGuard, useSaveInFlightGuard } from "@/features/settings/components/leave-guard";
@@ -189,7 +189,7 @@ export function SystemSettingsForm({
             <TextField defaultValue={defaults.contactEmail} label={FIELD_LABELS.contactEmail} name="contactEmail" type="email" />
             <Field className="md:col-span-2" label={FIELD_LABELS.address}>
               {(props) => (
-                <textarea className={cn(controlClassName, "min-h-20 py-2")} defaultValue={defaults.address} maxLength={500} name="address" {...props} />
+                <textarea className={textareaClassName} defaultValue={defaults.address} maxLength={500} name="address" {...props} />
               )}
             </Field>
           </div>
@@ -241,7 +241,7 @@ export function SystemSettingsForm({
             </CheckboxField>
             <Field className="md:col-span-2" label={FIELD_LABELS.zaloAbsenceTemplate} required>
               {(props) => (
-                <textarea className={cn(controlClassName, "min-h-20 py-2")} defaultValue={defaults.zaloAbsenceTemplate} maxLength={1000} name="zaloAbsenceTemplate" required {...props} />
+                <textarea className={textareaClassName} defaultValue={defaults.zaloAbsenceTemplate} maxLength={1000} name="zaloAbsenceTemplate" required {...props} />
               )}
             </Field>
           </div>

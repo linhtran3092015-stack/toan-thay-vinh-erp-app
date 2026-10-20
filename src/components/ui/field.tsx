@@ -12,9 +12,23 @@ import {
 
 import { cn } from "@/lib/utils";
 
+const controlChromeClassName =
+  "w-full rounded-md border border-border-subtle bg-surface-base px-3 text-control text-text-default outline-none transition placeholder:text-text-subtle focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring aria-[invalid=true]:border-danger disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled";
+
 /** One control height (44px on touch, 40px on desktop) and one focus ring for every form. */
-export const controlClassName =
-  "min-h-11 w-full rounded-md border border-border-subtle bg-surface-base px-3 text-control text-text-default outline-none transition placeholder:text-text-subtle focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring aria-[invalid=true]:border-danger disabled:border-disabled-border disabled:bg-disabled-bg disabled:text-text-disabled md:min-h-10";
+export const controlClassName = `min-h-11 ${controlChromeClassName} md:min-h-10`;
+
+/**
+ * Same chrome without the single-line height: cn() does not merge classes, so
+ * `md:min-h-10` would beat any `min-h-*` a textarea adds from 768px up.
+ */
+const textareaChromeClassName = `${controlChromeClassName} py-2`;
+
+/** Textarea chrome with its default 80px minimum, for raw `<textarea>`s that do not use `Textarea`. */
+export const textareaClassName = `${textareaChromeClassName} min-h-20`;
+
+/** An unprefixed `min-h-*` from the caller replaces the default (a shorter one would otherwise lose to min-h-20 by CSS order). */
+const OWN_MIN_HEIGHT = /(^|\s)min-h-/;
 
 export const Label = forwardRef<HTMLLabelElement, LabelHTMLAttributes<HTMLLabelElement> & { required?: boolean }>(
   function Label({ children, className, required, ...props }, ref) {
@@ -51,7 +65,13 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
   function Textarea({ className, ...props }, ref) {
-    return <textarea className={cn(controlClassName, "min-h-20 py-2", className)} ref={ref} {...props} />;
+    return (
+      <textarea
+        className={cn(textareaChromeClassName, !OWN_MIN_HEIGHT.test(className ?? "") && "min-h-20", className)}
+        ref={ref}
+        {...props}
+      />
+    );
   },
 );
 

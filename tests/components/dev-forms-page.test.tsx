@@ -9,6 +9,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { FORMS_PREVIEW_STATES, FORMS_PREVIEW_VIEWS, parseFormsPreviewParams } from "@/app/dev/forms/forms-preview-params";
 import DevFormsPage from "@/app/dev/forms/page";
 import { DATABASE_PERMISSION_CODES } from "@/lib/permissions/types";
 
@@ -133,5 +134,30 @@ describe("/dev/forms page", () => {
     for (const file of files) {
       expect(readFileSync(join(process.cwd(), file), "utf8"), file).not.toMatch(forbidden);
     }
+  });
+});
+
+// Value (extension, review M2 of step 15a): protects=FORMS_PREVIEW_STATES lists each view's states and the parser accepts every listed state and falls back to the view's first one for a bogus, empty or missing state;
+// fails_when=a listed state is refused, the parser's states drift from FORMS_PREVIEW_STATES, or a bogus state does not fall back to the first;
+// why_new=FORMS_PREVIEW_STATES was exported but unused; seam=the exported table and the pure parser; no_claim=the bodies' rendering of each state (lane preview tests)
+describe("parseFormsPreviewParams", () => {
+  it("lists each view's states in the order the page documents", () => {
+    expect(FORMS_PREVIEW_STATES).toEqual({
+      batch: ["default", "holidays", "capped", "empty"],
+      class: ["clean", "error", "no-year"],
+      "class-edit": ["clean", "error", "no-year"],
+      student: ["clean", "dirty", "error", "duplicate", "sibling"],
+      "student-edit": ["clean", "dirty", "error", "duplicate", "sibling"],
+    });
+  });
+
+  it.each(FORMS_PREVIEW_VIEWS)("accepts every %s state and falls back to its first", (view) => {
+    const states = FORMS_PREVIEW_STATES[view];
+    for (const state of states) {
+      expect(parseFormsPreviewParams({ role: "ta", state, view })).toEqual({ role: "ta", state, view });
+    }
+    expect(parseFormsPreviewParams({ state: "bogus", view })).toEqual({ role: "owner", state: states[0], view });
+    expect(parseFormsPreviewParams({ state: [], view })).toEqual({ role: "owner", state: states[0], view });
+    expect(parseFormsPreviewParams({ view })).toEqual({ role: "owner", state: states[0], view });
   });
 });

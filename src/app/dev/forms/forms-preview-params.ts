@@ -26,14 +26,14 @@ const studentStates: readonly StudentFormsPreviewState[] = ["clean", "dirty", "e
 const classStates: readonly ClassFormsPreviewState[] = ["clean", "error", "no-year"];
 const batchStates: readonly BatchFormsPreviewState[] = ["default", "holidays", "capped", "empty"];
 
-/** Allowed `state` values per view; the first is the fallback. */
-export const FORMS_PREVIEW_STATES: Readonly<Record<FormsPreviewView, readonly FormsPreviewState[]>> = {
+/** Allowed `state` values per view; the first is the fallback. The one list parseFormsPreviewParams reads. */
+export const FORMS_PREVIEW_STATES = {
   batch: batchStates,
   class: classStates,
   "class-edit": classStates,
   student: studentStates,
   "student-edit": studentStates,
-};
+} as const satisfies Readonly<Record<FormsPreviewView, readonly FormsPreviewState[]>>;
 
 /** The real route each view previews (the shell's active nav item and breadcrumb). Never linked to. */
 export const FORMS_PREVIEW_PATHNAMES: Readonly<Record<FormsPreviewView, string>> = {
@@ -52,7 +52,10 @@ function pick<T extends string>(value: string | string[] | undefined, allowed: r
   return allowed.find((item) => item === first) ?? fallback;
 }
 
-/** Whitelists `view`, `role` and `state` (per view), each falling back to its first value. */
+/**
+ * Whitelists `view`, `role` and `state` (per view, from FORMS_PREVIEW_STATES),
+ * each falling back to its first value.
+ */
 export function parseFormsPreviewParams(params: {
   role?: string | string[];
   state?: string | string[];
@@ -60,9 +63,10 @@ export function parseFormsPreviewParams(params: {
 }): FormsPreviewParams {
   const role = pick(params.role, FORMS_PREVIEW_ROLES, "owner");
   const view = pick(params.view, FORMS_PREVIEW_VIEWS, "student");
-  if (view === "batch") return { role, state: pick(params.state, batchStates, batchStates[0]), view };
-  if (view === "class" || view === "class-edit") return { role, state: pick(params.state, classStates, classStates[0]), view };
-  return { role, state: pick(params.state, studentStates, studentStates[0]), view };
+  const state = <T extends FormsPreviewState>(allowed: readonly T[]): T => pick(params.state, allowed, allowed[0]);
+  if (view === "batch") return { role, state: state(FORMS_PREVIEW_STATES[view]), view };
+  if (view === "class" || view === "class-edit") return { role, state: state(FORMS_PREVIEW_STATES[view]), view };
+  return { role, state: state(FORMS_PREVIEW_STATES[view]), view };
 }
 
 /**
