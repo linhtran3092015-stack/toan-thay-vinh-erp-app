@@ -2,6 +2,22 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.28.0.0] - 2026-10-20
+
+Buổi học có khu **Bài kiểm tra** để trợ giảng tải ảnh đề, nhập đáp án từng câu và chốt đáp án (kế hoạch chấm bài AI, Giai đoạn 2 "Đề & đáp án"). AI sẽ chỉ chấm theo đáp án đã chốt; chưa có bước chấm bằng AI và chưa gọi Claude.
+
+### Added
+- **Bài kiểm tra** ở tab "Cuối giờ · Kết quả" của buổi học, ngay trên các thẻ cũ: dòng trạng thái Chưa có đề / Chờ chốt đáp án / Đã chốt đáp án (kèm số trang, số câu, tổng điểm, hoặc phiên bản, người chốt, giờ chốt). Màn hình lớn: ảnh đề bên trái (giữ nguyên khi cuộn), đáp án bên phải; điện thoại: một cột.
+- **Ảnh đề nhiều trang**: chụp hoặc chọn nhiều ảnh một lần (JPEG, PNG, WebP, GIF). Trình duyệt thu nhỏ ảnh còn cạnh dài tối đa 2.576 px, lưu JPEG chất lượng 0,9, xoay đúng chiều và bỏ thông tin EXIF (vị trí GPS) trước khi tải lên. Ảnh HEIC từ iPhone: chọn từ Thư viện ảnh trên iPhone thì máy tự đổi sang JPEG; HEIC đến từ nơi khác bị từ chối kèm hướng dẫn đổi sang JPEG. Ảnh trùng một trang đã có thì bỏ qua. Tối đa 20 trang mỗi đề. Đổi thứ tự trang bằng nút lên/xuống, bỏ trang có bước xác nhận. Bấm vào trang để mở ảnh đầy đủ (phóng to trên điện thoại).
+- **Nhập đáp án tay**: mỗi câu có số câu, điểm, đáp án cuối, cách viết khác được chấp nhận (mỗi dòng một cách, ví dụ 1/2 và 0,5), đề bài và lời giải chi tiết (mỗi dòng một bước, dùng cho mục "Bài chữa chi tiết" của tin Zalo) cùng ghi chú chấm. Tổng điểm hiện trực tiếp (đủ 10 / còn thiếu / thừa); điểm mỗi câu từ 0,25 đến 10 theo bước 0,25; nút "Chia đều 10 điểm"; "Lưu nháp" khi chưa xong.
+- **Chốt đáp án**: chỉ chốt được khi câu nào cũng có điểm và đáp án cuối, tổng điểm đúng bằng 10; nút bị khóa thì ghi rõ lý do. Mỗi câu đúng trọn điểm hoặc sai, không có điểm từng phần. Sửa đáp án đã chốt bắt buộc ghi lý do và tạo phiên bản mới; người khác vừa chốt hoặc sửa thì báo tải lại thay vì ghi đè. Chốt, sửa và dùng lại đề đều ghi Nhật ký hệ thống (kèm bản đáp án cũ khi sửa).
+- **Dùng đề có sẵn**: chọn đề đã chốt của buổi khác cùng ngày, cùng khối (xem trước đáp án), chép đáp án và chốt luôn cho buổi này; buổi này chưa có ảnh thì chép cả ảnh đề (dùng chung file, không nhân bản). Sửa đề gốc sau đó không tự cập nhật buổi này.
+- **AI đọc đề**: nút xếp một lượt đọc đề (Claude Opus 5.5, mức suy luận cao) vào hàng chờ, có thể hủy khi còn chờ. Khi chưa cấu hình `ANTHROPIC_API_KEY` thì nút khóa với lời nhắn "Chưa cấu hình khóa AI — nhập đáp án tay". Tiến trình nền gọi Claude thuộc Giai đoạn 3; không đặt khóa này trên Vercel trước khi Giai đoạn 3 phát hành.
+- Bảng `session_tests` (đề của buổi), `session_test_assets` (ảnh đề), `grading_runs` (mỗi lần gọi AI; giai đoạn này chỉ dùng loại `extract_key`), đều bật RLS và chỉ ghi qua RPC kiểm tra quyền. Buổi đã khóa hoặc đã hủy thì đề chỉ để xem.
+- **Supabase Storage lần đầu dùng trong ERP**: bucket riêng tư `session-tests` (chỉ nhận ảnh, tối đa 10 MB/ảnh); tải lên, xem và xoá theo quyền; ảnh chỉ xem qua link ký sống 15 phút; ảnh đã tải không ghi đè được, và chỉ xoá được ảnh không còn trang đề nào dùng.
+- Quyền mới **ai_grading.manage_tests** ("Quản lý đề kiểm tra") và **ai_grading.confirm_key** ("Chốt đáp án") cho chủ trung tâm, quản lý vận hành, quản lý trợ lý và trợ giảng (trợ giảng được chốt đáp án theo quyết định 17/10).
+- Trang xem trước `/dev/session?test=none|pending|confirmed|ai` cho khu Bài kiểm tra (trả 404 trên production; các nút chỉ trả lời "Bản xem trước không ghi dữ liệu.").
+
 ## [0.27.0.0] - 2026-10-19
 
 Thông báo, Nhật ký hệ thống và Báo cáo dựng lại theo phong cách Stumana (bước 14d): thông báo đọc nhanh theo loại sự kiện và mở thẳng trang liên quan, nhật ký lọc và xem dữ liệu trước/sau gọn trong một bảng, báo cáo hiện rõ cái nào xuất được và cần quyền gì.
