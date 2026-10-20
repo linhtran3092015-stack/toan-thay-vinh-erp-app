@@ -3,6 +3,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getSessionGradingSubmissions } from "@/features/grading-submissions/data";
 import { getSessionMessageContact } from "@/features/parent-messages/data";
+import { getSessionTestState } from "@/features/session-tests/data";
 import { getAdditionalStudyCandidates } from "@/features/sessions/attendance-data";
 import { getSessionDetail } from "@/features/sessions/detail-data";
 import { SessionDetailPage } from "@/features/sessions/session-detail-page";
@@ -174,6 +175,17 @@ export default async function SessionDetailRoute({
       ? await getSessionGradingSubmissions(sessionId)
       : null;
 
+  const canManageTests = permissionResult.permissions.includes("ai_grading.manage_tests");
+  const sessionTest =
+    (permissionResult.permissions.includes("ai_grading.view") || canManageTests) && detailResult.detail.status !== "cancelled"
+      ? await getSessionTestState({
+          canConfirm: permissionResult.permissions.includes("ai_grading.confirm_key"),
+          canManage: canManageTests,
+          editable: detailResult.detail.lockedAt === null,
+          sessionId,
+        })
+      : null;
+
   return (
     <SessionDetailPage
       additionalStudyCandidates={
@@ -204,6 +216,7 @@ export default async function SessionDetailRoute({
       directoryQuery={directoryQuery}
       gradingSubmissions={gradingSubmissions}
       messageContact={messageContact}
+      sessionTest={sessionTest}
     />
   );
 }

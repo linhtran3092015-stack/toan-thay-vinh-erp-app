@@ -10,6 +10,8 @@ import type {
 import { SessionDetailPage } from "@/features/sessions/session-detail-page";
 import { DATABASE_PERMISSION_CODES, type PermissionCode } from "@/lib/permissions/types";
 
+import { buildSessionTestState, previewSessionTestActions, type SessionTestPreviewState } from "./session-test-fixtures";
+
 export type SessionPreviewState = "live" | "pending" | "ready" | "locked";
 
 const names: Array<[string, string]> = [
@@ -143,13 +145,23 @@ const taPermissions: readonly PermissionCode[] = [
   "results.view",
   "results.manage",
   "ai_grading.view",
+  "ai_grading.manage_tests",
+  "ai_grading.confirm_key",
   "students.view",
   "timekeeping.view",
   "timekeeping.check",
   "notifications.view",
 ];
 
-export function SessionPreview({ role, state }: { role: "owner" | "ta"; state: SessionPreviewState }) {
+export function SessionPreview({
+  role,
+  state,
+  test,
+}: {
+  role: "owner" | "ta";
+  state: SessionPreviewState;
+  test: SessionTestPreviewState;
+}) {
   const isOwner = role === "owner";
   const permissions = isOwner
     ? DATABASE_PERMISSION_CODES.filter((code) => code !== "student_care.view")
@@ -185,6 +197,8 @@ export function SessionPreview({ role, state }: { role: "owner" | "ta"; state: S
         gradingSubmissions={
           permissions.includes("ai_grading.view") ? { data: buildSubmissions(detail.participants), ok: true } : null
         }
+        sessionTest={{ data: buildSessionTestState(test, state === "locked"), ok: true }}
+        sessionTestActions={previewSessionTestActions}
         messageContact={
           state === "ready" || state === "locked"
             ? { saved: { phone: "0912 345 678", supervisorName: "Cô Lê Bích Ngọc", updatedAt: "2026-10-12T13:00:00Z" }, suggestion: null }
