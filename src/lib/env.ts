@@ -189,6 +189,15 @@ export function getAlertWebhookUrl(): string | null {
   }
 }
 
+/**
+ * Claude API key for AI grading (plan §4.9: server-only, workspace "ai-grading"). Null until
+ * it is configured; the ERP then works with answer keys typed by hand.
+ */
+export function getAnthropicApiKey(): string | null {
+  const value = process.env.ANTHROPIC_API_KEY?.trim();
+  return value ? value : null;
+}
+
 export interface ZaloCrmEnv {
   ZALOCRM_API_KEY: string;
   ZALOCRM_BASE_URL: string;
