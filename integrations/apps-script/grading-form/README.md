@@ -25,6 +25,7 @@ Câu 6 (học thử tiếng Anh) và câu 7 (SĐT phụ huynh) chỉ ghi vào Sh
    - `ERP_BASE_URL` = địa chỉ ERP, ví dụ `https://ttp-erp-orcin.vercel.app` (không có `/` ở cuối)
    - `ERP_FORM_SECRET` = cùng khóa ở bước 1
 4. **Dán code:** thay toàn bộ `Code.gs` và `FormHocSinh.html` bằng hai file trong thư mục này.
+   Nếu dự án có hiện file `appsscript.json` và trong đó có mục `oauthScopes`, mục này phải có đủ 4 quyền (giữ các quyền đang có, chỉ thêm quyền còn thiếu): `https://www.googleapis.com/auth/spreadsheets`, `https://www.googleapis.com/auth/drive`, `https://www.googleapis.com/auth/script.external_request` (gọi ERP) và `https://www.googleapis.com/auth/script.scriptapp` (tạo trigger gửi bù). Không có mục `oauthScopes` thì Apps Script tự hỏi quyền, không cần làm gì.
 5. **Kiểm tra:** chọn hàm `testErpConnection` → Run → xem Execution log:
    - `Danh sách năm sinh: HTTP 200 → [...]`: ERP trả danh sách.
    - `Webhook: HTTP 400 → chữ ký đúng`: khóa khớp (400 vì bài thử cố tình thiếu dữ liệu, không tạo bài nào).
