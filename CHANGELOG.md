@@ -2,6 +2,16 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.29.0.1] - 2026-10-21
+
+Form nộp bài Apps Script: câu 6 có lại lựa chọn "Khác" như form gốc, tên tiếng Việt lấy từ ERP luôn hiện đúng dấu, và hàm kiểm tra kết nối nói rõ vì sao không gọi được ERP.
+
+### Fixed
+- **Câu 6 "Con muốn học thử miễn phí thêm các lớp Tiếng Anh chứ?"** có lại dòng "Khác: ___" như form gốc (bản Giai đoạn 1 vô tình bỏ đi). Cột N của tab `Data` ghi `Khác: <chữ học sinh gõ>` thay vì `Other`; câu 6 vẫn chỉ ghi Sheet, không gửi ERP. Chữ đã gõ được giữ khi mở lại form.
+- **Tên học sinh và nhãn buổi học từ ERP** được đọc rõ bảng mã UTF-8. ERP trả JSON không ghi charset, nên nếu Apps Script đoán sai bảng mã thì tên bị vỡ chữ kiểu "Nguyá»…n".
+- **`testErpConnection`** in địa chỉ ERP đang dùng và lý do khi gọi ERP thất bại, thay vì chỉ "HTTP 0 (lỗi)". Thiếu quyền gọi ra ngoài thì chỉ rõ cần thêm `script.external_request` vào `appsscript.json`.
+- Cần dán lại `Code.gs` và `FormHocSinh.html` vào dự án Apps Script, rồi Deploy bản web app đang dùng với Version mới.
+
 ## [0.29.0.0] - 2026-10-20
 
 Form thêm/sửa học sinh, form tạo/sửa lớp và trang tạo buổi học hàng loạt dựng lại theo phong cách Stumana (bước 15a): form dài có mục lục và thanh lưu luôn hiện, tạo buổi hàng loạt có lưới xem trước bấm chọn từng buổi, bỏ qua ngày nghỉ và giới hạn 100 buổi mỗi đợt.
