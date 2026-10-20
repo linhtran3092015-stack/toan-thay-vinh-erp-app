@@ -1,5 +1,5 @@
-// Value: protects=the student form's table-of-contents model (design 17a): sections Hồ sơ · Phụ huynh chính · (Xác nhận tiếp tục lưu only while an exact duplicate is shown) · Lý do thao tác with stable ids, each status "{n} lỗi" (danger) over "{filled}/{total}" (success once every required field is filled, muted before) over "tùy chọn" (no required field); blank strings and a cleared number (NaN) are not filled; the save-bar field names follow page order and the mode ("Lý do tạo/cập nhật hồ sơ");
-// fails_when=a section id or order changes (anchors and the scroll-spy break), an error stops winning over the count, a whitespace-only value counts as filled, the success tone appears with a required field still empty, the confirmation item shows without a duplicate, or labels come back in errors-object (schema) order instead of page order;
+// Value: protects=the student form's table-of-contents model (design 17a): sections Hồ sơ · Phụ huynh chính · (Xác nhận tiếp tục lưu only while an exact duplicate is shown) · Lý do thao tác with stable ids, each status "{n} lỗi" (danger) over the required-field state in words, "đủ" (success) or "thiếu {m}" (muted), led by "{filled}/{total}" when the section also has optional fields, over "tùy chọn" (no required field); blank strings and a cleared number (NaN) are not filled; the save-bar field names follow page order and the mode ("Lý do tạo/cập nhật hồ sơ");
+// fails_when=a section id or order changes (anchors and the scroll-spy break), an error stops winning over the count, a whitespace-only value counts as filled, the success tone appears with a required field still empty, "complete" is told by the tone alone (no "đủ"/"thiếu" words, DESIGN hard rule 2), the confirmation item shows without a duplicate, or labels come back in errors-object (schema) order instead of page order;
 // why_new=step 15a adds the long-form TOC to /students/new and /students/[id]/edit; the status logic is pure so it is pinned here, the component test covers the wiring;
 // seam=none (pure functions); no_claim=does not prove the rendered TOC, the DOM order of the controls or RHF's error timing (student-profile-form.test.tsx)
 import { describe, expect, it } from "vitest";
@@ -14,6 +14,7 @@ import {
   STUDENT_FORM_SECTIONS,
 } from "@/features/students/form/student-form-toc";
 import { getStudentProfileFormDefaults } from "@/features/students/form/student-profile-form-helpers";
+import type { StudentProfileFormValues } from "@/features/students/form/student-profile-form-schema";
 
 const none = new Set<string>();
 
@@ -51,27 +52,67 @@ describe("student form TOC model", () => {
     const [hoSo, phuHuynh, , lyDo] = STUDENT_FORM_SECTIONS;
 
     // Create defaults prefill birth year, grade, level and mode; the name is still empty.
-    expect(getStudentFormSectionStatus(hoSo, defaults, none)).toEqual({ status: "4/9", tone: "muted" });
+    expect(getStudentFormSectionStatus(hoSo, defaults, none)).toEqual({ status: "4/9 · thiếu 1", tone: "muted" });
     expect(getStudentFormSectionStatus(hoSo, { ...defaults, fullName: "Nguyễn Gia Hân" }, none)).toEqual({
-      status: "5/9",
+      status: "5/9 · đủ",
       tone: "success",
     });
-    expect(getStudentFormSectionStatus(phuHuynh, defaults, none)).toEqual({ status: "0/6", tone: "muted" });
+    expect(getStudentFormSectionStatus(phuHuynh, defaults, none)).toEqual({ status: "0/6 · thiếu 3", tone: "muted" });
     expect(
       getStudentFormSectionStatus(
         phuHuynh,
         { ...defaults, guardianFullName: "Đỗ Thị Lan", guardianPhone: "0987654321", guardianZalo: "0987654321" },
         none,
       ),
-    ).toEqual({ status: "3/6", tone: "muted" });
+    ).toEqual({ status: "3/6 · thiếu 1", tone: "muted" });
     expect(
       getStudentFormSectionStatus(
         phuHuynh,
         { ...defaults, guardianFullName: "Đỗ Thị Lan", guardianPhone: "0987654321", guardianRelationship: "Mẹ" },
         none,
       ),
-    ).toEqual({ status: "3/6", tone: "success" });
-    expect(getStudentFormSectionStatus(lyDo, { reason: "Tư vấn" }, none)).toEqual({ status: "1/1", tone: "success" });
+    ).toEqual({ status: "3/6 · đủ", tone: "success" });
+    // Required fields only: the words alone ("1/1" / "0/1" would repeat them).
+    expect(getStudentFormSectionStatus(lyDo, { reason: "Tư vấn" }, none)).toEqual({ status: "đủ", tone: "success" });
+    expect(getStudentFormSectionStatus(lyDo, { reason: "  " }, none)).toEqual({ status: "thiếu 1", tone: "muted" });
+  });
+
+  it("says in words whether the required fields are complete; the tone only repeats it", () => {
+    const defaults = getStudentProfileFormDefaults("create");
+    // Every section of the page, "xac-nhan" included, as "id: status (tone)"; the words decide, the tone repeats them.
+    const statuses = (values: Partial<StudentProfileFormValues>) =>
+      STUDENT_FORM_SECTIONS.map((section) => {
+        const { status, tone } = getStudentFormSectionStatus(section, values, none);
+        return `${section.id}: ${status} (${tone})`;
+      });
+
+    expect(statuses(defaults)).toEqual([
+      "ho-so: 4/9 · thiếu 1 (muted)",
+      "phu-huynh: 0/6 · thiếu 3 (muted)",
+      "xac-nhan: thiếu 1 (muted)",
+      "ly-do: thiếu 1 (muted)",
+    ]);
+    expect(statuses({ ...defaults, fullName: "An" })).toEqual([
+      "ho-so: 5/9 · đủ (success)",
+      "phu-huynh: 0/6 · thiếu 3 (muted)",
+      "xac-nhan: thiếu 1 (muted)",
+      "ly-do: thiếu 1 (muted)",
+    ]);
+    expect(statuses({ ...defaults, guardianFullName: "Lan", guardianPhone: "0987654321" })).toEqual([
+      "ho-so: 4/9 · thiếu 1 (muted)",
+      "phu-huynh: 2/6 · thiếu 1 (muted)",
+      "xac-nhan: thiếu 1 (muted)",
+      "ly-do: thiếu 1 (muted)",
+    ]);
+    expect(
+      statuses({ ...defaults, fullName: "An", guardianFullName: "Lan", guardianPhone: "0987654321", guardianRelationship: "Mẹ", reason: "x" }),
+    ).toEqual(["ho-so: 5/9 · đủ (success)", "phu-huynh: 3/6 · đủ (success)", "xac-nhan: thiếu 1 (muted)", "ly-do: đủ (success)"]);
+    expect(statuses({ ...defaults, duplicateOverrideReason: "x" })).toEqual([
+      "ho-so: 4/9 · thiếu 1 (muted)",
+      "phu-huynh: 0/6 · thiếu 3 (muted)",
+      "xac-nhan: đủ (success)",
+      "ly-do: thiếu 1 (muted)",
+    ]);
   });
 
   it("shows the error count first, and 'tùy chọn' for a section without required fields", () => {
@@ -111,7 +152,7 @@ describe("student form TOC model", () => {
     });
     expect(shown.map((item) => item.id)).toEqual(["ho-so", "phu-huynh", "xac-nhan", "ly-do"]);
     expect(shown[2]).toEqual({ id: "xac-nhan", label: "Xác nhận tiếp tục lưu", status: "1 lỗi", tone: "danger" });
-    expect(shown[3]).toEqual({ id: "ly-do", label: "Lý do thao tác", status: "0/1", tone: "muted" });
+    expect(shown[3]).toEqual({ id: "ly-do", label: "Lý do thao tác", status: "thiếu 1", tone: "muted" });
   });
 
   it("names fields for the save bar in page order and by mode", () => {

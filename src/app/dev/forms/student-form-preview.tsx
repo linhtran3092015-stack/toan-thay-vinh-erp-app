@@ -4,7 +4,7 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import type { StudentFormActionOverrides } from "@/features/students/form/student-form-action-overrides";
 import type { StudentFormActionState } from "@/features/students/form/student-form-action-types";
 import { StudentFormPage } from "@/features/students/form/student-form-page";
-import { permissionDeniedDescription } from "@/lib/permissions/labels";
+import { STUDENT_CREATE_DENIED, STUDENT_EDIT_DENIED } from "@/features/students/form/student-form-route-copy";
 
 import { getFormsPreviewPermissions, type StudentFormsPreviewProps, type StudentFormsPreviewState } from "./forms-preview-params";
 import { getStudentFormPreviewFixture, getStudentFormPreviewLookup } from "./student-form-fixtures";
@@ -47,18 +47,11 @@ export function StudentFormPreviewBody({ role, state, view }: StudentFormsPrevie
   const permissions = getFormsPreviewPermissions(role);
 
   if (mode === "create" && !permissions.includes("students.create")) {
-    return (
-      <PermissionDeniedState description={permissionDeniedDescription("students.create")} title="Không có quyền tạo học viên" />
-    );
+    return <PermissionDeniedState description={STUDENT_CREATE_DENIED.description} title={STUDENT_CREATE_DENIED.title} />;
   }
 
   if (mode === "edit" && !(permissions.includes("students.view") && permissions.includes("students.update"))) {
-    return (
-      <PermissionDeniedState
-        description="Tài khoản hiện tại cần có cả quyền students.view và students.update."
-        title="Không có quyền chỉnh sửa học viên"
-      />
-    );
+    return <PermissionDeniedState description={STUDENT_EDIT_DENIED.description} title={STUDENT_EDIT_DENIED.title} />;
   }
 
   const fixture = getStudentFormPreviewFixture(mode, state);

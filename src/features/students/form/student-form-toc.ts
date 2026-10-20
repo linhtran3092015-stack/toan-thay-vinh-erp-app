@@ -129,10 +129,15 @@ export interface StudentFormSectionStatus {
 }
 
 /**
- * Table-of-contents status of one section:
+ * Table-of-contents status of one section. Whether the required (*) fields
+ * are complete is said in words; the tone repeats it in colour:
  * - any field in error → "{n} lỗi" (danger);
- * - a section with required fields → "{filled}/{total}" over all its fields,
- *   success once every required field is filled, muted before;
+ * - a section with required fields → "đủ" (success) once every required field
+ *   is filled, else "thiếu {m}" (muted, m required fields still empty); a
+ *   section that also has optional fields leads with "{filled}/{total}" over
+ *   all its fields ("5/9 · đủ", "0/6 · thiếu 3"); in a section of required
+ *   fields only the count would repeat the words, so it is left out (keeps
+ *   "Xác nhận tiếp tục lưu" unclipped in the 240px card);
  * - a section without required fields → "tùy chọn" (muted).
  */
 export function getStudentFormSectionStatus(
@@ -144,9 +149,13 @@ export function getStudentFormSectionStatus(
   if (errorCount > 0) return { status: `${errorCount} lỗi`, tone: "danger" };
   if (section.required.length === 0) return { status: "tùy chọn", tone: "muted" };
 
+  const missing = section.required.filter((name) => !isStudentFormValueFilled(values[name])).length;
+  const words = missing === 0 ? "đủ" : `thiếu ${missing}`;
+  const tone = missing === 0 ? "success" : "muted";
+  if (section.required.length === section.fields.length) return { status: words, tone };
+
   const filled = section.fields.filter((name) => isStudentFormValueFilled(values[name])).length;
-  const complete = section.required.every((name) => isStudentFormValueFilled(values[name]));
-  return { status: `${filled}/${section.fields.length}`, tone: complete ? "success" : "muted" };
+  return { status: `${filled}/${section.fields.length} · ${words}`, tone };
 }
 
 /** Items for `FormWithToc`, in page order; "xac-nhan" only while its section is shown. */

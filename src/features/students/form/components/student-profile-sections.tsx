@@ -123,12 +123,13 @@ export function SegmentedRadioGroup<T extends string>({
       >
         {label}
       </span>
+      {/* The 1px border sits outside the options: each option itself is 44px tall below md, 40px from md. */}
       <div
         aria-describedby={describedBy}
         aria-invalid={invalid || undefined}
         aria-labelledby={labelId}
         aria-required={required || undefined}
-        className="grid min-h-11 auto-cols-fr grid-flow-col overflow-hidden rounded-md border border-border-strong aria-[invalid=true]:border-danger md:min-h-10"
+        className="grid auto-cols-fr grid-flow-col overflow-hidden rounded-md border border-border-strong aria-[invalid=true]:border-danger"
         id={id}
         role="radiogroup"
       >
@@ -138,7 +139,7 @@ export function SegmentedRadioGroup<T extends string>({
             <button
               aria-checked={checked}
               className={cn(
-                "min-w-0 truncate px-2 text-control transition-colors duration-150 focus-visible:relative focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus",
+                "min-h-11 min-w-0 truncate px-2 text-control transition-colors duration-150 disabled:cursor-not-allowed disabled:text-text-disabled focus-visible:relative focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus md:min-h-10",
                 index > 0 && "border-l border-border-strong",
                 checked
                   ? "bg-surface-selected font-semibold text-action-primary"

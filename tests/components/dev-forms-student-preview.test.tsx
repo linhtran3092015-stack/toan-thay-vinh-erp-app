@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getStudentFormPreviewActions, StudentFormPreviewBody } from "@/app/dev/forms/student-form-preview";
 import * as studentFormActions from "@/features/students/form/student-form-actions";
+import { STUDENT_CREATE_DENIED, STUDENT_EDIT_DENIED } from "@/features/students/form/student-form-route-copy";
 
 const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }));
 
@@ -143,13 +144,16 @@ describe("/dev/forms student preview", () => {
   );
 
   it.each([
-    { name: "Không có quyền tạo học viên", role: "ta", view: "student" },
-    { name: "Không có quyền tạo học viên", role: "viewer", view: "student" },
-    { name: "Không có quyền chỉnh sửa học viên", role: "ta", view: "student-edit" },
-    { name: "Không có quyền chỉnh sửa học viên", role: "viewer", view: "student-edit" },
-  ] as const)("shows the route's denial to the $role on $view", ({ name, role, view }) => {
+    { copy: STUDENT_CREATE_DENIED, name: "Không có quyền tạo học viên", role: "ta", view: "student" },
+    { copy: STUDENT_CREATE_DENIED, name: "Không có quyền tạo học viên", role: "viewer", view: "student" },
+    { copy: STUDENT_EDIT_DENIED, name: "Không có quyền chỉnh sửa học viên", role: "ta", view: "student-edit" },
+    { copy: STUDENT_EDIT_DENIED, name: "Không có quyền chỉnh sửa học viên", role: "viewer", view: "student-edit" },
+  ] as const)("shows the route's denial to the $role on $view", ({ copy, name, role, view }) => {
     render(<StudentFormPreviewBody role={role} state="dirty" view={view} />);
     expect(screen.getByRole("heading", { level: 1, name })).toBeInTheDocument();
+    // The routes' own copy (new-student-route.test.tsx pins the routes to the same constants).
+    expect(copy.title).toBe(name);
+    expect(screen.getByText(copy.description)).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Thanh lưu thay đổi" })).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Mục trong form" })).not.toBeInTheDocument();
   });

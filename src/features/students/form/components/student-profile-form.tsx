@@ -4,8 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Info } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { Controller, useForm, useWatch, type FieldErrors, type FieldPath } from "react-hook-form";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { Controller, useForm, useWatch, type Control, type FieldErrors, type FieldPath } from "react-hook-form";
 
 import { FormSection, FormWithToc } from "@/components/patterns/form-with-toc";
 import { PageHeader } from "@/components/patterns/page-header";
@@ -85,17 +85,74 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
+ * Focuses the field (its control's id is the field name; a radiogroup hands
+ * focus to its checked radio). With `scroll`, first scrolls it to the middle
+ * of the viewport, clear of the topbar and the save bar.
+ */
+function focusField(root: HTMLElement | null, name: string, scroll = true) {
+  const element = root?.querySelector<HTMLElement>(`#${CSS.escape(name)}`);
+  if (!element) return;
+  const target =
+    element.getAttribute("role") === "radiogroup"
+      ? (element.querySelector<HTMLElement>('[role="radio"][tabindex="0"]') ?? element)
+      : element;
+  if (scroll && typeof target.scrollIntoView === "function") {
+    target.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "center" });
+  }
+  target.focus({ preventScroll: true });
+}
+
+/**
+ * Focuses the first of these fields in page order (a selector list matches in
+ * document order, not in the order of `names`); false when none is on the page.
+ */
+function focusFirstField(root: HTMLElement | null, names: readonly string[], scroll = true): boolean {
+  if (!root || names.length === 0) return false;
+  const first = root.querySelector<HTMLElement>(names.map((name) => `#${CSS.escape(name)}`).join(", "));
+  if (!first) return false;
+  focusField(root, first.id, scroll);
+  return true;
+}
+
+/**
+ * The table of contents around the sections. It is the only part of the form
+ * that watches every field (each section's status follows what is typed);
+ * the sections arrive as `children`, already rendered by the form, so a
+ * keystroke re-renders the table of contents and not the fields.
+ */
+function StudentFormToc({
+  children,
+  control,
+  errorFields,
+  showDuplicateConfirmation,
+}: {
+  children: ReactNode;
+  control: Control<StudentProfileFormValues>;
+  errorFields: ReadonlySet<string>;
+  showDuplicateConfirmation: boolean;
+}) {
+  const values = useWatch({ control });
+  return <FormWithToc items={getStudentFormTocItems({ errorFields, showDuplicateConfirmation, values })}>{children}</FormWithToc>;
+}
+
+/**
  * Student create/edit form (design 17a): a long page with a table of contents
  * ("Hồ sơ", "Phụ huynh chính", "Xác nhận tiếp tục lưu" while an exact
  * duplicate is shown, "Lý do thao tác") and the always-visible save bar.
  *
  * Every save first runs the duplicate lookup; an exact duplicate needs a
- * reason before the write. Create: "Lưu học sinh" opens the new profile,
+ * reason before the write, typed for that duplicate (a reason is emptied once
+ * its duplicate leaves the screen, and a save that finds another one asks
+ * again). Create: "Lưu học sinh" opens the new profile,
  * "Lưu và thêm tiếp" stays here with an empty form and a link to the new
  * profile (same server action; only the client's next step differs). Edit:
- * "Lưu thay đổi" returns to the profile. An invalid submit focuses the first
- * invalid field in page order. Unsaved edits: Hủy, the header link and the
- * profile links ask before leaving; reload/close asks through the browser.
+ * "Lưu thay đổi" returns to the profile. An invalid submit, client-side or
+ * rejected by the server, focuses the first invalid field in page order.
+ * While a save runs the sections are disabled (what is typed then would be
+ * lost); once it ends, focus the save took away (a disabled field or save
+ * button) goes back to that control, or to the save error when the control is
+ * gone or still disabled. Unsaved edits: Hủy, the header link and the profile
+ * links ask before leaving; reload/close asks through the browser.
  */
 export function StudentProfileForm({
   actions,
@@ -146,18 +203,41 @@ export function StudentProfileForm({
   const [submitAttempted, setSubmitAttempted] = useState(initialValidation);
   const [created, setCreated] = useState<{ href: string | null; label: string } | null>(null);
   const [leaveHref, setLeaveHref] = useState<string | null>(null);
+  /** The new profile of a successful "Lưu và thêm tiếp", set inside the submit and shown once the submit has finished. */
+  const createdForNext = useRef<{ href: string | null; label: string } | null>(null);
+  /** Fields to focus once the submit has finished: a control in the disabled sections cannot take focus. */
+  const pendingFocus = useRef<{ names: readonly string[]; scroll: boolean } | null>(null);
+  const [focusRequest, setFocusRequest] = useState(0);
+  /**
+   * The control inside the form that had focus when a submit started: a field
+   * (Enter) or a save-bar button. The save disables it, which drops focus to <body>.
+   */
+  const focusBeforeSubmit = useRef<HTMLElement | null>(null);
+  /** Focusable wrapper of the save error: where focus goes when the control it left is gone or still disabled. */
+  const saveErrorRef = useRef<HTMLDivElement>(null);
 
-  const values = useWatch({ control });
+  // Only the fields this component reads; the table of contents watches the rest (StudentFormToc).
+  const [watchedFullName, watchedBirthYear, watchedGuardianPhone] = useWatch({
+    control,
+    exact: true,
+    name: ["fullName", "birthYear", "guardianPhone"],
+  });
   const currentDuplicateKey = createDuplicateKey({
-    birthYear: Number(values.birthYear),
-    fullName: values.fullName ?? "",
-    guardianPhone: values.guardianPhone ?? "",
+    birthYear: Number(watchedBirthYear),
+    fullName: watchedFullName ?? "",
+    guardianPhone: watchedGuardianPhone ?? "",
   });
   const visibleDuplicateResult = checkedDuplicateKey === currentDuplicateKey ? duplicateResult : null;
   const showDuplicateConfirmation = Boolean(visibleDuplicateResult?.hasExactStudentDuplicate);
+  /** The exact duplicate "Xác nhận tiếp tục lưu" asks about (key + exact matches), or null while it is hidden. */
+  const shownConfirmation = visibleDuplicateResult?.hasExactStudentDuplicate
+    ? createConfirmationKey(currentDuplicateKey, visibleDuplicateResult)
+    : null;
+  /** The confirmation on screen at the last commit: what the reason typed so far answers. */
+  const confirmationOnScreen = useRef(shownConfirmation);
   const isOwnGuardian =
     mode === "edit" &&
-    normalizeStudentProfilePhone(values.guardianPhone ?? "") === normalizeStudentProfilePhone(defaultValues.guardianPhone);
+    normalizeStudentProfilePhone(watchedGuardianPhone ?? "") === normalizeStudentProfilePhone(defaultValues.guardianPhone);
 
   const dirtyNames = STUDENT_FORM_FIELD_ORDER.filter((name) => dirtyFields[name]);
   const isDirty = dirtyNames.length > 0;
@@ -167,10 +247,38 @@ export function StudentProfileForm({
   );
   const errorSet = new Set<string>(errorNames);
   const showErrorSummary = submitAttempted && errorNames.length > 0;
-  const tocItems = getStudentFormTocItems({ errorFields: errorSet, showDuplicateConfirmation, values });
 
   useLeaveGuard(isDirty && !isSubmitting);
   useSaveInFlightGuard(isSubmitting);
+
+  // Runs after the commit that re-enables the sections and renders the messages (aria-invalid, describedby).
+  useEffect(() => {
+    if (isSubmitting) return;
+    const pending = pendingFocus.current;
+    const before = focusBeforeSubmit.current;
+    pendingFocus.current = null;
+    focusBeforeSubmit.current = null;
+    if (pending && focusFirstField(formRef.current, pending.names, pending.scroll)) return;
+    if (!before || (document.activeElement !== null && document.activeElement !== document.body)) return;
+    // The submit disabled the control that had focus: give it back, else move to the save error.
+    if (before.isConnected && !before.matches(":disabled")) {
+      before.focus({ preventScroll: true });
+    } else {
+      saveErrorRef.current?.focus({ preventScroll: true });
+    }
+  }, [focusRequest, isSubmitting]);
+
+  // The override reason answers the duplicate it was typed for. Once that one leaves the screen (another
+  // key, or the lookup names another match) the reason is emptied: no other duplicate, and no later
+  // return to this one, inherits it. Dirty is recomputed against the defaults, so the bar drops it.
+  useEffect(() => {
+    const previous = confirmationOnScreen.current;
+    confirmationOnScreen.current = shownConfirmation;
+    if (previous === null || previous === shownConfirmation) return;
+    form.setValue("duplicateOverrideReason", "", { shouldDirty: true });
+    // A save that found another duplicate has just set this error for it; only a hidden section drops it.
+    if (shownConfirmation === null) form.clearErrors("duplicateOverrideReason");
+  }, [form, shownConfirmation]);
 
   // Dev previews only: validate the starting draft once, as after a submit attempt.
   useEffect(() => {
@@ -184,34 +292,15 @@ export function StudentProfileForm({
 
   const linkToStudent = studentHref ?? ((studentId: string) => withReturnQuery(`/students/${studentId}`, returnQuery));
 
-  /**
-   * Scrolls the field to the middle of the viewport (clear of the topbar and
-   * the save bar), then focuses it. Field ids are the field names (plain
-   * identifiers, valid in an id selector).
-   */
-  function focusField(name: string) {
-    const element = formRef.current?.querySelector<HTMLElement>(`#${name}`);
-    if (!element) return;
-    const target =
-      element.getAttribute("role") === "radiogroup"
-        ? (element.querySelector<HTMLElement>('[role="radio"][tabindex="0"]') ?? element)
-        : element;
-    if (typeof target.scrollIntoView === "function") {
-      target.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "center" });
-    }
-    target.focus({ preventScroll: true });
+  /** Focuses the first of these fields in page order once no submit runs (the sections are enabled again). */
+  function requestFocus(names: readonly string[], scroll = true) {
+    pendingFocus.current = { names, scroll };
+    setFocusRequest((count) => count + 1);
   }
 
-  /** The first of these fields in DOM order (not the order of the errors object). */
-  function focusFirstField(names: readonly string[]) {
-    const root = formRef.current;
-    if (!root || names.length === 0) return;
-    const elements = names
-      .map((name) => root.querySelector<HTMLElement>(`#${name}`))
-      .filter((element): element is HTMLElement => element !== null)
-      .sort((left, right) => (left.compareDocumentPosition(right) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
-    const first = elements[0];
-    if (first) focusField(first.id);
+  function rememberFocusBeforeSubmit() {
+    const active = document.activeElement;
+    focusBeforeSubmit.current = active instanceof HTMLElement && formRef.current?.contains(active) ? active : null;
   }
 
   async function runDuplicateLookup(lookupValues: StudentProfileFormValues): Promise<StudentDuplicateLookupResult> {
@@ -230,8 +319,12 @@ export function StudentProfileForm({
       result = { message: LOOKUP_CONNECTION_ERROR, ok: false };
     }
 
-    setCheckedDuplicateKey(createDuplicateKey(lookupValues));
-    setDuplicateResult(result.ok ? result : null);
+    // A failed lookup says nothing new about duplicates: the last successful result stays on screen
+    // with its key, so "Xác nhận tiếp tục lưu" and the reason typed for it survive a retry.
+    if (result.ok) {
+      setCheckedDuplicateKey(createDuplicateKey(lookupValues));
+      setDuplicateResult(result);
+    }
     return result;
   }
 
@@ -241,7 +334,7 @@ export function StudentProfileForm({
 
     const valid = await form.trigger(duplicateFields);
     if (!valid) {
-      focusFirstField(duplicateFields.filter((name) => form.getFieldState(name).invalid));
+      focusFirstField(formRef.current, duplicateFields.filter((name) => form.getFieldState(name).invalid));
       return;
     }
 
@@ -259,20 +352,27 @@ export function StudentProfileForm({
     setSaveError(null);
     setStatusMessage("");
 
+    // The exact duplicate on screen as this save starts: the only one a typed reason can answer.
+    const confirmed = confirmationOnScreen.current;
     const lookup = await runDuplicateLookup(submitted);
     if (!lookup.ok) {
       setSaveError(lookup.message);
       return;
     }
 
-    if (lookup.hasExactStudentDuplicate && !submitted.duplicateOverrideReason.trim()) {
+    const overrideReason = submitted.duplicateOverrideReason.trim();
+    if (
+      lookup.hasExactStudentDuplicate &&
+      (!overrideReason || createConfirmationKey(createDuplicateKey(submitted), lookup) !== confirmed)
+    ) {
+      // Another duplicate than the one on screen (or none was): ask again, never pass the earlier reason.
       form.setError("duplicateOverrideReason", {
         message: "Có học viên trùng họ tên, năm sinh và số điện thoại phụ huynh. Cần nhập lý do để tiếp tục.",
         type: "manual",
       });
       setSubmitAttempted(true);
-      // The section renders with this commit; focus it afterwards.
-      window.setTimeout(() => focusField("duplicateOverrideReason"), 0);
+      // The section renders with this commit; focus it once the submit has finished.
+      requestFocus(["duplicateOverrideReason"]);
       return;
     }
 
@@ -287,23 +387,22 @@ export function StudentProfileForm({
     }
 
     if (actionState.status === "error") {
-      if (applyActionFieldErrors(form, actionState)) setSubmitAttempted(true);
+      const rejected = applyActionFieldErrors(form, actionState);
+      if (rejected.length > 0) {
+        setSubmitAttempted(true);
+        // Like a client-side invalid submit: the first rejected field in page order, once the sections are enabled again.
+        requestFocus(rejected);
+      }
       setSaveError(actionState.message);
       return;
     }
 
     if (intent === "save-and-add" && mode === "create") {
-      // Client-only: the profile exists; start the next one on an empty form.
-      form.reset(defaultValues);
-      setDuplicateResult(null);
-      setCheckedDuplicateKey(null);
-      setSubmitAttempted(false);
-      setCreated({
+      // Client-only: the profile exists; saveAndAdd starts the next one once the submit has finished.
+      createdForNext.current = {
         href: actionState.redirectTo ? withReturnQuery(actionState.redirectTo, returnQuery) : null,
         label: actionState.studentPublicCode || submitted.fullName,
-      });
-      window.scrollTo({ behavior: prefersReducedMotion() ? "auto" : "smooth", top: 0 });
-      window.setTimeout(() => document.getElementById("fullName")?.focus({ preventScroll: true }), 0);
+      };
       return;
     }
 
@@ -321,13 +420,34 @@ export function StudentProfileForm({
 
   function handleInvalidSubmit(invalid: FieldErrors<StudentProfileFormValues>) {
     setSubmitAttempted(true);
-    const names = Object.keys(invalid);
-    // After the commit that renders the messages (aria-invalid, describedby).
-    window.setTimeout(() => focusFirstField(names), 0);
+    requestFocus(Object.keys(invalid));
   }
 
   const submit = (intent: "save" | "save-and-add") =>
     form.handleSubmit((submitted) => submitValues(submitted, intent), handleInvalidSubmit);
+
+  /**
+   * "Lưu và thêm tiếp": the same submit, then (on success) an empty form for
+   * the next student. The reset waits for handleSubmit to finish: RHF marks
+   * the form submitted after the submit handler returns, so a reset inside it
+   * would leave the next, untouched record validating on every keystroke
+   * instead of on blur like the first one.
+   */
+  async function saveAndAdd() {
+    createdForNext.current = null;
+    rememberFocusBeforeSubmit();
+    await submit("save-and-add")();
+    const next = createdForNext.current;
+    createdForNext.current = null;
+    if (!next) return;
+    form.reset(defaultValues);
+    setDuplicateResult(null);
+    setCheckedDuplicateKey(null);
+    setSubmitAttempted(false);
+    setCreated(next);
+    window.scrollTo({ behavior: prefersReducedMotion() ? "auto" : "smooth", top: 0 });
+    requestFocus(["fullName"], false);
+  }
 
   function requestLeave(href: string) {
     if (isSubmitting) return;
@@ -370,7 +490,7 @@ export function StudentProfileForm({
             {mode === "create" ? "Về danh sách" : "Về hồ sơ"}
           </Link>
         }
-        title={mode === "create" ? "Thêm học sinh" : values.fullName || "Học viên"}
+        title={mode === "create" ? "Thêm học sinh" : watchedFullName || "Học viên"}
       >
         <p className="mt-1 text-secondary text-text-muted">
           {mode === "create" ? (
@@ -388,7 +508,12 @@ export function StudentProfileForm({
         <ResultBanner
           action={
             createdHref ? (
-              <Link href={createdHref} onClick={(event) => onGuardedLinkClick(event, createdHref)}>
+              <Link
+                // 44px tap target on phones; plain inline text from md.
+                className="inline-flex min-h-11 items-center md:min-h-0"
+                href={createdHref}
+                onClick={(event) => onGuardedLinkClick(event, createdHref)}
+              >
                 Mở hồ sơ
               </Link>
             ) : undefined
@@ -401,239 +526,255 @@ export function StudentProfileForm({
       <form
         className="grid min-w-0"
         noValidate
-        onSubmit={(event) => void submit("save")(event)}
+        onSubmit={(event) => {
+          rememberFocusBeforeSubmit();
+          void submit("save")(event);
+        }}
         ref={formRef}
       >
         <input type="hidden" {...register("studentId")} />
 
-        <FormWithToc items={tocItems}>
-          <FormSection id="ho-so" title="Hồ sơ">
-            <div className="grid gap-x-6 gap-y-4 md:grid-cols-12">
-              {mode === "edit" ? (
-                <>
-                  <ProfileField className="md:col-span-6" label="Mã học viên" name="publicCode">
-                    {(props) => (
-                      <Input
-                        {...props}
-                        className="font-mono font-semibold read-only:bg-surface-sunken"
-                        readOnly
-                        {...register("publicCode")}
-                      />
-                    )}
-                  </ProfileField>
-                  <ProfileField className="md:col-span-6" label="Trạng thái hiện tại" name="lifecycleStatus">
-                    {(props) => (
-                      <Input {...props} className="read-only:bg-surface-sunken" readOnly value={lifecycleLabel ?? "-"} />
-                    )}
-                  </ProfileField>
-                </>
-              ) : (
-                <input type="hidden" {...register("publicCode")} />
-              )}
+        <StudentFormToc control={control} errorFields={errorSet} showDuplicateConfirmation={showDuplicateConfirmation}>
+          {/* Disabled while a save runs (edits typed then would be lost); `contents` keeps the sections as the column's own items. */}
+          <fieldset className="contents" disabled={isSubmitting}>
+            <FormSection id="ho-so" title="Hồ sơ">
+              <div className="grid gap-x-6 gap-y-4 md:grid-cols-12">
+                {mode === "edit" ? (
+                  <>
+                    <ProfileField className="md:col-span-6" label="Mã học viên" name="publicCode">
+                      {(props) => (
+                        <Input
+                          {...props}
+                          className="font-mono font-semibold read-only:bg-surface-sunken"
+                          readOnly
+                          {...register("publicCode")}
+                        />
+                      )}
+                    </ProfileField>
+                    <ProfileField className="md:col-span-6" label="Trạng thái hiện tại" name="lifecycleStatus">
+                      {(props) => (
+                        <Input {...props} className="read-only:bg-surface-sunken" readOnly value={lifecycleLabel ?? "-"} />
+                      )}
+                    </ProfileField>
+                  </>
+                ) : (
+                  <input type="hidden" {...register("publicCode")} />
+                )}
 
-              <ProfileField className="md:col-span-6" error={fieldError("fullName")} label="Họ và tên" name="fullName" required>
-                {(props) => <Input {...props} {...register("fullName")} />}
-              </ProfileField>
-              <ProfileField className="md:col-span-3" error={fieldError("nickname")} label="Tên thường gọi" name="nickname">
-                {(props) => <Input {...props} {...register("nickname")} />}
-              </ProfileField>
-              <ProfileField className="md:col-span-3" error={fieldError("birthYear")} label="Năm sinh" name="birthYear" required>
+                <ProfileField className="md:col-span-6" error={fieldError("fullName")} label="Họ và tên" name="fullName" required>
+                  {(props) => <Input {...props} {...register("fullName")} />}
+                </ProfileField>
+                <ProfileField className="md:col-span-3" error={fieldError("nickname")} label="Tên thường gọi" name="nickname">
+                  {(props) => <Input {...props} {...register("nickname")} />}
+                </ProfileField>
+                <ProfileField className="md:col-span-3" error={fieldError("birthYear")} label="Năm sinh" name="birthYear" required>
+                  {(props) => (
+                    <Input
+                      {...props}
+                      className="tabular-nums"
+                      inputMode="numeric"
+                      type="number"
+                      {...register("birthYear", { valueAsNumber: true })}
+                    />
+                  )}
+                </ProfileField>
+
+                <ProfileField className="md:col-span-3" error={fieldError("currentGrade")} label="Khối hiện tại" name="currentGrade" required>
+                  {(props) => (
+                    <Select {...props} {...register("currentGrade", { valueAsNumber: true })}>
+                      {gradeOptions.map((grade) => (
+                        <option key={grade} value={grade}>
+                          Khối {grade}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </ProfileField>
+                <ProfileField className="md:col-span-3" error={fieldError("learningLevel")} label="Mức học tập" name="learningLevel" required>
+                  {(props) => (
+                    <Select {...props} {...register("learningLevel")}>
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="CLC">CLC</option>
+                    </Select>
+                  )}
+                </ProfileField>
+                <div className="min-w-0 md:col-span-3">
+                  <Controller
+                    control={control}
+                    name="registeredMode"
+                    render={({ field }) => {
+                      const error = fieldError("registeredMode");
+                      return (
+                        <>
+                          <SegmentedRadioGroup
+                            controlRef={field.ref}
+                            describedBy={error ? "registeredMode-error" : undefined}
+                            id="registeredMode"
+                            invalid={Boolean(error)}
+                            label="Hình thức đăng ký"
+                            onBlur={field.onBlur}
+                            onChange={field.onChange}
+                            options={registeredModeOptions}
+                            required
+                            value={field.value}
+                          />
+                          {error ? (
+                            <p className="mt-1.5 text-caption font-medium text-danger" id="registeredMode-error" role="alert">
+                              {error}
+                            </p>
+                          ) : null}
+                        </>
+                      );
+                    }}
+                  />
+                </div>
+                <ProfileField className="md:col-span-3" error={fieldError("provinceName")} label="Tỉnh/thành phố" name="provinceName">
+                  {(props) => <Input {...props} {...register("provinceName")} />}
+                </ProfileField>
+
+                <ProfileField className="md:col-span-12" error={fieldError("learningGoal")} label="Mục tiêu học tập" name="learningGoal">
+                  {(props) => <Textarea {...props} {...register("learningGoal")} />}
+                </ProfileField>
+                <ProfileField className="md:col-span-12" error={fieldError("internalNote")} label="Ghi chú nội bộ" name="internalNote">
+                  {(props) => <Textarea {...props} {...register("internalNote")} />}
+                </ProfileField>
+              </div>
+            </FormSection>
+
+            <FormSection
+              description="Bắt buộc để tạo yêu cầu thanh toán và nhận thông báo học phí."
+              headerAction={
+                <Button
+                  className="max-md:h-11"
+                  disabled={isCheckingDuplicates || isSubmitting}
+                  isLoading={isCheckingDuplicates}
+                  onClick={handleDuplicateCheck}
+                  variant="secondary"
+                >
+                  {isCheckingDuplicates ? "Đang kiểm tra…" : "Kiểm tra hồ sơ trùng"}
+                </Button>
+              }
+              id="phu-huynh"
+              title="Phụ huynh chính"
+            >
+              <div className="grid gap-x-6 gap-y-4 md:grid-cols-12">
+                <ProfileField className="md:col-span-5" error={fieldError("guardianFullName")} label="Họ tên phụ huynh" name="guardianFullName" required>
+                  {(props) => <Input {...props} {...register("guardianFullName")} />}
+                </ProfileField>
+                <ProfileField className="md:col-span-3" error={fieldError("guardianRelationship")} label="Quan hệ với học viên" name="guardianRelationship" required>
+                  {(props) => (
+                    <Select {...props} {...register("guardianRelationship")}>
+                      <option value="">Chọn quan hệ</option>
+                      <option value="Mẹ">Mẹ</option>
+                      <option value="Bố">Bố</option>
+                      <option value="Người giám hộ">Người giám hộ</option>
+                      <option value="Khác">Khác</option>
+                    </Select>
+                  )}
+                </ProfileField>
+                <ProfileField
+                  className="md:col-span-4"
+                  error={fieldError("guardianPhone")}
+                  hint="Hệ thống chuẩn hóa số và dùng lại phụ huynh đã có cùng số điện thoại."
+                  label="Số điện thoại"
+                  name="guardianPhone"
+                  required
+                >
+                  {(props) => (
+                    <Input {...props} className="tabular-nums" inputMode="tel" type="tel" {...register("guardianPhone")} />
+                  )}
+                </ProfileField>
+
+                <ProfileField className="md:col-span-4" error={fieldError("guardianZalo")} label="Zalo" name="guardianZalo">
+                  {(props) => <Input {...props} className="tabular-nums" {...register("guardianZalo")} />}
+                </ProfileField>
+                <ProfileField className="md:col-span-8" error={fieldError("guardianEmail")} label="Email" name="guardianEmail">
+                  {(props) => <Input {...props} type="email" {...register("guardianEmail")} />}
+                </ProfileField>
+
+                {lookupError || visibleDuplicateResult ? (
+                  <div className="grid gap-3 md:col-span-12">
+                    {lookupError ? <ResultBanner description={lookupError} title="Chưa kiểm tra được hồ sơ trùng." tone="danger" /> : null}
+                    {visibleDuplicateResult ? (
+                      <DuplicateLookupNotices
+                        currentStudentId={mode === "edit" ? defaultValues.studentId : undefined}
+                        isOwnGuardian={isOwnGuardian}
+                        onLinkClick={onGuardedLinkClick}
+                        result={visibleDuplicateResult}
+                        studentHref={linkToStudent}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <ProfileField className="md:col-span-12" error={fieldError("guardianNote")} label="Ghi chú phụ huynh" name="guardianNote">
+                  {(props) => <Textarea {...props} {...register("guardianNote")} />}
+                </ProfileField>
+              </div>
+            </FormSection>
+
+            {showDuplicateConfirmation ? (
+              <FormSection
+                description="Chỉ cần khi đã có học sinh trùng họ tên, năm sinh và số điện thoại phụ huynh."
+                id="xac-nhan"
+                title="Xác nhận tiếp tục lưu"
+              >
+                <ProfileField
+                  error={fieldError("duplicateOverrideReason")}
+                  hint="Lý do này được lưu cùng audit của thao tác."
+                  label="Lý do vẫn tạo hoặc cập nhật hồ sơ"
+                  name="duplicateOverrideReason"
+                  required
+                >
+                  {(props) => <Textarea {...props} {...register("duplicateOverrideReason")} />}
+                </ProfileField>
+              </FormSection>
+            ) : null}
+
+            <FormSection id="ly-do" title="Lý do thao tác">
+              <ProfileField
+                error={fieldError("reason")}
+                hint="Nội dung được lưu trong nhật ký audit."
+                label={mode === "create" ? "Lý do tạo hồ sơ" : "Lý do cập nhật hồ sơ"}
+                name="reason"
+                required
+              >
                 {(props) => (
-                  <Input
+                  <Textarea
                     {...props}
-                    className="tabular-nums"
-                    inputMode="numeric"
-                    type="number"
-                    {...register("birthYear", { valueAsNumber: true })}
+                    placeholder={
+                      mode === "create"
+                        ? "Ví dụ: Tạo hồ sơ sau khi phụ huynh đăng ký tư vấn."
+                        : "Ví dụ: Cập nhật thông tin theo xác nhận của phụ huynh."
+                    }
+                    {...register("reason")}
                   />
                 )}
               </ProfileField>
-
-              <ProfileField className="md:col-span-3" error={fieldError("currentGrade")} label="Khối hiện tại" name="currentGrade" required>
-                {(props) => (
-                  <Select {...props} {...register("currentGrade", { valueAsNumber: true })}>
-                    {gradeOptions.map((grade) => (
-                      <option key={grade} value={grade}>
-                        Khối {grade}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </ProfileField>
-              <ProfileField className="md:col-span-3" error={fieldError("learningLevel")} label="Mức học tập" name="learningLevel" required>
-                {(props) => (
-                  <Select {...props} {...register("learningLevel")}>
-                    <option value="A">A</option>
-                    <option value="B">B</option>
-                    <option value="CLC">CLC</option>
-                  </Select>
-                )}
-              </ProfileField>
-              <div className="min-w-0 md:col-span-3">
-                <Controller
-                  control={control}
-                  name="registeredMode"
-                  render={({ field }) => {
-                    const error = fieldError("registeredMode");
-                    return (
-                      <>
-                        <SegmentedRadioGroup
-                          controlRef={field.ref}
-                          describedBy={error ? "registeredMode-error" : undefined}
-                          id="registeredMode"
-                          invalid={Boolean(error)}
-                          label="Hình thức đăng ký"
-                          onBlur={field.onBlur}
-                          onChange={field.onChange}
-                          options={registeredModeOptions}
-                          required
-                          value={field.value}
-                        />
-                        {error ? (
-                          <p className="mt-1.5 text-caption font-medium text-danger" id="registeredMode-error" role="alert">
-                            {error}
-                          </p>
-                        ) : null}
-                      </>
-                    );
-                  }}
-                />
-              </div>
-              <ProfileField className="md:col-span-3" error={fieldError("provinceName")} label="Tỉnh/thành phố" name="provinceName">
-                {(props) => <Input {...props} {...register("provinceName")} />}
-              </ProfileField>
-
-              <ProfileField className="md:col-span-12" error={fieldError("learningGoal")} label="Mục tiêu học tập" name="learningGoal">
-                {(props) => <Textarea {...props} {...register("learningGoal")} />}
-              </ProfileField>
-              <ProfileField className="md:col-span-12" error={fieldError("internalNote")} label="Ghi chú nội bộ" name="internalNote">
-                {(props) => <Textarea {...props} {...register("internalNote")} />}
-              </ProfileField>
-            </div>
-          </FormSection>
-
-          <FormSection
-            description="Bắt buộc để tạo yêu cầu thanh toán và nhận thông báo học phí."
-            headerAction={
-              <Button
-                className="max-md:h-11"
-                disabled={isCheckingDuplicates || isSubmitting}
-                isLoading={isCheckingDuplicates}
-                onClick={handleDuplicateCheck}
-                variant="secondary"
-              >
-                {isCheckingDuplicates ? "Đang kiểm tra…" : "Kiểm tra hồ sơ trùng"}
-              </Button>
-            }
-            id="phu-huynh"
-            title="Phụ huynh chính"
-          >
-            <div className="grid gap-x-6 gap-y-4 md:grid-cols-12">
-              <ProfileField className="md:col-span-5" error={fieldError("guardianFullName")} label="Họ tên phụ huynh" name="guardianFullName" required>
-                {(props) => <Input {...props} {...register("guardianFullName")} />}
-              </ProfileField>
-              <ProfileField className="md:col-span-3" error={fieldError("guardianRelationship")} label="Quan hệ với học viên" name="guardianRelationship" required>
-                {(props) => (
-                  <Select {...props} {...register("guardianRelationship")}>
-                    <option value="">Chọn quan hệ</option>
-                    <option value="Mẹ">Mẹ</option>
-                    <option value="Bố">Bố</option>
-                    <option value="Người giám hộ">Người giám hộ</option>
-                    <option value="Khác">Khác</option>
-                  </Select>
-                )}
-              </ProfileField>
-              <ProfileField
-                className="md:col-span-4"
-                error={fieldError("guardianPhone")}
-                hint="Hệ thống chuẩn hóa số và dùng lại phụ huynh đã có cùng số điện thoại."
-                label="Số điện thoại"
-                name="guardianPhone"
-                required
-              >
-                {(props) => (
-                  <Input {...props} className="tabular-nums" inputMode="tel" type="tel" {...register("guardianPhone")} />
-                )}
-              </ProfileField>
-
-              <ProfileField className="md:col-span-4" error={fieldError("guardianZalo")} label="Zalo" name="guardianZalo">
-                {(props) => <Input {...props} className="tabular-nums" {...register("guardianZalo")} />}
-              </ProfileField>
-              <ProfileField className="md:col-span-8" error={fieldError("guardianEmail")} label="Email" name="guardianEmail">
-                {(props) => <Input {...props} type="email" {...register("guardianEmail")} />}
-              </ProfileField>
-
-              {lookupError || visibleDuplicateResult ? (
-                <div className="grid gap-3 md:col-span-12">
-                  {lookupError ? <ResultBanner description={lookupError} title="Chưa kiểm tra được hồ sơ trùng." tone="danger" /> : null}
-                  {visibleDuplicateResult ? (
-                    <DuplicateLookupNotices
-                      currentStudentId={mode === "edit" ? defaultValues.studentId : undefined}
-                      isOwnGuardian={isOwnGuardian}
-                      onLinkClick={onGuardedLinkClick}
-                      result={visibleDuplicateResult}
-                      studentHref={linkToStudent}
-                    />
-                  ) : null}
-                </div>
-              ) : null}
-
-              <ProfileField className="md:col-span-12" error={fieldError("guardianNote")} label="Ghi chú phụ huynh" name="guardianNote">
-                {(props) => <Textarea {...props} {...register("guardianNote")} />}
-              </ProfileField>
-            </div>
-          </FormSection>
-
-          {showDuplicateConfirmation ? (
-            <FormSection
-              description="Chỉ cần khi đã có học sinh trùng họ tên, năm sinh và số điện thoại phụ huynh."
-              id="xac-nhan"
-              title="Xác nhận tiếp tục lưu"
-            >
-              <ProfileField
-                error={fieldError("duplicateOverrideReason")}
-                hint="Lý do này được lưu cùng audit của thao tác."
-                label="Lý do vẫn tạo hoặc cập nhật hồ sơ"
-                name="duplicateOverrideReason"
-                required
-              >
-                {(props) => <Textarea {...props} {...register("duplicateOverrideReason")} />}
-              </ProfileField>
             </FormSection>
-          ) : null}
 
-          <FormSection id="ly-do" title="Lý do thao tác">
-            <ProfileField
-              error={fieldError("reason")}
-              hint="Nội dung được lưu trong nhật ký audit."
-              label={mode === "create" ? "Lý do tạo hồ sơ" : "Lý do cập nhật hồ sơ"}
-              name="reason"
-              required
-            >
-              {(props) => (
-                <Textarea
-                  {...props}
-                  placeholder={
-                    mode === "create"
-                      ? "Ví dụ: Tạo hồ sơ sau khi phụ huynh đăng ký tư vấn."
-                      : "Ví dụ: Cập nhật thông tin theo xác nhận của phụ huynh."
-                  }
-                  {...register("reason")}
-                />
-              )}
-            </ProfileField>
-          </FormSection>
-
-          <p className="flex items-start gap-2 rounded-lg border border-border-subtle bg-surface-sunken px-4 py-3 text-secondary text-text-muted">
-            <Info aria-hidden="true" className="mt-px shrink-0" size={16} strokeWidth={1.8} />
-            Nguồn học viên, đơn giá học phí và ghi danh vào lớp được thiết lập trên hồ sơ học sinh sau khi lưu.
-          </p>
-        </FormWithToc>
+            <p className="flex items-start gap-2 rounded-lg border border-border-subtle bg-surface-sunken px-4 py-3 text-secondary text-text-muted">
+              <Info aria-hidden="true" className="mt-px shrink-0" size={16} strokeWidth={1.8} />
+              Nguồn học viên, đơn giá học phí và ghi danh vào lớp được thiết lập trên hồ sơ học sinh sau khi lưu.
+            </p>
+          </fieldset>
+        </StudentFormToc>
 
         <StickySaveBar
           changedLabels={showErrorSummary && firstErrorLabel ? [firstErrorLabel] : changedLabels}
           dirtyCount={dirtyNames.length}
-          error={saveError ? <ResultBanner description={saveError} title="Chưa lưu được hồ sơ." tone="danger" /> : null}
+          error={
+            saveError ? (
+              <div
+                className="rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+                ref={saveErrorRef}
+                tabIndex={-1}
+              >
+                <ResultBanner description={saveError} title="Chưa lưu được hồ sơ." tone="danger" />
+              </div>
+            ) : null
+          }
           isSaving={isSubmitting}
           onCancel={() => requestLeave(cancelHref)}
           saveDisabled={saveBlocked}
@@ -643,7 +784,7 @@ export function StudentProfileForm({
           savingLabel="Đang lưu…"
           secondaryAction={
             mode === "create"
-              ? { disabled: saveBlocked, label: "Lưu và thêm tiếp", onClick: () => void submit("save-and-add")() }
+              ? { disabled: saveBlocked, label: "Lưu và thêm tiếp", onClick: () => void saveAndAdd() }
               : undefined
           }
           stateLabel={showErrorSummary ? `Đang nhập · ${errorNames.length} lỗi cần sửa` : undefined}
@@ -679,17 +820,26 @@ function createDuplicateKey(
   ].join("|");
 }
 
-/** Puts the action's field errors on their fields; true when at least one was set. */
+/** What an override reason answers: the lookup key and the exact matches the lookup named for it. */
+function createConfirmationKey(duplicateKey: string, lookup: SuccessfulDuplicateLookup): string {
+  const exactIds = (lookup.guardian?.children ?? [])
+    .filter((student) => student.isExactDuplicate)
+    .map((student) => student.id)
+    .sort();
+  return `${duplicateKey}#${exactIds.join(",")}`;
+}
+
+/** Puts the action's field errors on their fields; returns the names of the fields that got one. */
 function applyActionFieldErrors(
   form: ReturnType<typeof useForm<StudentProfileFormValues>>,
   state: StudentFormActionState,
-): boolean {
-  let applied = false;
+): string[] {
+  const applied: string[] = [];
   for (const [fieldName, messages] of Object.entries(state.fieldErrors ?? {})) {
     const message = messages?.[0];
     if (!message) continue;
     form.setError(fieldName as FieldPath<StudentProfileFormValues>, { message, type: "server" });
-    applied = true;
+    applied.push(fieldName);
   }
   return applied;
 }
