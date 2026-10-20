@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge, CountChip } from "@/components/ui/badge";
 import { Button, getButtonClassName } from "@/components/ui/button";
+import { Input, Textarea } from "@/components/ui/field";
 import { TabPanel, Tabs } from "@/components/ui/tabs";
 
 afterEach(cleanup);
@@ -197,5 +198,35 @@ describe("ResultBanner", () => {
   it("treats danger as the error family", () => {
     render(<ResultBanner title="Không gửi được" tone="danger" />);
     expect(screen.getByRole("alert")).toHaveTextContent("Không gửi được");
+  });
+});
+
+describe("Field controls", () => {
+  it("keep the single-line height on inputs but never on textareas", () => {
+    render(
+      <>
+        <Input aria-label="Tên lớp" />
+        <Textarea aria-label="Ghi chú" />
+        <Textarea aria-label="Lý do" className="min-h-28" />
+        <Textarea aria-label="Hướng dẫn" className="min-h-11" rows={1} />
+        <Textarea aria-label="Mô tả" className="md:min-h-28" />
+      </>,
+    );
+
+    expect(screen.getByLabelText("Tên lớp")).toHaveClass("min-h-11", "md:min-h-10");
+    // cn() does not merge classes and md:min-h-10 is emitted after every min-h-*, so a textarea carrying it collapses to 40px from 768px.
+    for (const label of ["Ghi chú", "Lý do", "Hướng dẫn", "Mô tả"]) {
+      const textarea = screen.getByLabelText(label);
+      expect(textarea).toHaveClass("py-2", "rounded-md");
+      expect(textarea).not.toHaveClass("md:min-h-10");
+    }
+    // The 80px default applies unless the caller sets its own minimum; a shorter one would otherwise lose to min-h-20 by CSS order.
+    expect(screen.getByLabelText("Ghi chú")).toHaveClass("min-h-20");
+    expect(screen.getByLabelText("Lý do")).toHaveClass("min-h-28");
+    expect(screen.getByLabelText("Lý do")).not.toHaveClass("min-h-20");
+    expect(screen.getByLabelText("Hướng dẫn")).toHaveClass("min-h-11");
+    expect(screen.getByLabelText("Hướng dẫn")).not.toHaveClass("min-h-20");
+    // A breakpoint-only minimum keeps the default below that breakpoint.
+    expect(screen.getByLabelText("Mô tả")).toHaveClass("min-h-20", "md:min-h-28");
   });
 });

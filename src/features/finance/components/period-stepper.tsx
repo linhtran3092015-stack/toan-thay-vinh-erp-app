@@ -1,85 +1,17 @@
-import { Check } from "lucide-react";
-import Link from "next/link";
-
+import { Stepper, type StepperStep, type StepperStepState } from "@/components/patterns/stepper";
 import { formatDateTime } from "@/lib/datetime";
-import { cn } from "@/lib/utils";
 
-export type PeriodStepState = "done" | "current" | "upcoming";
+export type PeriodStepState = StepperStepState;
 
-export interface PeriodStep {
-  title: string;
-  description: string;
-  state: PeriodStepState;
-  /** Optional follow-up link under the description (e.g. the SePay review queue). */
-  link?: { href: string; label: string };
-}
-
-const stateLabels: Record<PeriodStepState, string> = {
-  current: "Đang ở bước này",
-  done: "Đã xong",
-  upcoming: "Chưa tới",
-};
+export type PeriodStep = StepperStep;
 
 /**
- * Tuition period stepper (HANDOFF §2, design 07 frame 7b): a 4-cell grid
- * `<ol>`; a finished step shows a success check, the current one the primary
- * number on a soft surface with `aria-current="step"`. Every state is also
- * written as text (screen-reader prefix), never colour alone.
+ * Tuition period stepper (HANDOFF §2, design 07 frame 7b): the shared
+ * `Stepper` (`components/patterns/stepper`) under the tuition label. A thin
+ * wrapper kept so the tuition route, its preview and tests keep one import.
  */
 export function PeriodStepper({ className, label = "Các bước của kỳ thu", steps }: { className?: string; label?: string; steps: readonly PeriodStep[] }) {
-  return (
-    <ol
-      aria-label={label}
-      className={cn(
-        "m-0 grid list-none grid-cols-[minmax(0,1fr)] overflow-hidden rounded-lg border border-border-subtle bg-surface-base p-0 shadow-[var(--panel-shadow)] sm:grid-cols-2 xl:grid-cols-4",
-        className,
-      )}
-    >
-      {steps.map((step, index) => {
-        const isCurrent = step.state === "current";
-        const isDone = step.state === "done";
-
-        return (
-          <li
-            aria-current={isCurrent ? "step" : undefined}
-            className={cn(
-              "flex items-start gap-3 border-border-row px-4 py-3 [&:not(:first-child)]:border-t sm:[&:nth-child(2)]:border-t-0 sm:[&:nth-child(odd)]:border-r xl:[&:not(:first-child)]:border-t-0 xl:[&:not(:last-child)]:border-r",
-              isCurrent && "bg-action-primary-soft",
-            )}
-            data-state={step.state}
-            key={step.title}
-          >
-            <span
-              aria-hidden="true"
-              className={cn(
-                "grid h-6 w-6 shrink-0 place-items-center rounded-full text-caption font-bold",
-                isDone && "bg-success text-text-on-primary",
-                isCurrent && "bg-action-primary text-text-on-primary",
-                step.state === "upcoming" && "border border-border-strong bg-surface-base text-text-muted",
-              )}
-            >
-              {isDone ? <Check size={14} strokeWidth={2.5} /> : index + 1}
-            </span>
-            <span className="min-w-0">
-              <span className={cn("block text-body font-semibold", isCurrent ? "text-action-primary" : "text-text-strong")}>
-                <span className="sr-only">{stateLabels[step.state]}: </span>
-                {index + 1}. {step.title}
-              </span>
-              <span className={cn("block text-caption", isCurrent ? "text-action-primary-hover" : "text-text-muted")}>{step.description}</span>
-              {step.link ? (
-                <Link
-                  className="mt-1 inline-flex min-h-11 items-center text-secondary font-semibold text-action-link! hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus md:min-h-0"
-                  href={step.link.href}
-                >
-                  {step.link.label}
-                </Link>
-              ) : null}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
+  return <Stepper className={className} label={label} steps={steps} />;
 }
 
 export interface TuitionPeriodStepInput {

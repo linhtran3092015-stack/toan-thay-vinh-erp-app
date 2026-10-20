@@ -2314,6 +2314,225 @@
 **Priority:** P4
 **Depends on:** None
 
+## Form & wizard (bước 15)
+
+### Tạo học sinh một lần kèm nguồn, sale, đơn giá và ghi danh ban đầu
+
+**What:** Thiết kế 17a có thêm các mục "Nguồn & sale" (nguồn học viên, đối tác/người giới thiệu, sale phụ trách), "Đơn giá học phí" (đơn giá/buổi, hiệu lực từ, căn cứ) và "Ghi danh ban đầu" ngay trong form tạo học sinh. Bước 15a chưa làm vì hàm tạo hồ sơ chỉ ghi học sinh, phụ huynh và liên kết giữa hai bên; nguồn, đơn giá và ghi danh là các thao tác riêng trên hồ sơ, mỗi thao tác cần quyền riêng. Hiện form ghi rõ các mục này được thiết lập trên hồ sơ sau khi lưu.
+
+**Why:** Muốn lưu một lần thì cần một hàm mới ghi tất cả trong một giao dịch (hoặc chấp nhận ghi nối tiếp, có thể lỗi giữa chừng). Riêng "đối tác/người giới thiệu" và "sale phụ trách" hiện không có cột nào trong dữ liệu học sinh.
+
+**Context:** `create_student_with_primary_guardian` (`supabase/migrations/20260809021500…`), `src/features/students/tuition-profile-actions.ts`, `enroll_student_in_class`; khảo sát `.gstack/briefs/step15-map-rules-data.md` §A.1, §F (F1, F2), §H.1 (O2).
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Thiết lập lịch tuần ngay khi tạo lớp
+
+**What:** Thiết kế 17b đặt bảng "Lịch tuần" (thứ, giờ, phòng/hình thức, hiệu lực từ) và cảnh báo trùng phòng ngay trong form tạo lớp. Bước 15a chưa làm: lớp mới luôn ở trạng thái Nháp, còn lịch tuần chỉ tạo được cho lớp đang hoạt động, bắt đầu từ hôm nay, cần quyền `classes.manage_schedule` và ghi từng dòng một. Hệ thống cũng chưa có danh mục phòng hay kiểm tra trùng phòng/giờ. Form tạo lớp hiện ghi các bước tiếp theo: lưu lớp (Nháp) → kích hoạt → thiết lập lịch tuần → tạo buổi hàng loạt.
+
+**Why:** Cần một hàm mới "tạo lớp kèm lịch" (quyết định cho lịch của lớp Nháp và ngày hiệu lực trong tương lai), và nếu muốn cảnh báo trùng phòng thì cần danh mục phòng.
+
+**Context:** `create_class` và `create_class_schedule_template` (`supabase/migrations/20260724150000…`, `20260724163000…`); khảo sát `.gstack/briefs/step15-map-rules-data.md` §0.1, §D.3, §F (F11–F13), §H.1 (O1).
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Sửa thông báo lỗi của tạo buổi hàng loạt
+
+**What:** `src/features/sessions/actions/session-batch-actions.ts` dịch mã lỗi theo `SESSIONS_MANAGE_PERMISSION_DENIED` và `INVALID_SESSION_TIME`, nhưng hàm `create_batch_class_sessions` trả `SESSION_MANAGE_PERMISSION_DENIED` và `CLASS_SESSION_TIME_INVALID`, nên hai lỗi này rơi về câu chung "Không thể lưu buổi học vào cơ sở dữ liệu…". `CLASS_ID_REQUIRED`, `SESSIONS_ARRAY_REQUIRED` và `SESSION_DATE_REQUIRED` cũng chưa có câu riêng. (Các lỗi của trigger `CLASS_SESSION_SCHEDULE_NOT_EFFECTIVE`, `CLASS_SESSION_WEEKDAY_MISMATCH`, `CLASS_SESSION_REQUIRES_ACTIVE_ACADEMIC_YEAR` đã có câu riêng.)
+
+**Why:** Người tạo buổi không biết vì sao cả đợt bị từ chối. Bước 15a đã bỏ chọn sẵn các buổi ngoài hiệu lực lịch ở màn xem trước, nhưng thông báo phía máy chủ vẫn nên đúng.
+
+**Context:** `supabase/migrations/20261014090000…` (dòng 47–51, 96–98), trigger `class_sessions_validate_business_rules` (`20261013090000…`); khảo sát `.gstack/briefs/step15-map-rules-data.md` §0.11, §H.1 (O7).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh (sửa server action)
+
+### Chọn loại buổi và xem trước phía máy chủ khi tạo buổi hàng loạt
+
+**What:** Thiết kế 17b có ô "Loại buổi" để chọn. Hiện loại buổi do hệ thống tự gán: theo lịch cố định là buổi chính, lịch lặp tùy chỉnh là buổi bổ sung; màn hình chỉ hiện loại đó. Màn xem trước cũng chỉ kiểm tra trùng trên 300 buổi gần nhất của lớp ngay trên trình duyệt (máy chủ kiểm tra lại khi tạo). Ngày nghỉ chỉ dùng để bỏ chọn trong lần tạo đó, không lưu.
+
+**Why:** Cho chọn loại buổi là đổi dữ liệu gửi lên máy chủ; xem trước phía máy chủ cần hàm mới; lưu ngày nghỉ cần bảng mới.
+
+**Context:** `src/features/sessions/batch-calculation.ts`, `src/features/sessions/batch-preview-models.ts`; khảo sát `.gstack/briefs/step15-map-rules-data.md` §C, §H.1 (O6).
+
+**Effort:** M
+**Priority:** P4
+**Depends on:** Quyết định của anh
+
+### Nhập ghi danh từ file không chuyển học sinh sang "Đang học"
+
+**What:** Khi xác nhận nhập ghi danh, các dòng được ghi vào `student_enrollments` ở trạng thái đang học, nhưng `students.lifecycle_status` của học sinh vẫn là "Đang quan tâm". Ghi danh thủ công (`enroll_student_in_class`) thì có chuyển sang "Đang học", và điểm danh từ chối học sinh còn ở "Đang quan tâm".
+
+**Why:** Học sinh nhập ghi danh từ file có thể không điểm danh được và bị đếm sai trong danh sách theo trạng thái.
+
+**Context:** `supabase/migrations/20260809023000…` (dòng 695–927), `20260723085911…` (dòng 125–132), `20260817090000…` (dòng 192); khảo sát `.gstack/briefs/step15-map-rules-data.md` §0.9, §H.1 (O8). Cần kiểm tra dữ liệu thật trước khi sửa.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Quyết định của anh
+
+### Trang tạo buổi hàng loạt vẫn tải dữ liệu của lớp không hoạt động
+
+**What:** Từ bước 15a, khu tạo buổi từ chối một `?classId=` không nằm trong danh sách lớp đang hoạt động (hiện "Lớp này không tạo buổi hàng loạt được", ẩn phần lịch/xem trước, khóa nút tạo, không gửi gì). Còn lại: `getBatchSessionCreationContext` (`src/features/sessions/batch-data.ts`) vẫn tải lịch tuần, buổi đã có và số buổi của lớp đó thay vì từ chối ngay ở máy chủ.
+
+**Why:** Phòng thủ nhiều lớp và đỡ một lần đọc dữ liệu thừa; không còn nguy cơ tạo buổi nhầm lớp từ giao diện.
+
+**Context:** `src/app/(app)/sessions/batch/page.tsx`, `src/features/sessions/batch-data.ts` (dòng 21–138); sửa ở loader là thay đổi đọc dữ liệu phía máy chủ.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh (sửa loader)
+
+### Dọn code form học sinh cũ không còn dùng
+
+**What:** `src/features/students/form` còn 16 file của form dạng wizard cũ (khoảng 2.537 dòng, ví dụ `student-form.tsx` và các section của nó), không file nào import.
+
+**Why:** Code chết dùng token giao diện cũ, làm các bài quét mã nguồn theo thư mục phải liệt kê từng file.
+
+**Context:** Khảo sát `.gstack/briefs/step15-map-ui-tests.md` §0 (16).
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** None
+
+### Thông báo "không kết nối được" khi lưu có thể đã ghi xong
+
+**What:** Khi server action bị từ chối (mất phản hồi, lệch phiên bản sau deploy), form học sinh và form lớp hiện "Không thể kết nối… Vui lòng thử lại", dù thao tác ghi có thể đã xong. Với học sinh, thử lại sẽ gặp lời nhắc trùng nêu chính hồ sơ vừa tạo; nếu người nhập gõ lý do vượt trùng thì tạo ra một bản trùng thật.
+
+**Why:** Câu chữ nên nói "có thể đã lưu, kiểm tra danh sách trước khi thử lại", hoặc form tra lại trước khi cho lưu lần nữa (review đối kháng A7).
+
+**Context:** `student-profile-form.tsx` (SAVE_CONNECTION_ERROR), `class-form-page.tsx` (CONNECTION_ERROR_MESSAGE). Lớp đã được chặn bởi lỗi trùng mã lớp; tạo buổi hàng loạt được chặn bởi việc máy chủ bỏ qua buổi trùng.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh (câu chữ)
+
+### Link tạo buổi hàng loạt ở trang lớp mang theo bộ lọc danh sách lớp
+
+**What:** `class-detail-page.tsx:195` nối query của danh sách lớp (`search`, `page`, …) vào `/sessions/batch?classId=…`. Trang tạo buổi đọc query đó như bộ lọc danh sách buổi học, nên link "Về danh sách buổi học", "Hủy" và đổi lớp mang `search`/`page` của danh sách lớp sang danh sách buổi. Bước 15a đã bỏ query này ở link bước 4 của form sửa lớp, trang lớp vẫn còn.
+
+**Why:** Danh sách buổi bị lọc theo từ khóa tìm lớp, người dùng không hiểu vì sao.
+
+**Context:** `src/features/classes/class-detail-page.tsx` (dòng 192–195), `src/features/sessions/session-directory-url-state.ts`; review bước 15a (C2-1).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Không
+
+### Chữ cỡ tiêu đề bảng bị token màu che
+
+**What:** `--color-table-header` che `--text-table-header` trong `globals.css`, nên lớp `text-table-header` ra màu nền (#F7F5F1) chứ không ra cỡ chữ 12/16. Tiêu đề các bảng (data-table-frame và 4 bảng khác, cùng bảng "Chỉnh từng buổi" mới của bước 15a) đang dùng cỡ chữ 14 của bảng; chữ vẫn đọc được chỉ nhờ `text-text-muted` đứng sau.
+
+**Why:** Thiết kế cần tiêu đề bảng 12/600. Sửa là đổi tên một trong hai token và rà cả 6 bảng.
+
+**Context:** `src/app/globals.css` (dòng ~1142, ~1162), `src/components/patterns/data-table-frame.tsx:65`, `batch-session-create-workspace.tsx` (thead); review bước 15a (D6).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Không
+
+### Thanh lưu của form tạo học sinh cao gấp đôi trên điện thoại
+
+**What:** Ba nút Hủy, "Lưu và thêm tiếp", "Lưu học sinh" (44px) không vừa một hàng 343px nên xuống hai hàng; thanh cố định cao khoảng 150px (thêm banner lỗi thì cao hơn), che khoảng một phần tư màn hình, nhiều hơn khi bàn phím mở.
+
+**Why:** DESIGN yêu cầu thanh lưu dưới đáy giữ được vùng nhìn khi gõ. Cần quyết định thiết kế: ẩn nút phụ dưới `sm`, đưa vào menu, hoặc rút gọn chữ.
+
+**Context:** `src/components/patterns/sticky-save-bar.tsx` (dòng ~192), `student-profile-form.tsx` (`secondaryAction`); review bước 15a (D8).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Quyết định của anh (thiết kế)
+
+### Trạng thái đang tải làm trang nhảy khi form hiện ra
+
+**What:** Các file `loading.tsx` của `/students/new`, `/classes/new`, `/sessions/batch` (và trước đó `/reports`, `/payroll/dashboard`) đặt một `LoadingNotice` nhìn thấy được phía trên skeleton; trang thật không có khối đó nên nội dung dịch lên khoảng 60px khi tải xong.
+
+**Why:** DESIGN yêu cầu trạng thái tải giữ đúng hình dạng trang. Đây là quyết định chung cho cả app (ẩn notice bằng `sr-only` hoặc đưa vào khung đầu tiên).
+
+**Context:** `src/components/shared/loading-state.tsx`, các `loading.tsx` kể trên; review bước 15a (D7).
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** Quyết định của anh
+
+### Dọn nhỏ sau bước 15a
+
+**What:** Các điểm nhỏ review bước 15a đã ghi nhận nhưng không sửa trong đợt này:
+- "Kiểm tra hồ sơ trùng" bị khóa trong lúc tra cứu nên focus rơi về đầu trang; nút "Đóng" trên thông báo kết quả tạo buổi hàng loạt cũng làm focus rơi về đầu trang.
+- Khi focus dự phòng chuyển vào khối thông báo lỗi của form học sinh, trình đọc màn hình có thể đọc lại thông báo hai lần; nhánh focus vào trường lỗi phía máy chủ có thể kéo focus khỏi chỗ người dùng vừa chuyển tới.
+- Lần "Lưu và thêm tiếp" đầu tiên có thể không được đọc lên (vùng thông báo gắn cùng lúc với nội dung).
+- Màn xem trước so giờ bắt đầu đã sửa mà không cắt khoảng trắng như máy chủ (máy chủ vẫn quyết định, chỉ số đếm lệch).
+- `/dev/forms` vai chủ trung tâm vẫn có link sidebar thật tới `/imports/*` (các bản xem trước khác cũng vậy).
+- Link trong ô hành động của `ResultBanner` ở các trang khác vẫn chỉ cao ~20px trên điện thoại (bước 15a chỉ sửa các link trong ba form).
+- Kiểm tra `<fieldset className="contents">` của form học sinh trên Safari iOS/macOS (khoảng cách giữa các mục, tràn ngang).
+- Bộ chặn rời trang của form lớp chép lại gần nguyên văn của form học sinh; nên tách thành một hook chung trong `leave-guard.tsx`.
+- Nhánh `selectedClassId === ""` trong khu tạo buổi không còn đường nào gọi tới ở production; mô tả hộp xác nhận hiện "cho lớp ." nếu lớp biến mất khi hộp đang mở (nút xác nhận đã khóa).
+- Form học sinh: tra cứu trùng thất bại làm ẩn lỗi "Cần nhập lý do…" đang hiện; lý do vượt trùng vẫn được gửi khi lần tra cứu lúc lưu không còn thấy trùng (nên gửi chuỗi rỗng); lỗi máy chủ trả về cho `studentId`/`publicCode` được đếm trên thanh lưu dù không có ô nào để sửa; sửa hồ sơ giữ nguyên số điện thoại sẽ ghi đè phụ huynh dùng chung trước khi thông báo "phụ huynh của chính học sinh này" kịp hiện.
+- Form lớp: bước 3 "Thiết lập lịch tuần" không bao giờ được đánh dấu xong dù lớp đã có lịch; route tạo/sửa lớp và tạo buổi vẫn viết trực tiếp câu từ chối quyền (hằng số `*-route-copy.ts` chỉ được test khớp).
+- Mục lục form: mục ngắn cuối trang không bao giờ được đánh dấu đang xem; khoảng dừng 1 giây sau khi bấm ngắn hơn một lần cuộn mượt dài; vệt mờ mép phải không đo lại khi mục "Xác nhận tiếp tục lưu" xuất hiện. Thanh lưu: nút phụ bị khóa không có lý do cho trình đọc màn hình.
+- Ô nhiều dòng của trình sửa website dựa vào thứ tự CSS (`min-h-24` sau `min-h-20`); các test component mới mất 1–2,5 giây mỗi test, có thể chạm mốc 5 giây của CI khi máy bận.
+
+**Why:** Gom lại để làm một lượt, không chặn bước 15a.
+
+**Context:** review bước 15a (B4-1..4, P3-6, P3-7, C2-9, P7-3, AF4–AF6, AF8, AG3, AG4, AG6, AG8, AG11, ghi chú lane S2/B3); `student-profile-form.tsx`, `batch-session-create-workspace.tsx`, `batch-preview-models.ts`, `forms-preview-params.ts`, `src/components/shared/result-banner.tsx`.
+
+**Effort:** M
+**Priority:** P4
+**Depends on:** Không
+
+### Đánh số tên buổi khi tạo đợt thứ hai trên cùng trang
+
+**What:** "Số bắt đầu" của trang tạo buổi hàng loạt lấy một lần khi mở trang (số buổi hiện có + 1), như trên production. Sau khi tạo một đợt, nếu người dùng dời ngày bắt đầu để tạo tiếp mà không tải lại trang, tên "Buổi n" sẽ lặp lại các số vừa tạo. Bước 15a đã thử cho số này tự đếm lại sau khi tạo, nhưng cách đó làm sai tên ở luồng "tăng số lượng từ cùng ngày" và gây reset nháp, nên đã trả về như cũ (quyết định D3 của anh).
+
+**Why:** Muốn đúng cho cả hai luồng thì nên đánh số chỉ các buổi được chọn và chưa bị chặn, theo thứ tự, lúc gửi đi; đó là thay đổi cách đặt tên, cần quyết định sản phẩm.
+
+**Context:** `src/features/sessions/components/batch-session-create-workspace.tsx`, `src/features/sessions/batch-calculation.ts` (`startNumber + sessionIndex` cho mọi nháp); review bước 15a (R3-4, A1, P5-1, AD4, AE1, AE4, AF1).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Quyết định của anh
+
+### Trang tạo buổi hàng loạt: lớp mặc định và giờ nhập tay
+
+**What:** (1) Vào `/sessions/batch` không kèm `classId` (link từ danh sách buổi), route chọn lại lớp hoạt động đầu tiên ở mỗi lần làm mới; nếu lớp đầu tiên thay đổi trong lúc mở trang, khu tạo buổi tải lại sang lớp khác và mất các lựa chọn. Nên ghi `classId` đã chọn vào URL khi mở trang. (2) Ô giờ trong "Chỉnh từng buổi" là chữ tự do và ô giờ của lịch tùy chỉnh để trống được: "8:00", giờ trống hoặc giờ kết thúc trước giờ bắt đầu (và ghi chú quá 500 ký tự) làm máy chủ từ chối cả đợt mà không nói dòng nào; nên dùng ô giờ / kiểm tra từng dòng và đưa vào lý do khóa nút tạo. (3) Ngay sau khi tạo thành công, các buổi vừa gửi vẫn được chọn cho tới khi trang làm mới xong (hoặc mãi mãi nếu các ngày đó nằm ngoài 300 buổi mới nhất trang tải về), nên bấm xác nhận lần nữa sẽ gửi lại; máy chủ bỏ qua và báo "0 buổi". Nên bỏ chọn các buổi đã gửi khi tạo xong.
+
+**Why:** Tránh mất công nhập và lỗi khó hiểu khi tạo đợt.
+
+**Context:** `src/app/(app)/sessions/batch/page.tsx` (dòng 76–86), `batch-session-create-workspace.tsx` (BatchDraftEditorRow); review bước 15a (P6-2/AE2, AE3, AF2, AF3, AG1).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Không
+
+### Kiểm tra hỏi "chưa lưu" sau khi lưu lớp thành công
+
+**What:** Review đối kháng nêu khả năng form lớp hỏi "Thay đổi chưa lưu sẽ mất" ngay sau khi lưu thành công nếu điều hướng chậm. Theo code, `router.push` chạy trong chính transition của lần lưu nên `isPending` giữ tới khi trang mới hiện, guard không bật lại; chưa kiểm chứng được trên trình duyệt vì bản xem trước không bao giờ lưu thành công.
+
+**Why:** Xác nhận một lần trên môi trường thật (tạo hoặc sửa một lớp nháp) rồi đóng mục này.
+
+**Context:** `src/features/classes/management/class-form-page.tsx` (startTransition, useLeaveGuard); review bước 15a (AD3).
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** Không
+
+### Kiểm tra trùng khi tạo buổi hàng loạt không chặn được hai người tạo cùng lúc
+
+**What:** `createBatchSessionsAction` đọc các buổi đã có rồi mới ghi (không nguyên tử) và bỏ qua lỗi khi đọc; nhánh lịch tùy chỉnh của `create_batch_class_sessions` ghi không có ràng buộc trùng (chỉ buổi theo lịch cố định có chỉ mục duy nhất `(schedule_template_id, session_date)`). Hai người cùng tạo, hoặc một lần đọc lỗi, có thể tạo trùng buổi bổ sung. `batch-data.ts` cũng bỏ qua lỗi đọc buổi đã có, nên màn xem trước có thể báo "0 trùng". Câu chữ mới ở màn xem trước và hộp xác nhận nói máy chủ kiểm tra lại và bỏ qua buổi trùng, điều này chỉ được cơ sở dữ liệu bảo đảm cho buổi theo lịch cố định.
+
+**Why:** Tránh buổi trùng (ảnh hưởng điểm danh, học phí) và câu chữ hứa quá mức.
+
+**Context:** `src/features/sessions/actions/session-batch-actions.ts` (dòng ~178–196), `supabase/migrations/20261014090000…` (nhánh custom, dòng ~169–197), `src/features/sessions/batch-data.ts` (dòng ~64–118), `batch-preview-grid.tsx` (câu "máy chủ kiểm tra lại"); review đối kháng bước 15a (AG2). Sửa là thay đổi máy chủ/migration.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Quyết định của anh (sửa server action / RPC)
+
 ## Tin nhắn phụ huynh (Zalo)
 
 ### Gỡ RPC `record_parent_message_result` cũ sau khi bản 0.21 chạy ổn

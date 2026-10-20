@@ -8,6 +8,7 @@ import {
   getStudentProfileFormDefaults,
 } from "@/features/students/form/student-profile-form-helpers";
 import { StudentFormPage } from "@/features/students/form/student-form-page";
+import { STUDENT_EDIT_DENIED } from "@/features/students/form/student-form-route-copy";
 import { getStudentDirectoryQuery, withStudentDirectoryQuery } from "@/features/students/student-directory-url-state";
 import {
   getCachedDatabasePermissions,
@@ -57,8 +58,8 @@ export default async function EditStudentRoute({
   if (!canUpdate) {
     return (
       <PermissionDeniedState
-        description="Tài khoản hiện tại cần có cả quyền students.view và students.update."
-        title="Không có quyền chỉnh sửa học viên"
+        description={STUDENT_EDIT_DENIED.description}
+        title={STUDENT_EDIT_DENIED.title}
       />
     );
   }

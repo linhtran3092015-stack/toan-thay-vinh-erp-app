@@ -24,6 +24,12 @@ describe("PeriodStepper", () => {
     expect(within(items[0]).queryByRole("link")).not.toBeInTheDocument();
   });
 
+  it("passes its className to the list", () => {
+    render(<PeriodStepper className="mt-2" steps={buildTuitionPeriodSteps({ counts: null, itemCount: 0, requestCount: 0, status: "draft" })} />);
+
+    expect(screen.getByRole("list", { name: "Các bước của kỳ thu" })).toHaveClass("mt-2");
+  });
+
   it("starts a draft on step 1 with the later steps upcoming", () => {
     render(<PeriodStepper steps={buildTuitionPeriodSteps({ counts: null, itemCount: 0, requestCount: 0, status: "draft" })} />);
 
