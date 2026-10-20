@@ -349,6 +349,107 @@ describe("EnrollmentImportPage wizard", () => {
     expect(currentStep()).toHaveTextContent("5. Xác nhận ghi danh");
   });
 
+  // Value: protects=a refused or lost dry-run and batch creation are said inline in words, the wizard stays on its step with nothing created, and the same button can retry;
+  // fails_when=handleRunDryRun or handleCreateBatch loses its !success or catch branch (silent failure, an unhandled rejection), moves on without a batch, or the "Chưa tạo lô." / unknown-result words change;
+  // why_new=the failure test above covers the commit only; no test made the dry-run or the batch creation fail;
+  // seam=none (the page's `actions` override props); no_claim=does not prove which errors the server returns or whether a lost create reached it; the answers are fixtures
+  it("keeps a refused or lost dry-run and batch creation inline, on their step, retryable", async () => {
+    const { actions } = renderPage({ initialFile: file });
+    actions.dryRunStudentEnrollmentImport
+      .mockResolvedValueOnce({ error: "Không tìm thấy năm học 2026-2027.", success: false } as never)
+      .mockRejectedValueOnce(new Error("network"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra 3 dòng" }));
+    const refusedCheck = await screen.findByRole("alert");
+    expect(refusedCheck).toHaveTextContent("Chưa kiểm tra được.");
+    expect(refusedCheck).toHaveTextContent("Không tìm thấy năm học 2026-2027.");
+    expect(currentStep()).toHaveTextContent("1. Chọn năm học & file");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Kiểm tra 3 dòng" })).toBeEnabled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra 3 dòng" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Không kết nối được tới máy chủ. Kiểm tra kết nối rồi thử lại; bước này không ghi dữ liệu.",
+      ),
+    );
+    expect(currentStep()).toHaveTextContent("1. Chọn năm học & file");
+    expect(actions.dryRunStudentEnrollmentImport).toHaveBeenCalledTimes(2);
+    cleanup();
+
+    const created = renderPage({ initialDryRun: cleanDryRun(), initialFile: file, initialStep: "batch" });
+    created.actions.createStudentEnrollmentImportBatch
+      .mockResolvedValueOnce({ error: "File này đã được tạo batch trước đó.", success: false } as never)
+      .mockRejectedValueOnce(new Error("network"));
+    fireEvent.click(screen.getByRole("checkbox", { name: /muốn tạo lô cho 3 dòng/ }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Tạo lô 3 dòng" }));
+    const refusedBatch = await screen.findByRole("alert");
+    expect(refusedBatch).toHaveTextContent("Chưa tạo lô.");
+    expect(refusedBatch).toHaveTextContent("File này đã được tạo batch trước đó.");
+    expect(currentStep()).toHaveTextContent("4. Tạo lô");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Tạo lô 3 dòng" })).toBeEnabled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Tạo lô 3 dòng" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Không rõ kết quả. Mở lại trang để kiểm tra trước khi thử lại."));
+    expect(currentStep()).toHaveTextContent("4. Tạo lô");
+    expect(screen.queryByText("Đã tạo lô.")).not.toBeInTheDocument();
+    expect(commitButton()).not.toBeInTheDocument();
+    expect(created.actions.createStudentEnrollmentImportBatch).toHaveBeenCalledTimes(2);
+    expect(created.actions.commitStudentEnrollmentImportBatch).not.toHaveBeenCalled();
+  });
+
+  // Value: protects=the batch is created with the SHA-256 of the chosen file's bytes (the server's one-batch-per-file key), shown short with the full value in title;
+  // fails_when=computeSha256 hashes something else, drops the zero padding of a byte below 0x10, or the create call stops sending the hash of the file read in step 1;
+  // why_new=every other test seeds `initialFile` with a made-up hash; no test reads a file through the input, so computeSha256 and the read path never ran;
+  // seam=none (parseEnrollmentWorkbook is mocked as in the rest of the file; jsdom's File and WebCrypto do the hashing); no_claim=does not parse a real .xlsx or prove the server dedupes on the hash
+  it("hashes the chosen file's bytes and creates the batch with that SHA-256", async () => {
+    vi.mocked(parseEnrollmentWorkbook).mockResolvedValueOnce(parsed);
+    // SHA-256("abc"), a FIPS 180-2 test vector with bytes 0x01, 0x03 and 0x00 (zero padding matters).
+    const ABC_SHA256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+    const { actions } = renderPage();
+
+    const chosen = new File(["abc"], "ghi-danh.xlsx");
+    fireEvent.change(screen.getByLabelText("Chọn file Excel"), { target: { files: [chosen] } });
+
+    expect(await screen.findByText("ghi-danh.xlsx · 3 dòng")).toBeInTheDocument();
+    expect(parseEnrollmentWorkbook).toHaveBeenCalledWith(chosen);
+    expect(screen.getByTitle(ABC_SHA256)).toHaveTextContent("ba7816bf8f01…");
+    expect(states()).toEqual(["current", "done", "upcoming", "upcoming", "upcoming"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra 3 dòng" }));
+    await waitFor(() => expect(currentStep()).toHaveTextContent("3. Kiểm tra dòng"));
+    fireEvent.click(screen.getByRole("button", { name: "Tiếp: Tạo lô" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /muốn tạo lô cho 3 dòng/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Tạo lô 3 dòng" }));
+
+    await waitFor(() => expect(currentStep()).toHaveTextContent("5. Xác nhận ghi danh"));
+    expect(actions.createStudentEnrollmentImportBatch).toHaveBeenCalledWith(
+      "ghi-danh.xlsx",
+      ABC_SHA256,
+      "Nhập ghi danh học sinh năm học 2026-2027",
+      "2026-2027",
+      parsed.rows,
+    );
+  });
+
+  // Value: protects=a typed "Lý do xác nhận" is the commit's audit reason (trimmed), with the default only when the field is left empty, as before the redesign;
+  // fails_when=the commit call sends defaultCommitReason whatever is typed, stops trimming, or the hint stops naming the default it will use;
+  // why_new=the commit tests only commit with an empty reason field, so they pass whether or not a typed reason is used;
+  // seam=none (the page's `actions` override props); no_claim=does not prove the server stores the reason in the audit log
+  it("commits with the typed reason, trimmed, instead of the default", async () => {
+    const { actions } = renderPage({ initialBatch: batch, initialDryRun: cleanDryRun(), initialFile: file });
+
+    const reason = screen.getByLabelText("Lý do xác nhận");
+    expect(describedBy(reason)).toBe("Để trống thì dùng: Xác nhận ghi danh năm học 2026-2027: 2 mới, 1 dùng lại");
+    fireEvent.change(reason, { target: { value: "  Ghi danh đợt 2 theo danh sách lớp  " } });
+    fireEvent.change(screen.getByLabelText("Gõ cụm xác nhận"), { target: { value: "GHI DANH 3" } });
+    fireEvent.click(screen.getByRole("button", { name: "XÁC NHẬN COMMIT GHI DANH 3 HỌC VIÊN" }));
+
+    await screen.findByText("Đã ghi danh 3 học sinh.");
+    expect(actions.commitStudentEnrollmentImportBatch).toHaveBeenCalledTimes(1);
+    expect(actions.commitStudentEnrollmentImportBatch).toHaveBeenCalledWith("batch-3", "Ghi danh đợt 2 theo danh sách lớp");
+  });
+
   it("falls back to the real actions when none are injected", async () => {
     vi.mocked(realActions.dryRunStudentEnrollmentImportAction).mockResolvedValue({ data: cleanDryRun(), success: true });
     render(<EnrollmentImportPage initialFile={file} />);

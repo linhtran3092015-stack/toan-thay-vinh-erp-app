@@ -624,6 +624,71 @@ describe("Session balance batch page panels (step 15b)", () => {
     });
   });
 
+  // Value: protects=the irreversible ledger write and the approval stay off when the batch counts say so: post with 0 valid rows or with entries already posted, approve while review/invalid rows remain;
+  // fails_when=postBlockedReason or rowsClear drops the validCount===0, postedCount>0 or review/invalid check kept from the pre-redesign disabled props, so an armed post or a click writes;
+  // why_new=the post/approve tests only vary the checkbox, phrase, permission and creator; no test gives an approved batch with 0 valid or posted entries, or an approvable batch with rows left;
+  // seam=none (the page's own `actions` override props); no_claim=does not prove the RPCs refuse these writes too; the batch counts are fixtures, not a real batch
+  it("post and approve stay off on the batch counts, even armed: no valid row, entries already posted, rows left to review", () => {
+    const postSessionBalanceImportBatch = vi.fn();
+    const approveSessionBalanceImportBatch = vi.fn();
+    const actions = { approveSessionBalanceImportBatch, postSessionBalanceImportBatch };
+    const conditionTexts = (panel: HTMLElement) => within(panel).getAllByRole("listitem").map((item) => item.textContent);
+    const armPost = () => {
+      const panel = screen.getByRole("region", { name: "Ghi số dư vào sổ buổi" });
+      fireEvent.click(within(panel).getByRole("checkbox", { name: /Tôi xác nhận đã kiểm tra lô đã phê duyệt/ }));
+      fireEvent.change(within(panel).getByLabelText("Gõ GHI SO DU để xác nhận"), { target: { value: "GHI SO DU" } });
+      return { panel, post: within(panel).getByRole("button", { name: "Ghi số dư vào sổ buổi" }) };
+    };
+
+    render(
+      <SessionBalanceBatchDetailPage
+        actions={actions}
+        canApprove={true}
+        currentUserId="user-approver-222"
+        detail={detailWith({ status: "approved", valid_count: 0 })}
+      />,
+    );
+    let armed = armPost();
+    expect(conditionTexts(armed.panel)[0]).toBe("Chưa đạt:Không có dòng hợp lệ để ghi");
+    expect(armed.post).toBeDisabled();
+    expect(armed.post).toHaveAccessibleDescription("Lô không có dòng hợp lệ để ghi.");
+    fireEvent.click(armed.post);
+    cleanup();
+
+    render(
+      <SessionBalanceBatchDetailPage
+        actions={actions}
+        canApprove={true}
+        currentUserId="user-approver-222"
+        detail={detailWith({ posted_count: 3, status: "approved", valid_count: 10 })}
+      />,
+    );
+    armed = armPost();
+    expect(armed.post).toBeDisabled();
+    expect(armed.post).toHaveAccessibleDescription("Lô đã có bút toán được ghi.");
+    fireEvent.click(armed.post);
+    cleanup();
+
+    render(
+      <SessionBalanceBatchDetailPage
+        actions={actions}
+        canApprove={true}
+        currentUserId="user-approver-222"
+        detail={detailWith({ invalid_count: 1, review_count: 1, status: "awaiting_approval" })}
+      />,
+    );
+    const panel = screen.getByRole("region", { name: "Bước phê duyệt số dư đầu kỳ" });
+    const approve = within(panel).getByRole("button", { name: "Phê duyệt batch" });
+    expect(conditionTexts(panel)[0]).toBe("Chưa đạt:Lô còn dòng cần xem lại hoặc không hợp lệ");
+    expect(approve).toBeDisabled();
+    expect(approve).toHaveAccessibleDescription("Lô còn dòng cần xem lại hoặc không hợp lệ.");
+    fireEvent.click(approve);
+
+    expect(postSessionBalanceImportBatch).not.toHaveBeenCalled();
+    expect(approveSessionBalanceImportBatch).not.toHaveBeenCalled();
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
   it("post without the approval permission: disabled, said in words", () => {
     render(
       <SessionBalanceBatchDetailPage canApprove={false} currentUserId="user-approver-222" detail={detailWith({ status: "approved" })} />,

@@ -364,6 +364,39 @@ describe("ClassScheduleImportPage: back, stale and 'Tạo lô'", () => {
     expectStep(2);
   });
 
+  // Value: protects=a re-run that fails (lost or refused) keeps the old result stale: the error in words, the stale banner, "Chạy lại kiểm tra" as the only way on, no review and no batch from it;
+  // fails_when=the checked state is recorded before the answer or on a failure, or the primary goes to the review whenever a result exists, so a result for the old mapping reaches "Tạo lô";
+  // why_new=step 15b keeps the stale result during a re-run (the old page cleared it first); the stale test above only re-runs successfully;
+  // seam=none (the page's `actions` override props); no_claim=does not prove the server's own checks at batch creation; the answers are fixtures
+  it("keeps a stale result stale when the re-run fails, so it never reaches the review", async () => {
+    actions.dryRunClassScheduleImport
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce({ code: "database_error", message: "Lỗi kiểm tra dữ liệu từ cơ sở dữ liệu: timeout", ok: false } as never);
+    renderPage({ initialDryRun: CLASS_IMPORT_PREVIEW_DRY_RUN, initialWorkbook: CLASS_IMPORT_PREVIEW_WORKBOOK });
+    fireEvent.click(screen.getByRole("button", { name: "Quay lại bước Ánh xạ cột" }));
+    fireEvent.click(screen.getByRole("tab", { name: /Sheet Schedules/ }));
+    fireEvent.change(screen.getByLabelText("Phòng học"), { target: { value: "unassigned" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Chạy lại kiểm tra" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Không kiểm tra được dữ liệu. Không kết nối được máy chủ để kiểm tra. Bước này chưa ghi gì: kiểm tra mạng rồi thử lại.",
+    );
+    const rerun = await screen.findByRole("button", { name: "Chạy lại kiểm tra" });
+    await waitFor(() => expect(rerun).toBeEnabled());
+    expect(screen.getByText("Kết quả kiểm tra trước không còn đúng.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tiếp tục: Kiểm tra dòng" })).toBeNull();
+    expectStep(1);
+
+    fireEvent.click(rerun);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Lỗi kiểm tra dữ liệu từ cơ sở dữ liệu: timeout"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Chạy lại kiểm tra" })).toBeEnabled());
+    expect(screen.getByText("Kết quả kiểm tra trước không còn đúng.")).toBeInTheDocument();
+    expectStep(1);
+    expect(screen.queryByRole("table", { name: "Kết quả kiểm tra 6 dòng lớp học" })).toBeNull();
+    expect(actions.dryRunClassScheduleImport).toHaveBeenCalledTimes(2);
+    expect(actions.createClassScheduleImportBatch).not.toHaveBeenCalled();
+  });
+
   it("resets everything from 'Chọn file khác'", () => {
     renderPage({ initialDryRun: CLASS_IMPORT_PREVIEW_DRY_RUN, initialStep: "file", initialWorkbook: CLASS_IMPORT_PREVIEW_WORKBOOK });
     expectStep(0);
