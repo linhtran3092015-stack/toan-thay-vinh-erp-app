@@ -2,6 +2,15 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.28.0.1] - 2026-10-20
+
+Form nộp bài Apps Script: câu 6 có lại lựa chọn "Khác" như form gốc, và tên tiếng Việt lấy từ ERP luôn hiện đúng dấu.
+
+### Fixed
+- **Câu 6 "Con muốn học thử miễn phí thêm các lớp Tiếng Anh chứ?"** có lại dòng "Khác: ___" như form gốc (bản Giai đoạn 1 vô tình bỏ đi). Cột N của tab `Data` ghi `Khác: <chữ học sinh gõ>` thay vì `Other`; câu 6 vẫn chỉ ghi Sheet, không gửi ERP. Chữ đã gõ được giữ khi mở lại form.
+- **Tên học sinh và nhãn buổi học từ ERP** được đọc rõ bảng mã UTF-8. ERP trả JSON không ghi charset, nên nếu Apps Script đoán sai bảng mã thì tên bị vỡ chữ kiểu "Nguyá»…n".
+- Cần dán lại `Code.gs` và `FormHocSinh.html` vào dự án Apps Script, rồi Deploy bản web app đang dùng với Version mới.
+
 ## [0.28.0.0] - 2026-10-20
 
 Buổi học có khu **Bài kiểm tra** để trợ giảng tải ảnh đề, nhập đáp án từng câu và chốt đáp án (kế hoạch chấm bài AI, Giai đoạn 2 "Đề & đáp án"). AI sẽ chỉ chấm theo đáp án đã chốt; chưa có bước chấm bằng AI và chưa gọi Claude.
