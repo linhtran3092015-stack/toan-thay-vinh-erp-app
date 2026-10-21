@@ -42,7 +42,7 @@ try {
  const salaryStart=notifications.indexOf('create or replace function public.',notifications.indexOf('grant execute on function public.mark_all_notifications_read'));
  if(salaryStart<0) throw new Error('Notification foundation extraction marker missing');
  sql(notifications.slice(0,salaryStart)+'\ncommit;');
- for(const file of ['20260917100000_student_care_foundation.sql','20260917101000_student_care_workflows.sql','20260917102000_student_care_automation.sql']) sql(migration(file));
+ for(const file of ['20260917100000_student_care_foundation.sql','20260917101000_student_care_workflows.sql','20260917102000_student_care_automation.sql','20261022150000_student_care_students_given_name_order.sql']) sql(migration(file));
  sql(readFileSync(new URL('../tests/database/student-care.sql',import.meta.url),'utf8'));
  const authenticatedJson=query=>JSON.parse(sql("set request.jwt.claim.sub='11111111-1111-4111-8111-111111111111';"+query).trim().split('\n').at(-1));
  dashboardSchema.parse(authenticatedJson('select public.get_student_care_dashboard();'));
