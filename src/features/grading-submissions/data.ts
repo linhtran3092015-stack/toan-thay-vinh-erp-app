@@ -29,7 +29,36 @@ export interface IgnoredGradingSubmission extends UnmatchedGradingSubmission {
   ignored: { at: string; byName: string | null; reason: string | null } | null;
 }
 
+/**
+ * AI grading of a submission (phase 3a). state: not_counted (an older attempt), grading (queued or
+ * running), waiting_key (no confirmed key, or not graded on the current key yet), graded, failed.
+ */
+export type SubmissionAiState = "not_counted" | "grading" | "waiting_key" | "graded" | "failed";
+
+export interface SubmissionAiQuestion {
+  errorLocation: string;
+  extractedFinalAnswer: string;
+  label: string;
+  noteForParent: string;
+  reasonForTeacher: string;
+  verdict: "correct" | "incorrect" | "missing";
+}
+
+export interface SubmissionAi {
+  color: "green" | "yellow" | "red" | null;
+  confidence: "high" | "medium" | "low" | null;
+  flags: string[];
+  gradedAt: string | null;
+  keyVersion: number | null;
+  questions: SubmissionAiQuestion[];
+  /** Sum of the points of the questions marked correct (not rounded, no bonus). */
+  rawScore: number | null;
+  state: SubmissionAiState;
+}
+
 export interface SessionGradingSubmission {
+  /** Absent in fixtures written before phase 3a. */
+  ai?: SubmissionAi;
   answerText: string;
   answerTruncated: boolean;
   attemptNo: number | null;
@@ -84,7 +113,47 @@ const sessionRowSchema = z.object({
   student_public_code: z.string(),
   submission_id: z.string().uuid(),
   submitted_at: z.string(),
+  ai_state: z.enum(["not_counted", "grading", "waiting_key", "graded", "failed"]).catch("waiting_key"),
+  ai_color: z.enum(["green", "yellow", "red"]).nullable().catch(null),
+  ai_raw_score: z.coerce.number().nullable().catch(null),
+  ai_question_results: z
+    .array(
+      z.object({
+        error_location: z.string().catch(""),
+        extracted_final_answer: z.string().catch(""),
+        label: z.string(),
+        note_for_parent: z.string().catch(""),
+        reason_for_teacher: z.string().catch(""),
+        verdict: z.enum(["correct", "incorrect", "missing"]),
+      }),
+    )
+    .nullable()
+    .catch(null),
+  ai_flags: z.array(z.string()).nullable().catch(null),
+  ai_confidence: z.enum(["high", "medium", "low"]).nullable().catch(null),
+  ai_answer_key_version: z.number().int().nullable().catch(null),
+  ai_graded_at: z.string().nullable().catch(null),
 });
+
+function toSubmissionAi(row: z.infer<typeof sessionRowSchema>): SubmissionAi {
+  return {
+    color: row.ai_color,
+    confidence: row.ai_confidence,
+    flags: row.ai_flags ?? [],
+    gradedAt: row.ai_graded_at,
+    keyVersion: row.ai_answer_key_version,
+    questions: (row.ai_question_results ?? []).map((question) => ({
+      errorLocation: question.error_location,
+      extractedFinalAnswer: question.extracted_final_answer,
+      label: question.label,
+      noteForParent: question.note_for_parent,
+      reasonForTeacher: question.reason_for_teacher,
+      verdict: question.verdict,
+    })),
+    rawScore: row.ai_raw_score,
+    state: row.ai_state,
+  };
+}
 
 function toUnmatchedSubmission(row: z.infer<typeof unmatchedRowSchema>): UnmatchedGradingSubmission {
   return {
@@ -150,6 +219,7 @@ export async function getSessionGradingSubmissions(sessionId: string): Promise<G
     if (!parsed.success) return { error: "Dữ liệu bài nộp không hợp lệ.", ok: false };
     return {
       data: parsed.data.map((row) => ({
+        ai: toSubmissionAi(row),
         answerText: row.answer_text,
         answerTruncated: row.answer_truncated,
         attemptNo: row.attempt_no,

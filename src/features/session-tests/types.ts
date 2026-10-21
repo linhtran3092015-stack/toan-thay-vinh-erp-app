@@ -22,7 +22,14 @@ export interface SessionTestExtraction {
   errorCode: string | null;
   finishedAt: string | null;
   id: string;
+  /**
+   * What the finished run did with its draft: applied (written into the draft), draft_changed (the
+   * draft was edited after the request, so it was kept), key_confirmed, invalid_key.
+   */
+  outcome?: string | null;
   status: GradingRunStatus;
+  /** Spots the AI could not read for sure ("transcription_warnings"). */
+  warnings?: string[];
 }
 
 export interface SessionTestDetail {

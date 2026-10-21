@@ -1,6 +1,8 @@
+import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SubmissionAiSummary } from "@/features/grading-submissions/components/submission-ai-summary";
 import { SubmissionAnswer } from "@/features/grading-submissions/components/submission-answer";
 import type { GradingDataResult, SessionGradingSubmission } from "@/features/grading-submissions/data";
 import { matchIssueLabel } from "@/features/grading-submissions/matching";
@@ -71,11 +73,12 @@ export function SessionSubmissionsCard({
       <CardHeader>
         <CardTitle>Bài nộp qua form</CardTitle>
         <p className="text-secondary text-text-muted">
-          Bài học sinh gõ trên form cuối buổi, ERP tự ghép vào buổi này. Nộp nhiều lần thì lần cuối được tính. Chỉ để xem; chấm
-          bài vẫn nhập ở phần kết quả bên dưới.
+          Bài học sinh gõ trên form cuối buổi, ERP tự ghép vào buổi này. Nộp nhiều lần thì lần cuối được tính. Khi đáp án đã
+          chốt, AI chấm thử từng bài để trợ giảng tham khảo; điểm vẫn nhập ở phần kết quả bên dưới.
         </p>
       </CardHeader>
       <CardContent className="grid gap-4">
+        <AutoRefresh active={counted.some((submission) => submission.ai?.state === "grading")} />
         <p className="text-secondary text-text-default">
           {counted.length} học sinh đã nộp
           {presentCount > 0 ? ` · ${presentCount - missing.length}/${presentCount} em có mặt đã nộp` : ""}
@@ -107,6 +110,7 @@ export function SessionSubmissionsCard({
                     <p className="text-caption text-text-muted">Ghép {sessionMethodLabels[submission.sessionMatchMethod] ?? submission.sessionMatchMethod}</p>
                   ) : null}
                   <SubmissionAnswer text={submission.answerText} truncated={submission.answerTruncated} />
+                  {submission.ai ? <SubmissionAiSummary ai={submission.ai} /> : null}
                   {earlier.length > 0 ? (
                     <details className="text-caption text-text-muted">
                       <summary className="cursor-pointer">{earlier.length} lần nộp trước (không tính)</summary>

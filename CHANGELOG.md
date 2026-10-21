@@ -2,6 +2,18 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.30.0.0] - 2026-10-21
+
+Chấm bài AI, Giai đoạn 3a: ERP tự gọi Claude để đọc ảnh đề và chấm bài nộp qua form, theo đáp án trợ giảng đã chốt. Kết quả AI hiện trên từng bài ở buổi học để trợ giảng tham khảo; duyệt điểm vào kết quả buổi và tin Zalo ở Giai đoạn 3b.
+
+### Added
+- **Chấm bài tự động:** chốt đáp án (hoặc sửa sau khi chốt) là mọi bài đang tính điểm của buổi được xếp lượt chấm; bài nộp sau khi đã có đáp án cũng vậy. Bài nộp lại thay bài cũ thì lượt chờ của bài cũ bị hủy. Mỗi bài chấm hai lần (mặc định Claude Haiku 5.5, mức suy luận vừa); hai lần khớp từng câu thì "xanh", lệch thì hỏi Claude Sonnet 5.5 làm trọng tài, có cờ hay AI không chắc thì "vàng", không có kết quả dùng được thì "đỏ" để chấm tay. Bài trống được 0 điểm mà không gọi AI. Không gửi họ tên, mã hay SĐT học sinh cho AI.
+- **AI đọc đề chạy thật:** lượt "AI đọc đề" (mặc định Claude Opus 5.5) đọc các trang ảnh đề, điền bản nháp đáp án vào ô sửa và liệt kê chỗ ảnh khó đọc. Bản nháp đã sửa sau khi yêu cầu thì không bị ghi đè. Khu Bài kiểm tra và Bài nộp qua form tự cập nhật trong lúc AI đang đọc/chấm.
+- **Bài nộp qua form** trên trang buổi học hiện kết quả AI: "AI đang chấm", "AI: 8 điểm · chấm 2 lần khớp" (hoặc "cần trợ giảng xem"), "AI không chấm được · chấm tay", kèm kết quả từng câu và chỗ sai. Điểm AI là tổng điểm câu đúng, chưa cộng điểm tích cực.
+- **Cài đặt → Chấm bài AI** (chỉ owner sửa): bật/tắt, model chấm, mức suy luận, chấm hai lần, model trọng tài, model đọc đề, trần chi phí ngày (mặc định 20 USD). Trang hiện chi phí hôm nay/tháng này, số bài đã chấm, hàng đợi, lỗi, và lý do khi hàng đợi tạm dừng kèm nút "Chạy lại ngay".
+- **Tiến trình nền:** chạy ngay sau khi có việc (bài nộp mới, chốt đáp án, AI đọc đề, mở trang buổi còn việc chờ) và qua lịch GitHub Actions 5 phút/lần gọi `/api/internal/ai-grading/worker` với `CRON_SECRET`. Lỗi tạm thời (quá tải, giới hạn theo phút) tự thử lại tối đa 3 lần; hết tín dụng, chạm trần chi tiêu, khóa API sai thì dừng cả hàng đợi 1 giờ và báo owner; chạm trần ngày thì dừng tới 0 giờ hôm sau. pg_cron 10 phút/lần cảnh báo khi có lượt chờ quá 20 phút hoặc lỗi trên 20% trong 1 giờ.
+- Cần đặt trên Vercel: `ANTHROPIC_API_KEY` (workspace ai-grading) và `CRON_SECRET` (ít nhất 32 ký tự); trên GitHub: secret `CRON_SECRET` và `AI_GRADING_WORKER_URL`. Chấm bài AI mặc định tắt cho tới khi owner bật trong Cài đặt.
+
 ## [0.29.0.1] - 2026-10-21
 
 Form nộp bài Apps Script: câu 6 có lại lựa chọn "Khác" như form gốc, tên tiếng Việt lấy từ ERP luôn hiện đúng dấu, và hàm kiểm tra kết nối nói rõ vì sao không gọi được ERP.

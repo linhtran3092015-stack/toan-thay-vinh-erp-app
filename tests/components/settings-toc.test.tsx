@@ -40,14 +40,14 @@ describe("SettingsToc", () => {
       "Con người & phân quyền",
       "Hệ thống",
     ]);
-    expect(linkNames()).toEqual(["Tổng quan", "Chung", "Tin Zalo", "Thương hiệu & giao diện", "Trang web công khai", "Người dùng", "Phân quyền", "Nhật ký"]);
+    expect(linkNames()).toEqual(["Tổng quan", "Chung", "Tin Zalo", "Chấm bài AI", "Thương hiệu & giao diện", "Trang web công khai", "Người dùng", "Phân quyền", "Nhật ký"]);
     expect(within(nav).getByRole("link", { name: "Tổng quan" })).toHaveAttribute("href", "/settings");
     expect(within(nav).getByRole("link", { name: "Nhật ký" })).toHaveAttribute("href", "/audit");
   });
 
   it("hides sections the person cannot open instead of disabling them", () => {
     render(<SettingsToc canViewAudit={false} canViewUsers={false} />);
-    expect(linkNames()).toEqual(["Tổng quan", "Chung", "Tin Zalo", "Thương hiệu & giao diện", "Trang web công khai", "Phân quyền"]);
+    expect(linkNames()).toEqual(["Tổng quan", "Chung", "Tin Zalo", "Chấm bài AI", "Thương hiệu & giao diện", "Trang web công khai", "Phân quyền"]);
     expect(within(screen.getByRole("navigation", { name: "Mục cài đặt" })).getAllByRole("group")).toHaveLength(2);
   });
 
@@ -67,9 +67,9 @@ describe("SettingsToc", () => {
   // why_new=the TOC gained a "Tổng quan" landing item that is not a section; seam=next/navigation mocked; no_claim=the layout's permission reads (server)
   it("counts settings sections in the hub header without the Tổng quan landing", () => {
     const { rerender } = render(<SettingsHub canViewAudit canViewUsers centerName="Trung tâm A"><p>Nội dung</p></SettingsHub>);
-    expect(screen.getByText("Trung tâm A · 7 mục cài đặt")).toBeInTheDocument();
+    expect(screen.getByText("Trung tâm A · 8 mục cài đặt")).toBeInTheDocument();
     rerender(<SettingsHub canViewAudit={false} canViewUsers={false} centerName="Trung tâm A"><p>Nội dung</p></SettingsHub>);
-    expect(screen.getByText("Trung tâm A · 5 mục cài đặt")).toBeInTheDocument();
+    expect(screen.getByText("Trung tâm A · 6 mục cài đặt")).toBeInTheDocument();
   });
 
   // Value: protects=below lg the TOC is a horizontal scroller: on mount the current link is scrolled to the centre of the row (nearest block, so the page does not jump);

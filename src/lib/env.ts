@@ -198,6 +198,16 @@ export function getAnthropicApiKey(): string | null {
   return value ? value : null;
 }
 
+/**
+ * Shared secret for the AI grading worker route (/api/internal/ai-grading/worker), sent as
+ * "Authorization: Bearer <CRON_SECRET>" by the GitHub Actions schedule. Optional: without it the
+ * route refuses every call and the worker still runs from after() in the app.
+ */
+export function getCronSecret(): string | null {
+  const value = process.env.CRON_SECRET?.trim();
+  return value && value.length >= 32 ? value : null;
+}
+
 export interface ZaloCrmEnv {
   ZALOCRM_API_KEY: string;
   ZALOCRM_BASE_URL: string;

@@ -7,6 +7,7 @@ import {
   answerKeyToStored,
   type AnswerKey,
 } from "@/features/session-tests/answer-key";
+import { kickGradingWorker } from "@/features/ai-grading/kick";
 import { AI_KEY_MISSING_MESSAGE } from "@/features/session-tests/status";
 import { SESSION_TEST_BUCKET } from "@/features/session-tests/storage";
 import { getAnthropicApiKey } from "@/lib/env";
@@ -273,6 +274,7 @@ export async function confirmSessionTestKeyAction(input: {
     p_title: parsed.data.title ?? "",
   });
   if (error) return { message: rpcErrorMessage(error), ok: false };
+  kickGradingWorker("key_confirmed");
   const version = data?.[0]?.answer_key_version ?? parsed.data.expectedVersion + 1;
   return {
     message:
@@ -311,6 +313,7 @@ export async function copySessionTestKeyAction(input: {
     p_source_test_id: parsed.data.sourceTestId,
   });
   if (error) return { message: rpcErrorMessage(error), ok: false };
+  kickGradingWorker("key_copied");
   const copiedPages = data?.[0]?.copied_pages ?? 0;
   return {
     message: `Đã dùng đề có sẵn và chốt đáp án cho buổi này.${copiedPages > 0 ? ` Đã kèm ${copiedPages} trang ảnh đề.` : ""}`,
@@ -319,8 +322,8 @@ export async function copySessionTestKeyAction(input: {
 }
 
 /**
- * "AI đọc đề": queues an extract_key run (Claude Opus 5.5, effort high). Refused while
- * ANTHROPIC_API_KEY is not configured; the background worker that runs it comes in phase 3.
+ * "AI đọc đề": queues an extract_key run (the key model from Cài đặt → Chấm bài AI, Opus 5.5 by
+ * default, effort high) and starts the worker. Refused while ANTHROPIC_API_KEY is not configured.
  */
 export async function requestSessionTestKeyExtractionAction(input: { testId: string }): Promise<SessionTestActionResult> {
   const denied = await requirePermissions([MANAGE]);
@@ -332,6 +335,7 @@ export async function requestSessionTestKeyExtractionAction(input: { testId: str
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("request_session_test_key_extraction", { p_test_id: parsed.data.testId });
   if (error) return { message: rpcErrorMessage(error), ok: false };
+  kickGradingWorker("key_extraction");
   return { message: "Đã xếp lượt AI đọc đề. Đáp án đề xuất sẽ hiện ở đây để trợ giảng kiểm tra và chốt.", ok: true };
 }
 

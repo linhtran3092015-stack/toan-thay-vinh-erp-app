@@ -1,6 +1,7 @@
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
+import { kickGradingWorker } from "@/features/ai-grading/kick";
 import { getSessionGradingSubmissions } from "@/features/grading-submissions/data";
 import { getSessionMessageContact } from "@/features/parent-messages/data";
 import { getSessionTestState } from "@/features/session-tests/data";
@@ -11,6 +12,10 @@ import { getSessionDirectoryQuery } from "@/features/sessions/session-directory-
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 import { permissionDeniedDescription } from "@/lib/permissions/labels";
+// Server actions on this page ("AI đọc đề", chốt đáp án) start the AI grading worker in after(),
+// which runs for this page's maxDuration.
+export const maxDuration = 300;
+
 interface SessionDetailRouteProps {
   params: Promise<{
     sessionId: string;
@@ -185,6 +190,13 @@ export default async function SessionDetailRoute({
           sessionId,
         })
       : null;
+
+  // Wake the AI grading worker when this session still has AI work waiting (safety net for a
+  // batch that stopped early); the worker claims nothing when another one already runs it.
+  const extractionActive =
+    sessionTest?.ok === true && (sessionTest.data.test?.extraction?.status === "queued" || sessionTest.data.test?.extraction?.status === "running");
+  const gradingActive = gradingSubmissions?.ok === true && gradingSubmissions.data.some((submission) => submission.ai?.state === "grading");
+  if (extractionActive || gradingActive) kickGradingWorker("session_page");
 
   return (
     <SessionDetailPage

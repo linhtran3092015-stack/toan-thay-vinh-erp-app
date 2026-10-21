@@ -22,6 +22,8 @@ const PUBLIC_PATHS = new Set([
   // Apps Script submission form: HMAC-signed, no staff session.
   "/api/webhooks/grading-submissions",
   "/api/integrations/grading-roster",
+  // AI grading worker: Bearer CRON_SECRET from the GitHub Actions schedule, no staff session.
+  "/api/internal/ai-grading/worker",
 ]);
 
 function isPublicPath(pathname: string, method: string): boolean {

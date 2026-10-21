@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getDatabasePermissions: vi.fn(),
+  kick: vi.fn(),
   server: vi.fn(),
 }));
 
@@ -14,6 +15,7 @@ vi.mock("@/lib/permissions/database-permissions", () => ({
   getDatabasePermissions: mocks.getDatabasePermissions,
 }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: mocks.server }));
+vi.mock("@/features/ai-grading/kick", () => ({ kickGradingWorker: mocks.kick }));
 
 import {
   confirmSessionTestKeyAction,
@@ -106,6 +108,8 @@ describe("confirmSessionTestKeyAction", () => {
       p_title: "Đề lớp 3",
     });
     expect(result).toEqual({ message: "Đã chốt đáp án. AI sẽ chấm bài theo đáp án này.", ok: true, version: 1 });
+    // Confirming queues grading of the session's papers (database trigger); the worker starts now.
+    expect(mocks.kick).toHaveBeenCalledWith("key_confirmed");
   });
 
   it("explains a version conflict and a total that is not 10", async () => {
@@ -129,6 +133,7 @@ describe("requestSessionTestKeyExtractionAction", () => {
     const { fake } = client(() => ({ data: "run", error: null }));
     expect(await requestSessionTestKeyExtractionAction({ testId })).toEqual({ message: "Chưa cấu hình khóa AI — nhập đáp án tay", ok: false });
     expect(fake.rpc).not.toHaveBeenCalled();
+    expect(mocks.kick).not.toHaveBeenCalled();
   });
 
   it("queues a run once the key exists", async () => {
@@ -137,6 +142,7 @@ describe("requestSessionTestKeyExtractionAction", () => {
     const result = await requestSessionTestKeyExtractionAction({ testId });
     expect(fake.rpc).toHaveBeenCalledWith("request_session_test_key_extraction", { p_test_id: testId });
     expect(result.ok).toBe(true);
+    expect(mocks.kick).toHaveBeenCalledWith("key_extraction");
   });
 });
 

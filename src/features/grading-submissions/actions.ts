@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { kickGradingWorker } from "@/features/ai-grading/kick";
 import { getUnmatchedGradingSubmissions } from "@/features/grading-submissions/data";
 import {
   matchCandidateRowSchema,
@@ -137,6 +138,7 @@ export async function matchGradingSubmissionAction(input: {
   });
   if (error) return { message: rpcErrorMessage(error), ok: false };
 
+  kickGradingWorker("submission_matched");
   revalidatePath(PAGE_PATH);
   revalidatePath(`/sessions/${parsed.data.classSessionId}`);
   const attempt = Array.isArray(data) ? data[0] : null;
@@ -224,6 +226,7 @@ export async function rematchGradingSubmissionsAction(): Promise<GradingRematchR
     if (!rows.success) return { message: "Không đọc được kết quả ghép lại. Tải lại trang.", ok: false };
 
     const summary = summarizeRematch(rows.data.map((row) => row.outcome), pending.data.length, failed);
+    if (summary.matched > 0) kickGradingWorker("submissions_rematched");
     if (summary.matched > 0 || summary.updated > 0) {
       revalidatePath(PAGE_PATH);
       const matchedIds = new Set(rows.data.filter((row) => row.outcome === "matched").map((row) => row.submission_id));
