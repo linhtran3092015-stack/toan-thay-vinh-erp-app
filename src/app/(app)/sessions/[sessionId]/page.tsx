@@ -2,9 +2,12 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { kickGradingWorker } from "@/features/ai-grading/kick";
+import { getGradingCommentPhrases } from "@/features/ai-grading/phrases-data";
+import type { ReviewContext } from "@/features/grading-submissions/components/submission-review-panel";
 import { getSessionGradingSubmissions } from "@/features/grading-submissions/data";
 import { getSessionMessageContact } from "@/features/parent-messages/data";
 import { getSessionTestState } from "@/features/session-tests/data";
+import { getGradingRankBands } from "@/features/settings/system-settings-data";
 import { getAdditionalStudyCandidates } from "@/features/sessions/attendance-data";
 import { getSessionDetail } from "@/features/sessions/detail-data";
 import { SessionDetailPage } from "@/features/sessions/session-detail-page";
@@ -198,6 +201,27 @@ export default async function SessionDetailRoute({
   const gradingActive = gradingSubmissions?.ok === true && gradingSubmissions.data.some((submission) => submission.ai?.state === "grading");
   if (extractionActive || gradingActive) kickGradingWorker("session_page");
 
+  // Phase 3b: approving AI-graded papers writes the session result, so it follows the result rules
+  // (started, not locked) and needs results.manage on top of ai_grading.review.
+  const canReview = permissionResult.permissions.includes("ai_grading.review");
+  let submissionReview: ReviewContext | undefined;
+  if (canReview && gradingSubmissions?.ok) {
+    const confirmedTest = sessionTest?.ok && sessionTest.data.test?.status === "key_confirmed" ? sessionTest.data.test : null;
+    const [bands, phrases] = await Promise.all([getGradingRankBands(), getGradingCommentPhrases()]);
+    submissionReview = {
+      bands,
+      canReview,
+      canWriteResults: canManageResults,
+      editable:
+        detailResult.detail.lockedAt === null &&
+        (detailResult.detail.status === "in_progress" || detailResult.detail.status === "completed"),
+      key: confirmedTest?.answerKey ?? null,
+      keyVersion: confirmedTest?.answerKeyVersion ?? 0,
+      phrases,
+      sessionId,
+    };
+  }
+
   return (
     <SessionDetailPage
       additionalStudyCandidates={
@@ -229,6 +253,7 @@ export default async function SessionDetailRoute({
       gradingSubmissions={gradingSubmissions}
       messageContact={messageContact}
       sessionTest={sessionTest}
+      submissionReview={submissionReview}
     />
   );
 }

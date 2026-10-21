@@ -60,8 +60,8 @@ select ok(
   and not has_function_privilege('anon', 'public.claim_grading_runs(integer, integer)', 'execute'),
   'only service_role claims and completes runs');
 select ok(
-  not has_function_privilege('authenticated', 'public.enqueue_submission_grading(uuid)', 'execute')
-  and not has_function_privilege('service_role', 'public.enqueue_submission_grading(uuid)', 'execute')
+  not has_function_privilege('authenticated', 'public.enqueue_submission_grading(uuid, boolean)', 'execute')
+  and not has_function_privilege('service_role', 'public.enqueue_submission_grading(uuid, boolean)', 'execute')
   and not has_function_privilege('service_role', 'public.record_submission_ai_failure(public.grading_runs)', 'execute')
   and not has_function_privilege('authenticated', 'public.ai_grading_settings()', 'execute')
   and not has_function_privilege('service_role', 'public.run_ai_grading_health_check()', 'execute'),

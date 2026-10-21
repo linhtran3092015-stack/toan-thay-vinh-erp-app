@@ -2,6 +2,22 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.31.0.0] - 2026-10-21
+
+Chấm bài AI, Giai đoạn 3b: trợ giảng duyệt bài AI đã chấm ngay trên trang buổi học; duyệt là ghi điểm và nhận xét vào kết quả buổi (giữ nguyên điểm vở), tin Zalo có bài làm của học sinh, bài chữa cả đề và "(đã cộng 1)".
+
+### Added
+- **Duyệt bài** (quyền mới `ai_grading.review` cho owner, hai quản lý, trợ giảng; cần thêm quyền nhập kết quả buổi): mỗi bài nộp có "Xem và duyệt" để sửa đúng/sai/bỏ trống từng câu, tick "Tích cực tương tác (+1)", xem trước điểm và xếp hạng, sửa nhận xét rồi "Duyệt và ghi điểm". Điểm tính trong cơ sở dữ liệu theo quy tắc đã chốt: câu đúng được trọn điểm, tổng làm tròn số nguyên (.5 lên) rồi mới cộng 1, tối đa 10; xếp hạng theo điểm cuối.
+- **Nhận xét soạn sẵn 4 ý** theo mẫu Thầy Vinh: câu báo cộng điểm (nếu tick), kết quả (khen khi đúng hết, hoặc từng câu sai kèm đáp án đúng và chỗ sai), lời nhờ phụ huynh, tương tác, lời chúc. Câu mẫu lấy từ bản demo (bảng `grading_comment_phrases`), xoay vòng theo học sinh; trợ giảng sửa thoải mái trước khi duyệt. Bài đã 10 điểm mà được tick thì chỉ khen, không nhắc cộng điểm.
+- **"Duyệt N bài xanh"**: duyệt một lần mọi bài xanh của buổi (theo đáp án hiện tại, em có mặt, chưa có điểm nhập tay) với kết quả AI, tick đã chọn và nhận xét soạn sẵn.
+- **"Chấm lại AI"** (kể cả bài đã duyệt hoặc đã bỏ qua; kết quả buổi giữ nguyên tới khi duyệt lại) và **"Bỏ qua"** (bắt buộc lý do; trợ giảng chấm tay).
+- **Tin Zalo nhận xét**: dòng Kết quả ghi "Điểm luyện tập cuối buổi: 9 (đã cộng 1)"; mục "Bài làm của học sinh" (tối đa 1.500 ký tự) và "Bài chữa chi tiết của thầy cô" (lời giải cả đề từ đáp án đã chốt, tối đa 2.500 ký tự) chỉ có ở bài chấm AI đã duyệt; buổi nhập tay vẫn tự ẩn hai mục này.
+
+### Changed
+- Người duyệt là người chấm (`graded_by`) nên nhận công chấm khi khóa buổi, như nhập tay. Sửa điểm tay sau khi duyệt thì bỏ hậu tố "(đã cộng 1)".
+- Sửa đáp án sau khi chốt không còn tự chấm lại bài đã duyệt; trang hiện "Đáp án đã đổi sau khi duyệt" để trợ giảng bấm "Chấm lại" nếu cần.
+- Thẻ bài nộp hiện điểm danh, điểm nhập tay đang có, trạng thái tin Zalo và người duyệt.
+
 ## [0.30.0.0] - 2026-10-21
 
 Chấm bài AI, Giai đoạn 3a: ERP tự gọi Claude để đọc ảnh đề và chấm bài nộp qua form, theo đáp án trợ giảng đã chốt. Kết quả AI hiện trên từng bài ở buổi học để trợ giảng tham khảo; duyệt điểm vào kết quả buổi và tin Zalo ở Giai đoạn 3b.
