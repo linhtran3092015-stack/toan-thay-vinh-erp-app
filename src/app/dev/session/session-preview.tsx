@@ -8,6 +8,8 @@ import type {
   SessionParticipantReadModel,
 } from "@/features/sessions/detail-read-models";
 import { SessionDetailPage } from "@/features/sessions/session-detail-page";
+import { DEFAULT_COMMENT_PHRASES } from "@/features/ai-grading/comment";
+import type { ReviewActions } from "@/features/grading-submissions/components/submission-review-panel";
 import { DATABASE_PERMISSION_CODES, type PermissionCode } from "@/lib/permissions/types";
 
 import { buildSessionTestState, previewSessionTestActions, type SessionTestPreviewState } from "./session-test-fixtures";
@@ -123,6 +125,22 @@ function buildSubmissions(participants: SessionParticipantReadModel[]): SessionG
     studentMatchMethod: "student_code",
     studentName: participants[index].studentName ?? "",
     submittedAt: "2026-10-12T14:31:00Z",
+    review: {
+      attendanceStatus: participants[index].attendanceStatus,
+      feedbackText: null,
+      finalScore: null,
+      finalVerdicts: null,
+      keyVersion: null,
+      messageStatus: null,
+      note: null,
+      paperScore: null,
+      praiseBonus: false,
+      rankLabel: null,
+      result: null,
+      reviewedAt: null,
+      reviewedByName: null,
+      status: "pending",
+    },
     ...overrides,
   });
   // AI results (phase 3a): green, yellow with a flag, still grading, red.
@@ -173,11 +191,20 @@ const taPermissions: readonly PermissionCode[] = [
   "ai_grading.view",
   "ai_grading.manage_tests",
   "ai_grading.confirm_key",
+  "ai_grading.review",
   "students.view",
   "timekeeping.view",
   "timekeeping.check",
   "notifications.view",
 ];
+
+/** Review actions in the preview never reach the server. */
+const previewReviewActions: ReviewActions = {
+  approve: async () => ({ message: "Xem trước: không ghi điểm thật.", ok: true }),
+  regrade: async () => ({ message: "Xem trước: không chấm lại thật.", ok: true }),
+  setPraise: async () => ({ message: "Xem trước: không lưu.", ok: true }),
+  skip: async () => ({ message: "Xem trước: không bỏ qua thật.", ok: true }),
+};
 
 export function SessionPreview({
   role,
@@ -193,6 +220,7 @@ export function SessionPreview({
     ? DATABASE_PERMISSION_CODES.filter((code) => code !== "student_care.view")
     : taPermissions;
   const detail = buildDetail(state);
+  const testState = buildSessionTestState(test, state === "locked");
 
   return (
     <AppShell
@@ -223,8 +251,29 @@ export function SessionPreview({
         gradingSubmissions={
           permissions.includes("ai_grading.view") ? { data: buildSubmissions(detail.participants), ok: true } : null
         }
-        sessionTest={{ data: buildSessionTestState(test, state === "locked"), ok: true }}
+        sessionTest={{ data: testState, ok: true }}
         sessionTestActions={previewSessionTestActions}
+        submissionReview={
+          permissions.includes("ai_grading.review")
+            ? {
+                actions: previewReviewActions,
+                bands: [
+                  { label: "Tiến bộ ít", minScore: 0 },
+                  { label: "Tiến bộ vừa", minScore: 5 },
+                  { label: "Tiến bộ", minScore: 8 },
+                  { label: "Tiến bộ nhiều", minScore: 9 },
+                  { label: "Rất tiến bộ", minScore: 10 },
+                ],
+                canReview: true,
+                canWriteResults: permissions.includes("results.manage"),
+                editable: detail.lockedAt === null && (detail.status === "in_progress" || detail.status === "completed"),
+                key: testState.test?.status === "key_confirmed" ? testState.test.answerKey : null,
+                keyVersion: testState.test?.status === "key_confirmed" ? testState.test.answerKeyVersion : 0,
+                phrases: DEFAULT_COMMENT_PHRASES,
+                sessionId: detail.id,
+              }
+            : undefined
+        }
         messageContact={
           state === "ready" || state === "locked"
             ? { saved: { phone: "0912 345 678", supervisorName: "Cô Lê Bích Ngọc", updatedAt: "2026-10-12T13:00:00Z" }, suggestion: null }

@@ -56,9 +56,32 @@ export interface SubmissionAi {
   state: SubmissionAiState;
 }
 
+/** Review of a submission (phase 3b). */
+export interface SubmissionReview {
+  /** Attendance of the student in this session (null when not marked yet). */
+  attendanceStatus: string | null;
+  feedbackText: string | null;
+  finalScore: number | null;
+  finalVerdicts: Record<string, "correct" | "incorrect" | "missing"> | null;
+  keyVersion: number | null;
+  /** Latest Zalo comment message status of the session result (queued, sent, ...). */
+  messageStatus: string | null;
+  note: string | null;
+  paperScore: number | null;
+  praiseBonus: boolean;
+  rankLabel: string | null;
+  /** The student's current session result, whoever wrote it. */
+  result: { comment: string | null; fromThisSubmission: boolean; id: string; testScore: number | null } | null;
+  reviewedAt: string | null;
+  reviewedByName: string | null;
+  status: "pending" | "approved" | "skipped";
+}
+
 export interface SessionGradingSubmission {
   /** Absent in fixtures written before phase 3a. */
   ai?: SubmissionAi;
+  /** Absent in fixtures written before phase 3b. */
+  review?: SubmissionReview;
   answerText: string;
   answerTruncated: boolean;
   attemptNo: number | null;
@@ -133,7 +156,45 @@ const sessionRowSchema = z.object({
   ai_confidence: z.enum(["high", "medium", "low"]).nullable().catch(null),
   ai_answer_key_version: z.number().int().nullable().catch(null),
   ai_graded_at: z.string().nullable().catch(null),
+  review_status: z.enum(["pending", "approved", "skipped"]).catch("pending"),
+  praise_bonus: z.boolean().catch(false),
+  final_question_verdicts: z.record(z.string(), z.enum(["correct", "incorrect", "missing"])).nullable().catch(null),
+  paper_score: z.number().int().nullable().catch(null),
+  final_score: z.number().int().nullable().catch(null),
+  rank_label: z.string().nullable().catch(null),
+  feedback_text: z.string().nullable().catch(null),
+  review_answer_key_version: z.number().int().nullable().catch(null),
+  reviewed_at: z.string().nullable().catch(null),
+  reviewed_by_name: z.string().nullable().catch(null),
+  review_note: z.string().nullable().catch(null),
+  attendance_status: z.string().nullable().catch(null),
+  result_id: z.string().uuid().nullable().catch(null),
+  result_test_score: z.coerce.number().nullable().catch(null),
+  result_comment: z.string().nullable().catch(null),
+  result_from_this_submission: z.boolean().nullable().catch(null),
+  message_status: z.string().nullable().catch(null),
 });
+
+function toSubmissionReview(row: z.infer<typeof sessionRowSchema>): SubmissionReview {
+  return {
+    attendanceStatus: row.attendance_status,
+    feedbackText: row.feedback_text,
+    finalScore: row.final_score,
+    finalVerdicts: row.final_question_verdicts,
+    keyVersion: row.review_answer_key_version,
+    messageStatus: row.message_status,
+    note: row.review_note,
+    paperScore: row.paper_score,
+    praiseBonus: row.praise_bonus,
+    rankLabel: row.rank_label,
+    result: row.result_id
+      ? { comment: row.result_comment, fromThisSubmission: row.result_from_this_submission === true, id: row.result_id, testScore: row.result_test_score }
+      : null,
+    reviewedAt: row.reviewed_at,
+    reviewedByName: row.reviewed_by_name,
+    status: row.review_status,
+  };
+}
 
 function toSubmissionAi(row: z.infer<typeof sessionRowSchema>): SubmissionAi {
   return {
@@ -221,6 +282,7 @@ export async function getSessionGradingSubmissions(sessionId: string): Promise<G
       data: parsed.data.map((row) => ({
         ai: toSubmissionAi(row),
         answerText: row.answer_text,
+        review: toSubmissionReview(row),
         answerTruncated: row.answer_truncated,
         attemptNo: row.attempt_no,
         countsForScore: row.counts_for_score,

@@ -2,8 +2,10 @@ import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ApproveGreenButton } from "@/features/grading-submissions/components/approve-green-button";
 import { SubmissionAiSummary } from "@/features/grading-submissions/components/submission-ai-summary";
 import { SubmissionAnswer } from "@/features/grading-submissions/components/submission-answer";
+import { SubmissionReviewPanel, type ReviewContext } from "@/features/grading-submissions/components/submission-review-panel";
 import type { GradingDataResult, SessionGradingSubmission } from "@/features/grading-submissions/data";
 import { matchIssueLabel } from "@/features/grading-submissions/matching";
 import type { SessionParticipantReadModel } from "@/features/sessions/detail-read-models";
@@ -29,10 +31,13 @@ export function SessionSubmissionsCard({
   canViewStudents,
   participants,
   result,
+  review,
 }: {
   canViewStudents: boolean;
   participants: SessionParticipantReadModel[];
   result: GradingDataResult<SessionGradingSubmission[]>;
+  /** Phase 3b review (approve into the session result); absent for viewers who cannot review. */
+  review?: ReviewContext;
 }) {
   if (!result.ok) {
     return (
@@ -74,11 +79,28 @@ export function SessionSubmissionsCard({
         <CardTitle>Bài nộp qua form</CardTitle>
         <p className="text-secondary text-text-muted">
           Bài học sinh gõ trên form cuối buổi, ERP tự ghép vào buổi này. Nộp nhiều lần thì lần cuối được tính. Khi đáp án đã
-          chốt, AI chấm thử từng bài để trợ giảng tham khảo; điểm vẫn nhập ở phần kết quả bên dưới.
+          chốt, AI chấm từng bài; trợ giảng xem, sửa nếu cần rồi duyệt để ghi điểm và nhận xét vào kết quả buổi (điểm vở giữ nguyên).
         </p>
       </CardHeader>
       <CardContent className="grid gap-4">
         <AutoRefresh active={counted.some((submission) => submission.ai?.state === "grading")} />
+        {review?.canReview && review.canWriteResults && review.editable ? (
+          <ApproveGreenButton
+            count={
+              counted.filter(
+                (submission) =>
+                  submission.ai?.state === "graded" &&
+                  submission.ai.color === "green" &&
+                  submission.ai.keyVersion === review.keyVersion &&
+                  submission.review?.status === "pending" &&
+                  submission.review.attendanceStatus !== null &&
+                  PRESENT.has(submission.review.attendanceStatus) &&
+                  !(submission.review.result && !submission.review.result.fromThisSubmission && submission.review.result.testScore !== null),
+              ).length
+            }
+            sessionId={review.sessionId}
+          />
+        ) : null}
         <p className="text-secondary text-text-default">
           {counted.length} học sinh đã nộp
           {presentCount > 0 ? ` · ${presentCount - missing.length}/${presentCount} em có mặt đã nộp` : ""}
@@ -111,6 +133,7 @@ export function SessionSubmissionsCard({
                   ) : null}
                   <SubmissionAnswer text={submission.answerText} truncated={submission.answerTruncated} />
                   {submission.ai ? <SubmissionAiSummary ai={submission.ai} /> : null}
+                  {review && submission.review ? <SubmissionReviewPanel context={review} submission={submission} /> : null}
                   {earlier.length > 0 ? (
                     <details className="text-caption text-text-muted">
                       <summary className="cursor-pointer">{earlier.length} lần nộp trước (không tính)</summary>
