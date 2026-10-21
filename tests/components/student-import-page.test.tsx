@@ -2,10 +2,14 @@
 // fails_when=two step bodies render together, a step opens without its data, the stepper gains a second current step, a mapping problem shows a raw field key, the review shows only the first 100 rows, a warning says "mặc định B" or the server's guardian wording, an exact duplicate reads as a warning, a mapping change keeps the old dry-run, a new file keeps the old mapping, the commit runs without one of today's conditions or sends other rows, a failure leaves the page or claims nothing was written after a lost connection, the result links change, or the page starts calling a next/navigation hook (this test installs no next/navigation mock);
 // why_new=no test rendered the student import page or its commit panel before step 15b;
 // seam=the actions module is mocked (default calls observable) and most tests inject the actions prop; the workbook parser and the template download are mocked (no real xlsx in jsdom); seeding props open later steps; no_claim=the RPCs, the zod schemas, the real workbook parsing (unit tests cover the mapping module) or the visual layout
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as realActions from "@/features/imports/students/actions";
+import { STUDENT_IMPORT_ALREADY_COMMITTED_MESSAGE } from "@/features/imports/students/student-import-commit-panel";
 import type { StudentImportActionOverrides } from "@/features/imports/students/student-import-action-overrides";
 import { StudentImportPage, type StudentImportPageProps } from "@/features/imports/students/student-import-page";
 import { downloadStudentImportTemplate } from "@/features/imports/students/template-browser";
@@ -142,13 +146,15 @@ const commitResult: StudentImportCommitResult = {
 
 type Overrides = Required<StudentImportActionOverrides>;
 
-/** An action answer the test hands back by hand (a request still in flight). */
+/** An action answer the test hands back by hand (a request still in flight): an answer, or a call that throws. */
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 }
 
 function renderPage(props: Partial<StudentImportPageProps> = {}) {
@@ -422,6 +428,27 @@ describe("StudentImportPage wizard", () => {
     expect(actions.validateStudentImportRows.mock.calls[1]?.[0].rows[0]).toMatchObject({ nickname: "Ghi chú 2" });
   });
 
+  // Value: protects=a dry-run call that throws after the mapping changed leaves nothing behind: "Ánh xạ cột" shows no "Chưa kiểm tra được." banner for a check of a mapping no longer chosen;
+  // fails_when=the catch branch of handleValidate sets its error without checking that its run is still the latest;
+  // why_new=the late-answer test above resolves with a success, so the guard in the catch branch never ran;
+  // seam=none (the page's `actions` override props; the call is a promise the test rejects by hand); no_claim=does not prove which errors a real lost connection throws
+  it("drops a dry-run failure that lands after the mapping changed", async () => {
+    const late = deferred<Awaited<ReturnType<Overrides["validateStudentImportRows"]>>>();
+    const { actions } = renderPage({ initialStep: "mapping", initialWorkbook: workbook() });
+    actions.validateStudentImportRows.mockReturnValueOnce(late.promise);
+
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra 3 dòng" }));
+    fireEvent.change(screen.getByLabelText("Tên thường gọi"), { target: { value: "G" } });
+    await act(async () => {
+      late.reject(new Error("network"));
+    });
+
+    expect(currentStep()).toHaveTextContent("2. Ánh xạ cột");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("Chưa kiểm tra được.")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Kiểm tra 3 dòng" })).toBeEnabled());
+  });
+
   it("gates the commit on today's conditions with the reason, then commits the mapped rows once", async () => {
     const { actions } = renderPage({ initialDryRun: cleanResult(), initialStep: "confirm", initialWorkbook: workbook() });
 
@@ -490,8 +517,10 @@ describe("StudentImportPage wizard", () => {
 
   it("keeps a refused commit inline and says the result is unknown when the call itself fails", async () => {
     const { actions } = renderPage({ initialDryRun: cleanResult(), initialStep: "confirm", initialWorkbook: workbook() });
+    // A "conflict" other than the already-committed file (that one reads as done: see the next test).
+    const duplicate = "Phát hiện học viên trùng dữ liệu. Import hàng loạt không cho phép bỏ qua cảnh báo này.";
     actions.commitStudentImportRows
-      .mockResolvedValueOnce({ code: "conflict", message: "File này đã được import thành công trước đó.", ok: false } as never)
+      .mockResolvedValueOnce({ code: "conflict", message: duplicate, ok: false } as never)
       .mockRejectedValueOnce(new Error("network"));
 
     fireEvent.change(screen.getByLabelText("Lý do nhập"), { target: { value: "Lý do" } });
@@ -500,7 +529,7 @@ describe("StudentImportPage wizard", () => {
 
     const refused = await screen.findByRole("alert");
     expect(refused).toHaveTextContent("Chưa nhập.");
-    expect(refused).toHaveTextContent("File này đã được import thành công trước đó.");
+    expect(refused).toHaveTextContent(duplicate);
     expect(currentStep()).toHaveTextContent("4. Xác nhận nhập");
     await waitFor(() => expect(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" })).toBeEnabled());
 
@@ -511,6 +540,46 @@ describe("StudentImportPage wizard", () => {
       ),
     );
     expect(screen.queryByText(/chưa được thay đổi|chưa ghi/i)).not.toBeInTheDocument();
+  });
+
+  // Value: protects=pressing again after a lost commit, as the banner says, ends in words when the first press had landed: the server's already-committed refusal reads "File này đã được nhập." (info, the server's words, a link to the student list), never "Chưa nhập.", and the commit, the reason and the checkbox are locked with their reason;
+  // fails_when=toStudentImportCommitError stops telling that refusal apart (or the action's message drifts from STUDENT_IMPORT_ALREADY_COMMITTED_MESSAGE), the banner turns red, the link goes, or the commit or its inputs stay usable after it;
+  // why_new=owner decision D5 (make "press again in place" true); no test pressed again after a lost commit, and the refusal that follows read as a failure;
+  // seam=the page's `actions` override props, answering with the action's failure for STUDENT_IMPORT_FILE_ALREADY_COMMITTED; actions.ts is read as text to keep its message in step; no_claim=does not prove the RPC refuses a second commit of the same file or that the first press landed
+  it("reads a retry refused as already committed as done, links the student list and locks the commit", async () => {
+    const { actions } = renderPage({ initialDryRun: cleanResult(), initialStep: "confirm", initialWorkbook: workbook() });
+    actions.commitStudentImportRows
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce({ code: "conflict", message: "File này đã được import thành công trước đó.", ok: false } as never);
+
+    fireEvent.change(screen.getByLabelText("Lý do nhập"), { target: { value: "Lý do" } });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Không rõ kết quả. Bấm xác nhận lại: máy chủ không ghi hai lần và sẽ báo nếu lần trước đã ghi xong.",
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" })).toBeEnabled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" }));
+    const banner = (await screen.findByText("File này đã được nhập.")).closest<HTMLElement>('[role="status"]');
+    expect(banner).toHaveTextContent(
+      "File này đã được nhập. File này đã được import thành công trước đó. Hồ sơ đã tạo có trong danh sách học viên.",
+    );
+    expect(within(banner as HTMLElement).getByRole("link", { name: "Mở danh sách học viên" })).toHaveAttribute("href", "/students");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("Chưa nhập.")).not.toBeInTheDocument();
+
+    // The label reads "Đang nhập…" until the commit transition settles.
+    const commit = await screen.findByRole("button", { name: "Xác nhận nhập 3 học sinh" });
+    await waitFor(() => expect(describedBy(commit)).toBe("File này đã được nhập; không cần nhập lại."));
+    expect(commit).toBeDisabled();
+    expect(screen.getByLabelText("Lý do nhập")).toBeDisabled();
+    expect(screen.getByRole("checkbox")).toBeDisabled();
+    expect(actions.commitStudentImportRows).toHaveBeenCalledTimes(2);
+    // The action's own words: a reworded message would quietly turn this back into "Chưa nhập.".
+    expect(readFileSync(join(process.cwd(), "src/features/imports/students/actions.ts"), "utf8")).toContain(
+      `"${STUDENT_IMPORT_ALREADY_COMMITTED_MESSAGE}"`,
+    );
   });
 
   it("falls back to the real actions and clamps a seeded step to the data it has", async () => {

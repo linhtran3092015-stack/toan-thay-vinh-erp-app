@@ -141,7 +141,7 @@ export function ClassScheduleBatchDetailPage({
   const phraseMatches = confirmationText.trim() === CLASS_IMPORT_COMMIT_PHRASE;
   const commitBlockedReason =
     blockingCount > 0
-      ? `Còn ${blockingCount} dòng xung đột hoặc không hợp lệ.`
+      ? `Còn ${formatNumber(blockingCount)} dòng xung đột hoặc không hợp lệ.`
       : !trimmedReason
         ? "Nhập lý do nhập."
         : !confirmationChecked
@@ -188,7 +188,7 @@ export function ClassScheduleBatchDetailPage({
 
   const conditions: GuardedCondition[] = [
     blockingCount > 0
-      ? { label: `Còn ${blockingCount} dòng xung đột hoặc không hợp lệ`, state: "unmet" }
+      ? { label: `Còn ${formatNumber(blockingCount)} dòng xung đột hoặc không hợp lệ`, state: "unmet" }
       : { label: "Không còn dòng xung đột hoặc không hợp lệ", state: "met" },
     trimmedReason ? { label: "Đã nhập lý do", state: "met" } : { label: "Chưa nhập lý do", state: "unmet" },
     confirmationChecked ? { label: "Đã đánh dấu xác nhận", state: "met" } : { label: "Chưa đánh dấu xác nhận", state: "unmet" },
@@ -237,7 +237,7 @@ export function ClassScheduleBatchDetailPage({
         />
       ) : batch.status === "previewed" ? (
         <ResultBanner
-          description={`Còn ${blockingCount} dòng xung đột hoặc không hợp lệ. Lô đã tạo không sửa được và cùng một file không tạo lại được lô: sửa file Excel rồi tạo lô mới từ file đã sửa.`}
+          description={`Còn ${formatNumber(blockingCount)} dòng xung đột hoặc không hợp lệ. Lô đã tạo không sửa được và cùng một file không tạo lại được lô: sửa file Excel rồi tạo lô mới từ file đã sửa.`}
           title="Lô này không nhập được."
           tone="warning"
         />
@@ -368,10 +368,10 @@ export function ClassScheduleBatchDetailPage({
                   />
                 )}
               </Field>
-              <label className="flex min-h-11 items-center gap-2.5 text-body text-text-strong md:min-h-10" htmlFor={`${ids}-commit-confirm`}>
+              <label className="flex min-h-11 items-start gap-2.5 py-2 text-body text-text-strong md:min-h-10" htmlFor={`${ids}-commit-confirm`}>
                 <input
                   checked={confirmationChecked}
-                  className="h-4 w-4 shrink-0 accent-[var(--action-primary)]"
+                  className="mt-1 h-4 w-4 shrink-0 accent-[var(--action-primary)]"
                   id={`${ids}-commit-confirm`}
                   onChange={(event) => setConfirmationChecked(event.target.checked)}
                   type="checkbox"

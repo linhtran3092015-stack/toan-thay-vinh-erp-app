@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CLASS_IMPORT_PREVIEW_BATCH_ID, getClassBatchPreviewDetail } from "@/app/dev/imports/class-import-fixtures";
 import * as realActions from "@/features/imports/classes/actions";
 import { ClassScheduleBatchDetailPage, CLASS_IMPORT_COMMIT_PHRASE } from "@/features/imports/classes/class-schedule-batch-detail-page";
+import { blockingRowsReason } from "@/features/imports/classes/class-schedule-import-presentation";
 import { commitClassScheduleImportBatchSchema } from "@/features/imports/classes/schemas";
 import type { ClassScheduleImportBatchDetail, ClassScheduleImportBatchRecord } from "@/features/imports/classes/types";
 
@@ -184,6 +185,22 @@ describe("ClassScheduleBatchDetailPage: ready batch", () => {
     expect(commitButton()).toBeDisabled();
     expect(commitButton()).toHaveAccessibleDescription("Còn 1 dòng xung đột hoặc không hợp lệ.");
     expect(screen.getByText("Còn 1 dòng xung đột hoặc không hợp lệ")).toBeInTheDocument();
+  });
+
+  // Value: protects=blocking-row counts read with Vietnamese thousands separators like every other count on both class import pages: the commit's reason and condition, the "không nhập được" banner, and the wizard's shared blocking reason;
+  // fails_when=one of those sites prints the raw number again ("Còn 1234 dòng");
+  // why_new=the existing counts are 1 and 4, which read the same either way;
+  // seam=detail fixtures with targeted overrides, and the shared presentation helper called directly; no_claim=does not prove a file can hold that many rows
+  it("formats large blocking counts with thousands separators", () => {
+    const blocking = { class_conflict_count: 0, class_invalid_count: 0, schedule_conflict_count: 0, schedule_invalid_count: 1234 };
+    renderPage(withBatch(getClassBatchPreviewDetail("ready"), blocking));
+    expect(commitButton()).toHaveAccessibleDescription("Còn 1.234 dòng xung đột hoặc không hợp lệ.");
+    expect(screen.getByText("Còn 1.234 dòng xung đột hoặc không hợp lệ")).toBeInTheDocument();
+    cleanup();
+
+    renderPage(withBatch(getClassBatchPreviewDetail("previewed"), blocking));
+    expect(screen.getByRole("status")).toHaveTextContent("Lô này không nhập được. Còn 1.234 dòng xung đột hoặc không hợp lệ.");
+    expect(blockingRowsReason(1234)).toBe("Còn 1.234 dòng xung đột hoặc không hợp lệ. Sửa file Excel rồi chọn lại file.");
   });
 
   it("shows a refused commit inline and does not refresh", async () => {

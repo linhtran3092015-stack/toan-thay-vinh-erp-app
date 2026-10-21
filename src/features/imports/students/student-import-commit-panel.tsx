@@ -1,15 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
 import { GuardedActionPanel, type GuardedCondition } from "@/components/patterns/guarded-action-panel";
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
+import { getButtonClassName } from "@/components/ui/button";
 import { Label, Textarea } from "@/components/ui/field";
 import { formatImportTimestamp } from "@/features/imports/components/import-labels";
 import { ImportSummaryStrip } from "@/features/imports/components/import-summary-strip";
-import type { StudentImportCommitResult, StudentImportValidationResult } from "@/features/imports/students/types";
+import type {
+  StudentImportActionFailure,
+  StudentImportCommitResult,
+  StudentImportValidationResult,
+} from "@/features/imports/students/types";
 import { formatNumber } from "@/lib/format";
 import { permissionLabel } from "@/lib/permissions/labels";
 
@@ -25,6 +31,14 @@ const REASON_MAX_TEXT = formatNumber(STUDENT_IMPORT_REASON_MAX_LENGTH);
  */
 const COMMIT_UNKNOWN_RESULT = "Bấm xác nhận lại: máy chủ không ghi hai lần và sẽ báo nếu lần trước đã ghi xong.";
 
+/**
+ * The commit action's message for STUDENT_IMPORT_FILE_ALREADY_COMMITTED
+ * (actions.ts getRpcFailure, code "conflict"). The action passes no database
+ * code through, and "conflict" also means a duplicate student, so the message
+ * tells the two apart.
+ */
+export const STUDENT_IMPORT_ALREADY_COMMITTED_MESSAGE = "File này đã được import thành công trước đó.";
+
 export interface StudentImportCommitGateInput {
   canCreateStudents: boolean;
   /** Rows mapped from the file currently chosen (0 when no file is held). */
@@ -34,6 +48,8 @@ export interface StudentImportCommitGateInput {
   confirmed: boolean;
   isPending: boolean;
   isCommitted: boolean;
+  /** The commit refused this file as already committed (an earlier press landed): locked, with its reason. */
+  isAlreadyCommitted?: boolean;
 }
 
 export interface StudentImportCommitGate {
@@ -47,11 +63,13 @@ export interface StudentImportCommitGate {
  * The commit gate of today's panel, condition by condition and in the same
  * order as its checks: `students.create`, 0 invalid rows, the dry-run still
  * matches the mapped file (same row count, at least one row), a reason of
- * 1–1,500 characters, the confirmation checkbox, not pending, not committed.
+ * 1–1,500 characters, the confirmation checkbox, not pending, not committed
+ * (here or by an earlier press the server reports).
  */
 export function getStudentImportCommitGate({
   canCreateStudents,
   confirmed,
+  isAlreadyCommitted = false,
   isCommitted,
   isPending,
   mappedRowCount,
@@ -98,13 +116,24 @@ export function getStudentImportCommitGate({
   const firstUnmet = checks.find((check) => !check.ok);
 
   return {
-    canCommit: !firstUnmet && !isPending && !isCommitted,
+    canCommit: !firstUnmet && !isPending && !isCommitted && !isAlreadyCommitted,
     conditions: checks.map((check) => ({ label: check.ok ? check.met : check.unmet, state: check.ok ? "met" : "unmet" })),
-    reason: firstUnmet && !isPending ? firstUnmet.why : null,
+    reason: isAlreadyCommitted ? "File này đã được nhập; không cần nhập lại." : firstUnmet && !isPending ? firstUnmet.why : null,
   };
 }
 
-export type StudentImportCommitError = { kind: "error"; message: string } | { kind: "unknown" };
+export type StudentImportCommitError =
+  | { kind: "error"; message: string }
+  | { kind: "unknown" }
+  /** The server's refusal of a file it already committed; `message` is its words. */
+  | { kind: "already_committed"; message: string };
+
+/** A refused commit in the panel's terms: the already-committed refusal is told apart from the rest. */
+export function toStudentImportCommitError(failure: Pick<StudentImportActionFailure, "code" | "message">): StudentImportCommitError {
+  return failure.code === "conflict" && failure.message === STUDENT_IMPORT_ALREADY_COMMITTED_MESSAGE
+    ? { kind: "already_committed", message: failure.message }
+    : { kind: "error", message: failure.message };
+}
 
 interface StudentImportCommitPanelProps {
   gate: StudentImportCommitGate;
@@ -114,9 +143,11 @@ interface StudentImportCommitPanelProps {
   onReasonChange: (value: string) => void;
   confirmed: boolean;
   onConfirmedChange: (value: boolean) => void;
-  /** Inputs locked (pending, no permission, rows still invalid), as today. */
+  /** Inputs locked (pending, no permission, rows still invalid, file already committed). */
   inputsDisabled: boolean;
   error: StudentImportCommitError | null;
+  /** Where the already-committed banner sends people to see the students (the /dev preview keeps it under /dev). */
+  studentListHref: string;
 }
 
 /**
@@ -133,6 +164,7 @@ export function StudentImportCommitPanel({
   onReasonChange,
   reason,
   reusedGuardianCount,
+  studentListHref,
   validation,
 }: StudentImportCommitPanelProps) {
   const total = formatNumber(validation.row_count);
@@ -149,6 +181,17 @@ export function StudentImportCommitPanel({
         error ? (
           error.kind === "unknown" ? (
             <ResultBanner description={COMMIT_UNKNOWN_RESULT} title="Không rõ kết quả." tone="conflict" />
+          ) : error.kind === "already_committed" ? (
+            <ResultBanner
+              action={
+                <Link className={getButtonClassName({ className: "max-md:h-11", size: "sm", variant: "secondary" })} href={studentListHref}>
+                  Mở danh sách học viên
+                </Link>
+              }
+              description={`${error.message} Hồ sơ đã tạo có trong danh sách học viên.`}
+              title="File này đã được nhập."
+              tone="info"
+            />
           ) : (
             <ResultBanner description={error.message} title="Chưa nhập." tone="error" />
           )

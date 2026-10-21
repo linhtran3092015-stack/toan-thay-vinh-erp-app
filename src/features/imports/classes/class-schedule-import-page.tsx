@@ -69,7 +69,12 @@ const MAPPING_PREVIEW_ROWS = { classes: 20, schedules: 30 } as const;
 
 const UNASSIGNED = "unassigned";
 
-const CONNECTION_LOST_MESSAGE = "Không rõ kết quả. Mở lại trang (hoặc lô) để kiểm tra trước khi thử lại.";
+/**
+ * A batch creation whose answer never arrived. Retrying in place is safe: the
+ * create action looks the file up by SHA-256 first and answers with the batch
+ * already made from it, which this page links.
+ */
+const CREATE_UNKNOWN_RESULT = "Không rõ kết quả. Bấm “Tạo lô” lại: nếu lô đã được tạo, trang sẽ hiện link mở lô đó.";
 
 /** The file step's limits, read from the parser's own constants. */
 const LIMITS_TEXT = `File Excel (.xlsx) có hai sheet “Classes” (lớp học) và “Schedules” (lịch học); tối đa ${formatNumber(
@@ -418,7 +423,7 @@ export function ClassScheduleImportPage({
           source_sha256: workbook.sourceSha256,
         });
       } catch {
-        setCreateError(CONNECTION_LOST_MESSAGE);
+        setCreateError(CREATE_UNKNOWN_RESULT);
         return;
       }
 
@@ -441,6 +446,7 @@ export function ClassScheduleImportPage({
 
   if (step === "file") {
     const fileReasonId = `${ids}-file-reason`;
+    const fileReason = isReading ? "Đang đọc file." : workbook ? undefined : "Chọn file Excel trước.";
     body = (
       <ImportFileStep
         accept=".xlsx,.xls"
@@ -479,11 +485,11 @@ export function ClassScheduleImportPage({
     actionBar = (
       <ImportActionBar
         primary={
-          <Button aria-describedby={workbook ? undefined : fileReasonId} disabled={!workbook} onClick={() => setStep("mapping")}>
+          <Button aria-describedby={fileReason ? fileReasonId : undefined} disabled={Boolean(fileReason)} onClick={() => setStep("mapping")}>
             Tiếp tục: Ánh xạ cột
           </Button>
         }
-        {...reasonProps(workbook ? undefined : "Chọn file Excel trước.", fileReasonId)}
+        {...reasonProps(fileReason, fileReasonId)}
         text="Hệ thống đọc file trên trình duyệt; chưa gửi dữ liệu nào lên máy chủ."
       />
     );
@@ -694,10 +700,10 @@ export function ClassScheduleImportPage({
                 />
               )}
             </Field>
-            <label className="flex min-h-11 items-center gap-2.5 text-body text-text-strong md:min-h-10" htmlFor={`${ids}-batch-confirm`}>
+            <label className="flex min-h-11 items-start gap-2.5 py-2 text-body text-text-strong md:min-h-10" htmlFor={`${ids}-batch-confirm`}>
               <input
                 checked={confirmationChecked}
-                className="h-4 w-4 shrink-0 accent-[var(--action-primary)]"
+                className="mt-1 h-4 w-4 shrink-0 accent-[var(--action-primary)]"
                 id={`${ids}-batch-confirm`}
                 onChange={(event) => setConfirmationChecked(event.target.checked)}
                 type="checkbox"

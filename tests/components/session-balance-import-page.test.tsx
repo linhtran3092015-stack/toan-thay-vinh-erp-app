@@ -168,13 +168,15 @@ const batch: SessionBalanceImportBatchListItem = {
 
 const failure = (message: string): SessionBalanceImportActionFailure => ({ code: "invalid_request", message, ok: false });
 
-/** An action answer the test hands back by hand (a request still in flight). */
+/** An action answer the test hands back by hand (a request still in flight): an answer, or a call that throws. */
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 }
 
 function stepper() {
@@ -362,6 +364,27 @@ describe("SessionBalanceImportPage wizard", () => {
     await waitFor(() => expect(currentStepTitle()).toBe("3. Kiểm tra dòng"));
     expect(dryRunSessionBalanceImport).toHaveBeenCalledTimes(2);
     expect(dryRunSessionBalanceImport.mock.calls[1][0].rows[0]).not.toHaveProperty("source_student_name", "Nguyễn Ngọc Hà Anh");
+  });
+
+  // Value: protects=a check call that throws after the mapping changed leaves nothing behind: "Ánh xạ cột" shows no "Chưa kiểm tra được." banner for a check of a mapping no longer chosen;
+  // fails_when=the catch branch of handleDryRun sets its error without checking that its run is still the latest;
+  // why_new=the late-answer test above resolves with a success, so the guard in the catch branch never ran;
+  // seam=none (the page's `actions` override props; the call is a promise the test rejects by hand); no_claim=does not prove which errors a real lost connection throws
+  it("mapping: drops a check failure that lands after the mapping changed", async () => {
+    const late = deferred<{ data: SessionBalanceImportDryRunResult; ok: true }>();
+    const dryRunSessionBalanceImport = vi.fn().mockReturnValueOnce(late.promise);
+    render(<SessionBalanceImportPage actions={{ dryRunSessionBalanceImport }} initialStep="mapping" initialWorkbook={workbook} today="2026-10-19" />);
+
+    fireEvent.click(primary("Kiểm tra 3 dòng"));
+    fireEvent.change(screen.getByLabelText("Họ và tên học viên"), { target: { value: "" } });
+    await act(async () => {
+      late.reject(new Error("network"));
+    });
+
+    expect(currentStepTitle()).toBe("2. Ánh xạ cột");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("Chưa kiểm tra được.")).not.toBeInTheDocument();
+    await waitFor(() => expect(primary("Kiểm tra 3 dòng")).toBeEnabled());
   });
 
   it("review: the five counts, 'Cần xem' first, Vietnamese messages by code with the raw message as fallback, and the notes", () => {

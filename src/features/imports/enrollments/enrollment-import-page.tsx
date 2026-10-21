@@ -77,10 +77,11 @@ const LIMITS_TEXT = `Chỉ nhận .xlsx có trang tính "Enrollments", tối đa
   ENROLLMENT_IMPORT_MAX_FILE_BYTES / (1024 * 1024),
 )} MB và ${formatNumber(ENROLLMENT_IMPORT_MAX_ROWS)} dòng dữ liệu.`;
 
-/** Counts the required fields, so "cột bắt buộc" stays true if an optional column is ever added. */
-const TEMPLATE_HINT = `Mẫu có ${formatNumber(
-  ENROLLMENT_IMPORT_FIELDS.filter((field) => field.required).length,
-)} cột bắt buộc: mã học sinh, mã lớp, hình thức, hiệu lực từ.`;
+/**
+ * The template's four required columns (ENROLLMENT_IMPORT_FIELDS), written by
+ * hand: the field labels ("Mã học viên", "Hình thức học") are not this wording.
+ */
+const TEMPLATE_HINT = "Mẫu có 4 cột bắt buộc: mã học sinh, mã lớp, hình thức, hiệu lực từ.";
 
 /** A read error that is not the parser's own (e.g. the hash failed): no raw technical message. */
 const FILE_READ_FAILED = "Không thể đọc file Excel. Hãy kiểm tra lại file và thử lại.";
@@ -91,6 +92,19 @@ const FILE_READ_FAILED = "Không thể đọc file Excel. Hãy kiểm tra lại 
  * and says so; reopening the page would lose the batch id instead.
  */
 const COMMIT_UNKNOWN_RESULT = "Bấm xác nhận lại: máy chủ không ghi hai lần và sẽ báo nếu lần trước đã ghi xong.";
+
+/**
+ * The commit RPC's refusal of a batch that is already committed (the action
+ * passes the database message through: "Lỗi Commit ghi danh: …"). After a lost
+ * answer it means the first press landed.
+ */
+const BATCH_ALREADY_COMMITTED_CODE = "STUDENT_ENROLLMENT_IMPORT_BATCH_ALREADY_COMMITTED";
+
+/**
+ * A batch creation whose answer never arrived. Retrying in place is safe: the
+ * create RPC refuses a second batch for the same file (by SHA-256) and says so.
+ */
+const CREATE_UNKNOWN_RESULT = "Bấm “Tạo lô” lại: nếu lô đã được tạo, máy chủ sẽ báo file này đã có lô.";
 
 interface EnrollmentImportBatchInfo {
   id?: string;
@@ -130,6 +144,9 @@ export interface EnrollmentImportPageProps {
 }
 
 type ActionError = { kind: "error"; message: string } | { kind: "unknown" };
+
+/** A commit refusal, or the refusal that says an earlier press already committed the batch. */
+type CommitError = ActionError | { kind: "already_committed" };
 
 /** The action bar's disabled reason (shown under the bar, wired to the primary), or nothing. */
 function barReason(
@@ -249,7 +266,7 @@ export function EnrollmentImportPage({
   const [batchConfirmed, setBatchConfirmed] = useState(false);
 
   const [commitResult, setCommitResult] = useState<EnrollmentImportCommitResult | null>(initialCommitResult ?? null);
-  const [commitError, setCommitError] = useState<ActionError | null>(null);
+  const [commitError, setCommitError] = useState<CommitError | null>(null);
   const [commitConfirmInput, setCommitConfirmInput] = useState("");
   const [commitReasonInput, setCommitReasonInput] = useState("");
 
@@ -262,7 +279,7 @@ export function EnrollmentImportPage({
   const reasonHintId = useId();
   const commitReasonId = useId();
   // Bumped by every input change that invalidates a check (a new or cleared file, a year change)
-  // and by each check: a dry-run or create-batch answer is applied only while its run is still the latest.
+  // and by each check: a dry-run answer is applied only while its run is still the latest.
   const checkRun = useRef(0);
 
   const effectiveNewCount = createBatchResult?.new_count ?? dryRunResult?.new_count ?? 0;
@@ -425,8 +442,6 @@ export function EnrollmentImportPage({
 
   function handleCreateBatch() {
     if (!canCreateBatch || !fileFacts || !parsedWorkbook || !dryRunResult) return;
-    // Not a new check: the batch belongs to the current one, so a file reset or a year change drops its answer.
-    const run = checkRun.current;
     setCreateBatchError(null);
     startCreate(async () => {
       try {
@@ -437,7 +452,6 @@ export function EnrollmentImportPage({
           academicYearCode,
           parsedWorkbook.rows,
         );
-        if (run !== checkRun.current) return;
         if (!response.success || !response.data) {
           setCreateBatchError({ kind: "error", message: response.error || "Tạo lô thất bại." });
           return;
@@ -445,13 +459,14 @@ export function EnrollmentImportPage({
         setCreateBatchResult(toBatchInfo(response.data.batch));
         setStep("commit");
       } catch {
-        if (run !== checkRun.current) return;
         setCreateBatchError({ kind: "unknown" });
       }
     });
   }
 
   const batchStatus = createBatchResult?.status;
+  // Committed (seeded, or the commit refused a second press): the commit and its inputs are locked.
+  const isBatchCommitted = batchStatus === "committed";
   const commitChecks: Check[] = [
     {
       met: "Đã tạo lô",
@@ -463,7 +478,7 @@ export function EnrollmentImportPage({
       met: "Lô sẵn sàng xác nhận",
       ok: batchStatus === undefined || batchStatus === "ready_to_commit",
       unmet: `Lô đang ở trạng thái ${batchStatusLabel(batchStatus)}`,
-      why: "Chỉ xác nhận được lô sẵn sàng xác nhận.",
+      why: isBatchCommitted ? "Lô đã được ghi danh." : "Chỉ xác nhận được lô sẵn sàng xác nhận.",
     },
     {
       met: "Kết quả kiểm tra còn mới",
@@ -502,6 +517,12 @@ export function EnrollmentImportPage({
       try {
         const response = await commitBatchAction(targetBatchId, activeCommitReason);
         if (!response.success || !response.data) {
+          if (response.error?.includes(BATCH_ALREADY_COMMITTED_CODE)) {
+            // An earlier press (whose answer was lost) committed the batch: say so and lock the commit.
+            setCommitError({ kind: "already_committed" });
+            setCreateBatchResult((current) => (current ? { ...current, status: "committed" } : current));
+            return;
+          }
           setCommitError({ kind: "error", message: response.error || "Ghi danh thất bại." });
           return;
         }
@@ -713,7 +734,9 @@ export function EnrollmentImportPage({
               danh học sinh nào; mỗi file chỉ tạo lô được một lần.
             </>
           }
-          result={createBatchError ? <ActionErrorBanner error={createBatchError} title="Chưa tạo lô." /> : null}
+          result={
+            createBatchError ? <ActionErrorBanner error={createBatchError} title="Chưa tạo lô." unknownDescription={CREATE_UNKNOWN_RESULT} /> : null
+          }
           title="Tạo lô ghi danh"
           titleId="enrollment-import-batch-title"
         >
@@ -777,20 +800,24 @@ export function EnrollmentImportPage({
           </>
         }
         result={
-          commitError ? <ActionErrorBanner error={commitError} title="Chưa ghi danh." unknownDescription={COMMIT_UNKNOWN_RESULT} /> : null
+          commitError?.kind === "already_committed" ? (
+            <ResultBanner description="Lần bấm trước đã ghi xong; máy chủ không ghi thêm lần nữa." title="Lô này đã được ghi danh." tone="info" />
+          ) : commitError ? (
+            <ActionErrorBanner error={commitError} title="Chưa ghi danh." unknownDescription={COMMIT_UNKNOWN_RESULT} />
+          ) : null
         }
         title="Xác nhận ghi danh"
         titleId="enrollment-import-commit-title"
       >
         <p className="mt-3 text-body text-text-default tabular-nums [&_strong]:font-semibold">
-          Ghi danh mới: <strong>{effectiveNewCount}</strong> · Dùng lại: <strong>{effectiveMatchingCount}</strong>
+          Ghi danh mới: <strong>{formatNumber(effectiveNewCount)}</strong> · Dùng lại: <strong>{formatNumber(effectiveMatchingCount)}</strong>
         </p>
         <div className="mt-4 grid max-w-[720px] gap-4 md:grid-cols-2">
           <div className="grid content-start gap-1.5">
             <Label htmlFor={commitReasonId}>Lý do xác nhận</Label>
             <Input
               aria-describedby={reasonHintId}
-              disabled={isPending}
+              disabled={isPending || isBatchCommitted}
               id={commitReasonId}
               onChange={(event) => {
                 setCommitReasonInput(event.target.value);
@@ -810,7 +837,7 @@ export function EnrollmentImportPage({
               aria-describedby={phraseHintId}
               autoComplete="off"
               className="font-mono"
-              disabled={isPending}
+              disabled={isPending || isBatchCommitted}
               id={phraseInputId}
               onChange={(event) => {
                 setCommitConfirmInput(event.target.value);
@@ -856,12 +883,12 @@ export function EnrollmentImportPage({
 function ActionErrorBanner({
   error,
   title,
-  unknownDescription = "Mở lại trang để kiểm tra trước khi thử lại.",
+  unknownDescription,
 }: {
   error: ActionError;
   title: string;
   /** What to do when the answer was lost; each write says what is safe for it. */
-  unknownDescription?: string;
+  unknownDescription: string;
 }) {
   if (error.kind === "unknown") {
     return <ResultBanner description={unknownDescription} title="Không rõ kết quả." tone="conflict" />;

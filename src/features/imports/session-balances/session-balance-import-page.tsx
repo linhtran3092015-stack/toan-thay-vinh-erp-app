@@ -705,10 +705,10 @@ function SessionBalanceImportWizard({
           <Field className="max-w-2xl" hint="Ghi rõ mục đích, ví dụ: số dư buổi đầu kỳ của các lớp đang học." label="Lý do tạo lô" required>
             {(props) => <Textarea {...props} maxLength={2000} onChange={(event) => setReason(event.target.value)} value={reason} />}
           </Field>
-          <label className="flex min-h-11 items-center gap-2.5 text-body text-text-strong md:min-h-10" htmlFor={ids.confirm}>
+          <label className="flex min-h-11 items-start gap-2.5 py-2 text-body text-text-strong md:min-h-10" htmlFor={ids.confirm}>
             <input
               checked={isConfirmed}
-              className="h-4 w-4 shrink-0 accent-[var(--action-primary)]"
+              className="mt-1 h-4 w-4 shrink-0 accent-[var(--action-primary)]"
               id={ids.confirm}
               onChange={(event) => setIsConfirmed(event.target.checked)}
               type="checkbox"

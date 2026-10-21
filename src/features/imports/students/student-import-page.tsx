@@ -25,6 +25,7 @@ import {
   getStudentImportCommitGate,
   StudentImportCommitPanel,
   StudentImportCommitResultView,
+  toStudentImportCommitError,
   type StudentImportCommitError,
 } from "@/features/imports/students/student-import-commit-panel";
 import { downloadStudentImportTemplate } from "@/features/imports/students/template-browser";
@@ -325,10 +326,13 @@ export function StudentImportPage({
     });
   }
 
+  // The server refused this file as already committed (after a lost answer, the first press landed).
+  const isAlreadyCommitted = commitError?.kind === "already_committed";
   const gate = validation
     ? getStudentImportCommitGate({
         canCreateStudents,
         confirmed,
+        isAlreadyCommitted,
         isCommitted: commitResult !== null,
         isPending: isCommitting,
         mappedRowCount: mappedRows.length,
@@ -349,7 +353,7 @@ export function StudentImportPage({
           sourceSha256: workbook.sourceSha256,
         });
         if (!result.ok) {
-          setCommitError({ kind: "error", message: result.message });
+          setCommitError(toStudentImportCommitError(result));
           return;
         }
         setCommitResult(result.data);
@@ -586,7 +590,7 @@ export function StudentImportPage({
         confirmed={confirmed}
         error={commitError}
         gate={gate}
-        inputsDisabled={isCommitting || validation.invalid_count > 0 || !canCreateStudents}
+        inputsDisabled={isCommitting || validation.invalid_count > 0 || !canCreateStudents || isAlreadyCommitted}
         onConfirmedChange={(value) => {
           setConfirmed(value);
           setCommitError(null);
@@ -597,6 +601,7 @@ export function StudentImportPage({
         }}
         reason={reason}
         reusedGuardianCount={reusedGuardianCount}
+        studentListHref={resultLinks.studentList}
         validation={validation}
       />
     );

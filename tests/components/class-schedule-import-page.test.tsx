@@ -89,13 +89,15 @@ function withoutYear(workbook: ClassScheduleImportParsedWorkbook): ClassSchedule
   };
 }
 
-/** An action answer the test hands back by hand (a request still in flight). */
+/** An action answer the test hands back by hand (a request still in flight): an answer, or a call that throws. */
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 }
 
 async function goToBatchStep() {
@@ -136,6 +138,27 @@ describe("ClassScheduleImportPage: steps and file", () => {
     expectStep(1);
     expect(screen.getByText("lop-lich-hoc-2026-2027.xlsx · 6 lớp · 10 lịch học")).toBeInTheDocument();
     expect(screen.queryByLabelText("Chọn file Excel")).toBeNull();
+  });
+
+  // Value: protects=while the chosen file is being read, the file step says so ("Đang đọc file.") instead of asking for a file that was just chosen, as the student and enrollment wizards do;
+  // fails_when=the file step's disabled reason ignores isReading;
+  // why_new=the read tests resolve at once, so no test saw the file step during a read (and the reason said "Chọn file Excel trước." then);
+  // seam=parseClassScheduleImportWorkbook mocked with a read the test finishes by hand; no_claim=does not time a real read
+  it("says the file is being read while it is", async () => {
+    const read = deferred<ClassScheduleImportParsedWorkbook>();
+    vi.mocked(parseClassScheduleImportWorkbook).mockReturnValueOnce(read.promise);
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Chọn file Excel"), { target: { files: [new File(["x"], "lop-lich-hoc-2026-2027.xlsx")] } });
+    const next = screen.getByRole("button", { name: "Tiếp tục: Ánh xạ cột" });
+    expect(next).toBeDisabled();
+    expect(next).toHaveAccessibleDescription("Đang đọc file.");
+
+    await act(async () => {
+      read.resolve(CLASS_IMPORT_PREVIEW_WORKBOOK);
+    });
+    expect(await screen.findByRole("tab", { name: /Sheet Classes/, selected: true })).toBeInTheDocument();
+    expectStep(1);
   });
 
   it("keeps a read error inside the file card and stays on the file step", async () => {
@@ -441,6 +464,29 @@ describe("ClassScheduleImportPage: back, stale and 'Tạo lô'", () => {
     expect(actions.createClassScheduleImportBatch).not.toHaveBeenCalled();
   });
 
+  // Value: protects=a dry-run call that throws after the mapping changed leaves nothing behind: "Ánh xạ cột" shows no "Không kiểm tra được dữ liệu." banner for a check of a mapping no longer chosen;
+  // fails_when=the catch branch of handleRunDryRun sets its error without checking that its run is still the latest;
+  // why_new=the late-answer test above resolves with a success, so the guard in the catch branch never ran;
+  // seam=none (the page's `actions` override props; the call is a promise the test rejects by hand); no_claim=does not prove which errors a real lost connection throws
+  it("drops a dry-run failure that lands after the mapping changed", async () => {
+    const late = deferred<Awaited<ReturnType<typeof realActions.dryRunClassScheduleImportAction>>>();
+    actions.dryRunClassScheduleImport.mockReturnValueOnce(late.promise);
+    renderPage({ initialWorkbook: CLASS_IMPORT_PREVIEW_WORKBOOK });
+
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra dòng" }));
+    fireEvent.click(screen.getByRole("tab", { name: /Sheet Schedules/ }));
+    fireEvent.change(screen.getByLabelText("Phòng học"), { target: { value: "unassigned" } });
+    await act(async () => {
+      late.reject(new TypeError("Failed to fetch"));
+    });
+
+    expectStep(1);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(/Không kiểm tra được dữ liệu/)).toBeNull();
+    const check = await screen.findByRole("button", { name: "Kiểm tra dòng" });
+    await waitFor(() => expect(check).toBeEnabled());
+  });
+
   it("resets everything from 'Chọn file khác'", () => {
     renderPage({ initialDryRun: CLASS_IMPORT_PREVIEW_DRY_RUN, initialStep: "file", initialWorkbook: CLASS_IMPORT_PREVIEW_WORKBOOK });
     expectStep(0);
@@ -535,7 +581,9 @@ describe("ClassScheduleImportPage: back, stale and 'Tạo lô'", () => {
     fireEvent.click(screen.getByLabelText("Tôi đã xem kết quả kiểm tra và muốn lưu file này thành lô chờ xác nhận."));
     fireEvent.click(screen.getByRole("button", { name: "Tạo lô" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Không rõ kết quả. Mở lại trang (hoặc lô) để kiểm tra trước khi thử lại.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Không rõ kết quả. Bấm “Tạo lô” lại: nếu lô đã được tạo, trang sẽ hiện link mở lô đó.",
+    );
     expect(router.push).not.toHaveBeenCalled();
   });
 

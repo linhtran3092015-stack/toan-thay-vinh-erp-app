@@ -7,7 +7,7 @@ import type { ImportReviewColumn, ImportRowSeverity } from "@/features/imports/c
 import type { ImportSummaryCell } from "@/features/imports/components/import-summary-strip";
 import type { StepperStep } from "@/components/patterns/stepper";
 import { formatIsoDate, formatTime } from "@/lib/datetime";
-import { formatLearningMode } from "@/lib/format";
+import { formatLearningMode, formatNumber } from "@/lib/format";
 
 import type {
   ClassScheduleImportSummaryCount,
@@ -151,7 +151,7 @@ export function countBlockingRows(classes: ClassScheduleImportSummaryCount, sche
 
 /** Reason under a disabled "Tạo lô" / step primary while rows block the batch. */
 export function blockingRowsReason(count: number): string {
-  return `Còn ${count} dòng xung đột hoặc không hợp lệ. Sửa file Excel rồi chọn lại file.`;
+  return `Còn ${formatNumber(count)} dòng xung đột hoặc không hợp lệ. Sửa file Excel rồi chọn lại file.`;
 }
 
 /** Summary strip cells (Tổng · Tạo mới · Đã tồn tại & khớp · Xung đột · Không hợp lệ). */

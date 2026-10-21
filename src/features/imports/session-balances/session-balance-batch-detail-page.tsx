@@ -635,7 +635,8 @@ function ExcludeCell({
           {error}
         </p>
       ) : null}
-      <div className="flex flex-wrap items-center justify-end gap-1.5">
+      {/* Top-aligned: "Xác nhận loại" may carry its disabled reason under it, and "Hủy" lines up with the button, not the pair. */}
+      <div className="flex flex-wrap items-start justify-end gap-1.5">
         <Button className="max-md:h-11" disabled={isExcluding} onClick={onCancel} size="sm" variant="ghost">
           Hủy
         </Button>
