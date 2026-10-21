@@ -74,6 +74,7 @@ interface CommitResultInfo {
   status: string;
   committed_new_count: number;
   reused_matching_count: number;
+  activated_student_count?: number;
   committed_at: string;
 }
 
@@ -150,6 +151,12 @@ export function EnrollmentImportPage({ initialBatch, initialDryRun }: Enrollment
   }, [academicYearCode, effectiveNewCount, effectiveMatchingCount, effectiveTotalCommitCount]);
 
   const activeCommitReason = commitReasonInput.trim() || defaultCommitReason;
+
+  // Commit only ever targets the batch staged in this session, and only while it is ready.
+  const stagedBatchId =
+    createBatchResult?.batch?.status === "ready_to_commit"
+      ? createBatchResult.batch.id ?? null
+      : null;
 
   // Handle File Upload & SHA-256 Calculation
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -249,14 +256,14 @@ export function EnrollmentImportPage({ initialBatch, initialDryRun }: Enrollment
 
   // Run Commit Action
   const handleCommitBatch = () => {
-    const targetBatchId = createBatchResult?.batch?.id || "36be8c0e-2787-4d88-ab21-61e1a43baccb";
+    if (!stagedBatchId) return;
     if (commitConfirmInput.trim() !== expectedConfirmationPhrase) return;
     if (!activeCommitReason) return;
 
     setCommitError(null);
 
     startTransition(async () => {
-      const res = await commitStudentEnrollmentImportBatchAction(targetBatchId, activeCommitReason);
+      const res = await commitStudentEnrollmentImportBatchAction(stagedBatchId, activeCommitReason);
 
       if (res.success && res.data) {
         setCommitResult(res.data);
@@ -281,6 +288,7 @@ export function EnrollmentImportPage({ initialBatch, initialDryRun }: Enrollment
     !createBatchResult;
 
   const canCommitBatch =
+    stagedBatchId !== null &&
     effectiveTotalCommitCount > 0 &&
     commitConfirmInput.trim() === expectedConfirmationPhrase &&
     activeCommitReason.length > 0 &&
@@ -469,6 +477,9 @@ export function EnrollmentImportPage({ initialBatch, initialDryRun }: Enrollment
             <p><strong>Trạng thái:</strong> <span className="text-blue-700 font-bold">{commitResult.status}</span></p>
             <p><strong>Số ghi danh mới đã tạo:</strong> <strong className="text-emerald-700">{commitResult.committed_new_count}</strong></p>
             <p><strong>Số ghi danh dùng lại:</strong> <strong className="text-blue-700">{commitResult.reused_matching_count}</strong></p>
+            {commitResult.activated_student_count != null && (
+              <p><strong>Học viên chuyển sang Đang học:</strong> <strong className="text-emerald-700">{commitResult.activated_student_count}</strong></p>
+            )}
             <p><strong>Thời gian Commit:</strong> {commitResult.committed_at}</p>
           </div>
         </div>
@@ -548,8 +559,21 @@ export function EnrollmentImportPage({ initialBatch, initialDryRun }: Enrollment
               )}
             </div>
 
+            {!createBatchResult && !commitResult && (
+              <p className="text-xs text-gray-500">
+                Bước 2 (commit ghi danh) mở ra sau khi tạo Batch Staging ở trên.
+              </p>
+            )}
+
+            {createBatchResult && !stagedBatchId && !commitResult && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+                Batch đang ở trạng thái <strong>{createBatchResult.batch?.status ?? "không rõ"}</strong> nên không commit được.
+                Hãy chọn lại file và chạy Dry-Run lại.
+              </div>
+            )}
+
             {/* Step 2: Atomic Commit Controls */}
-            {!commitResult && (
+            {stagedBatchId && !commitResult && (
               <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-bold text-amber-900 flex items-center gap-2">
