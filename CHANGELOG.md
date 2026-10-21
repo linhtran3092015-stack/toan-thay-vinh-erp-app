@@ -2,6 +2,16 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.32.0.1] - 2026-10-21
+
+Import ghi danh học viên (`/imports/enrollments`): học viên được ghi danh qua file giờ chuyển sang "Đang học" như khi ghi danh thủ công, và nút commit không còn gửi nhầm batch.
+
+### Fixed
+- **Commit import ghi danh kích hoạt học viên**: mỗi dòng mới đặt trạng thái học viên là "Đang học", hình thức học theo dòng import và ngày bắt đầu chính thức bằng ngày hiệu lực (giữ ngày cũ nếu đã có), giống "Ghi danh vào lớp" thủ công. Trước đây học viên vẫn ở "Quan tâm" nên không được phân bổ chuyển khoản SePay, không vào chăm sóc học viên và không tính vào số "đang học". Dòng "Đã tồn tại & khớp" cũng kích hoạt học viên chưa ở trạng thái đang học, nên import lại file cũ sửa được học viên đã import trước bản này. Kết quả commit và nhật ký ghi thêm số học viên được kích hoạt.
+- **Bước commit chỉ mở sau khi tạo Batch Staging** và chỉ commit đúng batch vừa tạo ở trạng thái sẵn sàng. Trước đây có thể bấm commit khi chưa có batch (hoặc sau khi chọn lại file), trang gửi một mã batch cũ còn sót trong code và báo `STUDENT_ENROLLMENT_IMPORT_BATCH_NOT_FOUND`. Batch bị từ chối hiện cảnh báo thay vì nút commit.
+- **Thông báo lỗi dễ đọc**: các mã lỗi của import ghi danh (batch không tồn tại, đã commit, chưa sẵn sàng, dữ liệu đã đổi, file đã dùng, thiếu quyền) hiện bằng tiếng Việt, và không còn lặp chữ "Lỗi Commit ghi danh:" hai lần.
+- Cần chạy migration `20261022160000_enrollment_import_commit_activates_students.sql` (`supabase db push`).
+
 ## [0.32.0.0] - 2026-10-21
 
 Chấm bài AI, Giai đoạn 3c: trang "Chấm bài AI" gom các buổi cần duyệt, owner sửa câu mẫu nhận xét và xem chi phí 30 ngày, nhắc khi buổi sắp tự khóa mà còn bài chưa duyệt.
