@@ -16,6 +16,15 @@ import { permissionLabel } from "@/lib/permissions/labels";
 /** Same cap as the server's zod schema ("Lý do import không được vượt quá 1.500 ký tự."). */
 export const STUDENT_IMPORT_REASON_MAX_LENGTH = 1500;
 
+const REASON_MAX_TEXT = formatNumber(STUDENT_IMPORT_REASON_MAX_LENGTH);
+
+/**
+ * A commit whose answer never arrived. Retrying in place is safe: the commit
+ * RPC refuses a second commit of the same file
+ * (STUDENT_IMPORT_FILE_ALREADY_COMMITTED) and says so.
+ */
+const COMMIT_UNKNOWN_RESULT = "Bấm xác nhận lại: máy chủ không ghi hai lần và sẽ báo nếu lần trước đã ghi xong.";
+
 export interface StudentImportCommitGateInput {
   canCreateStudents: boolean;
   /** Rows mapped from the file currently chosen (0 when no file is held). */
@@ -75,8 +84,8 @@ export function getStudentImportCommitGate({
     {
       met: "Đã nhập lý do",
       ok: reasonOk,
-      unmet: trimmedReason.length > STUDENT_IMPORT_REASON_MAX_LENGTH ? "Lý do dài quá 1.500 ký tự" : "Chưa nhập lý do",
-      why: trimmedReason.length > STUDENT_IMPORT_REASON_MAX_LENGTH ? "Rút gọn lý do còn tối đa 1.500 ký tự." : "Nhập lý do nhập dữ liệu.",
+      unmet: trimmedReason.length > STUDENT_IMPORT_REASON_MAX_LENGTH ? `Lý do dài quá ${REASON_MAX_TEXT} ký tự` : "Chưa nhập lý do",
+      why: trimmedReason.length > STUDENT_IMPORT_REASON_MAX_LENGTH ? `Rút gọn lý do còn tối đa ${REASON_MAX_TEXT} ký tự.` : "Nhập lý do nhập dữ liệu.",
     },
     {
       met: "Đã đánh dấu xác nhận",
@@ -139,7 +148,7 @@ export function StudentImportCommitPanel({
       result={
         error ? (
           error.kind === "unknown" ? (
-            <ResultBanner description="Mở lại trang để kiểm tra trước khi thử lại." title="Không rõ kết quả." tone="conflict" />
+            <ResultBanner description={COMMIT_UNKNOWN_RESULT} title="Không rõ kết quả." tone="conflict" />
           ) : (
             <ResultBanner description={error.message} title="Chưa nhập." tone="error" />
           )
@@ -171,7 +180,7 @@ export function StudentImportCommitPanel({
             value={reason}
           />
           <p className="text-caption text-text-muted tabular-nums" id="student-import-reason-count">
-            {formatNumber(reason.length)}/1.500 ký tự
+            {formatNumber(reason.length)}/{REASON_MAX_TEXT} ký tự
           </p>
         </div>
 

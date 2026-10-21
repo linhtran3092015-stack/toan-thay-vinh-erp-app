@@ -2,7 +2,7 @@
 // fails_when=the commit controls appear (or the commit action runs) before a batch exists, a fallback batch id returns, window.confirm comes back, the status <select> returns, a conflict or a stale year no longer blocks, the phrase check loosens, the create/commit payloads change, the mapping becomes a current step, two step bodies render together, or the page starts calling a next/navigation hook (no next/navigation mock here);
 // why_new=step 15b rewrites the page into a wizard; the only existing test pins the commit copy (enrollment-import-commit-counts.test.tsx, kept unchanged);
 // seam=the actions module is mocked (default calls observable) and most tests inject the actions prop; the workbook parser and the template download are mocked; seeding props open later steps; no_claim=the RPCs, the server's own phrase/permission checks, the real workbook parsing (enrollment-import-mapping.test.ts covers the header mapping) or the visual layout
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as realActions from "@/features/imports/enrollments/actions";
@@ -96,6 +96,15 @@ const problemDryRun = () =>
   ]);
 const batch = { id: "batch-3", matching_count: 1, new_count: 2, row_count: 3, status: "ready_to_commit" };
 
+/** An action answer the test hands back by hand (a request still in flight). */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 function renderPage(props: Partial<EnrollmentImportPageProps> = {}) {
   const actions = {
     commitStudentEnrollmentImportBatch: vi.fn(async () => ({
@@ -148,6 +157,31 @@ describe("EnrollmentImportPage wizard", () => {
     const check = screen.getByRole("button", { name: "Kiểm tra dòng" });
     expect(check).toBeDisabled();
     expect(describedBy(check)).toBe("Chọn file Excel trước.");
+  });
+
+  // Value: protects=while the chosen file is being read, step 1 says so ("Đang đọc file.") instead of asking for a file that was just chosen, and a read that fails for a reason other than the parser's shows a plain message, not a raw technical one;
+  // fails_when=the disabled reason ignores isReading, or any thrown Error's message reaches the file card again;
+  // why_new=the read tests resolve at once and only fail with the parser's own error, so neither branch ran;
+  // seam=parseEnrollmentWorkbook mocked with a read the test finishes by hand, then with a plain Error; no_claim=does not time a real read or prove which errors the browser throws
+  it("says the file is being read while it is, and keeps a non-parser read error plain", async () => {
+    const read = deferred<ParsedEnrollmentWorkbook>();
+    vi.mocked(parseEnrollmentWorkbook).mockReturnValueOnce(read.promise).mockRejectedValueOnce(new Error("TypeError: buffer detached"));
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Chọn file Excel"), { target: { files: [new File(["abc"], "ghi-danh.xlsx")] } });
+    const check = screen.getByRole("button", { name: "Kiểm tra dòng" });
+    expect(check).toBeDisabled();
+    expect(describedBy(check)).toBe("Đang đọc file.");
+    await act(async () => {
+      read.resolve(parsed);
+    });
+    expect(await screen.findByText("ghi-danh.xlsx · 3 dòng")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Chọn file khác" }));
+    fireEvent.change(screen.getByLabelText("Chọn file Excel"), { target: { files: [new File(["abc"], "ghi-danh.xlsx")] } });
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Không thể đọc file Excel. Hãy kiểm tra lại file và thử lại.");
+    expect(alert).not.toHaveTextContent("buffer detached");
   });
 
   it("refuses a dropped non-.xlsx file inline without parsing it", async () => {
@@ -316,6 +350,39 @@ describe("EnrollmentImportPage wizard", () => {
     expect(commitButton()).toBeDisabled();
   });
 
+  // Value: protects=the commit needs a batch id and something to enroll: a created batch without an id and a batch with 0 rows each show their unmet condition and never reach the commit action, even with the phrase typed;
+  // fails_when=the "Đã tạo lô" or "Có dòng để ghi danh" condition is dropped or stops gating canCommitBatch, or handleCommitBatch falls back to another batch id;
+  // why_new=the commit-gate tests above use a batch with an id and 3 rows, so neither condition was ever unmet;
+  // seam=none (seeding props and the page's `actions` override props); no_claim=does not prove what the create-batch RPC returns or that the server refuses an empty batch
+  it("keeps the commit off for a batch without an id and for a batch with nothing to enroll", () => {
+    const noId = renderPage({
+      initialBatch: { matching_count: 1, new_count: 2, row_count: 3, status: "ready_to_commit" },
+      initialDryRun: cleanDryRun(),
+      initialFile: file,
+    });
+    fireEvent.change(screen.getByLabelText("Gõ cụm xác nhận"), { target: { value: "GHI DANH 3" } });
+    expect(conditions("Xác nhận ghi danh")[0]).toBe("Chưa đạt:Lô vừa tạo không có mã lô");
+    const commit = screen.getByRole("button", { name: "XÁC NHẬN COMMIT GHI DANH 3 HỌC VIÊN" });
+    expect(commit).toBeDisabled();
+    expect(describedBy(commit)).toBe("Mở lại trang rồi tạo lô lại.");
+    fireEvent.click(commit);
+    expect(noId.actions.commitStudentEnrollmentImportBatch).not.toHaveBeenCalled();
+    cleanup();
+
+    const empty = renderPage({
+      initialBatch: { ...batch, matching_count: 0, new_count: 0, row_count: 0 },
+      initialDryRun: dryRun([]),
+      initialFile: file,
+    });
+    fireEvent.change(screen.getByLabelText("Gõ cụm xác nhận"), { target: { value: "GHI DANH 0" } });
+    expect(conditions("Xác nhận ghi danh")[4]).toBe("Chưa đạt:Không có dòng nào để ghi danh");
+    const commitNothing = screen.getByRole("button", { name: "XÁC NHẬN COMMIT GHI DANH 0 HỌC VIÊN" });
+    expect(commitNothing).toBeDisabled();
+    expect(describedBy(commitNothing)).toBe("Lô không có dòng nào để ghi danh.");
+    fireEvent.click(commitNothing);
+    expect(empty.actions.commitStudentEnrollmentImportBatch).not.toHaveBeenCalled();
+  });
+
   it("marks the dry-run stale when the year changes: no skipping ahead without a fresh check", () => {
     renderPage({ initialBatch: batch, initialDryRun: cleanDryRun(), initialFile: file });
 
@@ -329,6 +396,31 @@ describe("EnrollmentImportPage wizard", () => {
     expect(screen.getByText("Năm học đã đổi sau lần kiểm tra gần nhất.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Tiếp: Kiểm tra dòng" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kiểm tra 3 dòng" })).toBeInTheDocument();
+  });
+
+  // Value: protects=a dry-run answer that lands after "Chọn file khác" is dropped: the wizard stays on step 1 with no file, no review and no way on until a file is chosen and checked again;
+  // fails_when=handleRunDryRun applies a late answer (setDryRunResult + setStep("review")) without checking that the file it checked is still held, or a file reset / new file stops invalidating an in-flight check;
+  // why_new="Chọn file khác" stays enabled while the dry-run runs and every other dry-run test answers at once, so no test cleared the file mid-check;
+  // seam=none (the page's `actions` override props; the answer is a promise the test resolves by hand); no_claim=does not cover the create-batch guard (no UI path reaches the file step while a batch is being created)
+  it("drops a dry-run answer that lands after the file was cleared", async () => {
+    const late = deferred<{ data: EnrollmentImportDryRunResult; success: boolean }>();
+    const { actions } = renderPage({ initialFile: file });
+    actions.dryRunStudentEnrollmentImport.mockReturnValueOnce(late.promise);
+
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra 3 dòng" }));
+    fireEvent.click(screen.getByRole("button", { name: "Chọn file khác" }));
+    await act(async () => {
+      late.resolve({ data: cleanDryRun(), success: true });
+    });
+
+    expect(currentStep()).toHaveTextContent("1. Chọn năm học & file");
+    expect(screen.queryByLabelText("Kết quả kiểm tra năm học 2026-2027")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tiếp: Kiểm tra dòng" })).not.toBeInTheDocument();
+    expect(screen.queryByText("ghi-danh.xlsx · 3 dòng")).not.toBeInTheDocument();
+    const check = screen.getByRole("button", { name: "Kiểm tra dòng" });
+    expect(check).toBeDisabled();
+    expect(describedBy(check)).toBe("Chọn file Excel trước.");
+    expect(actions.createStudentEnrollmentImportBatch).not.toHaveBeenCalled();
   });
 
   it("keeps refused writes inline and says the result is unknown when a call itself fails", async () => {
@@ -345,7 +437,11 @@ describe("EnrollmentImportPage wizard", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "XÁC NHẬN COMMIT GHI DANH 3 HỌC VIÊN" })).toBeEnabled());
 
     fireEvent.click(screen.getByRole("button", { name: "XÁC NHẬN COMMIT GHI DANH 3 HỌC VIÊN" }));
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Không rõ kết quả. Mở lại trang để kiểm tra trước khi thử lại."));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Không rõ kết quả. Bấm xác nhận lại: máy chủ không ghi hai lần và sẽ báo nếu lần trước đã ghi xong.",
+      ),
+    );
     expect(currentStep()).toHaveTextContent("5. Xác nhận ghi danh");
   });
 

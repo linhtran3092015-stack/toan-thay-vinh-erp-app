@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, useTransition, type ReactNode } from "react";
+import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { GuardedActionPanel, type GuardedCondition } from "@/components/patterns/guarded-action-panel";
 import type { StepperStep } from "@/components/patterns/stepper";
@@ -26,7 +26,13 @@ import type { EnrollmentImportActionOverrides } from "./enrollment-import-action
 import { ENROLLMENT_IMPORT_FIELDS } from "./fields";
 import { downloadEnrollmentImportTemplate } from "./template-browser";
 import type { EnrollmentImportDryRunResult, EnrollmentImportDryRunRow } from "./types";
-import { EnrollmentWorkbookError, parseEnrollmentWorkbook, type ParsedEnrollmentWorkbook } from "./workbook";
+import {
+  ENROLLMENT_IMPORT_MAX_FILE_BYTES,
+  ENROLLMENT_IMPORT_MAX_ROWS,
+  EnrollmentWorkbookError,
+  parseEnrollmentWorkbook,
+  type ParsedEnrollmentWorkbook,
+} from "./workbook";
 
 /**
  * The enrollment import's real stages (W1): the column mapping is automatic
@@ -65,6 +71,26 @@ const MODE_LABELS: Readonly<Record<string, string>> = {
   offline: "Tại lớp",
   online: "Trực tuyến",
 };
+
+/** The file step's limits, read from the parser's own constants. */
+const LIMITS_TEXT = `Chỉ nhận .xlsx có trang tính "Enrollments", tối đa ${formatNumber(
+  ENROLLMENT_IMPORT_MAX_FILE_BYTES / (1024 * 1024),
+)} MB và ${formatNumber(ENROLLMENT_IMPORT_MAX_ROWS)} dòng dữ liệu.`;
+
+/** Counts the required fields, so "cột bắt buộc" stays true if an optional column is ever added. */
+const TEMPLATE_HINT = `Mẫu có ${formatNumber(
+  ENROLLMENT_IMPORT_FIELDS.filter((field) => field.required).length,
+)} cột bắt buộc: mã học sinh, mã lớp, hình thức, hiệu lực từ.`;
+
+/** A read error that is not the parser's own (e.g. the hash failed): no raw technical message. */
+const FILE_READ_FAILED = "Không thể đọc file Excel. Hãy kiểm tra lại file và thử lại.";
+
+/**
+ * A commit whose answer never arrived. Retrying in place is safe: the commit
+ * RPC refuses a batch that is no longer ready_to_commit (already committed)
+ * and says so; reopening the page would lose the batch id instead.
+ */
+const COMMIT_UNKNOWN_RESULT = "Bấm xác nhận lại: máy chủ không ghi hai lần và sẽ báo nếu lần trước đã ghi xong.";
 
 interface EnrollmentImportBatchInfo {
   id?: string;
@@ -235,6 +261,9 @@ export function EnrollmentImportPage({
   const phraseInputId = useId();
   const reasonHintId = useId();
   const commitReasonId = useId();
+  // Bumped by every input change that invalidates a check (a new or cleared file, a year change)
+  // and by each check: a dry-run or create-batch answer is applied only while its run is still the latest.
+  const checkRun = useRef(0);
 
   const effectiveNewCount = createBatchResult?.new_count ?? dryRunResult?.new_count ?? 0;
   const effectiveMatchingCount = createBatchResult?.matching_count ?? dryRunResult?.matching_count ?? 0;
@@ -284,6 +313,7 @@ export function EnrollmentImportPage({
   }
 
   function resetFile() {
+    checkRun.current += 1;
     setFileFacts(null);
     setParsedWorkbook(null);
     setParseError(null);
@@ -305,9 +335,7 @@ export function EnrollmentImportPage({
       setFileFacts({ name: selected.name, sha256 });
       setParsedWorkbook(parsed);
     } catch (error) {
-      setParseError(
-        error instanceof EnrollmentWorkbookError || error instanceof Error ? error.message : "Không thể đọc file Excel.",
-      );
+      setParseError(error instanceof EnrollmentWorkbookError ? error.message : FILE_READ_FAILED);
     } finally {
       setIsReading(false);
     }
@@ -326,16 +354,20 @@ export function EnrollmentImportPage({
   }
 
   function handleYearChange(nextYear: string) {
+    checkRun.current += 1;
     setAcademicYearCode(nextYear);
     if (dryRunResult) setIsStale(true);
   }
 
   function handleRunDryRun() {
     if (!parsedWorkbook || !academicYearCode) return;
+    const run = ++checkRun.current;
     setDryRunError(null);
     startDryRun(async () => {
       try {
         const response = await dryRunAction(academicYearCode, parsedWorkbook.rows);
+        // The file or the year changed while the check ran: this answer is for other inputs.
+        if (run !== checkRun.current) return;
         if (!response.success || !response.data) {
           setDryRunError(response.error || "Kiểm tra thất bại.");
           return;
@@ -344,6 +376,7 @@ export function EnrollmentImportPage({
         setDryRunResult(response.data);
         setStep("review");
       } catch {
+        if (run !== checkRun.current) return;
         setDryRunError("Không kết nối được tới máy chủ. Kiểm tra kết nối rồi thử lại; bước này không ghi dữ liệu.");
       }
     });
@@ -392,6 +425,8 @@ export function EnrollmentImportPage({
 
   function handleCreateBatch() {
     if (!canCreateBatch || !fileFacts || !parsedWorkbook || !dryRunResult) return;
+    // Not a new check: the batch belongs to the current one, so a file reset or a year change drops its answer.
+    const run = checkRun.current;
     setCreateBatchError(null);
     startCreate(async () => {
       try {
@@ -402,6 +437,7 @@ export function EnrollmentImportPage({
           academicYearCode,
           parsedWorkbook.rows,
         );
+        if (run !== checkRun.current) return;
         if (!response.success || !response.data) {
           setCreateBatchError({ kind: "error", message: response.error || "Tạo lô thất bại." });
           return;
@@ -409,6 +445,7 @@ export function EnrollmentImportPage({
         setCreateBatchResult(toBatchInfo(response.data.batch));
         setStep("commit");
       } catch {
+        if (run !== checkRun.current) return;
         setCreateBatchError({ kind: "unknown" });
       }
     });
@@ -542,7 +579,7 @@ export function EnrollmentImportPage({
           inputId="enrollment-import-file"
           isReading={isReading}
           label="Chọn file Excel"
-          limitsText='Chỉ nhận .xlsx có trang tính "Enrollments", tối đa 5 MB và 1.000 dòng dữ liệu.'
+          limitsText={LIMITS_TEXT}
           onFileSelected={handleFileSelected}
           onReset={fileFacts ? resetFile : undefined}
           templateAction={
@@ -550,7 +587,7 @@ export function EnrollmentImportPage({
               <Button isLoading={isTemplateDownloading} onClick={handleTemplateDownload} size="sm" variant="secondary">
                 Tải file mẫu .xlsx
               </Button>
-              <span className="text-secondary text-text-muted">Mẫu có 4 cột bắt buộc: mã học sinh, mã lớp, hình thức, hiệu lực từ.</span>
+              <span className="text-secondary text-text-muted">{TEMPLATE_HINT}</span>
               {templateError ? (
                 <span className="text-secondary font-medium text-danger" role="alert">
                   {templateError}
@@ -607,7 +644,7 @@ export function EnrollmentImportPage({
             </Button>
           )
         }
-        {...barReason(canGoOn || parsedWorkbook ? null : "Chọn file Excel trước.", primaryReasonId)}
+        {...barReason(canGoOn || parsedWorkbook ? null : isReading ? "Đang đọc file." : "Chọn file Excel trước.", primaryReasonId)}
         text="Kiểm tra chỉ đọc dữ liệu; chưa ghi danh học sinh nào."
       />
     );
@@ -735,11 +772,13 @@ export function EnrollmentImportPage({
         conditions={toConditions(commitChecks)}
         consequence={
           <>
-            Ghi danh <strong>{effectiveTotalCommitCount} học sinh</strong> vào lớp trong một lần; nếu máy chủ từ chối thì không ghi dòng nào.
+            Ghi danh <strong>{formatNumber(effectiveTotalCommitCount)} học sinh</strong> vào lớp trong một lần; nếu máy chủ từ chối thì không ghi dòng nào.
             Bước này không đổi trạng thái học sinh.
           </>
         }
-        result={commitError ? <ActionErrorBanner error={commitError} title="Chưa ghi danh." /> : null}
+        result={
+          commitError ? <ActionErrorBanner error={commitError} title="Chưa ghi danh." unknownDescription={COMMIT_UNKNOWN_RESULT} /> : null
+        }
         title="Xác nhận ghi danh"
         titleId="enrollment-import-commit-title"
       >
@@ -814,9 +853,18 @@ export function EnrollmentImportPage({
   );
 }
 
-function ActionErrorBanner({ error, title }: { error: ActionError; title: string }) {
+function ActionErrorBanner({
+  error,
+  title,
+  unknownDescription = "Mở lại trang để kiểm tra trước khi thử lại.",
+}: {
+  error: ActionError;
+  title: string;
+  /** What to do when the answer was lost; each write says what is safe for it. */
+  unknownDescription?: string;
+}) {
   if (error.kind === "unknown") {
-    return <ResultBanner description="Mở lại trang để kiểm tra trước khi thử lại." title="Không rõ kết quả." tone="conflict" />;
+    return <ResultBanner description={unknownDescription} title="Không rõ kết quả." tone="conflict" />;
   }
   return <ResultBanner description={error.message} title={title} tone="error" />;
 }

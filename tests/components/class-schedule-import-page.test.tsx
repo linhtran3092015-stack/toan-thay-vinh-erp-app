@@ -89,6 +89,15 @@ function withoutYear(workbook: ClassScheduleImportParsedWorkbook): ClassSchedule
   };
 }
 
+/** An action answer the test hands back by hand (a request still in flight). */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 async function goToBatchStep() {
   renderPage({ initialDryRun: CLASS_IMPORT_PREVIEW_DRY_RUN, initialWorkbook: CLASS_IMPORT_PREVIEW_WORKBOOK });
   fireEvent.click(screen.getByRole("button", { name: "Tiếp tục: Tạo lô" }));
@@ -394,6 +403,41 @@ describe("ClassScheduleImportPage: back, stale and 'Tạo lô'", () => {
     expectStep(1);
     expect(screen.queryByRole("table", { name: "Kết quả kiểm tra 6 dòng lớp học" })).toBeNull();
     expect(actions.dryRunClassScheduleImport).toHaveBeenCalledTimes(2);
+    expect(actions.createClassScheduleImportBatch).not.toHaveBeenCalled();
+  });
+
+  // Value: protects=a dry-run answer that lands after the mapping changed is dropped (the wizard stays on "Ánh xạ cột" with no result, old or stale), and the way back to the file stays shut while a check runs, so a late answer can never land on a cleared file;
+  // fails_when=handleRunDryRun applies a late answer (setDryRunResult + setStep("review")) without checking that the inputs it checked are still current, a mapping change stops invalidating an in-flight check, or the mapping step's back is enabled during the check;
+  // why_new=every other dry-run test answers at once; in the browser, back → "Chọn file khác" during a check let the old file's result open "Kiểm tra dòng" with "Tiếp tục: Tạo lô" enabled and an empty batch frame;
+  // seam=none (the page's `actions` override props; the answers are promises the test resolves by hand); no_claim=does not prove the server's own checks at batch creation
+  it("drops a dry-run answer that lands after the mapping changed, and keeps back shut while checking", async () => {
+    const late = deferred<Awaited<ReturnType<typeof realActions.dryRunClassScheduleImportAction>>>();
+    const next = deferred<Awaited<ReturnType<typeof realActions.dryRunClassScheduleImportAction>>>();
+    actions.dryRunClassScheduleImport.mockReturnValueOnce(late.promise).mockReturnValueOnce(next.promise);
+    renderPage({ initialWorkbook: CLASS_IMPORT_PREVIEW_WORKBOOK });
+
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra dòng" }));
+    fireEvent.click(screen.getByRole("tab", { name: /Sheet Schedules/ }));
+    fireEvent.change(screen.getByLabelText("Phòng học"), { target: { value: "unassigned" } });
+    await act(async () => {
+      late.resolve({ data: CLASS_IMPORT_PREVIEW_DRY_RUN, ok: true });
+    });
+
+    expectStep(1);
+    expect(screen.queryByRole("table", { name: "Kết quả kiểm tra 6 dòng lớp học" })).toBeNull();
+    expect(screen.queryByText("Kết quả kiểm tra trước không còn đúng.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Tiếp tục: Kiểm tra dòng" })).toBeNull();
+    const check = await screen.findByRole("button", { name: "Kiểm tra dòng" });
+    await waitFor(() => expect(check).toBeEnabled());
+
+    fireEvent.click(check);
+    expect(screen.getByRole("button", { name: "Quay lại bước Tải mẫu & chọn file" })).toBeDisabled();
+    await act(async () => {
+      next.resolve({ data: CLASS_IMPORT_PREVIEW_DRY_RUN, ok: true });
+    });
+    expect(await screen.findByRole("table", { name: "Kết quả kiểm tra 6 dòng lớp học" })).toBeInTheDocument();
+    expectStep(2);
+    expect((actions.dryRunClassScheduleImport.mock.calls[1][0] as unknown as { schedules: { room_name: unknown }[] }).schedules[0].room_name).toBeNull();
     expect(actions.createClassScheduleImportBatch).not.toHaveBeenCalled();
   });
 

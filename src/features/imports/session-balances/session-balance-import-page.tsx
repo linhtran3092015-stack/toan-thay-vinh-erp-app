@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
 import { PageHeader } from "@/components/patterns/page-header";
@@ -244,6 +244,9 @@ function SessionBalanceImportWizard({
   const [createError, setCreateError] = useState<string | null>(null);
   const [isDryRunning, startDryRun] = useTransition();
   const [isCreating, startCreate] = useTransition();
+  // Bumped by every input change that invalidates a check (a new or cleared file, the mapping,
+  // the effective date) and by each check: an answer is applied only while its run is still the latest.
+  const checkRun = useRef(0);
 
   const mappingValidation = useMemo(
     () => (workbook ? validateSessionBalanceImportColumnMapping(workbook.columns, mapping) : null),
@@ -267,6 +270,7 @@ function SessionBalanceImportWizard({
 
   /** A new file (or a cleared one) invalidates every later step. */
   function clearFromFile(): void {
+    checkRun.current += 1;
     setWorkbook(null);
     setMapping({});
     setAutoMappedCount(null);
@@ -313,22 +317,27 @@ function SessionBalanceImportWizard({
   }
 
   function handleEffectiveOnChange(value: string): void {
+    checkRun.current += 1;
     setEffectiveOn(value);
     // The check ran for another date: it no longer describes this batch.
     setDryRunResult(null);
+    setIsConfirmed(false);
     setCreateError(null);
   }
 
   function handleMappingChange(fieldKey: SessionBalanceImportFieldKey, columnKey: string): void {
+    checkRun.current += 1;
     // A changed mapping sends other values: the previous check is stale.
     setDryRunResult(null);
     setDryRunError(null);
+    setIsConfirmed(false);
     setCreateError(null);
     setMapping((current) => ({ ...current, [fieldKey]: columnKey === "" ? null : columnKey }));
   }
 
   function handleDryRun(): void {
     if (!workbook || !mappingValidation?.isValid || mappedRows.length === 0 || !effectiveOn) return;
+    const run = ++checkRun.current;
     setDryRunError(null);
     setDryRunResult(null);
     setCreateError(null);
@@ -337,14 +346,19 @@ function SessionBalanceImportWizard({
       try {
         result = await dryRun({ effective_on: effectiveOn, rows: mappedRows });
       } catch {
+        if (run !== checkRun.current) return;
         setDryRunError("Không kết nối được máy chủ để kiểm tra. Bước này không ghi dữ liệu; thử lại sau.");
         return;
       }
+      // The file, the mapping or the date changed while the check ran: this answer is for other inputs.
+      if (run !== checkRun.current) return;
       if (!result.ok) {
         setDryRunError(result.message);
         return;
       }
       setDryRunResult(result.data);
+      // The confirmation belongs to one check, as in the other import wizards.
+      setIsConfirmed(false);
       setStep("review");
     });
   }
@@ -575,7 +589,7 @@ function SessionBalanceImportWizard({
     );
     actionBar = (
       <ImportActionBar
-        back={{ label: SESSION_BALANCE_IMPORT_STEP_TITLES.file, onClick: () => setStep("file") }}
+        back={{ disabled: isDryRunning, label: SESSION_BALANCE_IMPORT_STEP_TITLES.file, onClick: () => setStep("file") }}
         {...stepReason(reasonText, ids.stepReason)}
         primary={
           <Button

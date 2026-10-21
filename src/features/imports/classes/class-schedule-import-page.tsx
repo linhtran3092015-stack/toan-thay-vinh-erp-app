@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
 import { GuardedActionPanel, type GuardedCondition } from "@/components/patterns/guarded-action-panel";
@@ -42,7 +42,15 @@ import type {
   ScheduleImportColumnMapping,
   ScheduleImportRowInput,
 } from "./types";
-import { parseClassScheduleImportWorkbook, parseDateValue, parseTimeValue, parseWeekdayValue } from "./workbook";
+import {
+  CLASS_IMPORT_MAX_ROWS,
+  CLASS_SCHEDULE_IMPORT_MAX_FILE_BYTES,
+  parseClassScheduleImportWorkbook,
+  parseDateValue,
+  parseTimeValue,
+  parseWeekdayValue,
+  SCHEDULE_IMPORT_MAX_ROWS,
+} from "./workbook";
 
 /** Wizard steps on this page; the fifth ("Xác nhận nhập") is on the batch page. */
 export type ClassScheduleImportStep = "file" | "mapping" | "review" | "batch";
@@ -62,6 +70,11 @@ const MAPPING_PREVIEW_ROWS = { classes: 20, schedules: 30 } as const;
 const UNASSIGNED = "unassigned";
 
 const CONNECTION_LOST_MESSAGE = "Không rõ kết quả. Mở lại trang (hoặc lô) để kiểm tra trước khi thử lại.";
+
+/** The file step's limits, read from the parser's own constants. */
+const LIMITS_TEXT = `File Excel (.xlsx) có hai sheet “Classes” (lớp học) và “Schedules” (lịch học); tối đa ${formatNumber(
+  CLASS_SCHEDULE_IMPORT_MAX_FILE_BYTES / (1024 * 1024),
+)} MB, ${formatNumber(CLASS_IMPORT_MAX_ROWS)} lớp và ${formatNumber(SCHEDULE_IMPORT_MAX_ROWS)} lịch học. File được đọc ngay trên trình duyệt.`;
 
 interface LastDryRunState {
   academicYearCode: string;
@@ -212,6 +225,9 @@ export function ClassScheduleImportPage({
   const [isReading, setIsReading] = useState(false);
   const [isPendingDryRun, startTransitionDryRun] = useTransition();
   const [isPendingBatch, startTransitionBatch] = useTransition();
+  // Bumped by every input change that invalidates a check (a new or cleared file, either mapping)
+  // and by each check: a dry-run answer is applied only while its run is still the latest.
+  const checkRun = useRef(0);
 
   const [workbook, setWorkbook] = useState<ClassScheduleImportParsedWorkbook | null>(initialWorkbook);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -238,15 +254,13 @@ export function ClassScheduleImportPage({
   const [chosenStep, setStep] = useState<ClassScheduleImportStep>(
     () => initialStep ?? (initialWorkbook && initialDryRun ? "review" : initialWorkbook ? "mapping" : "file"),
   );
-  // A step whose data is missing falls back to the furthest one available.
-  const step: ClassScheduleImportStep =
-    (chosenStep === "review" || chosenStep === "batch") && !dryRunResult
-      ? workbook
-        ? "mapping"
-        : "file"
-      : chosenStep === "mapping" && !workbook
-        ? "file"
-        : chosenStep;
+  // A step whose data is missing falls back to the furthest one available: every
+  // later step needs the file, and the review and the batch need a result too.
+  const step: ClassScheduleImportStep = !workbook
+    ? "file"
+    : (chosenStep === "review" || chosenStep === "batch") && !dryRunResult
+      ? "mapping"
+      : chosenStep;
   const stepIndex = STEP_ORDER.indexOf(step);
 
   const classesMappingValidation = useMemo(() => validateClassesMapping(classesMapping), [classesMapping]);
@@ -286,6 +300,7 @@ export function ClassScheduleImportPage({
   }
 
   async function handleFileSelected(file: File) {
+    checkRun.current += 1;
     setFileError(null);
     setDryRunError(null);
     setCreateError(null);
@@ -311,6 +326,7 @@ export function ClassScheduleImportPage({
   }
 
   function handleReset() {
+    checkRun.current += 1;
     setWorkbook(null);
     setFileError(null);
     setDryRunError(null);
@@ -322,6 +338,17 @@ export function ClassScheduleImportPage({
     setLastDryRunState(null);
     setConfirmationChecked(false);
     setStep("file");
+  }
+
+  /** A mapping change makes the last check stale (see isStale) and drops an answer still in flight. */
+  function handleClassesMappingChange(key: keyof ClassImportColumnMapping, value: string | null) {
+    checkRun.current += 1;
+    setClassesMapping((previous) => ({ ...previous, [key]: value }));
+  }
+
+  function handleSchedulesMappingChange(key: keyof ScheduleImportColumnMapping, value: string | null) {
+    checkRun.current += 1;
+    setSchedulesMapping((previous) => ({ ...previous, [key]: value }));
   }
 
   function handleRunDryRun() {
@@ -343,6 +370,7 @@ export function ClassScheduleImportPage({
       schedulesMapping: { ...schedulesMapping },
       sha256: workbook.sourceSha256,
     };
+    const run = ++checkRun.current;
 
     startTransitionDryRun(async () => {
       let res: Awaited<ReturnType<typeof dryRunClassScheduleImport>>;
@@ -353,10 +381,13 @@ export function ClassScheduleImportPage({
           schedules: scheduleInputs,
         });
       } catch {
+        if (run !== checkRun.current) return;
         setDryRunError("Không kết nối được máy chủ để kiểm tra. Bước này chưa ghi gì: kiểm tra mạng rồi thử lại.");
         return;
       }
 
+      // The file or a mapping changed while the check ran: this answer is for other rows.
+      if (run !== checkRun.current) return;
       if (!res.ok) {
         setDryRunError(res.message);
         return;
@@ -427,7 +458,7 @@ export function ClassScheduleImportPage({
         inputId="class-import-file"
         isReading={isReading}
         label="Chọn file Excel"
-        limitsText="File Excel (.xlsx) có hai sheet “Classes” (lớp học) và “Schedules” (lịch học); tối đa 5 MB, 500 lớp và 2.000 lịch học. File được đọc ngay trên trình duyệt."
+        limitsText={LIMITS_TEXT}
         onFileSelected={(file) => void handleFileSelected(file)}
         onReset={workbook ? handleReset : undefined}
         templateAction={
@@ -459,7 +490,7 @@ export function ClassScheduleImportPage({
   } else if (step === "mapping" && workbook) {
     const mappingReasonId = `${ids}-mapping-reason`;
     const primaryLabel = !dryRunResult ? "Kiểm tra dòng" : isStale ? "Chạy lại kiểm tra" : "Tiếp tục: Kiểm tra dòng";
-    const mappingReason = !isMappingValid ? `Sửa ánh xạ cột: còn ${mappingIssueCount} vấn đề.` : undefined;
+    const mappingReason = !isMappingValid ? `Sửa ánh xạ cột: còn ${formatNumber(mappingIssueCount)} vấn đề.` : undefined;
     body = (
       <>
         <section aria-labelledby={`${ids}-mapping-title`} className="grid min-w-0 gap-4 rounded-lg border border-border-subtle bg-surface-base p-5 shadow-[var(--panel-shadow)]">
@@ -499,7 +530,7 @@ export function ClassScheduleImportPage({
               <SheetMapping
                 fields={CLASS_IMPORT_FIELDS}
                 mapping={classesMapping}
-                onChange={(key, value) => setClassesMapping((previous) => ({ ...previous, [key]: value }))}
+                onChange={handleClassesMappingChange}
                 previewRows={MAPPING_PREVIEW_ROWS.classes}
                 sheet={workbook.classesSheet}
                 sheetLabel="Classes"
@@ -512,7 +543,7 @@ export function ClassScheduleImportPage({
               <SheetMapping
                 fields={SCHEDULE_IMPORT_FIELDS}
                 mapping={schedulesMapping}
-                onChange={(key, value) => setSchedulesMapping((previous) => ({ ...previous, [key]: value }))}
+                onChange={handleSchedulesMappingChange}
                 previewRows={MAPPING_PREVIEW_ROWS.schedules}
                 sheet={workbook.schedulesSheet}
                 sheetLabel="Schedules"
@@ -523,8 +554,8 @@ export function ClassScheduleImportPage({
         </section>
         {!isMappingValid ? (
           <ResultBanner
-            description={`Sheet Classes: ${classesMappingValidation.issues.length} · Sheet Schedules: ${schedulesMappingValidation.issues.length}. Mở từng sheet để xem chi tiết.`}
-            title={`Ánh xạ còn ${mappingIssueCount} vấn đề.`}
+            description={`Sheet Classes: ${formatNumber(classesMappingValidation.issues.length)} · Sheet Schedules: ${formatNumber(schedulesMappingValidation.issues.length)}. Mở từng sheet để xem chi tiết.`}
+            title={`Ánh xạ còn ${formatNumber(mappingIssueCount)} vấn đề.`}
             tone="warning"
           />
         ) : null}
@@ -540,7 +571,7 @@ export function ClassScheduleImportPage({
     );
     actionBar = (
       <ImportActionBar
-        back={{ label: CLASS_IMPORT_STEP_TITLES[0], onClick: () => setStep("file") }}
+        back={{ disabled: isPendingDryRun, label: CLASS_IMPORT_STEP_TITLES[0], onClick: () => setStep("file") }}
         primary={
           <Button
             aria-describedby={mappingReason ? mappingReasonId : undefined}
@@ -590,8 +621,8 @@ export function ClassScheduleImportPage({
         {...reasonProps(reviewReason, reviewReasonId)}
         text={
           blockingCount > 0
-            ? `Còn ${blockingCount} dòng xung đột hoặc không hợp lệ. Ứng dụng không sửa hay bỏ dòng: sửa file Excel rồi chọn lại file.`
-            : `Không còn dòng chặn: lô sẽ tạo ${classSummary.new} lớp và ${scheduleSummary.new} lịch học mới; ${classSummary.existing_matching} lớp và ${scheduleSummary.existing_matching} lịch học đã có và khớp được dùng lại.`
+            ? `Còn ${formatNumber(blockingCount)} dòng xung đột hoặc không hợp lệ. Ứng dụng không sửa hay bỏ dòng: sửa file Excel rồi chọn lại file.`
+            : `Không còn dòng chặn: lô sẽ tạo ${formatNumber(classSummary.new)} lớp và ${formatNumber(scheduleSummary.new)} lịch học mới; ${formatNumber(classSummary.existing_matching)} lớp và ${formatNumber(scheduleSummary.existing_matching)} lịch học đã có và khớp được dùng lại.`
         }
       />
     );
@@ -608,7 +639,7 @@ export function ClassScheduleImportPage({
               : undefined;
     const conditions: GuardedCondition[] = [
       blockingCount > 0
-        ? { label: `Còn ${blockingCount} dòng xung đột hoặc không hợp lệ`, state: "unmet" }
+        ? { label: `Còn ${formatNumber(blockingCount)} dòng xung đột hoặc không hợp lệ`, state: "unmet" }
         : { label: "Không còn dòng xung đột hoặc không hợp lệ", state: "met" },
       ...(isStale ? [{ label: "Kết quả kiểm tra khớp file và ánh xạ hiện tại", state: "unmet" as const }] : []),
       trimmedReason ? { label: "Đã nhập lý do", state: "met" } : { label: "Chưa nhập lý do", state: "unmet" },
@@ -663,10 +694,10 @@ export function ClassScheduleImportPage({
                 />
               )}
             </Field>
-            <label className="flex items-start gap-2 text-body text-text-strong" htmlFor={`${ids}-batch-confirm`}>
+            <label className="flex min-h-11 items-center gap-2.5 text-body text-text-strong md:min-h-10" htmlFor={`${ids}-batch-confirm`}>
               <input
                 checked={confirmationChecked}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--action-primary)]"
+                className="h-4 w-4 shrink-0 accent-[var(--action-primary)]"
                 id={`${ids}-batch-confirm`}
                 onChange={(event) => setConfirmationChecked(event.target.checked)}
                 type="checkbox"
@@ -760,7 +791,7 @@ function SheetMapping<Key extends string>({
       {validation.issues.length > 0 ? (
         <div className="rounded-md border border-warning-border bg-warning-bg p-3 text-body text-warning-ink" role="status">
           <p className="font-semibold">
-            Sheet {sheetLabel} còn {validation.issues.length} vấn đề ánh xạ:
+            Sheet {sheetLabel} còn {formatNumber(validation.issues.length)} vấn đề ánh xạ:
           </p>
           <ul className="mt-1 list-disc pl-5">
             {validation.issues.map((issue, index) => (

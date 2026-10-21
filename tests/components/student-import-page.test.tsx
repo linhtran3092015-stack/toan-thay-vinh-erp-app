@@ -2,7 +2,7 @@
 // fails_when=two step bodies render together, a step opens without its data, the stepper gains a second current step, a mapping problem shows a raw field key, the review shows only the first 100 rows, a warning says "mặc định B" or the server's guardian wording, an exact duplicate reads as a warning, a mapping change keeps the old dry-run, a new file keeps the old mapping, the commit runs without one of today's conditions or sends other rows, a failure leaves the page or claims nothing was written after a lost connection, the result links change, or the page starts calling a next/navigation hook (this test installs no next/navigation mock);
 // why_new=no test rendered the student import page or its commit panel before step 15b;
 // seam=the actions module is mocked (default calls observable) and most tests inject the actions prop; the workbook parser and the template download are mocked (no real xlsx in jsdom); seeding props open later steps; no_claim=the RPCs, the zod schemas, the real workbook parsing (unit tests cover the mapping module) or the visual layout
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as realActions from "@/features/imports/students/actions";
@@ -142,6 +142,15 @@ const commitResult: StudentImportCommitResult = {
 
 type Overrides = Required<StudentImportActionOverrides>;
 
+/** An action answer the test hands back by hand (a request still in flight). */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 function renderPage(props: Partial<StudentImportPageProps> = {}) {
   const actions = {
     commitStudentImportRows: vi.fn<Overrides["commitStudentImportRows"]>(async () => ({ data: commitResult, ok: true })),
@@ -217,6 +226,26 @@ describe("StudentImportPage wizard", () => {
     expect(screen.getByLabelText("Tên thường gọi")).toHaveValue("");
     expect(screen.getByRole("table", { name: "Xem trước các dòng đầu sau khi ánh xạ" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kiểm tra 3 dòng" })).toBeEnabled();
+  });
+
+  // Value: protects=while the chosen file is being read, the file step says so ("Đang đọc file.") instead of asking for a file that was just chosen;
+  // fails_when=the disabled reason ignores isReading;
+  // why_new=the read tests resolve at once, so the reading branch of the reason never showed;
+  // seam=parseStudentImportWorkbook mocked with a read the test finishes by hand; no_claim=does not time a real read
+  it("says the file is being read while it is", async () => {
+    const read = deferred<StudentImportParsedWorkbook>();
+    vi.mocked(parseStudentImportWorkbook).mockReturnValueOnce(read.promise);
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Chọn file Excel"), { target: { files: [new File(["x"], "hoc-sinh.xlsx")] } });
+    const next = screen.getByRole("button", { name: "Tiếp: Ánh xạ cột" });
+    expect(next).toBeDisabled();
+    expect(describedBy(next)).toBe("Đang đọc file.");
+
+    await act(async () => {
+      read.resolve(workbook());
+    });
+    expect(screen.getByRole("button", { name: "Tiếp: Ánh xạ cột" })).toBeEnabled();
   });
 
   it("shows a file error inside the file step and stays there", async () => {
@@ -366,6 +395,33 @@ describe("StudentImportPage wizard", () => {
     expect(screen.getByRole("button", { name: "Tiếp: Ánh xạ cột" })).toBeDisabled();
   });
 
+  // Value: protects=a dry-run answer that lands after the mapping changed is dropped: the wizard stays on "Ánh xạ cột", never says the new mapping was checked, and a new check (with the new mapping) is the only way on;
+  // fails_when=handleValidate applies a late answer (setValidation + setStep("review")) without checking that the mapping it checked is still the current one, or a mapping change stops invalidating an in-flight check;
+  // why_new=every other dry-run test answers at once, so none changed the mapping while the check was in flight (seen in the browser: step 3 opened with the old mapping's result);
+  // seam=none (the page's `actions` override props; the first answer is a promise the test resolves by hand); no_claim=does not prove the server re-checks the rows at commit time
+  it("drops a dry-run answer that lands after the mapping changed", async () => {
+    const late = deferred<Awaited<ReturnType<Overrides["validateStudentImportRows"]>>>();
+    const { actions } = renderPage({ initialStep: "mapping", initialWorkbook: workbook() });
+    actions.validateStudentImportRows.mockReturnValueOnce(late.promise);
+
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra 3 dòng" }));
+    fireEvent.change(screen.getByLabelText("Tên thường gọi"), { target: { value: "G" } });
+    await act(async () => {
+      late.resolve({ data: cleanResult(), ok: true });
+    });
+
+    expect(currentStep()).toHaveTextContent("2. Ánh xạ cột");
+    expect(screen.queryByText("Đã kiểm tra với ánh xạ này. Đổi cột nào thì phải kiểm tra lại.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tiếp: Kiểm tra dòng" })).not.toBeInTheDocument();
+    const check = screen.getByRole("button", { name: "Kiểm tra 3 dòng" });
+    await waitFor(() => expect(check).toBeEnabled());
+
+    fireEvent.click(check);
+    await waitFor(() => expect(currentStep()).toHaveTextContent("3. Kiểm tra dòng"));
+    expect(actions.validateStudentImportRows).toHaveBeenCalledTimes(2);
+    expect(actions.validateStudentImportRows.mock.calls[1]?.[0].rows[0]).toMatchObject({ nickname: "Ghi chú 2" });
+  });
+
   it("gates the commit on today's conditions with the reason, then commits the mapped rows once", async () => {
     const { actions } = renderPage({ initialDryRun: cleanResult(), initialStep: "confirm", initialWorkbook: workbook() });
 
@@ -449,7 +505,11 @@ describe("StudentImportPage wizard", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" })).toBeEnabled());
 
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" }));
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Không rõ kết quả. Mở lại trang để kiểm tra trước khi thử lại."));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Không rõ kết quả. Bấm xác nhận lại: máy chủ không ghi hai lần và sẽ báo nếu lần trước đã ghi xong.",
+      ),
+    );
     expect(screen.queryByText(/chưa được thay đổi|chưa ghi/i)).not.toBeInTheDocument();
   });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
 import type { StepperStep } from "@/components/patterns/stepper";
@@ -39,7 +39,12 @@ import type {
   StudentImportValidationResult,
   StudentImportValidationRow,
 } from "@/features/imports/students/types";
-import { parseStudentImportWorkbook, StudentImportWorkbookError } from "@/features/imports/students/workbook";
+import {
+  parseStudentImportWorkbook,
+  STUDENT_IMPORT_MAX_FILE_BYTES,
+  STUDENT_IMPORT_MAX_ROWS,
+  StudentImportWorkbookError,
+} from "@/features/imports/students/workbook";
 import { formatNumber } from "@/lib/format";
 import { permissionLabel } from "@/lib/permissions/labels";
 
@@ -61,6 +66,14 @@ const WARNING_MESSAGES: Readonly<Record<string, string>> = {
 const FIELD_LABELS: Readonly<Record<string, string>> = Object.fromEntries(
   STUDENT_IMPORT_FIELD_DEFINITIONS.map((definition) => [definition.key, definition.label]),
 );
+
+/** The file step's limits, read from the parser's own constants. */
+const LIMITS_TEXT = `Chỉ nhận .xlsx, tối đa ${formatNumber(
+  STUDENT_IMPORT_MAX_FILE_BYTES / (1024 * 1024),
+)} MB, đúng một trang tính và tối đa ${formatNumber(STUDENT_IMPORT_MAX_ROWS)} dòng dữ liệu.`;
+
+/** The template's column count, from the field list the template is built from. */
+const TEMPLATE_HINT = `Mẫu có đủ ${formatNumber(STUDENT_IMPORT_FIELD_DEFINITIONS.length)} cột; cột có dấu * là bắt buộc.`;
 
 export interface StudentImportPageProps {
   canCreateStudents: boolean;
@@ -203,6 +216,9 @@ export function StudentImportPage({
   const [isValidating, startValidating] = useTransition();
   const [isCommitting, startCommitting] = useTransition();
   const primaryReasonId = useId();
+  // Bumped by every input change that invalidates a check (a new or cleared file, a mapping change)
+  // and by each check: a dry-run answer is applied only while its run is still the latest.
+  const checkRun = useRef(0);
 
   const mappingValidation = useMemo(
     () => (workbook ? validateStudentImportColumnMapping(workbook.columns, mapping) : null),
@@ -232,6 +248,7 @@ export function StudentImportPage({
 
   /** A new file (or none): every later step is dropped. */
   function clearFile() {
+    checkRun.current += 1;
     setWorkbook(null);
     setMapping({});
     setValidation(null);
@@ -277,6 +294,7 @@ export function StudentImportPage({
 
   /** A mapping change drops the dry-run and the commit step (today's stale rule). */
   function updateMapping(fieldKey: StudentImportFieldKey, columnKey: string) {
+    checkRun.current += 1;
     setMapping((current) => ({ ...current, [fieldKey]: columnKey.length > 0 ? columnKey : null }));
     setValidation(null);
     setValidateError(null);
@@ -286,10 +304,13 @@ export function StudentImportPage({
   function handleValidate() {
     if (!workbook || !mappingValidation?.isValid) return;
     const rows = mapStudentImportWorkbookRows(workbook, mapping);
+    const run = ++checkRun.current;
     setValidateError(null);
     startValidating(async () => {
       try {
         const result = await validateRows({ rows });
+        // The file or the mapping changed while the check ran: this answer is for other rows.
+        if (run !== checkRun.current) return;
         if (!result.ok) {
           setValidateError(result.message);
           return;
@@ -298,6 +319,7 @@ export function StudentImportPage({
         clearCommitState();
         setStep("review");
       } catch {
+        if (run !== checkRun.current) return;
         setValidateError("Không kết nối được tới máy chủ. Kiểm tra kết nối rồi thử lại; bước này không ghi dữ liệu.");
       }
     });
@@ -391,7 +413,7 @@ export function StudentImportPage({
           inputId="student-import-file"
           isReading={isReading}
           label="Chọn file Excel"
-          limitsText="Chỉ nhận .xlsx, tối đa 5 MB, đúng một trang tính và tối đa 500 dòng dữ liệu."
+          limitsText={LIMITS_TEXT}
           onFileSelected={handleFileSelected}
           onReset={workbook ? resetToFile : undefined}
           templateAction={
@@ -399,7 +421,7 @@ export function StudentImportPage({
               <Button isLoading={isTemplateDownloading} onClick={handleTemplateDownload} size="sm" variant="secondary">
                 Tải file mẫu .xlsx
               </Button>
-              <span className="text-secondary text-text-muted">Mẫu có đủ 15 cột; cột có dấu * là bắt buộc.</span>
+              <span className="text-secondary text-text-muted">{TEMPLATE_HINT}</span>
               {templateError ? (
                 <span className="text-secondary font-medium text-danger" role="alert">
                   {templateError}
@@ -417,7 +439,7 @@ export function StudentImportPage({
             Tiếp: Ánh xạ cột
           </Button>
         }
-        {...barReason(workbook ? null : "Chọn file Excel trước.", primaryReasonId)}
+        {...barReason(workbook ? null : isReading ? "Đang đọc file." : "Chọn file Excel trước.", primaryReasonId)}
         text={
           workbook
             ? `Đã đọc ${formatNumber(workbook.rowCount)} dòng từ trang tính ${workbook.sheetName}. Bước sau chọn cột cho từng trường.`

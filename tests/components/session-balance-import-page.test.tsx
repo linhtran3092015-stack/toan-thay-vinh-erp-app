@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as realActions from "@/features/imports/session-balances/actions";
@@ -168,6 +168,15 @@ const batch: SessionBalanceImportBatchListItem = {
 
 const failure = (message: string): SessionBalanceImportActionFailure => ({ code: "invalid_request", message, ok: false });
 
+/** An action answer the test hands back by hand (a request still in flight). */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 function stepper() {
   return screen.getByRole("list", { name: "Các bước nhập số dư buổi" });
 }
@@ -325,6 +334,36 @@ describe("SessionBalanceImportPage wizard", () => {
     expect(currentStepTitle()).toBe("2. Ánh xạ cột");
   });
 
+  // Value: protects=a check answer that lands after the mapping changed is dropped (the wizard stays on "Ánh xạ cột" and needs a new check), and the way back to the date and the file stays shut while a check runs;
+  // fails_when=handleDryRun applies a late answer (setDryRunResult + setStep("review")) without checking that the mapping/date/file it checked are still current, a mapping change stops invalidating an in-flight check, or the mapping step's back is enabled during the check;
+  // why_new=every other check test answers at once, so none changed an input while the check was in flight;
+  // seam=none (the page's `actions` override props; the answers are promises the test resolves by hand); no_claim=does not prove the server's own checks at batch creation
+  it("mapping: drops a check answer that lands after the mapping changed, and keeps back shut while checking", async () => {
+    const late = deferred<{ data: SessionBalanceImportDryRunResult; ok: true }>();
+    const next = deferred<{ data: SessionBalanceImportDryRunResult; ok: true }>();
+    const dryRunSessionBalanceImport = vi.fn().mockReturnValueOnce(late.promise).mockReturnValueOnce(next.promise);
+    render(<SessionBalanceImportPage actions={{ dryRunSessionBalanceImport }} initialStep="mapping" initialWorkbook={workbook} today="2026-10-19" />);
+
+    fireEvent.click(primary("Kiểm tra 3 dòng"));
+    fireEvent.change(screen.getByLabelText("Họ và tên học viên"), { target: { value: "" } });
+    await act(async () => {
+      late.resolve({ data: dryRun, ok: true });
+    });
+
+    expect(currentStepTitle()).toBe("2. Ánh xạ cột");
+    expect(screen.queryByLabelText("Kết quả kiểm tra")).not.toBeInTheDocument();
+    await waitFor(() => expect(primary("Kiểm tra 3 dòng")).toBeEnabled());
+
+    fireEvent.click(primary("Kiểm tra 3 dòng"));
+    expect(screen.getByRole("button", { name: /Quay lại bước\s*Ngày hiệu lực & file/ })).toBeDisabled();
+    await act(async () => {
+      next.resolve({ data: dryRun, ok: true });
+    });
+    await waitFor(() => expect(currentStepTitle()).toBe("3. Kiểm tra dòng"));
+    expect(dryRunSessionBalanceImport).toHaveBeenCalledTimes(2);
+    expect(dryRunSessionBalanceImport.mock.calls[1][0].rows[0]).not.toHaveProperty("source_student_name", "Nguyễn Ngọc Hà Anh");
+  });
+
   it("review: the five counts, 'Cần xem' first, Vietnamese messages by code with the raw message as fallback, and the notes", () => {
     render(
       <SessionBalanceImportPage initialDryRun={dryRun} initialStep="review" initialWorkbook={workbook} today="2026-10-19" />,
@@ -449,6 +488,36 @@ describe("SessionBalanceImportPage wizard", () => {
     });
   });
 
+  // Value: protects=the confirmation tick belongs to one check: after a new check the box is clear again and "Tạo lô đối soát" waits for it, as in the other three wizards;
+  // fails_when=handleDryRun stops resetting isConfirmed on success, so a tick given for one result carries over to another;
+  // why_new=the create tests above start from a fresh page, so none re-ran the check after ticking;
+  // seam=none (the page's `actions` override props); no_claim=does not prove the server's own checks at batch creation
+  it("create: a new check clears the confirmation tick", async () => {
+    const dryRunSessionBalanceImport = vi.fn().mockResolvedValue({ data: dryRun, ok: true });
+    render(
+      <SessionBalanceImportPage
+        actions={{ dryRunSessionBalanceImport }}
+        initialDryRun={dryRun}
+        initialStep="create"
+        initialWorkbook={workbook}
+        today="2026-10-19"
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Lý do tạo lô"), { target: { value: "Số dư đầu kỳ" } });
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(primary("Tạo lô đối soát")).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Quay lại bước\s*Kiểm tra dòng/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Quay lại bước\s*Ánh xạ cột/ }));
+    fireEvent.click(primary("Kiểm tra 3 dòng"));
+    await waitFor(() => expect(currentStepTitle()).toBe("3. Kiểm tra dòng"));
+    fireEvent.click(primary("Tiếp tục: Tạo lô đối soát"));
+
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(primary("Tạo lô đối soát")).toBeDisabled();
+    expect(screen.getByText("Đánh dấu ô xác nhận.")).toBeInTheDocument();
+  });
+
   it("create: a refused write stays inline; a lost answer says the result is unknown and reloads the list", async () => {
     const createSessionBalanceImportBatch = vi
       .fn()
@@ -477,6 +546,39 @@ describe("SessionBalanceImportPage wizard", () => {
     expect(await screen.findByText("Không rõ kết quả. Mở lại trang (hoặc lô) để kiểm tra trước khi thử lại.")).toBeInTheDocument();
     expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  // Value: protects=the effective date gates both steps: an empty date keeps "Tiếp tục: Ánh xạ cột" off with "Chọn ngày hiệu lực trước.", and a mapping step reached without one keeps the check off with "Chọn ngày hiệu lực ở bước 1 trước khi kiểm tra." and sends nothing;
+  // fails_when=the file step's or the mapping step's reason drops the date condition, or handleDryRun runs without an effective date;
+  // why_new=every other test has a date (a fixed `today` or the Vietnam date), so the date branch of either reason never ran;
+  // seam=none (seeding props and the page's `actions` override props); no_claim=does not prove the server refuses a check or a batch without a date
+  it("an empty effective date keeps both steps from going on, with the reason", () => {
+    render(<SessionBalanceImportPage initialWorkbook={workbook} today="2026-10-19" />);
+    expect(primary("Tiếp tục: Ánh xạ cột")).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("Ngày hiệu lực số dư"), { target: { value: "" } });
+    const next = primary("Tiếp tục: Ánh xạ cột");
+    expect(next).toBeDisabled();
+    expect(document.getElementById(next.getAttribute("aria-describedby") ?? "")).toHaveTextContent("Chọn ngày hiệu lực trước.");
+    cleanup();
+
+    const dryRunSessionBalanceImport = vi.fn();
+    render(
+      <SessionBalanceImportPage
+        actions={{ dryRunSessionBalanceImport }}
+        initialEffectiveOn=""
+        initialStep="mapping"
+        initialWorkbook={workbook}
+        today="2026-10-19"
+      />,
+    );
+    expect(currentStepTitle()).toBe("2. Ánh xạ cột");
+    const check = primary("Kiểm tra 3 dòng");
+    expect(check).toBeDisabled();
+    expect(document.getElementById(check.getAttribute("aria-describedby") ?? "")).toHaveTextContent(
+      "Chọn ngày hiệu lực ở bước 1 trước khi kiểm tra.",
+    );
+    fireEvent.click(check);
+    expect(dryRunSessionBalanceImport).not.toHaveBeenCalled();
   });
 
   it("clamps seeded steps to the data they need", () => {
@@ -545,12 +647,16 @@ describe("session-balance import copy and sources", () => {
       "src/app/dev/imports/balance-import-fixtures.ts",
     ];
     const forbidden =
-      /outline-none|focus:ring|focus-visible:ring|\b(text-ink[\w-]*|border-hairline[\w-]*|bg-surface-[12]|bg-canvas|shadow-card|font-display|bg-white|text-primary|bg-primary)\b|#[0-9a-fA-F]{3,8}\b|\b(?:bg|text|border|ring|fill|stroke|from|to|via|divide)-(?:gray|slate|blue|emerald|amber|red|green|yellow|rose|zinc|stone|neutral|sky|indigo|orange)-\d{2,3}\b/;
+      /outline-none|focus:ring|focus-visible:ring|\b(text-ink[\w-]*|border-hairline[\w-]*|bg-surface-[12]|bg-canvas|shadow-card|font-display|bg-white|text-primary|bg-primary)\b|#[0-9a-fA-F]{3,8}\b/;
+    // Same prefixes and colours as the shared wizard shell's scan (import-wizard-shell.test.tsx).
+    const rawPalette =
+      /\b(?:text|bg|border|ring|fill|stroke|from|via|to|divide|outline|decoration|accent|caret|shadow)-(?:gray|slate|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/;
     const untruthful = /pilot|kế toán|Chủ trung tâm|Quản lý vận hành|Trợ giảng|\balert\(|student_session_ledger_entries|imports\.session_balances\.approve`/i;
 
     for (const file of files) {
       const source = read(file);
       expect(source, file).not.toMatch(forbidden);
+      expect(source, file).not.toMatch(rawPalette);
       expect(source, file).not.toMatch(untruthful);
     }
   });
