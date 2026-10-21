@@ -344,6 +344,24 @@ describe("AI đọc đề", () => {
     expect(await screen.findByText("Đã xếp lượt AI đọc đề.")).toBeInTheDocument();
   });
 
+  // Value: protects=the TA sees the AI's draft as soon as "AI đọc đề" finishes; fails_when=the editor keeps the empty draft it opened with after the server wrote the AI's questions (the 21/10 production report); why_new=the editor only remounted on a new confirmed version; seam=rerender with the refreshed server state; no_claim=the worker or the SQL that applies the draft
+  it("loads the AI draft into the editor when a reading finishes", () => {
+    const empty = detail({ answerKey: { questions: [] }, extraction: { createdAt: "2026-10-21T12:44:37Z", errorCode: null, finishedAt: null, id: "run-1", status: "running" } });
+    const { rerender } = render(<SessionTestCard actions={makeActions()} result={{ data: state({ aiConfigured: true, test: empty }), ok: true }} />);
+    expect(screen.getAllByRole("group", { name: /^Câu / })).toHaveLength(1);
+
+    const read = detail({
+      answerKey: draftKey,
+      extraction: { createdAt: "2026-10-21T12:44:37Z", errorCode: null, finishedAt: "2026-10-21T12:45:05Z", id: "run-1", outcome: "applied", status: "succeeded", warnings: ["Câu 15 khó đọc"] },
+      title: "LT 10 (Miền B)",
+      updatedAt: "2026-10-21T12:45:05Z",
+    });
+    rerender(<SessionTestCard actions={makeActions()} result={{ data: state({ aiConfigured: true, test: read }), ok: true }} />);
+    expect(screen.getAllByRole("group", { name: /^Câu / })).toHaveLength(3);
+    expect(within(question("13")).getByLabelText("Đáp án cuối")).toHaveValue("54");
+    expect(screen.getByText("Câu 15 khó đọc")).toBeInTheDocument();
+  });
+
   it("shows a waiting run with a cancel button", async () => {
     const user = userEvent.setup();
     const actions = renderCard(

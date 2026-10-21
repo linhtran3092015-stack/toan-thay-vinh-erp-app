@@ -2,6 +2,11 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.32.0.2] - 2026-10-21
+
+### Fixed
+- **AI đọc đề xong mà ô đáp án vẫn trống:** bản nháp AI đã ghi vào hệ thống nhưng ô sửa đáp án giữ nội dung lúc mở trang (ví dụ "1 câu, chưa có điểm") cho tới khi tải lại trang. Giờ ô đáp án tự nạp bản nháp AI ngay khi AI đọc xong.
+
 ## [0.32.0.0] - 2026-10-21
 
 Chấm bài AI, Giai đoạn 3c: trang "Chấm bài AI" gom các buổi cần duyệt, owner sửa câu mẫu nhận xét và xem chi phí 30 ngày, nhắc khi buổi sắp tự khóa mà còn bài chưa duyệt.
