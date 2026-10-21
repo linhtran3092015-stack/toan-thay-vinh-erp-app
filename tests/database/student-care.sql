@@ -166,6 +166,14 @@ do $$declare d jsonb;begin
 end;$$;
 rollback;
 
+-- The coaching dialog's student options reach every student, past the old 500-row ceiling.
+begin;
+insert into public.students(full_name,public_code) select 'Coaching student '||n,'COACH-'||n from generate_series(1,505) n;
+do $$begin
+ assert (select count(*) from public.get_coaching_student_options(10000))=(select count(*) from public.students),'coaching options list every student';
+end;$$;
+rollback;
+
 -- All classes are aggregated, CP/KP combine, and unrecorded attendance breaks a streak.
 begin;
 insert into public.classes(id,name) values('33333333-3333-4333-8333-333333333334','Class B');

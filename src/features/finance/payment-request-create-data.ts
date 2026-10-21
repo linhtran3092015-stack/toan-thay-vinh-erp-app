@@ -1,3 +1,5 @@
+import { sortByStudentName } from "@/lib/student-order";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export interface PaymentRequestStudentOption {
@@ -17,34 +19,38 @@ export async function getPaymentRequestCreationOptions(): Promise<
 > {
   try {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("students")
-      .select(
-        `
-        id,
-        public_code,
-        full_name,
-        student_guardians!inner(
-          is_primary,
-          ended_at,
-          guardian:guardians(full_name, phone)
+    // Every payable student: a capped read silently drops whoever sorts last.
+    const { data, error } = await fetchAllPages((from, to) =>
+      supabase
+        .from("students")
+        .select(
+          `
+          id,
+          public_code,
+          full_name,
+          student_guardians!inner(
+            is_primary,
+            ended_at,
+            guardian:guardians(full_name, phone)
+          )
+        `,
         )
-      `,
-      )
-      // Provisional students from CRM (pending confirmation) may receive a
-      // new-enrollment request before conversion.
-      .in("lifecycle_status", ["active", "pending_enrollment_confirmation"])
-      .eq("student_guardians.is_primary", true)
-      .is("student_guardians.ended_at", null)
-      .order("full_name")
-      .limit(500);
+        // Provisional students from CRM (pending confirmation) may receive a
+        // new-enrollment request before conversion.
+        .in("lifecycle_status", ["active", "pending_enrollment_confirmation"])
+        .eq("student_guardians.is_primary", true)
+        .is("student_guardians.ended_at", null)
+        .order("full_name")
+        .order("id")
+        .range(from, to),
+    );
 
     if (error) {
       return { ok: false };
     }
 
     return {
-      data: (data ?? []).flatMap((student) => {
+      data: sortByStudentName(data ?? [], (student) => student.full_name).flatMap((student) => {
         const links = student.student_guardians as unknown as Array<{
           guardian: { full_name: string; phone: string } | null;
         }>;

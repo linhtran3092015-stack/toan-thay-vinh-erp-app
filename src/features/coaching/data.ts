@@ -9,6 +9,8 @@ import type {
   CoachingRecordEvent,
   CoachingStudentOption,
 } from "@/features/coaching/read-models";
+import { sortByStudentName } from "@/lib/student-order";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function normalizePriority(value: string): CoachingPriority {
@@ -136,13 +138,19 @@ export async function getCoachingRecordEventsResult(
   }
 }
 
+/** The RPC's own ceiling (migration 20261022151000); the dialog lists every student. */
+const COACHING_STUDENT_OPTIONS_LIMIT = 10000;
+
 export async function getCoachingManagementOptionsResult(): Promise<
   CoachingReadResult<CoachingManagementOptions>
 > {
   try {
     const supabase = await createSupabaseServerClient();
     const [studentsResult, assigneesResult] = await Promise.all([
-      supabase.rpc("get_coaching_student_options", { p_limit: 500 }),
+      // Every student, paged under PostgREST's max_rows: a capped list drops whoever sorts last.
+      fetchAllPages((from, to) =>
+        supabase.rpc("get_coaching_student_options", { p_limit: COACHING_STUDENT_OPTIONS_LIMIT }).range(from, to),
+      ),
       supabase.rpc("get_coaching_assignee_options"),
     ]);
 
@@ -155,7 +163,7 @@ export async function getCoachingManagementOptionsResult(): Promise<
       return { ok: false };
     }
 
-    const students: CoachingStudentOption[] = studentsResult.data.map((student) => ({
+    const students: CoachingStudentOption[] = sortByStudentName(studentsResult.data, (student) => student.student_full_name).map((student) => ({
       fullName: student.student_full_name,
       id: student.student_id,
       lifecycleStatus: student.lifecycle_status,
