@@ -23,6 +23,7 @@ import {
   type StudentDirectoryMetrics,
 } from "@/features/students/student-directory-metrics";
 import { addDays, getVietnamToday } from "@/lib/datetime";
+import { compareStudentsByGradeThenName } from "@/lib/student-order";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.generated";
 import type { StudentLifecycleStatus } from "@/types/domain";
@@ -464,7 +465,7 @@ export async function getStudentDirectory(
 
   return {
     ok: true,
-    students,
+    students: students.sort(compareStudentsByGradeThenName),
   };
 }
 
