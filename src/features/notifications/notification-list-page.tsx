@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, CalendarClock, HandCoins, HeartHandshake, PhoneCall, TriangleAlert } from "lucide-react";
+import { Bell, CalendarClock, ClipboardCheck, HandCoins, HeartHandshake, PhoneCall, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type MouseEvent, type ReactNode } from "react";
@@ -57,6 +57,7 @@ const LIST_LABEL = "Danh sách thông báo";
 
 /** One lucide icon per event family (first code segment); unknown families get the bell. */
 const FAMILY_ICONS: Record<NotificationFamily, ReactNode> = {
+  ai_grading: <ClipboardCheck />,
   crm: <PhoneCall />,
   ops: <TriangleAlert />,
   other: <Bell />,

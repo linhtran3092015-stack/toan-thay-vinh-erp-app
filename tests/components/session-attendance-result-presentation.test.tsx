@@ -131,6 +131,19 @@ describe("Session attendance and result presentation", () => {
     expect(screen.getByLabelText(/Lý do cập nhật/)).toBeInTheDocument();
   });
 
+  // Value: protects=the result editor tells a TA the truth about locking: a missing test score never blocks the lock (migration 20261011090100), only that a locked session's results cannot be edited, matching the lock panel's "không phải là điều kiện khóa";
+  // fails_when=the editor goes back to saying a session can only be locked once every present or additional-study student has a test score;
+  // why_new=the stale copy survived the 20261011090100 lock change and misled TAs; seam=none; no_claim=what the lock RPC enforces
+  it("says a test score is not a lock condition in the result editor", () => {
+    render(<SessionResultManagement {...resultProps()} />);
+    fireEvent.click(screen.getAllByRole("button", { name: /Nhập kết quả cho học viên/ })[0]);
+    const dialog = screen.getByRole("dialog");
+
+    expect(dialog).toHaveTextContent(/Có thể lưu kết quả chưa có điểm kiểm tra\./);
+    expect(dialog).toHaveTextContent(/không phải là điều\s+kiện khóa buổi học/);
+    expect(dialog).not.toHaveTextContent(/chỉ được khóa khi/);
+  });
+
   it("starts a new result's notebook at Chờ chấm vở so the Zalo comment waits for grading", () => {
     render(<SessionResultManagement {...resultProps({ participants: [{ ...participant, notebookStatus: null }] })} />);
     fireEvent.click(screen.getAllByRole("button", { name: /Nhập kết quả cho học viên/ })[0]);

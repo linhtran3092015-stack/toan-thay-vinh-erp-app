@@ -21,7 +21,8 @@ export interface NavigationItem {
   badge?: string;
   href: string;
   label: string;
-  permission?: PermissionCode;
+  /** Required permission; a list shows the item when any one of them is held. */
+  permission?: PermissionCode | readonly PermissionCode[];
 }
 
 export interface NavigationDomain {
@@ -104,7 +105,9 @@ const peopleDomain: NavigationDomain = {
       available: true,
       href: "/timekeeping",
       label: "Chấm công",
-      permission: "timekeeping.view",
+      // Same any-of gate as the route: a TA with only timekeeping.check gets the
+      // staff-only page (own check-in, monthly timesheet, adjustment requests).
+      permission: ["timekeeping.view", "timekeeping.check", "timekeeping.manage_verification"],
     },
     {
       available: true,
@@ -367,15 +370,27 @@ export interface VisibleNavigationGroup extends Omit<NavigationGroup, "domains">
   domains: readonly VisibleNavigationDomain[];
 }
 
+function hasItemPermission(
+  item: NavigationItem,
+  permissions: readonly PermissionCode[],
+): boolean {
+  if (!item.permission) {
+    return true;
+  }
+
+  const required: readonly PermissionCode[] =
+    typeof item.permission === "string" ? [item.permission] : item.permission;
+
+  return required.some((permission) => permissions.includes(permission));
+}
+
 function filterDomains(
   domains: readonly NavigationDomain[],
   permissions: readonly PermissionCode[],
 ): readonly VisibleNavigationDomain[] {
   return domains.flatMap((domain) => {
     const items = domain.items.filter(
-      (item) =>
-        item.available &&
-        (!item.permission || permissions.includes(item.permission)),
+      (item) => item.available && hasItemPermission(item, permissions),
     );
 
     return items.length > 0 ? [{ ...domain, items }] : [];

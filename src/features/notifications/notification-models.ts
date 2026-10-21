@@ -42,7 +42,7 @@ export const NOTIFICATIONS_ACCESS = {
 export type NotificationTone = IconTileTone;
 
 /** Event family = the first segment of `event_code`; `other` for anything unknown. */
-export type NotificationFamily = "salary_advance" | "student_care" | "session" | "crm" | "ops" | "other";
+export type NotificationFamily = "ai_grading" | "salary_advance" | "student_care" | "session" | "crm" | "ops" | "other";
 
 export type NotificationChip = "all" | "unread";
 
@@ -55,11 +55,18 @@ interface NotificationEventPresentation {
  * Every event code a database writer or the SePay webhook emits (map-rules
  * §A.3), keyed by the FULL code. The salary-advance and student-care labels and
  * tones are the pre-14d ones; session, CRM and ops codes were written since
- * phase 2a/2b/2e and used to fall back to "Sự kiện chưa hỗ trợ".
+ * phase 2a/2b/2e and used to fall back to "Sự kiện chưa hỗ trợ". The AI-grading
+ * codes (the review reminder and the worker's ops alerts) arrived in phase 3.
  */
 const EVENT_PRESENTATION: Readonly<Record<string, NotificationEventPresentation>> = {
+  "ai_grading.review_due": { label: "Bài chấm AI chờ duyệt", tone: "warning" },
   "crm.follow_up_due": { label: "Hẹn theo dõi lead", tone: "warning" },
   "crm.lead_assigned": { label: "Lead mới được giao", tone: "info" },
+  "ops.ai_grading_daily_budget": { label: "Cảnh báo vận hành", tone: "danger" },
+  "ops.ai_grading_failure_rate": { label: "Cảnh báo vận hành", tone: "danger" },
+  "ops.ai_grading_paused": { label: "Cảnh báo vận hành", tone: "danger" },
+  "ops.ai_grading_queue_stalled": { label: "Cảnh báo vận hành", tone: "danger" },
+  "ops.ai_grading_review_due": { label: "Bài chấm AI chờ duyệt", tone: "warning" },
   "ops.cron_job_failed": { label: "Cảnh báo vận hành", tone: "danger" },
   "ops.cron_job_stale": { label: "Cảnh báo vận hành", tone: "danger" },
   "ops.sepay_webhook_failed": { label: "Cảnh báo vận hành", tone: "danger" },
@@ -79,6 +86,7 @@ const EVENT_PRESENTATION: Readonly<Record<string, NotificationEventPresentation>
 };
 
 const FAMILIES: ReadonlySet<string> = new Set<Exclude<NotificationFamily, "other">>([
+  "ai_grading",
   "crm",
   "ops",
   "salary_advance",

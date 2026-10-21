@@ -598,10 +598,10 @@ function ResultEditor({
       </div>
 
       <Notice tone="neutral">
-        Có thể lưu kết quả chưa có điểm kiểm tra,
-        nhưng buổi học chỉ được khóa khi mọi học
-        viên có mặt hoặc học thêm đã có điểm kiểm
-        tra.
+        Có thể lưu kết quả chưa có điểm kiểm tra.
+        Kết quả và điểm kiểm tra không phải là điều
+        kiện khóa buổi học, nhưng sau khi khóa thì
+        không sửa được nữa.
       </Notice>
 
       <div className="grid gap-4 md:grid-cols-2">

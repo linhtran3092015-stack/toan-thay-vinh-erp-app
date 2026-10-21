@@ -2,6 +2,15 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.32.0.2] - 2026-10-21
+
+Ba chỗ làm trợ giảng bối rối khi dạy một buổi: hộp nhập kết quả nói sai điều kiện khóa buổi, nhắc duyệt bài chấm AI hiện "Sự kiện chưa hỗ trợ", và trợ giảng không thấy mục Chấm công trong menu.
+
+### Fixed
+- **Hộp "Nhập kết quả" / "Cập nhật kết quả"** không còn nói buổi học chỉ được khóa khi mọi học viên có mặt hoặc học thêm đã có điểm kiểm tra. Từ 0.6.6.0 (migration `20261011090100`) điểm kiểm tra không còn là điều kiện khóa; hộp giờ ghi như khung Khóa buổi học: kết quả và điểm kiểm tra không phải là điều kiện khóa, nhưng khóa rồi thì không sửa được.
+- **Thông báo "Còn bài chấm AI chưa duyệt"** (`ai_grading.review_due`, nhắc trước khi buổi tự khóa) có nhãn "Bài chấm AI chờ duyệt", màu cảnh báo và biểu tượng Chấm bài AI riêng, thay cho "Sự kiện chưa hỗ trợ: review_due". Bản tổng hợp gửi owner (`ops.ai_grading_review_due`) cùng nhãn; bốn cảnh báo vận hành của Chấm bài AI (chạm trần chi phí ngày, Claude API từ chối, lượt chờ quá 20 phút, lỗi nhiều trong 1 giờ) hiện "Cảnh báo vận hành" như các cảnh báo khác.
+- **Mục "Chấm công" trong menu Nhân sự** hiện cho người có quyền chấm công (`timekeeping.check`), quản lý xác minh chấm công, hoặc xem chấm công, đúng như trang `/timekeeping` vẫn cho vào. Trợ giảng chỉ có `timekeeping.check` mở được bảng công tháng và "Yêu cầu điều chỉnh" của mình từ menu; trang vẫn chỉ hiện phần cá nhân, không có lịch phân công, ca làm hay bảng công toàn trung tâm.
+
 ## [0.32.0.0] - 2026-10-21
 
 Chấm bài AI, Giai đoạn 3c: trang "Chấm bài AI" gom các buổi cần duyệt, owner sửa câu mẫu nhận xét và xem chi phí 30 ngày, nhắc khi buổi sắp tự khóa mà còn bài chưa duyệt.
