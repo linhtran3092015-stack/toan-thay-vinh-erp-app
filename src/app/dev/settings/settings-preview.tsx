@@ -9,6 +9,8 @@ import type { SystemSettingKey, SystemSettings } from "@/features/settings/syste
 import { SystemSettingsForm, SystemSettingsReadOnly, type SystemSettingsFields } from "@/features/settings/system-settings-form";
 import { ZaloMessageSettings } from "@/features/settings/zalo-message-settings";
 import { AiGradingSettingsPanel } from "@/features/ai-grading/components/ai-grading-settings";
+import { PhraseLibraryEditor } from "@/features/ai-grading/components/phrase-library-editor";
+import { DEFAULT_COMMENT_PHRASES } from "@/features/ai-grading/comment";
 import { AI_GRADING_DEFAULTS } from "@/features/ai-grading/settings";
 import type { SettingsPermission, SettingsPermissionMatrix, SettingsRole } from "@/features/settings/types";
 import { WebsiteEditor } from "@/features/website/editor";
@@ -267,6 +269,7 @@ export function SettingsPreview({
           />
         ) : null}
         {view === "ai-grading" ? (
+          <div className="grid gap-5">
           <AiGradingSettingsPanel
             actions={{
               resume: async () => ({ message: "Xem trước: không gọi máy chủ.", ok: true }),
@@ -276,6 +279,11 @@ export function SettingsPreview({
             canManage={canManageSettings}
             cronConfigured={false}
             overview={{
+              dailySpend: Array.from({ length: 30 }, (_, index) => ({
+                costUsd: index % 7 === 5 || index % 7 === 6 ? 0 : Math.round((0.6 + ((index * 37) % 11) / 10) * 100) / 100,
+                date: `2026-${index < 9 ? "09" : "10"}-${String(index < 9 ? 22 + index : index - 8).padStart(2, "0")}`,
+                runs: index % 7 === 5 || index % 7 === 6 ? 0 : 80 + ((index * 13) % 40),
+              })),
               failedToday: 1,
               gradedToday: 86,
               keysReadToday: 4,
@@ -288,6 +296,12 @@ export function SettingsPreview({
               spentTodayUsd: 1.37,
             }}
           />
+          <PhraseLibraryEditor
+            canManage={canManageSettings}
+            initial={DEFAULT_COMMENT_PHRASES}
+            save={async () => ({ message: "Xem trước: không lưu thật.", ok: true })}
+          />
+          </div>
         ) : null}
         {view === "branding" || view === "website" ? (
           <WebsiteEditor

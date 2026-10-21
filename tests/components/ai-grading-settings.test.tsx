@@ -14,6 +14,10 @@ afterEach(cleanup);
 
 function overview(extra: Partial<AiGradingOverview> = {}): AiGradingOverview {
   return {
+    dailySpend: [
+      { costUsd: 0.5, date: "2026-10-20", runs: 60 },
+      { costUsd: 0.42, date: "2026-10-21", runs: 48 },
+    ],
     failedToday: 1,
     gradedToday: 24,
     keysReadToday: 2,

@@ -96,7 +96,16 @@ export const PAUSE_REASON_LABELS: Record<string, string> = {
   workspace_limit: "Chạm trần chi tiêu của workspace",
 };
 
+export interface DailySpend {
+  costUsd: number;
+  /** YYYY-MM-DD, Vietnam date. */
+  date: string;
+  runs: number;
+}
+
 export interface AiGradingOverview {
+  /** Last 30 days, oldest first (days without runs are 0). */
+  dailySpend: DailySpend[];
   failedToday: number;
   gradedToday: number;
   keysReadToday: number;
@@ -111,6 +120,9 @@ export interface AiGradingOverview {
 
 export const overviewSchema = z
   .object({
+    daily_spend: z
+      .array(z.object({ cost_usd: z.coerce.number().catch(0), date: z.string(), runs: z.coerce.number().catch(0) }))
+      .catch([]),
     failed_today: z.coerce.number().catch(0),
     graded_today: z.coerce.number().catch(0),
     keys_read_today: z.coerce.number().catch(0),
@@ -124,6 +136,7 @@ export const overviewSchema = z
   })
   .transform(
     (row): AiGradingOverview => ({
+      dailySpend: row.daily_spend.map((day) => ({ costUsd: day.cost_usd, date: day.date, runs: day.runs })),
       failedToday: row.failed_today,
       gradedToday: row.graded_today,
       keysReadToday: row.keys_read_today,

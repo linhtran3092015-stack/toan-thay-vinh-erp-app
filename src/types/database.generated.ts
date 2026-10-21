@@ -9814,6 +9814,7 @@ export type Database = {
         }
       }
       get_ai_grading_overview: { Args: never; Returns: Json }
+      get_ai_grading_today: { Args: never; Returns: Json }
       get_attendance_exception_reviews: { Args: never; Returns: Json }
       get_attendance_verification_config: { Args: never; Returns: Json }
       get_attendance_verification_policy: { Args: never; Returns: Json }
@@ -10694,6 +10695,30 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      list_ai_grading_sessions: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          answer_key_version: number
+          approved: number
+          auto_lock_at: string
+          class_code: string
+          class_name: string
+          class_session_id: string
+          end_time: string
+          grading: number
+          green_pending: number
+          locked_at: string
+          red_pending: number
+          session_date: string
+          session_status: string
+          skipped: number
+          start_time: string
+          submissions: number
+          test_status: string
+          waiting_key: number
+          yellow_pending: number
+        }[]
       }
       list_grading_comment_phrases: {
         Args: never
@@ -12152,6 +12177,7 @@ export type Database = {
         }[]
       }
       run_ai_grading_health_check: { Args: never; Returns: undefined }
+      run_ai_grading_review_reminders: { Args: never; Returns: number }
       run_class_session_auto_lock_worker: { Args: never; Returns: number }
       run_class_session_lock_reminders: { Args: never; Returns: number }
       run_crm_follow_up_reminders: { Args: never; Returns: number }
@@ -12260,6 +12286,10 @@ export type Database = {
       set_finance_order_review: {
         Args: { p_is_checked: boolean; p_source_cashflow_record_id: string }
         Returns: Json
+      }
+      set_grading_comment_phrases: {
+        Args: { p_phrases: Json }
+        Returns: number
       }
       set_grading_praise_bonus: {
         Args: { p_praise: boolean; p_submission_id: string }

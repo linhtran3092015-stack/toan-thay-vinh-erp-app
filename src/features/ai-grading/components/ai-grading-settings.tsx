@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { controlClassName, Field } from "@/components/ui/field";
 import type { AiGradingActionResult } from "@/features/ai-grading/actions";
 import { resumeAiGradingAction, updateAiGradingSettingsAction } from "@/features/ai-grading/actions";
+import { SpendHistory } from "@/features/ai-grading/components/spend-history";
 import {
   DAILY_BUDGET_LIMITS,
   EFFORT_LABELS,
@@ -175,6 +176,12 @@ export function AiGradingSettingsPanel({
           </dl>
         </div>
       </SettingsCard>
+
+      {overview.dailySpend.length > 0 ? (
+        <SettingsCard description="Chi phí ước tính theo ngày (giờ Việt Nam), gồm đọc đề và chấm bài." title="Chi phí 30 ngày">
+          <SpendHistory budgetUsd={saved.dailyBudgetUsd} days={overview.dailySpend} />
+        </SettingsCard>
+      ) : null}
 
       <div className="grid gap-5 md:grid-cols-2">
         <SettingsCard

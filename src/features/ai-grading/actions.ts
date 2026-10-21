@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
+import { PHRASE_SLOTS, type PhraseSlot } from "@/features/ai-grading/comment";
 import { kickGradingWorker } from "@/features/ai-grading/kick";
 import { aiGradingSettingsPayload, aiGradingSettingsSchema, type AiGradingSettings } from "@/features/ai-grading/settings";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
@@ -53,6 +55,32 @@ export async function resumeAiGradingAction(): Promise<AiGradingActionResult> {
     kickGradingWorker("resumed");
     revalidatePath(PAGE_PATH);
     return { message: "Đã cho chạy lại. Nếu nguyên nhân chưa hết, hàng đợi sẽ tự dừng lại và báo tiếp.", ok: true };
+  } catch {
+    return { message: "Không thể kết nối hệ thống cài đặt.", ok: false };
+  }
+}
+
+const phrasesSchema = z
+  .array(z.object({ slot: z.enum(PHRASE_SLOTS), text: z.string().trim().min(1, "Câu mẫu không được để trống.").max(500, "Mỗi câu tối đa 500 ký tự.") }))
+  .max(120);
+
+/** Owner replaces the comment phrase library (every slot keeps at least one phrase). */
+export async function updateGradingPhrasesAction(input: Array<{ slot: PhraseSlot; text: string }>): Promise<AiGradingActionResult> {
+  const parsed = phrasesSchema.safeParse(input);
+  if (!parsed.success) return { message: parsed.error.issues[0]?.message ?? "Câu mẫu không hợp lệ.", ok: false };
+  const missing = PHRASE_SLOTS.filter((slot) => !parsed.data.some((phrase) => phrase.slot === slot));
+  if (missing.length > 0) return { message: "Mỗi ô cần ít nhất một câu mẫu.", ok: false };
+  if (!(await canManageSettings())) return { message: OWNER_ONLY, ok: false };
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.rpc("set_grading_comment_phrases", { p_phrases: parsed.data });
+    if (error) {
+      if (error.message.includes("GRADING_PHRASES_SLOT_COUNT")) return { message: "Mỗi ô cần từ 1 đến 20 câu mẫu.", ok: false };
+      if (error.message.includes("GRADING_PHRASES_INVALID")) return { message: "Có câu mẫu trống hoặc quá 500 ký tự.", ok: false };
+      return { message: rpcMessage(error.message), ok: false };
+    }
+    revalidatePath(PAGE_PATH);
+    return { message: `Đã lưu ${parsed.data.length} câu mẫu. Bản nháp nhận xét mới dùng ngay; nhận xét đã duyệt không đổi.`, ok: true };
   } catch {
     return { message: "Không thể kết nối hệ thống cài đặt.", ok: false };
   }
