@@ -2,6 +2,16 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.32.0.0] - 2026-10-21
+
+Chấm bài AI, Giai đoạn 3c: trang "Chấm bài AI" gom các buổi cần duyệt, owner sửa câu mẫu nhận xét và xem chi phí 30 ngày, nhắc khi buổi sắp tự khóa mà còn bài chưa duyệt.
+
+### Added
+- **Trang Chấm bài AI** (`/ai-grading`, quyền xem chấm bài AI; có trong menu Kết quả học tập): các buổi có đề hoặc bài nộp trong khoảng ngày (mặc định 7 ngày, tối đa 62), lọc "Cần duyệt" / "Đang chấm / chờ đáp án" / "Đã xong" / "Tất cả". Mỗi buổi hiện trạng thái đề, số bài xanh/vàng/đỏ chờ duyệt, đang chấm, chờ đáp án, đã duyệt, bỏ qua, và giờ tự khóa nếu dưới 24 giờ; nút "Mở buổi để duyệt N bài". Ô số liệu hôm nay: AI đã chấm, xanh, vàng, đỏ, đã duyệt.
+- **Cài đặt → Chấm bài AI → Câu mẫu nhận xét** (chỉ owner sửa): thêm, sửa, xóa câu theo từng ô (Ý 1 đúng hết, Ý 2 đúng hết / có câu sai, Ý 3 tích cực / còn trầm, Ý 4), mỗi ô 1–20 câu, mỗi câu tối đa 500 ký tự; có ghi nhật ký. Bản nháp nhận xét dùng ngay câu mới; nhận xét đã duyệt không đổi.
+- **Chi phí 30 ngày** trong Cài đặt → Chấm bài AI: cột theo ngày so với trần ngày, tổng 30 ngày và ngày cao nhất.
+- **Nhắc duyệt trước khi tự khóa** (pg_cron mỗi giờ): buổi đã hoàn thành sẽ tự khóa trong 24 giờ mà còn bài chưa duyệt thì báo người hoàn thành buổi (một lần mỗi buổi) và gửi owner một bản tổng hợp mỗi ngày.
+
 ## [0.31.0.0] - 2026-10-21
 
 Chấm bài AI, Giai đoạn 3b: trợ giảng duyệt bài AI đã chấm ngay trên trang buổi học; duyệt là ghi điểm và nhận xét vào kết quả buổi (giữ nguyên điểm vở), tin Zalo có bài làm của học sinh, bài chữa cả đề và "(đã cộng 1)".
