@@ -2,6 +2,11 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.32.1.0] - 2026-10-21
+
+### Added
+- **"Sao chép tin Zalo"** trên bảng kết quả buổi học (mỗi dòng đã có nhận xét): chép đúng tin nhận xét gửi phụ huynh theo mẫu đã chốt (tiêu đề, điểm "(đã cộng 1)", điểm vở, xếp hạng, bài làm, bài chữa, nhận xét, thông tin cuối) để dán tay vào Zalo khi học sinh chưa liên kết nhóm Zalo. Tin dài hơn 2.000 ký tự có nút chép từng phần (2–3 phần) như hàng chờ Zalo.
+
 ## [0.32.0.2] - 2026-10-21
 
 ### Fixed
