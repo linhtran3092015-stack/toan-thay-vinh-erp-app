@@ -1,5 +1,5 @@
-// Value: protects=TAs copying the parent comment message by hand while students are not linked to Zalo: one click copies the whole rendered message, a long message offers each 2–3 part separately, and a refusal (no comment, no permission) shows its reason instead of copying nothing silently;
-// fails_when=the button copies the bare comment instead of the rendered message, only part 1 of a long message can be copied, or a failure is swallowed;
+// Value: protects=TAs copying the parent comment message by hand while students are not linked to Zalo: one click copies the whole rendered message, long ones included (owner asked for a single copy), and a refusal (no comment, no permission) shows its reason instead of copying nothing silently;
+// fails_when=the button copies the bare comment instead of the rendered message, a long message is cut or split across clicks, or a failure is swallowed;
 // why_new=21/10 live use needed manual Zalo sending; seam=server action and clipboard stubbed; no_claim=the SQL renderer (zalo-comment-message-v2 pgTAP)
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -19,7 +19,7 @@ describe("CopyZaloMessageButton", () => {
   it("copies the whole rendered message", async () => {
     const user = userEvent.setup();
     const writeText = stubClipboard();
-    const load = vi.fn(async () => ({ ok: true as const, parts: ["THẦY VINH VÀ THẦY CÔ CỘNG SỰ...\n- Nhận xét cho học sinh:\nCon làm tốt."] }));
+    const load = vi.fn(async () => ({ ok: true as const, text: "THẦY VINH VÀ THẦY CÔ CỘNG SỰ...\n- Nhận xét cho học sinh:\nCon làm tốt." }));
     render(<CopyZaloMessageButton load={load} resultId="11111111-1111-4111-8111-111111111111" />);
     await user.click(screen.getByRole("button", { name: "Sao chép tin Zalo" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("THẦY VINH VÀ THẦY CÔ CỘNG SỰ...\n- Nhận xét cho học sinh:\nCon làm tốt."));
@@ -27,14 +27,16 @@ describe("CopyZaloMessageButton", () => {
     expect(await screen.findByRole("button", { name: "Đã chép tin Zalo" })).toBeTruthy();
   });
 
-  it("offers each part of a long message", async () => {
+  it("copies a long message in one click", async () => {
     const user = userEvent.setup();
     const writeText = stubClipboard();
-    render(<CopyZaloMessageButton load={async () => ({ ok: true, parts: ["Phần đầu", "(tiếp theo 2/2)\nPhần sau"] })} resultId="r" />);
+    const long = `THẦY VINH...\n${"Câu 13 (đáp án 90 cm²):\nDiện tích mới là 30 × 3 = 90 (cm²).\n".repeat(60)}`;
+    render(<CopyZaloMessageButton load={async () => ({ ok: true, text: long })} resultId="r" />);
     await user.click(screen.getByRole("button", { name: "Sao chép tin Zalo" }));
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith("Phần đầu"));
-    await user.click(await screen.findByRole("button", { name: "Chép phần 2/2" }));
-    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith("(tiếp theo 2/2)\nPhần sau"));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText).toHaveBeenCalledWith(long);
+    expect(long.length).toBeGreaterThan(2000);
+    expect(screen.queryByRole("button", { name: /Chép phần/ })).toBeNull();
   });
 
   it("shows why nothing was copied", async () => {

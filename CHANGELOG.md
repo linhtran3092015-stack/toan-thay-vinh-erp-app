@@ -2,6 +2,11 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.32.1.1] - 2026-10-21
+
+### Changed
+- **"Sao chép tin Zalo"** chép cả tin trong một lần bấm, kể cả tin dài, không chia thành nhiều phần nữa.
+
 ## [0.32.1.0] - 2026-10-21
 
 ### Added
