@@ -814,7 +814,7 @@ async function queryEnrollmentCandidates(
       query = query.or(`full_name.ilike.${value},public_code.ilike.${value}`);
     }
 
-    const { data, error } = await query.order("full_name", { ascending: true }).limit(limit + 1);
+    const { data, error } = await query.order("full_name", { ascending: true }).order("id", { ascending: true }).limit(limit + 1);
 
     if (error) return null;
 

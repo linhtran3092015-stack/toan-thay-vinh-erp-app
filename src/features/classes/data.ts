@@ -13,6 +13,7 @@ import type {
   ClassScheduleReadModel,
 } from "@/features/classes/read-models";
 import { getVietnamToday } from "@/lib/datetime";
+import { fetchAllPages, type PageResult } from "@/lib/supabase/fetch-all-pages";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.generated";
 
@@ -28,13 +29,6 @@ type EnrollmentRow =
 interface ClassReadOptions {
   includeStudentCounts: boolean;
 }
-
-interface PageResult<T> {
-  data: T[] | null;
-  error: unknown;
-}
-
-const PAGE_SIZE = 500;
 
 function createClassDataError(
   code: ClassDataErrorCode,
@@ -60,42 +54,6 @@ function createClassDataError(
     code,
     message: messages[code],
   };
-}
-
-async function fetchAllPages<T>(
-  fetchPage: (
-    from: number,
-    to: number,
-  ) => Promise<PageResult<T>>,
-): Promise<PageResult<T>> {
-  const rows: T[] = [];
-  let from = 0;
-
-  while (true) {
-    const result = await fetchPage(
-      from,
-      from + PAGE_SIZE - 1,
-    );
-
-    if (result.error) {
-      return {
-        data: null,
-        error: result.error,
-      };
-    }
-
-    const pageRows = result.data ?? [];
-    rows.push(...pageRows);
-
-    if (pageRows.length < PAGE_SIZE) {
-      return {
-        data: rows,
-        error: null,
-      };
-    }
-
-    from += PAGE_SIZE;
-  }
 }
 
 function normalizeLevel(

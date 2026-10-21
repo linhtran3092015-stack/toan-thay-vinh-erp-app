@@ -9,7 +9,7 @@ export function givenNameOf(fullName: string): string {
   return words[words.length - 1] ?? "";
 }
 
-/** "Trần Văn An" < "Nguyễn Thị Bình" < "Lê Bình": given name first, then the full name. */
+/** "Trần Văn An" < "Lê Bình" < "Nguyễn Thị Bình": given name first, then the full name. */
 export function compareStudentNames(left: string, right: string): number {
   return (
     collator.compare(givenNameOf(left), givenNameOf(right)) ||

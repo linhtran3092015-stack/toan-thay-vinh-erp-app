@@ -4,6 +4,15 @@
 -- matches compareStudentNames in src/lib/student-order.ts.
 begin;
 
+-- plpgsql only parses the body, so a missing collation would surface on the
+-- first call; fail the migration instead.
+do $$
+begin
+  if not exists (select 1 from pg_catalog.pg_collation where collname = 'vi-x-icu') then
+    raise exception 'collation vi-x-icu is missing';
+  end if;
+end $$;
+
 create or replace function public.get_student_care_students(p_search text default '',p_page integer default 1,p_inactive boolean default false)
 returns jsonb language plpgsql stable security definer set search_path='' as $$
 begin
