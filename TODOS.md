@@ -2693,6 +2693,42 @@
 **Priority:** P3
 **Depends on:** Quyết định của anh (sửa server action)
 
+### Đợt chỉnh chữ và đồng nhất giao diện màn nhập dữ liệu
+
+**What:** Gom các góp ý giao diện của review bước 15b vào một đợt có chủ đích: nút xác nhận ghi danh viết hoa "XÁC NHẬN COMMIT GHI DANH n HỌC VIÊN" (đổi thành chữ thường tiếng Việt, ví dụ "Ghi danh n học sinh"); chữ "Batch", "batch", "read-only", "Maker/Checker", "Chờ đối tác duyệt (Maker)" và "->" ở trang số dư buổi; "học sinh" và "học viên" lẫn lộn; "Tiếp:" và "Tiếp tục:", cỡ nút "Tải file mẫu", căn cột "Dòng" khác nhau giữa bốn wizard; bảng kiểm tra lớp hiện hai huy hiệu cho một dòng (cột "Kết quả" và "Hợp lệ"); nút "Tạo lô" của wizard lớp nằm trong panel thay vì thanh hành động; cỡ tiêu đề h2 lệch giữa hai trang lô; huy hiệu "Không nhập được" màu đỏ nhưng banner cùng ý màu cam; lý do loại dòng soạn sẵn "Chưa có enrollment đang active."; câu lỗi "invalid zip data" của file lớp.
+
+**Why:** Mỗi chỗ nhỏ, nhưng cùng một màn nói hai cách cho một việc. Nhiều câu đang bị test ghim (`enrollment-import-commit-counts`, `session-balance-approval-workflow`), nên đổi giữa lúc ship sẽ phải sửa test ghim; gom lại một lần thì sửa test có chủ đích.
+
+**Context:** Review /ship bước 15b (v0.30.0.0), chuyên gia design: `enrollment-import-page.tsx` (nút commit), `session-balance-batch-detail-page.tsx`, `session-balance-batch-list.tsx`, `session-balance-import-labels.ts`, `class-schedule-import-presentation.tsx` (cột "Kết quả"), `class-schedule-import-page.tsx` (nút "Tạo lô"), `class-schedule-batch-detail-page.tsx` (huy hiệu `previewed`), `classes/workbook.ts` (câu lỗi zip, file bị khóa phạm vi ở 15b).
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Không
+
+### Gõ phím trên trang lô vẽ lại toàn bộ dòng
+
+**What:** Trên trang lô số dư buổi và trang lô lớp, mỗi phím gõ vào ô lý do hay cụm xác nhận vẽ lại toàn bộ bảng dòng (tới 1.000 dòng số dư, 2.000 lịch học). Tách state ô nhập xuống component panel riêng, giữ lý do loại dòng trong ô của dòng đó, và memo `ImportReviewTable` với các hàm ổn định.
+
+**Why:** Trên điện thoại hoặc lô lớn, gõ bị chậm. Trang cũ trước redesign cũng vẽ lại như vậy, nên đây không phải lỗi mới.
+
+**Context:** Review /ship bước 15b (v0.30.0.0), chuyên gia hiệu năng: `session-balance-batch-detail-page.tsx`, `class-schedule-batch-detail-page.tsx`, `components/import-review-table.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Không
+
+### Dọn nhỏ sau bước 15b
+
+**What:** (1) `canImport` và `canReconcile` của trang số dư buổi mặc định `true`; đổi thành bắt buộc hoặc mặc định `false` (cả hai route đều truyền rõ; máy chủ vẫn chặn). (2) Trang lô lớp và wizard lớp tính vị trí bước theo chỉ số (`buildClassImportSteps(4, …)`, `index === 4`, `CLASS_IMPORT_STEP_TITLES[0]`); đặt theo khóa bước như wizard số dư. (3) Test `session-balance-import-page` "keeps the screen's four-eyes rule" chỉ tìm một dòng trong mã nguồn; thay bằng kiểm tra hành vi hoặc bỏ (hành vi đã có test ở `session-balance-approval-workflow`). (4) Test `enrollment-import-mapping` ghim việc tiêu đề không dấu ("Ma hoc vien") không khớp; tách thành ca riêng ghi rõ là hành vi hiện tại (ánh xạ ghi danh chưa chuẩn hóa dấu như học sinh và số dư).
+
+**Why:** Không có lỗi người dùng thấy; giữ code và test dễ đổi về sau.
+
+**Context:** Review /ship bước 15b (v0.30.0.0), chuyên gia bảo mật, maintainability và testing.
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** Không
+
 ## Completed
 
 ### Mở thông báo ngay khi bấm, đánh dấu đã đọc ở nền

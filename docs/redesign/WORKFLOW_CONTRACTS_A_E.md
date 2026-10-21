@@ -4,7 +4,7 @@
 
 These workflow descriptions capture currently observed behavior. Presentation may change in later waves, but no workflow may gain, lose, or reinterpret a transition, permission check, RPC, validation rule, audit path, or error mapping.
 
-Owner-approved exceptions are recorded next to the workflow they change, each marked with its release: the client lock-readiness mirror (v0.7.0.0, Sessions), and class-page bulk cancel, class-page enrolment and server-side enrolment search (v0.8.0.0, Sessions and Students), class-page transfer and reserve with the expected-enrolment check (v0.9.0.0, Students), the sessions directory's server-side date window with its until-today redirect and the larger list reads (v0.20.0.0, Sessions), and the sales-commission list's larger read (v0.22.0.0, List reads outside A–E).
+Owner-approved exceptions are recorded next to the workflow they change, each marked with its release: the client lock-readiness mirror (v0.7.0.0, Sessions), and class-page bulk cancel, class-page enrolment and server-side enrolment search (v0.8.0.0, Sessions and Students), class-page transfer and reserve with the expected-enrolment check (v0.9.0.0, Students), the sessions directory's server-side date window with its until-today redirect and the larger list reads (v0.20.0.0, Sessions), the sales-commission list's larger read (v0.22.0.0, List reads outside A–E), and the import wizards' client-side gates (v0.30.0.0, Imports outside A–E).
 
 ## Students
 
@@ -128,3 +128,12 @@ stateDiagram-v2
 ## List reads outside A–E
 
 - The sales-commission list (`/commissions`) reads `get_sales_commission_accruals_dashboard` with `p_limit` 500 (the RPC's maximum; the loader's default stays 200, the RPC's own default). Month, sale and source filters stay client filters over the loaded rows, and the page says when a selected month may be cut by that cap ("Tháng MM/YYYY có thể chưa đủ…"). Unchanged RPC, RLS scope and permissions (`commissions.view`, `commissions.manage`); no write path. Owner-approved for the Stumana redesign step 14b (v0.22.0.0).
+
+## Imports outside A–E
+
+Server actions, RPCs, validation, parsing, mapping and the typed confirmation phrases are unchanged. Owner-approved client-side gates for the Stumana redesign step 15b (v0.30.0.0):
+
+- Class & schedule import (`/imports/classes`): "Tạo lô" stays disabled while the dry-run reports conflicting or invalid rows ("Còn {n} dòng xung đột hoặc không hợp lệ. Sửa file Excel rồi chọn lại file."). Before, the page called `createClassScheduleImportBatchAction` anyway and the RPC staged a `previewed` batch that could never be committed and used up the file's SHA-256. The server-side fix stays in TODOS.
+- Enrollment import (`/imports/enrollments`): the commit needs a batch created on the page in this visit; the hard-coded fallback batch id is gone, and the commit also needs a fresh dry-run with 0 conflicts.
+- Session-balance import (`/imports/session-balances`, `/imports/session-balances/[batchId]`): without `imports.session_balances` the page shows the batch list only, and the batch page hides row exclusion and reconciliation. The routes pass their existing permission check; the server actions already required that code.
+- All four wizards drop a dry-run answer that arrives after the file, mapping, effective date or academic year changed, so a check never shows as current for inputs it did not run on.
