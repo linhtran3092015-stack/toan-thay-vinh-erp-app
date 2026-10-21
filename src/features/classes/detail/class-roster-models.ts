@@ -6,6 +6,7 @@ import {
   type ClassStudentRef,
 } from "@/features/classes/detail/class-detail-models";
 import type { StudentRegisteredMode } from "@/features/students/read-models";
+import { compareStudentNames } from "@/lib/student-order";
 
 /**
  * Pure models for the class page's students and results tabs (design 03,
@@ -92,7 +93,7 @@ export function pickLatestEnrollments(rows: readonly ClassEnrollmentRow[]): Clas
     }
   }
 
-  return [...byStudent.values()].sort((a, b) => a.fullName.localeCompare(b.fullName, "vi") || a.studentId.localeCompare(b.studentId));
+  return [...byStudent.values()].sort((a, b) => compareStudentNames(a.fullName, b.fullName) || a.studentId.localeCompare(b.studentId));
 }
 
 export interface ClassStudentDebt {
@@ -231,7 +232,7 @@ export function buildClassResultMatrix({
   const students = [
     ...activeStudents.map((student) => ({ row: null, student })),
     ...formerStudents,
-  ].sort((a, b) => a.student.fullName.localeCompare(b.student.fullName, "vi") || a.student.id.localeCompare(b.student.id));
+  ].sort((a, b) => compareStudentNames(a.student.fullName, b.student.fullName) || a.student.id.localeCompare(b.student.id));
 
   let missingCount = 0;
   const rows: ClassResultMatrixRow[] = students.map(({ row: enrollment, student }) => {

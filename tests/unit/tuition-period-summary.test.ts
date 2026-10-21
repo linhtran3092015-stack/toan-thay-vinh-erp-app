@@ -59,6 +59,28 @@ describe("toCurrentTuitionItemRows", () => {
     expect(rows[1].payment?.status).toBeNull();
     expect(getTuitionItemPaymentState(rows[1])).toBe("unknown");
   });
+
+  // Value: protects=a locked period's student rows read by given name (last word), a reissued student placed by the original snapshot's name;
+  // fails_when=toCurrentTuitionItemRows goes back to full-name (family-first) order or sorts before the reissue chain resolves the snapshot;
+  // why_new=existing fixtures name students "HS a".."HS v", where full-name and given-name order agree;
+  // seam=none; no_claim=pure function only; does not prove the period page table keeps this order
+  it("lists students by given name, using the original snapshot for a reissued item", () => {
+    const named = (fullName: string) => ({ class_name: "Toán 9A", current_grade: 9, full_name: fullName, public_code: null });
+    const rows = toCurrentTuitionItemRows([
+      item("y", "y", { student_snapshot: named("Bùi Thị Yến") }),
+      item("b", "b", { student_snapshot: named("Lê Văn Bình") }),
+      item("a1", "a", { payment_request: request("cancelled", 1_000_000, 0), student_snapshot: named("Phạm Ngọc Anh") }),
+      item("a2", "a", { reissued_from_item_id: "a1", student_snapshot: null }),
+      item("n", "n", { student_snapshot: named("Trần Minh An") }),
+    ]);
+
+    expect(rows.map((row) => [row.itemId, row.studentName])).toEqual([
+      ["n", "Trần Minh An"],
+      ["a2", "Phạm Ngọc Anh"],
+      ["b", "Lê Văn Bình"],
+      ["y", "Bùi Thị Yến"],
+    ]);
+  });
 });
 
 describe("summarizeTuitionPeriodRows", () => {

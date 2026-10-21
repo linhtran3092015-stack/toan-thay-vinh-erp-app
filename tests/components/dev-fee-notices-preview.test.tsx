@@ -202,7 +202,7 @@ describe("/dev/fee-notices preview", () => {
     expect(screen.queryByRole("button", { name: /Xuất bản phiên bản/ })).not.toBeInTheDocument();
   });
 
-  it("prints the current notices by grade then name, skipping the superseded original, through the print stub", () => {
+  it("prints the current notices by grade then given name, skipping the superseded original, through the print stub", () => {
     const stubs = spyOnStubs();
     const { container } = render(<FeeNoticesPreview role="owner" state="normal" view="print" />);
     expectShell("/finance/tuition-periods/print");
@@ -212,14 +212,14 @@ describe("/dev/fee-notices preview", () => {
     expect(sheets.map((sheet) => sheet.getAttribute("aria-label"))).toEqual([
       "Phiếu học phí của Mai Phương Linh",
       "Phiếu học phí của Trịnh Bảo Châu",
+      "Phiếu học phí của Nguyễn Minh Anh",
       "Phiếu học phí của Bùi Quang Minh",
       "Phiếu học phí của Lê Hoàng Nam",
-      "Phiếu học phí của Nguyễn Minh Anh",
     ]);
     expect(screen.getByText("Bỏ qua 1 phiếu đã được thay thế (in bản thay thế hiện hành).")).toBeInTheDocument();
     expect(screen.getByText("5 phiếu · mỗi phiếu một trang A5")).toBeInTheDocument();
 
-    const [linh, chau, minh, nam, anh] = sheets;
+    const [linh, chau, anh, minh, nam] = sheets;
     expect(within(anh).getByText(ANH_TRANSFER)).toBeInTheDocument();
     expect(plain(anh.textContent)).toContain("12 buổi × 200.000 ₫ · 8 buổi × 250.000 ₫ · 1 buổi nợ đầu kỳ × 200.000 ₫");
     expect(plain(anh.textContent)).toContain("−1 buổi (nợ)");

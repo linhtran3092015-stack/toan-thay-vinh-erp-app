@@ -12,6 +12,7 @@ import type {
   SessionLearningMode,
   SessionStatus,
 } from "@/features/sessions/read-models";
+import { compareStudentNames } from "@/lib/student-order";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 interface SessionClassRow {
@@ -497,9 +498,9 @@ export async function getSessionDetail(
         right.studentCode ??
         "";
 
-      return leftLabel.localeCompare(
+      return compareStudentNames(
+        leftLabel,
         rightLabel,
-        "vi",
       );
     });
 
