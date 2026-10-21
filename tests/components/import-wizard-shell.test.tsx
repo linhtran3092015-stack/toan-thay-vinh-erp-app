@@ -1,7 +1,7 @@
-// Value: protects=the shared import wizard shell (design 17c) the four import pages build on: the frame (h1 + context line, the labelled Stepper with exactly one current step, one column per step at xl, body, action bar); the file step (a real labelled file input that keyboard focus reaches, the limits wired as its description, a drop zone that really takes a dropped file, file facts with the short SHA-256 and the full value in title, "Chọn file khác" as reset or as the picker, the error inside the card as an alert wired to the input, a reading skeleton without an input); the summary strip (labelled counts in vi-VN figures, each tone's colour token, a column per cell); the review table ("Cần xem n" errors-first by default, "Tất cả n" in file order, counts, tints always with words, "Hợp lệ" badges, fallback words, one rendering per container width, the cap caption, the in-frame empty text); the action bar (consequence text, "← step" back button named "Quay lại bước …", the reason under the bar wired to the primary);
+// Value: protects=the shared import wizard shell (design 17c) the four import pages build on: the frame (h1 + context line, the labelled Stepper with exactly one current step, one column per step at xl, an odd count's last step without a doubled rule, body, action bar); the file step (a real labelled file input that keyboard focus reaches, the limits wired as its description, a drop zone that really takes a dropped file, file facts with the short SHA-256 and the full value in title, "Chọn file khác" as reset or as the picker, the error inside the card as an alert wired to the input, a reading skeleton without an input); the summary strip (labelled counts in vi-VN figures, each tone's colour token, a column per cell); the review table ("Cần xem n" errors-first by default, "Tất cả n" in file order, counts, tints always with words, "Hợp lệ" badges, fallback words, the tint kept on hover, one rendering per container width (measured on mount, so a narrow container never starts as the table), the cap caption, the in-frame empty text); the action bar (consequence text, "← step" back button named "Quay lại bước …", the reason under the bar wired to the primary);
 // fails_when=a second current step or an empty context line appears, the file input loses its label/accept/description or is hidden from keyboard focus, a drop is ignored or a dragged state sticks, a reset leaves an unlabelled input behind, the error leaves the card or stops being an alert, a summary value loses its separator or tone, "Cần xem" stops being the default while rows need review or does not fall back to "Tất cả" when none do, a flagged row shows colour without words, the table and the cards render together (a row text found twice), the cap caption is missing or shown without a cap, the empty text renders twice or outside a frame, the reason is not linked to the primary, or a shell file picks up next/navigation, outline-none, legacy tokens, raw hex or raw Tailwind palette colours;
 // why_new=step 15b adds src/features/imports/components (no shared import UI existed: each page had its own stepper, file card, tiles and tables);
-// seam=none for the components (pure, prop-driven); ResizeObserver is stubbed per test to report a container width (jsdom has no layout), and restored after;
+// seam=none for the components (pure, prop-driven); ResizeObserver (and once getBoundingClientRect) is stubbed per test to report a container width (jsdom has no layout), and restored after;
 // no_claim=does not prove any import page's steps, counts, copy or gating (each lane's page tests), the server actions, or the visual layout (no CSS in jsdom)
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { Stepper } from "@/components/patterns/stepper";
 import { Button } from "@/components/ui/button";
 import { ImportActionBar } from "@/features/imports/components/import-action-bar";
 import { ImportFileStep } from "@/features/imports/components/import-file-step";
@@ -19,7 +20,7 @@ import {
   type ImportRowSeverity,
 } from "@/features/imports/components/import-review-table";
 import { ImportSummaryStrip } from "@/features/imports/components/import-summary-strip";
-import { ImportWizardFrame } from "@/features/imports/components/import-wizard-frame";
+import { ImportWizardFrame, importStepperClassName } from "@/features/imports/components/import-wizard-frame";
 
 const originalResizeObserver = globalThis.ResizeObserver;
 
@@ -112,6 +113,35 @@ describe("ImportWizardFrame", () => {
 
     expect(container.querySelector("header p")).toBeNull();
     expect(screen.getByRole("list", { name: "Các bước nhập lớp" }).className).toContain("xl:grid-cols-5!");
+  });
+
+  // Value: protects=importStepperClassName: four steps add nothing to the shared Stepper; an odd count (3, 5) gets its xl columns plus the last-step fixes (no right rule, both columns from sm to below xl); six get only their columns; the frame applies exactly these classes;
+  // fails_when=a 4-step import stepper picks up any extra class, the odd-count overrides go missing (a doubled right edge at xl, a lone step beside an empty cell from sm) or leak onto even counts, or the frame stops using the helper;
+  // why_new=five-step steppers (classes wizard and batch page) inherited the Stepper's four-step border rules; the helper is new and shared by the frame and the class batch page;
+  // seam=none (pure helper + render); no_claim=does not prove the rendered borders (no CSS in jsdom; the compiled !important order was checked by hand) or touch stepper.tsx
+  it("adds nothing for four steps and fixes the last step of an odd count", () => {
+    const oddLastStep = ["[&>li:last-child]:border-r-0!", "sm:[&>li:last-child]:col-span-2", "xl:[&>li:last-child]:col-span-1"];
+    expect(importStepperClassName(4)).toBeUndefined();
+    expect(importStepperClassName(5)?.split(" ")).toEqual(["xl:grid-cols-5!", ...oddLastStep]);
+    expect(importStepperClassName(3)?.split(" ")).toEqual(["xl:grid-cols-3!", ...oddLastStep]);
+    expect(importStepperClassName(6)).toBe("xl:grid-cols-6!");
+
+    // Four steps: the frame's list carries exactly the shared Stepper's own classes.
+    render(<Stepper label="Stepper dùng chung" steps={steps} />);
+    render(
+      <ImportWizardFrame stepperLabel="Bốn bước" steps={steps} title="Bốn bước">
+        <p>Thân bước</p>
+      </ImportWizardFrame>,
+    );
+    expect(screen.getByRole("list", { name: "Bốn bước" }).className).toBe(screen.getByRole("list", { name: "Stepper dùng chung" }).className);
+
+    render(
+      <ImportWizardFrame stepperLabel="Năm bước" steps={[...steps, { state: "upcoming", title: "Tạo lô" }]} title="Năm bước">
+        <p>Thân bước</p>
+      </ImportWizardFrame>,
+    );
+    const fiveSteps = screen.getByRole("list", { name: "Năm bước" }).className.split(" ");
+    for (const name of ["xl:grid-cols-5!", ...oddLastStep]) expect(fiveSteps).toContain(name);
   });
 });
 
@@ -337,11 +367,14 @@ describe("ImportReviewTable", () => {
     const [warning, valid, error, neutral, errorWithoutText] = bodyRows();
 
     expect(error.className).toContain("bg-danger-bg");
+    // The tint holds under the pointer (beats TableRow's hover:bg-table-row-hover).
+    expect(error.className).toContain("hover:bg-danger-bg!");
     expect(error.className).toContain("h-14");
     expect(within(error).getByText("Năm sinh phải gồm 4 chữ số.").className).toBe("");
     expect(within(error).getAllByRole("cell").at(-1)).toHaveTextContent(/^Lỗi: Năm sinh phải gồm 4 chữ số\.$/);
 
     expect(warning.className).toContain("bg-warning-bg");
+    expect(warning.className).toContain("hover:bg-warning-bg!");
     expect(within(warning).getAllByRole("cell").at(-1)).toHaveTextContent(/^Cảnh báo: Phụ huynh đã có trong hệ thống và sẽ được dùng lại\.$/);
 
     expect(valid.className).not.toMatch(/bg-(danger|warning)-bg/);
@@ -410,6 +443,34 @@ describe("ImportReviewTable", () => {
     // An unlaid-out container (width 0) keeps the current rendering.
     act(() => observer.resize(0));
     expect(screen.getByRole("table", { name: "Kết quả kiểm tra 6 dòng" })).toBeInTheDocument();
+  });
+
+  // Value: protects=a narrow container (375px phone) mounts straight into the stacked cards from the layout effect's own measure, and the observer is still attached for later resizes;
+  // fails_when=the layout waits for a ResizeObserver report again (a narrow client mount commits and paints the 1040px table first, then swaps to cards);
+  // why_new=review fix: the hook only switched in the observer callback, which React renders after the first paint;
+  // seam=Element.prototype.getBoundingClientRect stubbed to a 375px box and a ResizeObserver that never reports, both restored after; no_claim=does not prove browser paint timing (jsdom has no paint), only that the first committed result of the mount is the cards
+  it("mounts a narrow container straight into the cards without waiting for the observer", () => {
+    const observe = vi.fn();
+    class SilentResizeObserver {
+      observe = observe;
+      unobserve() {}
+      disconnect() {}
+    }
+    globalThis.ResizeObserver = SilentResizeObserver as unknown as typeof ResizeObserver;
+    const rect = vi
+      .spyOn(Element.prototype, "getBoundingClientRect")
+      .mockReturnValue({ bottom: 600, height: 600, left: 0, right: 375, top: 0, width: 375, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
+
+    try {
+      renderReview();
+
+      expect(screen.queryByRole("table")).toBeNull();
+      const cards = within(screen.getByRole("list", { name: "Kết quả kiểm tra 6 dòng" })).getAllByRole("listitem");
+      expect(cards.map((card) => card.getAttribute("data-severity"))).toEqual(["error", "error", "warning"]);
+      expect(observe).toHaveBeenCalledTimes(1);
+    } finally {
+      rect.mockRestore();
+    }
   });
 
   it("caps the rows of the active chip and says so in the frame footer", () => {

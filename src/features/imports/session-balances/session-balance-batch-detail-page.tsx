@@ -626,7 +626,6 @@ function ExcludeCell({
     <div className="grid min-w-[200px] gap-1.5 py-2">
       <Input
         aria-label={`Lý do loại dòng ${row.source_row_number}`}
-        className="md:min-h-8 md:text-secondary"
         maxLength={2000}
         onChange={(event) => onReasonChange(event.target.value)}
         value={reason}
@@ -640,7 +639,15 @@ function ExcludeCell({
         <Button className="max-md:h-11" disabled={isExcluding} onClick={onCancel} size="sm" variant="ghost">
           Hủy
         </Button>
-        <Button className="max-md:h-11" disabled={!reason.trim()} isLoading={isExcluding} onClick={onConfirm} size="sm" variant="danger-outline">
+        <Button
+          className="max-md:h-11"
+          disabled={!reason.trim()}
+          disabledReason="Nhập lý do loại dòng."
+          isLoading={isExcluding}
+          onClick={onConfirm}
+          size="sm"
+          variant="danger-outline"
+        >
           Xác nhận loại
         </Button>
       </div>

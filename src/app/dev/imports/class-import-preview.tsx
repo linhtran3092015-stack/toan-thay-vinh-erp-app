@@ -22,6 +22,8 @@ const STUB = "Bản xem trước không ghi dữ liệu.";
 export const CLASS_IMPORT_PREVIEW_BATCH_HREF = "/dev/imports?view=class-batch&state=ready";
 /** The batch page's back link in the preview. */
 export const CLASS_IMPORT_PREVIEW_IMPORT_HREF = "/dev/imports?view=classes";
+/** Where the batch page's "Mở lớp" links open in the preview: the /dev class detail preview (fixture ids are not real classes). */
+export const CLASS_IMPORT_PREVIEW_CLASS_HREF = "/dev/class?state=active";
 
 /**
  * Inert stand-ins for every class & schedule import action (the preview runs
@@ -58,8 +60,8 @@ const WIZARD_SEEDS: Readonly<Record<ClassImportsPreviewState, WizardSeed>> = {
  * /dev/imports `view=classes` and `view=class-batch` body (design 17c);
  * rendered inside the AppShell by ImportsPreview. Without `imports.classes`
  * (maker, viewer) it shows the route's own denial; otherwise the real pages
- * with fixtures and the inert actions, every link to a batch or back to the
- * wizard kept under /dev.
+ * with fixtures and the inert actions, every link to a batch, a class or back
+ * to the wizard kept under /dev.
  */
 export function ClassImportPreviewBody(props: ClassImportPreviewProps) {
   const canImport = getImportsPreviewPermissions(props.role).includes("imports.classes");
@@ -76,6 +78,7 @@ export function ClassImportPreviewBody(props: ClassImportPreviewProps) {
     return (
       <ClassScheduleBatchDetailPage
         actions={previewClassImportActions}
+        classHref={() => CLASS_IMPORT_PREVIEW_CLASS_HREF}
         detail={getClassBatchPreviewDetail(props.state)}
         importHref={CLASS_IMPORT_PREVIEW_IMPORT_HREF}
         key={props.state}

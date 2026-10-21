@@ -33,6 +33,25 @@ const STEPPER_XL_COLUMNS: Readonly<Record<number, string>> = {
   6: "xl:grid-cols-6!",
 };
 
+// The Stepper's borders assume an even count: every odd step keeps a right
+// rule from sm (`sm:[&:nth-child(odd)]:border-r`). With an odd count the last
+// step would double the frame's right edge at xl, and from sm to xl it would
+// sit alone in its row beside an empty cell. Set on the <ol>: no right rule on
+// the last step, and from sm to below xl it spans both columns. `!` beats the
+// Stepper's own rule whatever the CSS order.
+const STEPPER_ODD_LAST_STEP = "[&>li:last-child]:border-r-0! sm:[&>li:last-child]:col-span-2 xl:[&>li:last-child]:col-span-1";
+
+/**
+ * Extra Stepper classes of an import pipeline with `stepCount` steps: one
+ * column per step at xl, and the odd-count last-step fixes above. Undefined
+ * for four steps (the Stepper's own layout). Shared by the wizard frame and
+ * the batch pages that repeat the wizard's steps.
+ */
+export function importStepperClassName(stepCount: number): string | undefined {
+  const classes = [STEPPER_XL_COLUMNS[stepCount], stepCount % 2 === 1 ? STEPPER_ODD_LAST_STEP : undefined].filter(Boolean);
+  return classes.length > 0 ? classes.join(" ") : undefined;
+}
+
 /**
  * Import wizard frame (design 17c, §4.3): PageHeader (title + optional
  * context line) → Stepper → the current step's body → the action bar, in one
@@ -53,7 +72,7 @@ export function ImportWizardFrame({
       <PageHeader actions={headerActions} title={title}>
         {context ? <p className="mt-1 text-secondary text-text-muted">{context}</p> : null}
       </PageHeader>
-      <Stepper className={STEPPER_XL_COLUMNS[steps.length]} label={stepperLabel} steps={steps} />
+      <Stepper className={importStepperClassName(steps.length)} label={stepperLabel} steps={steps} />
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">{children}</div>
       {actionBar}
     </div>

@@ -1,4 +1,4 @@
-// Value: protects=the session-balance approval workflow on screen: the batch list (each batch's file, creator and status word rendered once, "Chờ bạn duyệt" only for someone who may approve, "Chờ đối tác duyệt (Maker)" for the creator, one link per batch to its page), and the batch page's one panel per status: reconcile ("Bước đối soát Batch", conditions, reason required, exact "Hoàn tất đối soát -> Gửi phê duyệt"), approve ("Bước phê duyệt số dư đầu kỳ", the four-eyes and read-only sentences, "Phê duyệt batch" absent / disabled / enabled), post (checkbox + the exact phrase GHI SO DU before the write, consequence in words), the posted callout with "Xem sổ buổi", the review-row exclude editor with its prefilled reasons, and every write's exact payload + refresh;
+// Value: protects=the session-balance approval workflow on screen: the batch list (each batch's file, creator and status word rendered once, "Chờ bạn duyệt" only for someone who may approve, "Chờ đối tác duyệt (Maker)" for the creator, one link per batch to its page, the "Chỉ hiện 50 lô mới nhất." note from 50 batches), and the batch page's one panel per status: reconcile ("Bước đối soát Batch", conditions, reason required, exact "Hoàn tất đối soát -> Gửi phê duyệt"), approve ("Bước phê duyệt số dư đầu kỳ", the four-eyes and read-only sentences, "Phê duyệt batch" absent / disabled / enabled), post (checkbox + the exact phrase GHI SO DU before the write, consequence in words), the posted callout with "Xem sổ buổi", the review-row exclude editor with its prefilled reasons (a blank reason disables the confirm, said in words), and every write's exact payload + refresh;
 // fails_when=the creator can approve on screen, an approver without .approve gets an enabled button, the approve panel shows before reconciliation, the post fires without the checkbox or with a near-miss phrase, a batch text renders twice (table + cards), the exclude editor loses its prefilled reasons or appears outside reconciliation, a write sends another payload or skips the refresh, or a failed write is not shown inline;
 // why_new=step 15b rebuilt both pages on the shared import frame (GuardedActionPanel, Stepper, ImportReviewTable); the six original scenarios stay, Scenario 5 now finds the row action as one link (the old Link > Button nesting was invalid HTML);
 // seam=next/navigation useRouter (push, refresh) is mocked with one shared router; the writes go through the pages' `actions` overrides (the real actions are never called), the six original scenarios pass no overrides;
@@ -371,6 +371,26 @@ describe("Session balance batch list (step 15b)", () => {
     expect(screen.queryByLabelText("Chọn file Excel")).not.toBeInTheDocument();
     expect(screen.getByText("Chưa có lô số dư nào.")).toBeInTheDocument();
   });
+
+  // Value: protects=the cap note "Chỉ hiện 50 lô mới nhất." shows exactly when the list holds the route's 50 batches, and not at 49;
+  // fails_when=the cap check becomes `>` 50 (the note never shows, since the route returns at most 50) or fires below the limit;
+  // why_new=the cap note is new in step 15b and no test crossed its boundary;
+  // seam=none (props only; canImport={false} renders the list alone); no_claim=does not prove the route's .limit(50) itself
+  it("says only the newest 50 batches show from 50 batches, not at 49", () => {
+    const manyBatches = (count: number) =>
+      Array.from({ length: count }, (_, index) =>
+        listItem({ id: `b0000000-0000-4000-8000-${String(index).padStart(12, "0")}`, source_filename: `so_du_${index + 1}.xlsx` }),
+      );
+
+    render(<SessionBalanceImportPage batches={manyBatches(49)} canApprove={true} canImport={false} currentUserId="user-approver-222" />);
+    expect(screen.getByRole("heading", { level: 2, name: "Danh sách Batch đối soát & Phê duyệt (49)" })).toBeInTheDocument();
+    expect(screen.queryByText(/Chỉ hiện 50 lô mới nhất\./)).not.toBeInTheDocument();
+    cleanup();
+
+    render(<SessionBalanceImportPage batches={manyBatches(50)} canApprove={true} canImport={false} currentUserId="user-approver-222" />);
+    expect(screen.getByRole("heading", { level: 2, name: "Danh sách Batch đối soát & Phê duyệt (50)" })).toBeInTheDocument();
+    expect(screen.getByText(/Chỉ hiện 50 lô mới nhất\./)).toBeInTheDocument();
+  });
 });
 
 describe("Session balance batch page panels (step 15b)", () => {
@@ -433,6 +453,11 @@ describe("Session balance batch page panels (step 15b)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Loại khỏi lô dòng 5" }));
     const reason = screen.getByLabelText("Lý do loại dòng 5");
     expect(reason).toHaveValue("Chưa có enrollment đang active.");
+    // A blank reason disables the confirm and says why.
+    fireEvent.change(reason, { target: { value: "   " } });
+    const blankConfirm = screen.getByRole("button", { name: "Xác nhận loại" });
+    expect(blankConfirm).toBeDisabled();
+    expect(blankConfirm).toHaveAccessibleDescription("Nhập lý do loại dòng.");
     fireEvent.change(reason, { target: { value: "  Học viên đã nghỉ, chưa ghi danh lại.  " } });
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận loại" }));
 

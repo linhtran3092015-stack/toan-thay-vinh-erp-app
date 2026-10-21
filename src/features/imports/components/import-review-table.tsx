@@ -69,11 +69,14 @@ export const IMPORT_REVIEW_TABLE_MIN_WIDTH = 1042;
 const NEEDS_REVIEW: ReadonlySet<ImportRowSeverity> = new Set(["error", "warning"]);
 const SEVERITY_ORDER: Readonly<Record<ImportRowSeverity, number>> = { error: 0, neutral: 3, valid: 2, warning: 1 };
 
+// The tint stays on hover: TableRow's own `hover:bg-table-row-hover` (a
+// :hover rule, more specific than the plain tint) would otherwise wash it out
+// under the pointer; `!` wins over it whatever the CSS order.
 const rowTint: Record<ImportRowSeverity, string> = {
-  error: "bg-danger-bg",
+  error: "bg-danger-bg hover:bg-danger-bg!",
   neutral: "",
   valid: "",
-  warning: "bg-warning-bg",
+  warning: "bg-warning-bg hover:bg-warning-bg!",
 };
 
 const cardTone: Record<ImportRowSeverity, string> = {
@@ -120,9 +123,13 @@ function IssueContent({ issue, severity }: { issue: ReactNode; severity: ImportR
 
 /**
  * Picks the table or the cards from the wrapper's own width. Exactly one
- * rendering is in the DOM. Without ResizeObserver (jsdom, server render) it
- * stays on the table; the observer's first report arrives right after
- * mounting, before the browser paints a client-side mount.
+ * rendering is in the DOM. The server render (and jsdom, which has no
+ * layout) stays on the table. On a client mount the layout effect measures
+ * the wrapper synchronously: React applies a state update from a layout
+ * effect before the browser paints, so a narrow container paints its cards
+ * first. A ResizeObserver report is not enough for that (React renders the
+ * update it triggers in a later task, after the first paint, which would
+ * flash the full table), so the observer only follows later resizes.
  */
 function useReviewLayout() {
   const ref = useRef<HTMLDivElement>(null);
@@ -130,11 +137,14 @@ function useReviewLayout() {
 
   useLayoutEffect(() => {
     const element = ref.current;
-    if (!element || typeof ResizeObserver === "undefined") return;
+    if (!element) return;
+    // 0 = not laid out (e.g. a hidden tab panel, or jsdom): keep the current layout.
+    const width = element.getBoundingClientRect().width;
+    if (width > 0) setLayout(width >= IMPORT_REVIEW_TABLE_MIN_WIDTH ? "table" : "cards");
+    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? 0;
-      // 0 = not laid out (e.g. a hidden tab panel): keep the current layout.
-      if (width > 0) setLayout(width >= IMPORT_REVIEW_TABLE_MIN_WIDTH ? "table" : "cards");
+      const nextWidth = entries[0]?.contentRect.width ?? 0;
+      if (nextWidth > 0) setLayout(nextWidth >= IMPORT_REVIEW_TABLE_MIN_WIDTH ? "table" : "cards");
     });
     observer.observe(element);
     return () => observer.disconnect();

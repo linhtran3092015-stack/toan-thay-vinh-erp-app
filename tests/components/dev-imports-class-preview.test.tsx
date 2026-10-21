@@ -1,5 +1,5 @@
-// Value: protects=the /dev/imports class bodies (view=classes and view=class-batch) are inert and truthful: every class & schedule import action the two pages import has a preview stub (source scan, so a new action fails here until stubbed); creating a batch and committing answer "Bản xem trước không ghi dữ liệu." and the dry-run answers fixture results, so no click reaches a real action, router.push or router.refresh; each state opens the step it names (file, mapping, review-clean, review-conflicts; batch ready, committed, previewed); maker and viewer (no imports.classes) get the routes' own denials; links stay off /imports/* and the live write forms (back link and batch target under /dev); the fixtures agree with themselves (summaries = row classifications, workbook rows = dry-run rows, batch counts = rows) and the clean workbook auto-maps without issues;
-// fails_when=a page gains an action without a stub, a stub calls through or claims a write, a state opens the wrong step, a role without imports.classes sees a page, a preview link leads to /imports/* or a live form, or the fixture counts drift from their rows;
+// Value: protects=the /dev/imports class bodies (view=classes and view=class-batch) are inert and truthful: every class & schedule import action the two pages import has a preview stub (source scan, so a new action fails here until stubbed); creating a batch and committing answer "Bản xem trước không ghi dữ liệu." and the dry-run answers fixture results, so no click reaches a real action, router.push or router.refresh; each state opens the step it names (file, mapping, review-clean, review-conflicts; batch ready, committed, previewed); maker and viewer (no imports.classes) get the routes' own denials; links stay off /imports/* and the live write forms, every one under /dev (back link, batch target and the batch page's "Mở lớp" links to the /dev class preview); the fixtures agree with themselves (summaries = row classifications, workbook rows = dry-run rows, batch counts = rows) and the clean workbook auto-maps without issues;
+// fails_when=a page gains an action without a stub, a stub calls through or claims a write, a state opens the wrong step, a role without imports.classes sees a page, a preview link leads to /imports/*, a live form or a real /classes/<id> page, or the fixture counts drift from their rows;
 // why_new=step 15b replaces the placeholder class body of /dev/imports with the real wizard and batch page;
 // seam=the classes actions module is mocked so a real call is observable; next/navigation offers useRouter spies; the body is rendered without AppShell (the controller wraps it, dev-imports-page.test.tsx);
 // no_claim=does not prove the /dev/imports page wiring, the production 404 (dev-imports-page.test.tsx) or the pages' own rules (class-schedule-*-page tests)
@@ -18,6 +18,7 @@ import {
 } from "@/app/dev/imports/class-import-fixtures";
 import {
   CLASS_IMPORT_PREVIEW_BATCH_HREF,
+  CLASS_IMPORT_PREVIEW_CLASS_HREF,
   CLASS_IMPORT_PREVIEW_IMPORT_HREF,
   ClassImportPreviewBody,
   previewClassImportActions,
@@ -64,7 +65,8 @@ function expectLinksStayInPreview() {
     const href = link.getAttribute("href") ?? "";
     expect(href, href).not.toMatch(/^\/imports\//);
     expect(href, href).not.toMatch(/\/students\/new|\/classes\/new|\/sessions\/batch/);
-    expect(href, href).toMatch(/^\/dev\/imports\?|^\/classes\/[0-9a-f-]{36}$/);
+    // Every link stays under /dev (the batch page's "Mở lớp" opens the /dev class preview, never /classes/<id>).
+    expect(href, href).toMatch(/^\/dev\/(?:imports|class)\?/);
   }
 }
 
@@ -100,12 +102,14 @@ describe("/dev/imports class preview stubs", () => {
     expectNothingReal();
   });
 
-  it("keeps the batch target and the back link under /dev", () => {
+  it("keeps the batch target, the back link and the class links under /dev", () => {
     expect(CLASS_IMPORT_PREVIEW_BATCH_HREF).toBe("/dev/imports?view=class-batch&state=ready");
     expect(CLASS_IMPORT_PREVIEW_IMPORT_HREF).toBe("/dev/imports?view=classes");
+    expect(CLASS_IMPORT_PREVIEW_CLASS_HREF).toBe("/dev/class?state=active");
     const source = readFileSync(join(process.cwd(), "src/app/dev/imports/class-import-preview.tsx"), "utf8");
     expect(source).toContain("batchHref={() => CLASS_IMPORT_PREVIEW_BATCH_HREF}");
     expect(source).toContain("importHref={CLASS_IMPORT_PREVIEW_IMPORT_HREF}");
+    expect(source).toContain("classHref={() => CLASS_IMPORT_PREVIEW_CLASS_HREF}");
   });
 });
 
@@ -186,6 +190,19 @@ describe("/dev/imports class batch states", () => {
     expect(stepStates()).toEqual(steps);
     expect(screen.queryByRole("button", { name: "Nhập lớp & lịch học" })).toBeNull();
     expectLinksStayInPreview();
+    expectNothingReal();
+  });
+
+  // Value: protects=the committed batch's six "Mở lớp" links all open the /dev class preview, so the link check above is not passing on an empty set;
+  // fails_when=the preview stops passing classHref (the links go back to /classes/<fixture id>, which is no real class) or the class links vanish;
+  // why_new=the batch page's class target became injectable; before it the preview linked to real /classes/<id> pages;
+  // seam=same as the file; no_claim=does not prove /dev/class renders this class (it shows its own fixture class)
+  it("committed: every 'Mở lớp' opens the /dev class preview", () => {
+    renderBody({ role: "owner", state: "committed", view: "class-batch" });
+
+    const links = within(screen.getByRole("table", { name: "6 dòng lớp học trong lô" })).getAllByRole("link", { name: /^Mở lớp / });
+    expect(links).toHaveLength(6);
+    for (const link of links) expect(link).toHaveAttribute("href", CLASS_IMPORT_PREVIEW_CLASS_HREF);
     expectNothingReal();
   });
 });

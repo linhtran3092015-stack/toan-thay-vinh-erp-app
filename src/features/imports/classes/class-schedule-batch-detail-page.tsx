@@ -14,6 +14,7 @@ import { Button, getButtonClassName } from "@/components/ui/button";
 import { Field, Input, Label } from "@/components/ui/field";
 import { formatImportTimestamp, formatIsoWeekday } from "@/features/imports/components/import-labels";
 import { ImportSummaryStrip, type ImportSummaryCell } from "@/features/imports/components/import-summary-strip";
+import { importStepperClassName } from "@/features/imports/components/import-wizard-frame";
 import { formatNumber } from "@/lib/format";
 
 import { commitClassScheduleImportBatchAction } from "./actions";
@@ -87,9 +88,11 @@ export interface ClassScheduleBatchDetailPageProps {
   actions?: Pick<ClassScheduleImportActionOverrides, "commitClassScheduleImportBatch">;
   /** Back link to the import wizard; the preview keeps it under /dev. */
   importHref?: string;
+  /** "Mở lớp" target of a staged row's class; defaults to the real class page, the preview keeps it under /dev. */
+  classHref?: (classId: string) => string;
 }
 
-const classHref = (classId: string) => `/classes/${classId}`;
+const classDetailHref = (classId: string) => `/classes/${classId}`;
 
 /**
  * /imports/classes/[batchId] (design 17c, step 5 "Xác nhận nhập"): the batch
@@ -99,7 +102,12 @@ const classHref = (classId: string) => `/classes/${classId}`;
  * phrase "IMPORT LOP LICH", reason, confirmation; only while the batch is
  * ready) and every staged row per sheet.
  */
-export function ClassScheduleBatchDetailPage({ actions, detail, importHref = "/imports/classes" }: ClassScheduleBatchDetailPageProps) {
+export function ClassScheduleBatchDetailPage({
+  actions,
+  classHref = classDetailHref,
+  detail,
+  importHref = "/imports/classes",
+}: ClassScheduleBatchDetailPageProps) {
   const commitClassScheduleImportBatch = actions?.commitClassScheduleImportBatch ?? commitClassScheduleImportBatchAction;
   const router = useRouter();
   const ids = useId();
@@ -196,7 +204,7 @@ export function ClassScheduleBatchDetailPage({ actions, detail, importHref = "/i
           description: isCommitted
             ? `Đã nhập lúc ${formatImportTimestamp(batch.committed_at)}`
             : isReady
-              ? "Kiểm tra lô rồi xác nhận ở cuối trang"
+              ? "Kiểm tra lô rồi xác nhận ở mục Xác nhận nhập bên dưới"
               : "Lô này không nhập được",
         }
       : step,
@@ -219,7 +227,7 @@ export function ClassScheduleBatchDetailPage({ actions, detail, importHref = "/i
         </p>
       </PageHeader>
 
-      <Stepper className="xl:grid-cols-5!" label={CLASS_IMPORT_STEPPER_LABEL} steps={steps} />
+      <Stepper className={importStepperClassName(steps.length)} label={CLASS_IMPORT_STEPPER_LABEL} steps={steps} />
 
       {isCommitted ? (
         <ResultBanner
@@ -360,10 +368,10 @@ export function ClassScheduleBatchDetailPage({ actions, detail, importHref = "/i
                   />
                 )}
               </Field>
-              <label className="flex items-start gap-2 text-body text-text-strong" htmlFor={`${ids}-commit-confirm`}>
+              <label className="flex min-h-11 items-center gap-2.5 text-body text-text-strong md:min-h-10" htmlFor={`${ids}-commit-confirm`}>
                 <input
                   checked={confirmationChecked}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--action-primary)]"
+                  className="h-4 w-4 shrink-0 accent-[var(--action-primary)]"
                   id={`${ids}-commit-confirm`}
                   onChange={(event) => setConfirmationChecked(event.target.checked)}
                   type="checkbox"

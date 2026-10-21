@@ -13,8 +13,6 @@ import {
 } from "./imports-preview-params";
 import { StudentImportPreviewBody } from "./students-preview";
 
-export type { ImportsPreviewRole, ImportsPreviewState, ImportsPreviewView } from "./imports-preview-params";
-
 /**
  * /dev/imports (design 17c): the shell on the real route of the view
  * (`previewPathname`), with the role's permission codes, around the lane's

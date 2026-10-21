@@ -1,5 +1,5 @@
-// Value: protects=the /imports/classes/[batchId] page (design 17c step 5, step 15b): the status badge in words per batch status (ready_to_commit "Chờ xác nhận nhập", previewed "Không nhập được", committed "Đã nhập", rejected, unknown shown raw); the same five-step Stepper with steps 1–4 done and "Xác nhận nhập" current, or all done once committed; created/committed times in Vietnam time whatever the runtime zone; the actor as the stored account id; both summary strips; "Lớp sẽ được tạo" / "Lịch học sẽ được tạo" (weekday in words) only while ready; the commit panel only in ready_to_commit, disabled until 0 conflicts/invalid, a reason, the checkbox and the exact server phrase "IMPORT LOP LICH" (lowercase never passes), sending a payload the server schema accepts; after a commit the page shows the result and refreshes; errors inline, a lost connection says the result is unknown and refreshes; class links per staged row; a new detail from the server replaces the local copy;
-// fails_when=the commit can run from another status, with conflict/invalid counts, without reason/checkbox, or with any other phrase (or the sent text stops matching the schema), the phrase gets visually uppercased again, a timestamp is printed in the runtime zone, a weekday prints as "Thứ 1", a status loses its words, the class links disappear, or the page stops falling back to the real commit action;
+// Value: protects=the /imports/classes/[batchId] page (design 17c step 5, step 15b): the status badge in words per batch status (ready_to_commit "Chờ xác nhận nhập", previewed "Không nhập được", committed "Đã nhập", rejected, unknown shown raw); the same five-step Stepper with steps 1–4 done and "Xác nhận nhập" current, or all done once committed; created/committed times in Vietnam time whatever the runtime zone; the actor as the stored account id; both summary strips; "Lớp sẽ được tạo" / "Lịch học sẽ được tạo" (weekday in words) only while ready; the commit panel only in ready_to_commit, disabled until 0 conflicts/invalid, a reason, the checkbox and the exact server phrase "IMPORT LOP LICH" (lowercase never passes), sending a payload the server schema accepts; after a commit the page shows the result and refreshes; errors inline, a lost connection says the result is unknown and refreshes; class links per staged row (the real /classes/<id> by default, an injected classHref otherwise); the five-step stepper classes of the wizard frame; a new detail from the server replaces the local copy;
+// fails_when=the commit can run from another status, with conflict/invalid counts, without reason/checkbox, or with any other phrase (or the sent text stops matching the schema), the phrase gets visually uppercased again, a timestamp is printed in the runtime zone, a weekday prints as "Thứ 1", a status loses its words, the class links disappear or ignore an injected classHref, or the page stops falling back to the real commit action;
 // why_new=the batch page had no test (step 15 map §0 finding 2) and step 15b rebuilds it with the shared Stepper, GuardedActionPanel and an action override;
 // seam=next/navigation useRouter (refresh spy) and the actions module are mocked; detail fixtures come from the /dev/imports class fixtures (with targeted overrides); jsdom has no ResizeObserver so row tables render as tables;
 // no_claim=does not prove the commit RPC, the route's loader or gate (class-import-routes.test.tsx), or the visual layout
@@ -65,7 +65,12 @@ describe("ClassScheduleBatchDetailPage: ready batch", () => {
     expect(within(header()).getByRole("link", { name: "Về trang nhập lớp & lịch học" })).toHaveAttribute("href", "/imports/classes");
 
     expect(stepStates()).toEqual(["done", "done", "done", "done", "current"]);
-    expect(screen.getByText("Kiểm tra lô rồi xác nhận ở cuối trang")).toBeInTheDocument();
+    // Deliberate equal-strength copy edit (step 15b review): the rows section follows the commit panel, so "ở cuối trang" was wrong.
+    expect(screen.getByText("Kiểm tra lô rồi xác nhận ở mục Xác nhận nhập bên dưới")).toBeInTheDocument();
+    // The wizard frame's five-step classes: five columns at xl, the odd last step without a doubled right rule.
+    const stepperClassName = screen.getByRole("list", { name: "Các bước nhập lớp & lịch học" }).className;
+    expect(stepperClassName).toContain("xl:grid-cols-5!");
+    expect(stepperClassName).toContain("[&>li:last-child]:border-r-0!");
 
     expect(factValue("Tạo lô lúc")).toHaveTextContent("19/10/2026 09:40");
     expect(factValue("Người tạo lô")).toHaveTextContent("Tài khoản d0000000…");
@@ -261,6 +266,26 @@ describe("ClassScheduleBatchDetailPage: other statuses", () => {
 
     expect(within(table).getAllByText("Chưa có")).toHaveLength(4);
     expect(within(table).getByRole("link", { name: "Mở lớp 9A1" })).toHaveAttribute("href", "/classes/c1a55000-0000-4000-8000-000000000009");
+  });
+
+  // Value: protects=the "Mở lớp" links default to the real class page /classes/<id> and follow an injected `classHref` (called with the staged row's class id) when one is passed;
+  // fails_when=the default route changes, the page ignores `classHref` (the /dev preview would leave /dev again) or calls it with another id;
+  // why_new=the `classHref` prop is new (the target was hard-coded, so /dev/imports class-batch links opened real class pages);
+  // seam=none (props only); no_claim=does not prove the /dev preview passes a /dev target (dev-imports-class-preview.test.tsx) or that the class page exists
+  it("links each staged class to /classes/<id> by default and to an injected classHref otherwise", () => {
+    const detail = getClassBatchPreviewDetail("committed");
+    const firstClass = detail.classRows[0];
+    render(<ClassScheduleBatchDetailPage detail={detail} />);
+    const defaultLinks = within(screen.getByRole("table", { name: "6 dòng lớp học trong lô" })).getAllByRole("link");
+    expect(defaultLinks.map((link) => link.getAttribute("href"))).toEqual(detail.classRows.map((row) => `/classes/${row.resolved_class_id}`));
+    cleanup();
+
+    const classHref = vi.fn((classId: string) => `/dev/class?state=active&id=${classId}`);
+    render(<ClassScheduleBatchDetailPage classHref={classHref} detail={detail} />);
+    const table = screen.getByRole("table", { name: "6 dòng lớp học trong lô" });
+    expect(within(table).getByRole("link", { name: "Mở lớp 6A1" })).toHaveAttribute("href", `/dev/class?state=active&id=${firstClass.resolved_class_id}`);
+    expect(classHref).toHaveBeenCalledWith(firstClass.resolved_class_id);
+    for (const link of within(table).getAllByRole("link")) expect(link.getAttribute("href")).toMatch(/^\/dev\/class\?/);
   });
 
   it.each([
