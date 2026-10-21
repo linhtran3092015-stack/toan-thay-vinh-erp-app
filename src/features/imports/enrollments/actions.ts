@@ -3,6 +3,8 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/database.generated";
 
+import { describeEnrollmentImportDatabaseError } from "./errors";
+
 import type {
   EnrollmentImportDryRunResult,
   EnrollmentImportRawRow,
@@ -31,6 +33,7 @@ export interface CommitBatchActionResponse {
     status: string;
     committed_new_count: number;
     reused_matching_count: number;
+    activated_student_count?: number;
     committed_at: string;
   };
 }
@@ -73,7 +76,7 @@ export async function dryRunStudentEnrollmentImportAction(
     if (error) {
       return {
         success: false,
-        error: `Lỗi kiểm tra Dry-Run: ${error.message || "Giao dịch thất bại."}`,
+        error: describeEnrollmentImportDatabaseError(error.message, "Giao dịch thất bại."),
       };
     }
 
@@ -146,7 +149,7 @@ export async function createStudentEnrollmentImportBatchAction(
     if (error) {
       return {
         success: false,
-        error: `Lỗi tạo Batch staging: ${error.message || "Giao dịch tạo batch thất bại."}`,
+        error: describeEnrollmentImportDatabaseError(error.message, "Giao dịch tạo batch thất bại."),
       };
     }
 
@@ -197,7 +200,7 @@ export async function commitStudentEnrollmentImportBatchAction(
     if (error) {
       return {
         success: false,
-        error: `Lỗi Commit ghi danh: ${error.message || "Giao dịch commit thất bại."}`,
+        error: describeEnrollmentImportDatabaseError(error.message, "Giao dịch commit thất bại."),
       };
     }
 
@@ -208,6 +211,7 @@ export async function commitStudentEnrollmentImportBatchAction(
         status: string;
         committed_new_count: number;
         reused_matching_count: number;
+        activated_student_count?: number;
         committed_at: string;
       },
     };
