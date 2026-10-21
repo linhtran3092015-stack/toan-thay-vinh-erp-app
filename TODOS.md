@@ -2707,7 +2707,7 @@
 
 ### Gõ phím trên trang lô vẽ lại toàn bộ dòng
 
-**What:** Trên trang lô số dư buổi và trang lô lớp, mỗi phím gõ vào ô lý do hay cụm xác nhận vẽ lại toàn bộ bảng dòng (tới 1.000 dòng số dư, 2.000 lịch học). Tách state ô nhập xuống component panel riêng, giữ lý do loại dòng trong ô của dòng đó, và memo `ImportReviewTable` với các hàm ổn định.
+**What:** Trên trang lô số dư buổi và trang lô lớp, mỗi phím gõ vào ô lý do hay cụm xác nhận vẽ lại toàn bộ bảng dòng (tới 5.000 dòng số dư, vì trang lô số dư không giới hạn số dòng hiển thị như bước kiểm tra (500); tới 2.000 lịch học). Tách state ô nhập xuống component panel riêng, giữ lý do loại dòng trong ô của dòng đó, và memo `ImportReviewTable` với các hàm ổn định.
 
 **Why:** Trên điện thoại hoặc lô lớn, gõ bị chậm. Trang cũ trước redesign cũng vẽ lại như vậy, nên đây không phải lỗi mới.
 
@@ -2716,6 +2716,42 @@
 **Effort:** S
 **Priority:** P3
 **Depends on:** Không
+
+### Trang lô trên điện thoại hiện bảng rồi mới chuyển sang thẻ
+
+**What:** Hai trang lô (`/imports/session-balances/[batchId]`, `/imports/classes/[batchId]`) được máy chủ vẽ sẵn bảng dòng; trên điện thoại trình duyệt hiện bảng (cuộn ngang trong khung) trong lúc tải JS rồi mới đổi sang thẻ xếp dọc. Cách sửa: `ImportReviewTable` vẽ khung chờ cho tới khi hiệu ứng layout đo xong độ rộng (giữ bảng khi đo được 0, như jsdom).
+
+**Why:** Trang nhảy layout một lần lúc mở trên điện thoại. Không tràn trang (đã sửa ở QA bước 15b) và không sai dữ liệu; đây là đánh đổi của quy tắc chỉ một cách hiển thị trong DOM.
+
+**Context:** Review /ship bước 15b, chuyên gia hiệu năng (vòng 2); `src/features/imports/components/import-review-table.tsx` (`useReviewLayout`). Quyết định của anh 2026-10-21: để TODOS.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Không
+
+### Tạo lô ghi danh mất kết nối có thể để lại lô không mở được
+
+**What:** Khi câu trả lời của "Tạo lô" ghi danh bị mất nhưng máy chủ đã tạo lô, file đó không tạo được lô thứ hai (SHA-256 là duy nhất, `STUDENT_ENROLLMENT_IMPORT_SHA_ALREADY_EXISTS`) và màn ghi danh không có cách mở lô đã tạo (không có trang lô, không có mã lô). Cần một hàm đọc lô theo SHA-256 (hoặc trang lô ghi danh, xem mục "Trang lô cho nhập học sinh và nhập ghi danh") để màn hình đưa người dùng tới lô đó.
+
+**Why:** Bước 15b chỉ sửa được câu chữ (bấm "Tạo lô" lại để máy chủ báo file đã có lô); lô `ready_to_commit` đó vẫn không xác nhận được từ giao diện.
+
+**Context:** `src/features/imports/enrollments/actions.ts` (khóa phạm vi ở 15b), `supabase/migrations/20260809023000_student_enrollment_import_foundation.sql` (khoảng dòng 560–566). Review /ship bước 15b (red team vòng 2), quyết định D5 của anh.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Quyết định của anh (thêm hàm máy chủ)
+
+### Bấm xác nhận nhập học sinh lại trong lúc lần trước còn chạy báo sai
+
+**What:** Nếu lần xác nhận nhập học sinh trước vẫn đang chạy (ví dụ máy chủ quá thời gian) mà người dùng bấm lại, cả hai cùng qua bước kiểm tra trùng và lần sau vấp chỉ mục duy nhất `student_import_batches_source_sha256_uidx`; server action không dịch lỗi này nên trả "Không thể xử lý import học viên. Dữ liệu chưa được thay đổi.", câu này sai khi lần trước đã ghi. Cần dịch lỗi chỉ mục đó thành "File này đã được nhập" như mã `STUDENT_IMPORT_FILE_ALREADY_COMMITTED`.
+
+**Why:** Câu chữ "Bấm xác nhận lại" của bước 15b dựa vào việc máy chủ báo đúng khi file đã được nhập.
+
+**Context:** `src/features/imports/students/actions.ts` (khoảng dòng 171–202, khóa phạm vi ở 15b), `supabase/migrations/20260801021000…` (dòng 93). Review /ship bước 15b (red team vòng 2).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Quyết định của anh (sửa server action)
 
 ### Dọn nhỏ sau bước 15b
 
