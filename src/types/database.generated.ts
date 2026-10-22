@@ -10387,7 +10387,10 @@ export type Database = {
           unit_price_vnd: number
         }[]
       }
-      get_session_comment_message: { Args: { p_result_id: string }; Returns: string }
+      get_session_comment_message: {
+        Args: { p_result_id: string }
+        Returns: string
+      }
       get_session_grading_submissions: {
         Args: { p_class_session_id: string }
         Returns: {
