@@ -156,6 +156,24 @@ do $$declare d jsonb;begin
 end;$$;
 rollback;
 
+-- Students list in roll order: given name (last word) first, then the full name, Vietnamese collation.
+begin;
+insert into public.students(full_name,public_code) values
+ ('Trần Văn Bình','CARE-ORD-1'),('Nguyễn Thị An','CARE-ORD-2'),('Đỗ Minh An','CARE-ORD-3'),('Lê Ngọc Ân','CARE-ORD-4'),('Phạm Văn Ánh','CARE-ORD-5');
+do $$declare d jsonb;begin
+ d:=public.get_student_care_students('CARE-ORD',1,false);
+ assert (select string_agg(r->>'full_name',',' order by o) from jsonb_array_elements(d->'rows') with ordinality x(r,o))='Đỗ Minh An,Nguyễn Thị An,Phạm Văn Ánh,Lê Ngọc Ân,Trần Văn Bình','students sorted by given name';
+end;$$;
+rollback;
+
+-- The coaching dialog's student options reach every student, past the old 500-row ceiling.
+begin;
+insert into public.students(full_name,public_code) select 'Coaching student '||n,'COACH-'||n from generate_series(1,505) n;
+do $$begin
+ assert (select count(*) from public.get_coaching_student_options(10000))=(select count(*) from public.students),'coaching options list every student';
+end;$$;
+rollback;
+
 -- All classes are aggregated, CP/KP combine, and unrecorded attendance breaks a streak.
 begin;
 insert into public.classes(id,name) values('33333333-3333-4333-8333-333333333334','Class B');

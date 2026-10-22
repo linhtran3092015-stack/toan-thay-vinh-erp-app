@@ -2,6 +2,24 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.33.0.0] - 2026-10-22
+
+Danh sách học sinh xếp theo tên (chữ cuối của họ tên), danh sách tổng xếp theo khối từ lớp 12 xuống, và các ô chọn học sinh không còn bỏ sót em nào.
+
+### Changed
+- **Danh sách học sinh** (`/students`): xếp theo khối từ lớp 12 xuống, trong mỗi khối xếp theo tên (chữ cuối của họ tên) theo bảng chữ tiếng Việt (An, Anh, Ánh, Ăn, Ân… D trước Đ); trùng tên thì xét tiếp họ và tên đệm. Vì thứ tự đổi, link `/students?page=N` đã lưu sẽ mở ra trang khác.
+- **Xếp theo tên ở các danh sách học sinh khác:**
+  - Trang lớp: tab Học sinh, Kết quả, Học phí, cảnh báo vắng liên tiếp, ô thêm học sinh vào lớp.
+  - Buổi học: điểm danh, kết quả, ô chọn học sinh học thêm.
+  - Học phí: bảng kiểm tra trước khi chốt kỳ và 2 file Excel xuất từ bảng đó, bảng kỳ đã chốt. In phiếu học phí hàng loạt vẫn theo khối tăng dần, sau đó theo tên.
+  - Tài chính: ô chọn học sinh khi tạo yêu cầu thanh toán, kết quả tìm học sinh khi phân bổ SePay thủ công.
+  - Coaching: ô chọn học sinh khi tạo, bộ lọc học viên trong danh sách phản hồi.
+  - Kết quả học tập: các buổi vẫn mới nhất trước, học sinh trong mỗi buổi xếp theo tên.
+  - Chăm sóc học viên: "Phân công lâu dài" và "Theo dõi riêng" (xếp ngay trong cơ sở dữ liệu nên đúng thứ tự qua mọi trang 50 em).
+
+### Fixed
+- **Ô chọn học sinh bị thiếu em:** ô học thêm trong buổi học, ô chọn học sinh khi tạo yêu cầu thanh toán và khi tạo coaching chỉ tải tối đa 500 em, lấy theo họ, nên các em có họ đứng sau trong bảng chữ cái (Trần, Võ, Vũ…) không chọn được. Giờ các ô này tải đủ mọi học sinh.
+
 ## [0.32.1.1] - 2026-10-21
 
 ### Changed

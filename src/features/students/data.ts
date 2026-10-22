@@ -23,6 +23,8 @@ import {
   type StudentDirectoryMetrics,
 } from "@/features/students/student-directory-metrics";
 import { addDays, getVietnamToday } from "@/lib/datetime";
+import { compareStudentsByGradeThenName } from "@/lib/student-order";
+import { fetchAllPages, type PageResult } from "@/lib/supabase/fetch-all-pages";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.generated";
 import type { StudentLifecycleStatus } from "@/types/domain";
@@ -48,13 +50,6 @@ interface StudentReadOptions {
   includeClasses: boolean;
   includeGuardians: boolean;
 }
-
-interface PageResult<T> {
-  data: T[] | null;
-  error: unknown;
-}
-
-const PAGE_SIZE = 500;
 
 const lifecycleStatuses: readonly StudentLifecycleStatus[] = [
   "active",
@@ -95,42 +90,6 @@ function createDataError(
     code,
     message: messages[code],
   };
-}
-
-async function fetchAllPages<T>(
-  fetchPage: (
-    from: number,
-    to: number,
-  ) => PromiseLike<PageResult<T>>,
-): Promise<PageResult<T>> {
-  const rows: T[] = [];
-  let from = 0;
-
-  while (true) {
-    const result = await fetchPage(
-      from,
-      from + PAGE_SIZE - 1,
-    );
-
-    if (result.error) {
-      return {
-        data: null,
-        error: result.error,
-      };
-    }
-
-    const pageRows = result.data ?? [];
-    rows.push(...pageRows);
-
-    if (pageRows.length < PAGE_SIZE) {
-      return {
-        data: rows,
-        error: null,
-      };
-    }
-
-    from += PAGE_SIZE;
-  }
 }
 
 function normalizeLifecycleStatus(
@@ -464,7 +423,7 @@ export async function getStudentDirectory(
 
   return {
     ok: true,
-    students,
+    students: students.sort(compareStudentsByGradeThenName),
   };
 }
 

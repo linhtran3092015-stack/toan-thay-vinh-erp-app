@@ -7,6 +7,7 @@ import {
   type LearningResultDirectoryItem,
   type LearningResultsDirectoryResult,
 } from "@/features/learning-results/read-models";
+import { compareStudentNames } from "@/lib/student-order";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const learningResultRowsSchema = z.array(
@@ -64,6 +65,22 @@ function mapLearningResult(
   };
 }
 
+/**
+ * The RPC returns sessions newest first; keep that session order and list each
+ * session's students by given name (the RPC sorts them by family name).
+ */
+function orderWithinSessions(rows: LearningResultDirectoryItem[]): LearningResultDirectoryItem[] {
+  const sessionRank = new Map<string, number>();
+  for (const row of rows) {
+    if (!sessionRank.has(row.classSessionId)) sessionRank.set(row.classSessionId, sessionRank.size);
+  }
+  return rows.sort(
+    (left, right) =>
+      (sessionRank.get(left.classSessionId) ?? 0) - (sessionRank.get(right.classSessionId) ?? 0) ||
+      compareStudentNames(left.studentName, right.studentName),
+  );
+}
+
 export async function getLearningResultsDirectory(): Promise<LearningResultsDirectoryResult> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -95,7 +112,7 @@ export async function getLearningResultsDirectory(): Promise<LearningResultsDire
     }
 
     return {
-      data: parsedRows.data.map(mapLearningResult),
+      data: orderWithinSessions(parsedRows.data.map(mapLearningResult)),
       ok: true,
     };
   } catch {

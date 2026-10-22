@@ -432,6 +432,46 @@ describe("TuitionReadinessTable · design 15a", () => {
     expect(downloadTuitionRateExcel).toHaveBeenLastCalledWith();
   });
 
+  // Value: protects=readiness rows (blockers first) and both pre-filled Excel files list students by the given name of their full name, not by the "Name (code)" label;
+  // fails_when=the table or an export sorts by label (family name or code first) or loses blockers-first, or an export keeps the readiness order;
+  // why_new=15a fixtures use one-word names in id order, where all orders agree; Bình now lacks a source too, so the source export's input order differs;
+  // seam=none; no_claim=jsdom render with mocked Excel helpers; does not prove the .xlsx row order the browser writes
+  it("orders rows and exports by given name, blockers first", async () => {
+    vi.mocked(downloadTuitionRateExcel).mockClear();
+    vi.mocked(downloadTuitionSourceExcel).mockClear();
+    const people = [
+      { code: "TTV-1", id: "an", name: "Trần Minh An" },
+      { code: "TTV-2", id: "yen", name: "Bùi Thị Yến" },
+      { code: "TTV-3", id: "binh", name: "Lê Văn Bình" },
+      { code: "TTV-4", id: "anh", name: "Phạm Ngọc Anh" },
+    ];
+    const priceless = { unitPriceVnd: null };
+    const students = buildReadinessStudents([
+      row("an", { ...priceless, acquisitionSourceId: null }),
+      row("yen", { ...priceless, acquisitionSourceId: null }),
+      // Input (readiness) order An, Yến, Bình differs from the roll order An, Bình, Yến.
+      row("binh", { ...priceless, acquisitionSourceId: null }),
+      row("anh"),
+    ]);
+    renderTable({
+      labels: Object.fromEntries(people.map((person) => [person.id, `${person.name} (${person.code})`])),
+      studentDetails: Object.fromEntries(people.map((person) => [person.id, { fullName: person.name, id: person.id, publicCode: person.code }])),
+      students,
+    });
+    const shownLabels = () => within(table()).getAllByRole("row").slice(1).map((item) => within(item).getByText(/\(TTV-\d\)$/).textContent);
+
+    expect(shownLabels()).toEqual(["Trần Minh An (TTV-1)", "Lê Văn Bình (TTV-3)", "Bùi Thị Yến (TTV-2)"]);
+    fireEvent.click(screen.getByRole("button", { name: /^Tất cả\s*4$/ }));
+    expect(shownLabels()).toEqual(["Trần Minh An (TTV-1)", "Lê Văn Bình (TTV-3)", "Bùi Thị Yến (TTV-2)", "Phạm Ngọc Anh (TTV-4)"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Xuất 3 học viên thiếu giá (.xlsx)" }));
+    expect(vi.mocked(downloadTuitionRateExcel).mock.calls[0]?.[0]?.map((entry) => entry.fullName)).toEqual(["Trần Minh An", "Lê Văn Bình", "Bùi Thị Yến"]);
+    await waitFor(() => expect(screen.getByRole("button", { name: "File mẫu nguồn (.xlsx)" })).toBeEnabled());
+
+    fireEvent.click(screen.getByRole("button", { name: "File mẫu nguồn (.xlsx)" }));
+    expect(vi.mocked(downloadTuitionSourceExcel).mock.calls[0]?.[1]?.map((entry) => entry.fullName)).toEqual(["Trần Minh An", "Lê Văn Bình", "Bùi Thị Yến"]);
+  });
+
   // Value: protects=below 960px the students render as cards in table order with profile/edit link, class·sessions·balance, rates/payable and the shared selection;
   // fails_when=a card checkbox keeps its own selection or shows with nothing to fix, the guardian-only card links to the profile, or the balance/upper bound drops;
   // why_new=step 13 added the ResponsiveRecordList cards; existing tests only read the table;

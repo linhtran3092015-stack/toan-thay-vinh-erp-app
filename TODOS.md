@@ -128,10 +128,10 @@
 
 **Why:** Nếu có dòng được thêm hoặc xoá giữa hai trang thì offset có thể bỏ sót hoặc lặp dòng; số liệu đã khử trùng theo id nhưng vẫn có thể thiếu.
 
-**Context:** `src/features/students/data.ts`. Hoãn ở review vòng 1.
+**Context:** `src/features/students/data.ts`. Hoãn ở review vòng 1. Review v0.33.0.0: một số truy vấn đọc theo trang còn không có `ORDER BY` (trong `students/data.ts`: `student_enrollments`, `classes`, `student_guardians`, `guardians`; trong `classes/data.ts`: enrollments), lịch lớp chỉ sắp theo `weekday, start_time`. Với 734 học sinh các bảng phụ huynh và ghi danh đã quá một trang 500 dòng, nên có thể lặp hoặc thiếu dòng giữa hai trang. Từ v0.33.0.0 các loader này dùng chung `fetchAllPages` (`src/lib/supabase/fetch-all-pages.ts`), hàm yêu cầu thứ tự kết thúc bằng cột duy nhất. Bước nhanh: thêm `.order("id")` vào từng truy vấn; sau đó khử trùng theo id hoặc chuyển sang keyset.
 
 **Effort:** M
-**Priority:** P3
+**Priority:** P2
 **Depends on:** None
 
 ## Buổi học
@@ -242,6 +242,18 @@
 
 **Effort:** S
 **Priority:** P3
+**Depends on:** None
+
+### Ô "học thêm" báo khi chỉ đang hiện 100 em
+
+**What:** Trong `session-attendance-management.tsx` (khoảng dòng 856), ô chọn học sinh học thêm chỉ hiện `.slice(0, 100)`; thêm dòng "Đang hiện 100/N học viên khớp, gõ tên hoặc mã để thu hẹp" như `SearchHint` của hộp thoại thêm học sinh vào lớp, và câu báo khi tìm không ra ai.
+
+**Why:** Từ v0.33.0.0 ô này tải đủ ~567 học sinh đang học và xếp theo tên, nên khi chưa gõ gì chỉ thấy các tên A đến khoảng D; trợ giảng dễ tưởng các em khác không có.
+
+**Context:** Giới hạn 100 có từ trước; loader `getAdditionalStudyCandidates` giờ đọc đủ qua `fetchAllPages`. Nhãn đang bắt đầu bằng mã ("TTV-… – Tên · Khối"), cân nhắc đưa tên lên trước.
+
+**Effort:** S
+**Priority:** P2
 **Depends on:** None
 
 ## Lớp học
@@ -486,6 +498,18 @@
 **Priority:** P3
 **Depends on:** None
 
+### Ô thêm học sinh vào lớp cắt theo họ khi quá giới hạn
+
+**What:** `queryEnrollmentCandidates` (`class-detail-data.ts`) lấy tối đa 500 em (50 khi tìm) theo `full_name` rồi mới xếp theo tên. Xếp theo tên ngay trong truy vấn (RPC hoặc cột khóa tên) trước khi cắt, và xếp lại một lần cả danh sách gộp trong `class-enroll-dialog.tsx`.
+
+**Why:** Khi bị cắt, hộp thoại hiện các em có họ đứng đầu bảng chữ cái nhưng trông như danh sách A–Z theo tên; kết quả tìm từ server nối sau kết quả tại chỗ thành hai đoạn xếp riêng.
+
+**Context:** Hộp thoại đã có cờ `truncated` và gợi ý gõ để tìm; số học sinh chưa từng ghi danh hiện nhỏ hơn 500 nên chưa xảy ra.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
 ## Giao diện
 
 ### Nút cỡ md 40px trên điện thoại
@@ -572,6 +596,18 @@
 **Priority:** P3
 **Depends on:** None
 
+### Ô chọn học sinh có ô tìm khi tạo yêu cầu thanh toán và tạo coaching
+
+**What:** `payment-request-create-form.tsx` (khoảng dòng 65) và `create-coaching-dialog.tsx` (khoảng dòng 167) là `<select>` thường, giờ chứa ~570–720 em. Thêm ô lọc theo tên, mã, SĐT phụ huynh (hoặc combobox), và với coaching đưa tên lên trước mã ("Nguyễn Văn An (HS0452)").
+
+**Why:** Danh sách đã xếp theo tên nhưng nhãn coaching bắt đầu bằng mã nên không nhìn ra thứ tự; gõ phím tắt nhảy theo mã chứ không theo tên; trên điện thoại là một bánh xe rất dài.
+
+**Context:** Từ v0.33.0.0 hai ô này tải đủ mọi học sinh (trước đây cắt 500 em theo họ). Ô học thêm trong buổi học đã có ô tìm, có thể dùng lại cách làm đó.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
 ## Dữ liệu và quyền
 
 ### Thu hẹp RLS cho mức học phí và nguồn tuyển sinh
@@ -634,6 +670,30 @@
 **Priority:** P2
 **Depends on:** None
 
+### Thống nhất quy tắc xếp tên giữa app (JS) và SQL
+
+**What:** `src/lib/student-order.ts` dùng `Intl.Collator("vi", { numeric: true })` và `trim()` (bỏ mọi khoảng trắng); SQL trong `get_student_care_students` dùng `collate "vi-x-icu"` (không numeric) và `btrim()` (chỉ bỏ dấu cách). Bỏ `numeric: true` hoặc tạo collation ICU có `kn`, và chuẩn hóa khoảng trắng trong SQL; thêm một bộ tên mẫu dùng chung cho test JS và test SQL.
+
+**Why:** Tên có số ("HS 2" và "HS 10") xếp khác nhau giữa trang Chăm sóc và các danh sách khác; tên kết thúc bằng khoảng trắng lạ (tab, NBSP) có khóa tên rỗng trong SQL nên đứng đầu.
+
+**Context:** Khóa SQL đã kiểm tra trên PG17 Supabase: NBSP giữa các chữ cho kết quả giống JS; chỉ khác ở số và khoảng trắng lạ ở cuối. Rất hiếm với dữ liệu thật.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### `fetchAllPages` đọc 1000 dòng mỗi trang
+
+**What:** `FETCH_PAGE_SIZE` trong `src/lib/supabase/fetch-all-pages.ts` là 500 nên ô chọn ~570–720 em cần 2 lượt đọc nối tiếp. Cân nhắc 1000 (bằng `max_rows` của PostgREST) sau khi xác nhận `max_rows` trên production.
+
+**Why:** Bớt một lượt gọi mạng cho trang buổi học, tạo yêu cầu thanh toán và coaching.
+
+**Context:** Giữ 500 vì điều kiện dừng là "trang ngắn hơn kích thước trang": nếu `max_rows` trên production nhỏ hơn kích thước trang thì sẽ âm thầm thiếu dòng. Kiểm tra `max_rows` trước khi tăng.
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** None
+
 ## Dọn code
 
 ### Gói rút gọn code sau redesign
@@ -684,6 +744,42 @@
 **Priority:** P2
 **Depends on:** None
 
+### Phần chấm bài dùng hàm xếp tên chung
+
+**What:** `grading-submissions/roster.ts` (`lastNameWord`) và `grading-submissions/review.ts` (`givenName`, collator `sensitivity: "base"`) tự xếp theo tên; chuyển sang `givenNameOf` / `compareStudentNames` trong `src/lib/student-order.ts`, giữ các tiêu chí phụ (năm sinh, có buổi, mã).
+
+**Why:** Danh sách gợi ý ghép bài bỏ qua dấu thanh nên "Anh" và "Ánh" có thể đứng khác thứ tự so với các danh sách khác.
+
+**Context:** Hàm chung có từ v0.33.0.0; phần chấm bài vừa ship ở v0.30–0.32 nên tách PR riêng.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Preview `/dev/class` và `/dev/lists` theo đúng thứ tự trang thật
+
+**What:** `src/app/dev/class/class-preview.tsx` (khoảng dòng 232) vẫn sort `fullName.localeCompare(..., "vi")`; đổi sang `compareStudentNames`. `/dev/lists` view students dùng mảng fixture tự xếp; áp `compareStudentsByGradeThenName`.
+
+**Why:** Preview là nơi review giao diện trên dữ liệu mẫu; hiện nó hiện thứ tự theo họ, khác trang thật từ v0.33.0.0.
+
+**Context:** Chỉ ảnh hưởng trang dev, không ảnh hưởng production.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Viết gọn `orderWithinSessions` bằng `Map.groupBy`
+
+**What:** `src/features/learning-results/data.ts` tự dựng Map thứ hạng buổi và comparator hai khóa; có thể viết `[...Map.groupBy(rows, (r) => r.classSessionId).values()].flatMap((g) => sortByStudentName(g, (r) => r.studentName))`.
+
+**Why:** Ngắn hơn và không sort tại chỗ mảng đầu vào.
+
+**Context:** Hành vi giữ nguyên (Map giữ thứ tự buổi xuất hiện đầu tiên); có test `learning-results-directory-order.test.ts`.
+
+**Effort:** S
+**Priority:** P4
+**Depends on:** None
+
 ## Tài chính · SePay
 
 ### Xác nhận hàng loạt gợi ý trên tab Cần xử lý
@@ -719,6 +815,18 @@
 **Context:** Thiết kế `07-tai-chinh.dc.html` khung 7c.
 
 **Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Tìm học sinh khi phân bổ SePay cắt 30 kết quả theo họ
+
+**What:** RPC `search_sepay_allocation_students` lấy `order by s.full_name, s.id limit 30` rồi app mới xếp 30 em đó theo tên. Cho RPC xếp theo tên (cùng biểu thức với `get_student_care_students`) trước khi `limit 30`, hoặc trả cờ "còn nữa" để UI nhắc gõ thêm.
+
+**Why:** Khi tìm một từ rộng (ví dụ "an"), danh sách trông như đủ A–Z nhưng thiếu các em có họ đứng sau em thứ 30.
+
+**Context:** Thứ tự theo tên trong app có từ v0.33.0.0 (`manual-allocation-actions.ts`). Cần migration mới; giữ nguyên chữ ký hàm.
+
+**Effort:** S
 **Priority:** P3
 **Depends on:** None
 
@@ -782,6 +890,18 @@
 
 **Effort:** S
 **Priority:** P4
+**Depends on:** None
+
+### Bảng kiểm tra kỳ thu xếp lại toàn bộ mỗi lần gõ ô tìm
+
+**What:** Trong `tuition-readiness-table.tsx`, memo `visible` phụ thuộc `normalizedQuery` nên mỗi phím lại sort cả danh sách bằng `compareStudentNames` (~12–16 ms với ~570 em). Sort một lần (blocker trước, rồi theo tên) trong memo riêng theo `[students, labels, studentDetails]`, memo `visible` chỉ lọc.
+
+**Why:** Gõ nhanh ô tìm trên kỳ thu lớn hơi khựng; file đã tránh tính lại nhãn "không phải mỗi phím" nhưng sort thì chưa.
+
+**Context:** Thứ tự theo tên có từ v0.33.0.0. Lọc giữ nguyên thứ tự nên tách sort ra không đổi kết quả.
+
+**Effort:** S
+**Priority:** P3
 **Depends on:** None
 
 ## Trang chủ

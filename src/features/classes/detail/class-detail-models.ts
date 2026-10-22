@@ -1,6 +1,7 @@
 import { isSessionAttendanceStatus } from "@/features/sessions/detail-read-models";
 import type { ClassDetailWorkspace } from "@/features/classes/detail/class-detail-data";
 import type { SessionKind, SessionStatus } from "@/features/sessions/read-models";
+import { compareStudentNames } from "@/lib/student-order";
 
 /**
  * Pure models for the class detail page (design 03). The loader lives in
@@ -512,7 +513,7 @@ export function findAbsenceStreaks(
     }
   }
 
-  return streaks.sort((a, b) => b.count - a.count || a.student.fullName.localeCompare(b.student.fullName, "vi"));
+  return streaks.sort((a, b) => b.count - a.count || compareStudentNames(a.student.fullName, b.student.fullName));
 }
 
 export interface ClassDebtSummary {
