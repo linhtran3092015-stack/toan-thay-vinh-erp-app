@@ -65,6 +65,7 @@ const EVENT_PRESENTATION: Readonly<Record<string, NotificationEventPresentation>
   "crm.lead_assigned": { label: "Lead mới được giao", tone: "info" },
   "ops.ai_grading_daily_budget": { label: "Cảnh báo vận hành", tone: "danger" },
   "ops.ai_grading_failure_rate": { label: "Cảnh báo vận hành", tone: "danger" },
+  "ops.ai_grading_kick_failed": { label: "Cảnh báo vận hành", tone: "danger" },
   "ops.ai_grading_paused": { label: "Cảnh báo vận hành", tone: "danger" },
   "ops.ai_grading_queue_stalled": { label: "Cảnh báo vận hành", tone: "danger" },
   "ops.ai_grading_review_due": { label: "Bài chấm AI chờ duyệt", tone: "warning" },

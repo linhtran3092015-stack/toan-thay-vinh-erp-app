@@ -193,6 +193,8 @@ export type Database = {
       ai_grading_worker_state: {
         Row: {
           id: boolean
+          last_kick_at: string | null
+          last_kick_request_id: number | null
           pause_reason: string | null
           paused_at: string | null
           paused_until: string | null
@@ -200,6 +202,8 @@ export type Database = {
         }
         Insert: {
           id?: boolean
+          last_kick_at?: string | null
+          last_kick_request_id?: number | null
           pause_reason?: string | null
           paused_at?: string | null
           paused_until?: string | null
@@ -207,6 +211,8 @@ export type Database = {
         }
         Update: {
           id?: boolean
+          last_kick_at?: string | null
+          last_kick_request_id?: number | null
           pause_reason?: string | null
           paused_at?: string | null
           paused_until?: string | null
@@ -10684,6 +10690,7 @@ export type Database = {
           link_id: string
         }[]
       }
+      kick_ai_grading_worker: { Args: never; Returns: string }
       link_student_zalo_group: {
         Args: {
           p_group_name: string
