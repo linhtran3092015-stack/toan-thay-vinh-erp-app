@@ -8,6 +8,7 @@ import { SubmissionAnswer } from "@/features/grading-submissions/components/subm
 import { SubmissionReviewPanel, type ReviewContext } from "@/features/grading-submissions/components/submission-review-panel";
 import type { GradingDataResult, SessionGradingSubmission } from "@/features/grading-submissions/data";
 import { matchIssueLabel } from "@/features/grading-submissions/matching";
+import { keyWarningLine } from "@/features/session-tests/components/key-warnings";
 import type { SessionParticipantReadModel } from "@/features/sessions/detail-read-models";
 import { getParticipantDisplayName } from "@/features/sessions/lock-readiness";
 import { formatDateTime } from "@/lib/datetime";
@@ -98,6 +99,7 @@ export function SessionSubmissionsCard({
                   !(submission.review.result && !submission.review.result.fromThisSubmission && submission.review.result.testScore !== null),
               ).length
             }
+            keyWarning={review.keyWarnings && review.keyWarnings.length > 0 ? review.keyWarnings.map(keyWarningLine).join(" ") : null}
             sessionId={review.sessionId}
           />
         ) : null}
@@ -120,6 +122,9 @@ export function SessionSubmissionsCard({
                     {canViewStudents ? <span className="text-caption text-text-muted">{submission.studentCode}</span> : null}
                     <span className="text-caption text-text-muted">· nộp {formatDateTime(submission.submittedAt)}</span>
                     {submission.attemptNo && submission.attemptNo > 1 ? <Badge tone="info">Lần nộp {submission.attemptNo}</Badge> : null}
+                    {submission.review?.priorApproval && submission.review.status === "pending" ? (
+                      <Badge tone="warning">Nộp lại sau khi đã duyệt</Badge>
+                    ) : null}
                     {attendance === null ? <Badge tone="warning">Chưa điểm danh</Badge> : null}
                     {attendance !== null && !PRESENT.has(attendance) ? <Badge tone="warning">Vắng nhưng có bài</Badge> : null}
                     {submission.issues.map((issue) => (

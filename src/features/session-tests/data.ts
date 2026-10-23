@@ -43,6 +43,19 @@ const testSchema = z.object({
     })
     .nullable(),
   id: z.string().uuid(),
+  key_warnings: z
+    .array(
+      z.object({
+        common_answer: z.string().nullable().catch(null),
+        common_answer_count: z.number().int().nullable().catch(null),
+        key_answer: z.string().nullable().catch(null),
+        label: z.string(),
+        papers: z.number().int(),
+        wrong: z.number().int(),
+      }),
+    )
+    .optional()
+    .catch([]),
   marking_guide: z.string().nullable(),
   source: z
     .object({
@@ -123,6 +136,14 @@ async function loadTest(supabase: ServerClient, sessionId: string): Promise<Grad
           }
         : null,
       id: row.id,
+      keyWarnings: (row.key_warnings ?? []).map((warning) => ({
+        commonAnswer: warning.common_answer,
+        commonAnswerCount: warning.common_answer_count,
+        keyAnswer: warning.key_answer,
+        label: warning.label,
+        papers: warning.papers,
+        wrong: warning.wrong,
+      })),
       markingGuide: row.marking_guide,
       source: row.source
         ? {

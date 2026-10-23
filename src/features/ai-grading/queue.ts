@@ -18,11 +18,15 @@ export interface AiGradingQueueSession {
   id: string;
   lockedAt: string | null;
   redPending: number;
+  /** Papers handed in again after an earlier attempt was approved, still to review. */
+  resubmittedPending: number;
   sessionDate: string;
   sessionStatus: string;
   skipped: number;
   startTime: string;
   submissions: number;
+  /** Questions over 70% of the graded papers got wrong (the key may be off). */
+  suspectQuestions: number;
   testStatus: "none" | "draft" | "key_review" | "key_confirmed";
   waitingKey: number;
   yellowPending: number;
@@ -53,11 +57,13 @@ export const queueRowSchema = z
     green_pending: count,
     locked_at: z.string().nullable().catch(null),
     red_pending: count,
+    resubmitted_pending: count,
     session_date: z.string(),
     session_status: z.string(),
     skipped: count,
     start_time: z.string(),
     submissions: count,
+    suspect_questions: count,
     test_status: z.enum(["none", "draft", "key_review", "key_confirmed"]).catch("none"),
     waiting_key: count,
     yellow_pending: count,
@@ -75,11 +81,13 @@ export const queueRowSchema = z
       id: row.class_session_id,
       lockedAt: row.locked_at,
       redPending: row.red_pending,
+      resubmittedPending: row.resubmitted_pending,
       sessionDate: row.session_date,
       sessionStatus: row.session_status,
       skipped: row.skipped,
       startTime: row.start_time,
       submissions: row.submissions,
+      suspectQuestions: row.suspect_questions,
       testStatus: row.test_status,
       waitingKey: row.waiting_key,
       yellowPending: row.yellow_pending,

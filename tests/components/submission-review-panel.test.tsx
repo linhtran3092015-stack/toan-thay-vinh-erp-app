@@ -1,4 +1,4 @@
-// Value: protects=the TA's approval step on the session page: the panel starts from the AI verdicts, previews score/bonus/rank like the database, regenerates the draft comment when a verdict or the bonus changes (until the TA types their own), sends exactly what is shown, asks for a reason before replacing a hand-typed score, blocks approval for an absent student, saves the bonus tick before approval, and skips only with a reason;
+// Value: protects=the TA's approval step on the session page: the panel starts from the AI verdicts, previews score/bonus/rank like the database, regenerates the draft comment when a verdict or the bonus changes (until the TA types their own), sends exactly what is shown, asks for a reason before replacing a hand-typed score or the score of an approved earlier attempt, blocks approval for an absent student, saves the bonus tick before approval, and skips only with a reason;
 // fails_when=a flipped verdict is not sent, the preview disagrees with what is saved, the draft keeps a stale bonus line, a hand-typed score is overwritten without a reason, an absent student can be approved, or the bonus tick is lost before approval;
 // why_new=phase 3b review panel; seam=server actions injected, router mocked; no_claim=the SQL approval (pgTAP ai-grading-review)
 import { cleanup, render, screen } from "@testing-library/react";
@@ -161,6 +161,27 @@ describe("SubmissionReviewPanel", () => {
     expect(enabled.disabled).toBe(false);
     await user.click(enabled);
     expect(bundle.approve).toHaveBeenCalledWith(expect.objectContaining({ feedbackText: "Con cố gắng hơn nhé.", reason: "Chấm theo đáp án" }));
+  });
+
+  it("names the approved earlier attempt when the student handed in again, and needs a reason to replace its score", async () => {
+    const user = userEvent.setup();
+    const bundle = actions();
+    render(
+      <SubmissionReviewPanel
+        context={context(bundle)}
+        submission={submission({
+          priorApproval: { approvedAt: "2026-10-21T12:30:00Z", attemptNo: 1, resultFromIt: true },
+          result: { comment: "Nhận xét lần 1", fromThisSubmission: false, id: "r1", testScore: 8 },
+        })}
+      />,
+    );
+    expect(screen.getByText("Đang ghi 8 điểm của lần nộp 1 đã duyệt")).toBeTruthy();
+    expect(screen.queryByText(/nhập tay/)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Xem và duyệt" }));
+    expect((screen.getByRole("button", { name: "Duyệt và ghi điểm" }) as HTMLButtonElement).disabled).toBe(true);
+    await user.type(screen.getByLabelText("Lý do thay điểm 8 của lần nộp 1 đã duyệt"), "Em nộp lại bài đúng hơn");
+    await user.click(screen.getByRole("button", { name: "Duyệt và ghi điểm" }));
+    expect(bundle.approve).toHaveBeenCalledWith(expect.objectContaining({ reason: "Em nộp lại bài đúng hơn" }));
   });
 
   it("blocks approval for a student not marked present", async () => {
