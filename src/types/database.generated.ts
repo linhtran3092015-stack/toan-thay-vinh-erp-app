@@ -4868,6 +4868,60 @@ export type Database = {
           },
         ]
       }
+      session_test_lesson_pages: {
+        Row: {
+          created_at: string
+          height: number
+          id: string
+          mime_type: string
+          page_no: number
+          sha256: string
+          storage_path: string
+          test_id: string
+          uploaded_by: string | null
+          width: number
+        }
+        Insert: {
+          created_at?: string
+          height: number
+          id?: string
+          mime_type: string
+          page_no: number
+          sha256: string
+          storage_path: string
+          test_id: string
+          uploaded_by?: string | null
+          width: number
+        }
+        Update: {
+          created_at?: string
+          height?: number
+          id?: string
+          mime_type?: string
+          page_no?: number
+          sha256?: string
+          storage_path?: string
+          test_id?: string
+          uploaded_by?: string | null
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_test_lesson_pages_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "session_tests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_test_lesson_pages_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_tests: {
         Row: {
           answer_key: Json
@@ -7741,6 +7795,15 @@ export type Database = {
           storage_path: string
         }[]
       }
+      add_session_test_lesson_pages: {
+        Args: { p_pages: Json; p_test_id: string }
+        Returns: {
+          added: boolean
+          page_id: string
+          page_no: number
+          storage_path: string
+        }[]
+      }
       admin_adjust_time_entry: {
         Args: {
           p_check_in_at: string
@@ -8601,6 +8664,10 @@ export type Database = {
           copied_pages: number
           test_id: string
         }[]
+      }
+      copy_session_test_lesson_pages: {
+        Args: { p_source_test_id: string; p_test_id: string }
+        Returns: number
       }
       correct_student_acquisition_source: {
         Args: {
@@ -10799,6 +10866,18 @@ export type Database = {
           submitted_at: string
         }[]
       }
+      list_session_lesson_sources: {
+        Args: { p_class_session_id: string }
+        Returns: {
+          class_code: string
+          class_name: string
+          class_session_id: string
+          page_count: number
+          session_date: string
+          start_time: string
+          test_id: string
+        }[]
+      }
       list_session_test_sources: {
         Args: { p_class_session_id: string }
         Returns: {
@@ -11564,6 +11643,13 @@ export type Database = {
       }
       remove_session_test_asset: {
         Args: { p_asset_id: string }
+        Returns: {
+          still_referenced: boolean
+          storage_path: string
+        }[]
+      }
+      remove_session_test_lesson_page: {
+        Args: { p_page_id: string }
         Returns: {
           still_referenced: boolean
           storage_path: string
