@@ -2,6 +2,23 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.34.0.0] - 2026-10-23
+
+Bốn việc rút ra sau hai ngày chấm bài AI thật (193 bài): báo khi đáp án có thể chốt nhầm, thống kê trợ giảng sửa kết quả AI, đánh dấu bài nộp lại sau khi đã duyệt, và hướng dẫn cách gõ toán trên form.
+
+### Added
+- **Cảnh báo "Kiểm tra lại đáp án"** cạnh đáp án đã chốt khi một câu có hơn 70% bài sai (tính trên ít nhất 5 bài; bài đã duyệt lấy kết quả trợ giảng, bài nộp trống không tính). Cảnh báo ghi số bài sai và câu trả lời sai nhiều em ghi giống nhau, ví dụ "Câu 15: 9/11 bài sai (82%); 6 em cùng ghi “41”, đáp án đang chốt “42”", vì nhiều em cùng ra một số khác đáp án thường là đáp án chốt nhầm. Sửa đáp án thì AI chấm lại các bài chưa duyệt.
+- **"Duyệt N bài xanh" hỏi lại** khi buổi đang có cảnh báo đáp án: hiện lý do, trợ giảng chọn "Vẫn duyệt" hoặc "Để kiểm tra đáp án".
+- **Trang Chấm bài AI** đánh dấu buổi có câu hơn 70% bài sai và buổi có bài nộp lại sau khi đã duyệt còn chờ.
+- **Cài đặt → Chấm bài AI → "Duyệt bài 30 ngày"** (người có quyền xem cài đặt): theo từng người duyệt, số bài đã duyệt (xanh, vàng, đỏ), số bài và số câu đổi đúng/sai so với AI, số bài xanh vẫn phải sửa, bài nộp trống chấm tay, số em được cộng điểm, kèm dòng tổng. Đổi "thiếu" thành "sai" (cùng 0 điểm) không tính là sửa.
+- **Bài nộp lại sau khi đã duyệt** có nhãn "Nộp lại sau khi đã duyệt". Khung duyệt ghi rõ "Đang ghi X điểm của lần nộp N đã duyệt" thay cho "Đã có điểm nhập tay", và hỏi lý do trước khi thay điểm đó. Điểm trong kết quả buổi giữ nguyên tới khi duyệt bài mới; bài này không nằm trong "Duyệt N bài xanh".
+- **Thông báo "Nộp lại bài đã duyệt"** gửi người đã duyệt bài trước, một lần cho mỗi bài nộp mới, khi buổi chưa khóa. Thông báo ghi buổi, không ghi tên học sinh.
+- **Form nộp bài** (`integrations/apps-script/grading-form/FormHocSinh.html`): dưới ô bài làm có hướng dẫn ghi số câu ở đầu mỗi dòng và cách gõ ký hiệu toán (`x^2` thay cho `x2`, `3/4`, `sqrt(16)`, `>=`). Owner dán lại file này vào Apps Script rồi Deploy bản mới (README có hướng dẫn).
+
+### For contributors
+- Migration `20261023090000_ai_grading_insights.sql`: `session_test_key_warnings(test_id)` (nội bộ), `get_session_test` thêm `key_warnings`, `get_session_grading_submissions` thêm `prior_approved_attempt_no` / `prior_approved_at` / `result_from_prior_approval`, `list_ai_grading_sessions` thêm `suspect_questions` / `resubmitted_pending`, RPC mới `get_ai_grading_review_stats(p_days)` (cần `settings.view`), trigger `grading_submissions_notify_resubmission` gửi `ai_grading.resubmitted_after_review`.
+- pgTAP `ai-grading-insights` (30 kiểm tra); vitest `ai-grading-insights` và thêm một ca trong `submission-review-panel`.
+
 ## [0.33.0.1] - 2026-10-23
 
 Ba chỗ làm trợ giảng bối rối khi dạy một buổi: hộp nhập kết quả nói sai điều kiện khóa buổi, nhắc duyệt bài chấm AI hiện "Sự kiện chưa hỗ trợ", và trợ giảng không thấy mục Chấm công trong menu.
