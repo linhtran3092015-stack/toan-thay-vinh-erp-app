@@ -20,8 +20,9 @@ function authorized(header: string | null, secret: string): boolean {
 }
 
 /**
- * Safety net for the AI grading queue (plan §4.6): the GitHub Actions schedule calls this every
- * 5 minutes with "Authorization: Bearer <CRON_SECRET>" in case no after() batch picked a run up.
+ * Safety net for the AI grading queue (plan §4.6): the database job ai-grading-worker-kick (pg_cron
+ * + pg_net, every 5 minutes while runs wait) and, as a late backup, GitHub Actions call this with
+ * "Authorization: Bearer <CRON_SECRET>" in case no after() batch picked a run up.
  */
 export async function POST(request: Request) {
   const secret = getCronSecret();

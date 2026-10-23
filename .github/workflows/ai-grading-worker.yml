@@ -1,9 +1,11 @@
 name: AI grading worker
 
-# Safety net for the AI grading queue (docs/AI_GRADING_INTEGRATION_PLAN_2026-10-16.md §4.6):
-# the ERP grades from after() as soon as work arrives; this schedule picks up anything left.
-# Needs repo secrets CRON_SECRET (same value as on Vercel) and AI_GRADING_WORKER_URL
-# (https://<production domain>/api/internal/ai-grading/worker); without them it does nothing.
+# Backup safety net for the AI grading queue (docs/AI_GRADING_INTEGRATION_PLAN_2026-10-16.md §4.6):
+# the ERP grades from after() as soon as work arrives, and the database job ai-grading-worker-kick
+# (pg_cron + pg_net, migration 20261023170000) calls the worker every 5 minutes while runs wait.
+# GitHub fires this "*/5" schedule only every few hours on this repo, so it is a late backup and a
+# manual "Run workflow" button. Needs repo secrets CRON_SECRET (same value as on Vercel) and
+# AI_GRADING_WORKER_URL (https://<production domain>/api/internal/ai-grading/worker); without them it does nothing.
 on:
   schedule:
     - cron: "*/5 * * * *"

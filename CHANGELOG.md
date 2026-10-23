@@ -2,6 +2,54 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.35.1.0] - 2026-10-23
+
+Lưới an toàn của hàng đợi chấm bài AI chạy trong cơ sở dữ liệu, 5 phút một lần. Lịch `*/5` của GitHub Actions thực tế chỉ chạy 3–5 giờ một lần.
+
+### Added
+- **Lịch `ai-grading-worker-kick`** (`pg_cron` + `pg_net`) gọi worker chấm bài AI 5 phút một lần, nhưng chỉ khi có lượt đến hạn hoặc lượt đang chạy mà tiến trình đã dừng. Lịch không gọi khi tắt chấm AI, khi hàng đợi tạm dừng, hoặc khi chưa cấu hình.
+- **URL worker và `CRON_SECRET` lưu trong Supabase Vault** (`ai_grading_worker_url`, `ai_grading_cron_secret`), không ghi trong mã nguồn. Chưa có hai secret này thì lịch không làm gì.
+- **Cảnh báo "Lịch gọi chấm bài AI bị lỗi"** (`ops.ai_grading_kick_failed`) gửi người quản lý cài đặt khi lần gọi trước bị từ chối (ví dụ khóa trên Vercel và trong Vault khác nhau), mỗi giờ một lần.
+
+### For contributors
+- Migration `20261023170000_ai_grading_worker_db_cron.sql`:
+  - bật `pg_net`;
+  - thêm `ai_grading_worker_state.last_kick_at` và `last_kick_request_id`;
+  - thêm hàm `kick_ai_grading_worker()` (chỉ cơ sở dữ liệu gọi được), trả về `disabled | paused | not_configured | idle | kicked`.
+- Workflow GitHub giữ làm dự phòng và nút chạy tay.
+- pgTAP mới: `ai-grading-db-cron` (16 kiểm tra).
+
+## [0.35.0.0] - 2026-10-23
+
+Chấm bài AI theo 4 quy tắc owner chốt ngày 23/10 (prompt `grade-v3`), và bộ đề hồi quy để đo lại mỗi khi đổi prompt hoặc model.
+
+### Changed
+- **Quy tắc chấm của AI** (prompt `grade-v3`):
+  - Câu hỏi nhiều đáp số mà học sinh chỉ ghi một phần là **sai** (ví dụ hỏi số lít của mỗi thùng, con chỉ ghi một thùng).
+  - **Đúng số nhưng sai đơn vị** (ví dụ 6,03 m² khi đáp án là 6,03 m) vẫn **đúng**; AI ghi một câu nhắc đơn vị và câu đó được đưa vào nhận xét gửi phụ huynh.
+  - **Đáp số mâu thuẫn** (hai đáp số khác nhau, chọn B nhưng ghi nội dung C): AI chấm theo kết luận cuối nhưng đánh vàng để trợ giảng quyết định.
+  - **Thiếu ngoặc** (ví dụ `2x+4√x/x-1`): AI hiểu theo ý học sinh muốn viết, vẫn đánh vàng.
+- Lượt chấm mới ghi `prompt_version = grade-v3`.
+
+### Added
+- **Bộ đề hồi quy:** chấm lại các bài trợ giảng đã duyệt bằng đúng cấu hình đang chạy, so với kết quả trợ giảng chốt. Kết quả ngày 23/10 trên 147 bài thuộc 7 đề, mỗi lần chạy khoảng 0,21 USD:
+  - `grade-v2`: khớp từng câu 95,9%; 3 bài xanh lệch trợ giảng, trong đó 2 bài lệch 2 điểm ở câu "hai đáp số chỉ ghi một".
+  - `grade-v2`, khi áp quy tắc mới vào 2 câu trợ giảng chấm dễ: khớp 97,3%; lệch ≤ 1 điểm 98,6%.
+  - `grade-v3`: khớp từng câu 98,0%; không còn bài xanh nào lệch trợ giảng.
+  - `grade-v3` còn 3 bài lệch 2 điểm, đều đã đánh vàng (gõ "y-1" thay "y=1", một bài mâu thuẫn, một bài ghi nhầm số câu). Tỉ lệ bài xanh giảm từ 67% xuống 58%, vì AI đánh vàng thêm các trường hợp mâu thuẫn và thiếu ngoặc.
+
+### For contributors
+- Bộ đề hồi quy gồm 4 lệnh `node scripts/ai-grading-regression.mjs export | estimate | submit --confirm [--max-usd 1] | collect [--run grade-v2]`:
+  - `export`: lấy bài đã duyệt từ production, chỉ đọc qua Supabase CLI đã link, không lấy tên, mã hay SĐT học sinh.
+  - `estimate`: ước tính số lượt gọi và chi phí.
+  - `submit`: gửi qua Message Batches API, dùng chính `buildGradeParams` của worker. Không chạy nếu ước tính vượt `--max-usd`.
+  - `collect`: gửi lượt trọng tài rồi viết báo cáo theo các mốc Giai đoạn 0.
+- Mỗi phiên bản prompt chạy trong thư mục riêng dưới `.ai-grading-eval/regression/`. Thư mục này nằm trong `.gitignore`.
+- `overrides.json` đính chính các kết quả trợ giảng mà quy tắc owner đã sửa.
+- `jiti` thành devDependency để chạy TypeScript với alias `@/`.
+- Migration `20261023150000_ai_grading_prompt_grade_v3.sql` chỉ đổi nhãn `prompt_version` trong `enqueue_submission_grading`.
+- `composeComment` nhận thêm `reminders`. `draftComment` lấy ghi chú của AI ở câu đúng: lần chạy `grade-v2` không có câu đúng nào kèm ghi chú, 0/674.
+
 ## [0.34.0.1] - 2026-10-23
 
 ### Fixed
