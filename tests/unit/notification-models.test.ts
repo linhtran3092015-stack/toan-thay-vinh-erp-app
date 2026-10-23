@@ -45,6 +45,7 @@ describe("notification event vocabulary", () => {
     ["ops.ai_grading_review_due", "Bài chấm AI chờ duyệt", "warning", "ops"],
     ["ops.ai_grading_daily_budget", "Cảnh báo vận hành", "danger", "ops"],
     ["ops.ai_grading_failure_rate", "Cảnh báo vận hành", "danger", "ops"],
+    ["ops.ai_grading_kick_failed", "Cảnh báo vận hành", "danger", "ops"],
     ["ops.ai_grading_paused", "Cảnh báo vận hành", "danger", "ops"],
     ["ops.ai_grading_queue_stalled", "Cảnh báo vận hành", "danger", "ops"],
   ])("%s → %s (%s, %s)", (code, label, tone, family) => {

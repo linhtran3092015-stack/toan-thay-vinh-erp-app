@@ -2,6 +2,23 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.35.1.0] - 2026-10-23
+
+Lưới an toàn của hàng đợi chấm bài AI chạy trong cơ sở dữ liệu, 5 phút một lần. Lịch `*/5` của GitHub Actions thực tế chỉ chạy 3–5 giờ một lần.
+
+### Added
+- **Lịch `ai-grading-worker-kick`** (`pg_cron` + `pg_net`) gọi worker chấm bài AI 5 phút một lần, nhưng chỉ khi có lượt đến hạn hoặc lượt đang chạy mà tiến trình đã dừng. Lịch không gọi khi tắt chấm AI, khi hàng đợi tạm dừng, hoặc khi chưa cấu hình.
+- **URL worker và `CRON_SECRET` lưu trong Supabase Vault** (`ai_grading_worker_url`, `ai_grading_cron_secret`), không ghi trong mã nguồn. Chưa có hai secret này thì lịch không làm gì.
+- **Cảnh báo "Lịch gọi chấm bài AI bị lỗi"** (`ops.ai_grading_kick_failed`) gửi người quản lý cài đặt khi lần gọi trước bị từ chối (ví dụ khóa trên Vercel và trong Vault khác nhau), mỗi giờ một lần.
+
+### For contributors
+- Migration `20261023170000_ai_grading_worker_db_cron.sql`:
+  - bật `pg_net`;
+  - thêm `ai_grading_worker_state.last_kick_at` và `last_kick_request_id`;
+  - thêm hàm `kick_ai_grading_worker()` (chỉ cơ sở dữ liệu gọi được), trả về `disabled | paused | not_configured | idle | kicked`.
+- Workflow GitHub giữ làm dự phòng và nút chạy tay.
+- pgTAP mới: `ai-grading-db-cron` (16 kiểm tra).
+
 ## [0.35.0.0] - 2026-10-23
 
 Chấm bài AI theo 4 quy tắc owner chốt ngày 23/10 (prompt `grade-v3`), và bộ đề hồi quy để đo lại mỗi khi đổi prompt hoặc model.
