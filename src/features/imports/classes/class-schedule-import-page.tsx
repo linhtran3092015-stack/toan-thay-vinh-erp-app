@@ -146,11 +146,15 @@ const UNREADABLE_WEEKDAY_ECHO_MAX = 40;
 
 function unreadableWeekdayMessage(raw: unknown): string {
   const text = raw === null || raw === undefined ? "" : String(raw).normalize("NFC").trim();
-  if (!text) return "Không đọc được thứ trong tuần: ô để trống.";
-  // Counted in code points, so a cut never splits an emoji or a letter from its marks.
-  const characters = [...text];
-  const shown =
-    characters.length > UNREADABLE_WEEKDAY_ECHO_MAX ? `${characters.slice(0, UNREADABLE_WEEKDAY_ECHO_MAX).join("")}…` : text;
+  if (!text) {
+    // Excel gives every cell of a merged block but the first as empty.
+    return "Không đọc được thứ trong tuần: ô để trống (nếu ô “Thứ” được gộp nhiều dòng trong Excel, hãy bỏ gộp và ghi thứ vào từng dòng).";
+  }
+  // Counted in code points of a bounded head (each takes at most two UTF-16 units), so a cut never splits a surrogate
+  // pair or a letter from its marks, and a very long cell is not walked in full.
+  const head = [...text.slice(0, UNREADABLE_WEEKDAY_ECHO_MAX * 2)];
+  const isCut = text.length > UNREADABLE_WEEKDAY_ECHO_MAX * 2 || head.length > UNREADABLE_WEEKDAY_ECHO_MAX;
+  const shown = isCut ? `${head.slice(0, UNREADABLE_WEEKDAY_ECHO_MAX).join("")}…` : text;
   return `Không đọc được thứ trong tuần: “${shown}”.`;
 }
 
@@ -441,7 +445,7 @@ export function ClassScheduleImportPage({
     if (scheduleInputs.rows.length === 0 && scheduleInputs.unreadableWeekdayRows.length > 0) {
       // No schedule row left to send (the server needs at least one): most likely the wrong column for "Thứ".
       setDryRunError(
-        `Không đọc được thứ trong tuần ở cả ${formatNumber(scheduleInputs.unreadableWeekdayRows.length)} dòng lịch học. Kiểm tra cột chọn cho “Thứ” ở sheet Schedules, hoặc sửa file Excel rồi chọn lại file.`,
+        `Không đọc được thứ trong tuần ở cả ${formatNumber(scheduleInputs.unreadableWeekdayRows.length)} dòng lịch học. Kiểm tra cột đã chọn cho “Thứ” ở sheet Schedules, hoặc sửa file Excel rồi chọn lại file.`,
       );
       return;
     }

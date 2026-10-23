@@ -675,6 +675,8 @@ describe("StudentImportPage wizard", () => {
     expect(screen.queryByText(/Không kết nối được tới máy chủ/)).not.toBeInTheDocument();
     expect(currentStep()).toHaveTextContent("4. Xác nhận nhập");
     await waitFor(() => expect(screen.getByRole("button", { name: "Kiểm tra lại" })).toBeEnabled());
+    // The pressed button was disabled while it ran: focus comes back to it.
+    expect(screen.getByRole("button", { name: "Kiểm tra lại" })).toHaveFocus();
     expect(describedBy(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" }))).toBe(recheckReason);
 
     // That failure belongs to the refusal: "Ánh xạ cột" does not claim its own check failed.

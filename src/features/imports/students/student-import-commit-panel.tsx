@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
 import { GuardedActionPanel, type GuardedCondition } from "@/components/patterns/guarded-action-panel";
@@ -196,6 +196,14 @@ export function StudentImportCommitPanel({
   validation,
 }: StudentImportCommitPanelProps) {
   const total = formatNumber(validation.row_count);
+  const recheckButtonRef = useRef<HTMLButtonElement>(null);
+  const recheckWasPending = useRef(false);
+
+  // The button is disabled while its check runs, which drops focus; a failed check leaves it in place, so focus returns.
+  useEffect(() => {
+    if (recheckWasPending.current && !recheck.isPending) recheckButtonRef.current?.focus();
+    recheckWasPending.current = recheck.isPending;
+  }, [recheck.isPending]);
 
   return (
     <GuardedActionPanel
@@ -228,6 +236,7 @@ export function StudentImportCommitPanel({
                     className="max-md:h-11"
                     isLoading={recheck.isPending}
                     onClick={recheck.onRecheck}
+                    ref={recheckButtonRef}
                     size="sm"
                     variant="secondary"
                   >

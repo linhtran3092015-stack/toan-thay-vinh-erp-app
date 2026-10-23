@@ -59,6 +59,9 @@ function wholeWord(spellings: readonly string[]): RegExp {
 
 type WeekdaySpellings = ReadonlyArray<{ iso: number; pattern: RegExp }>;
 
+/** Longest "Thứ" cell read as a weekday ("Thứ 2 (cô Thu, phòng 201)" fits easily). */
+const WEEKDAY_CELL_MAX_LENGTH = 100;
+
 /** Vietnamese day names: when one is in the cell, it decides the day ("Thứ 2 (cô Thu)" is Monday). */
 const VIETNAMESE_DAY_NAMES: WeekdaySpellings = [
   { iso: 1, pattern: wholeWord(["THỨ ?2", "THỨ HAI"]) },
@@ -118,6 +121,8 @@ export function parseWeekdayValue(value: unknown): number | null {
   }
 
   if (typeof value === "string") {
+    // No weekday cell is this long, even with a note: a notes column mapped as "Thứ" stops here, before any matching.
+    if (value.length > WEEKDAY_CELL_MAX_LENGTH) return null;
     // NFC first: decomposed Vietnamese ("ư" typed as "u" + combining marks) would otherwise read "THỨ" as English "THU".
     // Any run of spaces (non-breaking ones pasted from Word, tabs, doubles) counts as one.
     const str = value.normalize("NFC").replace(/\s+/gu, " ").trim().toUpperCase();

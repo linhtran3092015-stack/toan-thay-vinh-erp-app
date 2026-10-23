@@ -105,6 +105,29 @@ function withWeekdays(
   };
 }
 
+/** The dry-run answers for the schedule rows actually sent: the clean fixture's rows, counted again. */
+function answerForRowsSent() {
+  actions.dryRunClassScheduleImport.mockImplementationOnce(async (input) => {
+    const sent = new Set(input.schedules.map((row) => row.source_row_number));
+    const scheduleRows = CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_rows.filter((row) => sent.has(row.source_row_number));
+    const count = (classification: string) => scheduleRows.filter((row) => row.classification === classification).length;
+    return {
+      data: {
+        ...CLASS_IMPORT_PREVIEW_DRY_RUN,
+        schedule_rows: scheduleRows,
+        schedule_summary: {
+          existing_conflict: count("existing_conflict"),
+          existing_matching: count("existing_matching"),
+          invalid: count("invalid"),
+          new: count("new"),
+          total: scheduleRows.length,
+        },
+      },
+      ok: true,
+    };
+  });
+}
+
 /** An action answer the test hands back by hand (a request still in flight): an answer, or a call that throws. */
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -315,23 +338,18 @@ describe("ClassScheduleImportPage: mapping", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  // Value: protects=a long unreadable "Thứ" cell (a notes column mapped by mistake) is echoed in the row message cut to 40 characters (code points of the NFC text, so a decomposed letter or an emoji is never split), so the reason stays readable in the table and the phone card;
-  // fails_when=unreadableWeekdayMessage echoes the whole cell again, adds "…" to a cell of exactly 40 characters, or cuts decomposed text by UTF-16 units;
+  // Value: protects=a long unreadable "Thứ" cell (a notes column mapped by mistake) is echoed in the row message cut to 40 characters (code points of the NFC text, so a surrogate pair or a letter and its marks are never split), so the reason stays readable in the table and the phone card;
+  // fails_when=unreadableWeekdayMessage echoes the whole cell again, adds "…" to a cell of exactly 40 characters, cuts decomposed text before NFC, or cuts by UTF-16 units (an emoji at the cut becomes a lone surrogate);
   // why_new=design review (third pass) of the unreadable-weekday message; no test had a long cell;
   // seam=the actions override answers with the clean fixture's rows for the rows sent; no_claim=does not prove the table's wrapping
   it.each([
     ["exactly 40 characters", "x".repeat(40), "x".repeat(40)],
     ["41 characters", "x".repeat(41), `${"x".repeat(40)}…`],
     ["decomposed Vietnamese", "Học buổi tối học thêm hình học nâng cao lớp chín".normalize("NFD"), "Học buổi tối học thêm hình học nâng cao …"],
+    ["an emoji at the cut", `${"x".repeat(39)}😀yy`, `${"x".repeat(39)}😀…`],
+    ["a long note", `Ghi chú ${"x".repeat(60)}`, `Ghi chú ${"x".repeat(32)}…`],
   ])("echoes an unreadable weekday cell of %s whole letters at a time", async (_case, cell, echoed) => {
-    actions.dryRunClassScheduleImport.mockImplementationOnce(async (input) => {
-      const sent = new Set(input.schedules.map((row) => row.source_row_number));
-      const scheduleRows = CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_rows.filter((row) => sent.has(row.source_row_number));
-      return {
-        data: { ...CLASS_IMPORT_PREVIEW_DRY_RUN, schedule_rows: scheduleRows, schedule_summary: { ...CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_summary, new: 7, total: 9 } },
-        ok: true,
-      };
-    });
+    answerForRowsSent();
     renderPage({ initialWorkbook: withWeekdays(CLASS_IMPORT_PREVIEW_WORKBOOK, { 4: cell }) });
 
     fireEvent.click(screen.getByRole("button", { name: "Kiểm tra dòng" }));
@@ -339,25 +357,6 @@ describe("ClassScheduleImportPage: mapping", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Lịch học/ }));
     const row = within(screen.getByRole("table", { name: "Kết quả kiểm tra 10 dòng lịch học" })).getAllByRole("row")[1];
     expect(row.textContent).toContain(`Không đọc được thứ trong tuần: “${echoed}”.`);
-  });
-
-  it("cuts a long unreadable weekday cell to 40 characters in the row message", async () => {
-    actions.dryRunClassScheduleImport.mockImplementationOnce(async (input) => {
-      const sent = new Set(input.schedules.map((row) => row.source_row_number));
-      const scheduleRows = CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_rows.filter((row) => sent.has(row.source_row_number));
-      return {
-        data: { ...CLASS_IMPORT_PREVIEW_DRY_RUN, schedule_rows: scheduleRows, schedule_summary: { ...CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_summary, new: 7, total: 9 } },
-        ok: true,
-      };
-    });
-    renderPage({ initialWorkbook: withWeekdays(CLASS_IMPORT_PREVIEW_WORKBOOK, { 4: `Ghi chú ${"x".repeat(60)}` }) });
-
-    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra dòng" }));
-    await waitFor(() => expectStep(2));
-    fireEvent.click(screen.getByRole("tab", { name: /Lịch học/ }));
-    const row = within(screen.getByRole("table", { name: "Kết quả kiểm tra 10 dòng lịch học" })).getAllByRole("row")[1];
-    expect(row).toHaveTextContent(`Lỗi: Không đọc được thứ trong tuần: “Ghi chú ${"x".repeat(32)}…”.`);
-    expect(row).not.toHaveTextContent("x".repeat(33));
   });
 });
 
@@ -428,18 +427,7 @@ describe("ClassScheduleImportPage: review", () => {
   // why_new=red-team finding of the step 15b review (pre-existing on main: an unreadable weekday silently became Thứ Hai); no test had a weekday the parser could not read;
   // seam=the actions override answers from the payload it gets (the clean fixture's rows for the rows sent); no_claim=does not prove the RPC's own INVALID_WEEKDAY check or the parser's spellings (tests/unit/class-schedule-import-weekday.test.ts)
   it("makes an unreadable weekday an invalid row of the check instead of Monday", async () => {
-    actions.dryRunClassScheduleImport.mockImplementationOnce(async (input) => {
-      const sent = new Set(input.schedules.map((row) => row.source_row_number));
-      const scheduleRows = CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_rows.filter((row) => sent.has(row.source_row_number));
-      return {
-        data: {
-          ...CLASS_IMPORT_PREVIEW_DRY_RUN,
-          schedule_rows: scheduleRows,
-          schedule_summary: { existing_conflict: 0, existing_matching: 2, invalid: 0, new: scheduleRows.length - 2, total: scheduleRows.length },
-        },
-        ok: true,
-      };
-    });
+    answerForRowsSent();
     renderPage({ initialWorkbook: withWeekdays(CLASS_IMPORT_PREVIEW_WORKBOOK, { 3: "Thứ Tám", 5: null }) });
 
     fireEvent.click(screen.getByRole("button", { name: "Kiểm tra dòng" }));
@@ -466,7 +454,9 @@ describe("ClassScheduleImportPage: review", () => {
     expect(rows[0]).toHaveTextContent("Không rõ thứ");
     expect(rows[0]).toHaveTextContent("Không hợp lệ");
     expect(rows[0]).toHaveTextContent("Lỗi: Không đọc được thứ trong tuần: “Thứ Tám”.");
-    expect(rows[1]).toHaveTextContent("Lỗi: Không đọc được thứ trong tuần: ô để trống.");
+    expect(rows[1]).toHaveTextContent(
+      "Lỗi: Không đọc được thứ trong tuần: ô để trống (nếu ô “Thứ” được gộp nhiều dòng trong Excel, hãy bỏ gộp và ghi thứ vào từng dòng).",
+    );
     for (const item of rows) expect(item).not.toHaveTextContent("Thứ Hai");
 
     // "Tất cả" is file order: the held-back rows sit between the server's rows, not after them.
@@ -502,7 +492,7 @@ describe("ClassScheduleImportPage: review", () => {
     fireEvent.click(screen.getByRole("button", { name: "Kiểm tra dòng" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Không kiểm tra được dữ liệu. Không đọc được thứ trong tuần ở cả 10 dòng lịch học. Kiểm tra cột chọn cho “Thứ” ở sheet Schedules, hoặc sửa file Excel rồi chọn lại file.",
+      "Không kiểm tra được dữ liệu. Không đọc được thứ trong tuần ở cả 10 dòng lịch học. Kiểm tra cột đã chọn cho “Thứ” ở sheet Schedules, hoặc sửa file Excel rồi chọn lại file.",
     );
     expectStep(1);
     expect(actions.dryRunClassScheduleImport).not.toHaveBeenCalled();
@@ -530,6 +520,8 @@ describe("ClassScheduleImportPage: review", () => {
     });
 
     expectStep(3);
+    // The batch would hold the rows sent, not the held-back one.
+    expect(screen.getByRole("region", { name: "Tạo lô nhập" })).toHaveTextContent("Lưu 6 dòng lớp và 9 dòng lịch học");
     fireEvent.change(screen.getByLabelText("Lý do tạo lô"), { target: { value: "Nhập lớp đầu năm" } });
     fireEvent.click(screen.getByLabelText("Tôi đã xem kết quả kiểm tra và muốn lưu file này thành lô chờ xác nhận."));
     const create = screen.getByRole("button", { name: "Tạo lô" });
@@ -700,6 +692,7 @@ describe("ClassScheduleImportPage: back, stale and 'Tạo lô'", () => {
 
   it("needs a typed reason (empty by default) and the confirmation, then creates the batch and opens it", async () => {
     await goToBatchStep();
+    expect(screen.getByRole("region", { name: "Tạo lô nhập" })).toHaveTextContent("Lưu 6 dòng lớp và 10 dòng lịch học của file lop-lich-hoc-2026-2027.xlsx");
 
     const reason = screen.getByLabelText("Lý do tạo lô");
     expect(reason).toHaveValue("");
