@@ -40,6 +40,12 @@ describe("notification event vocabulary", () => {
     ["ops.cron_job_stale", "Cảnh báo vận hành", "danger", "ops"],
     ["ops.sepay_webhook_failed", "Cảnh báo vận hành", "danger", "ops"],
     ["ops.sepay_webhook_processing_failed", "Cảnh báo vận hành", "danger", "ops"],
+    ["ai_grading.review_due", "Bài chấm AI chờ duyệt", "warning", "ai_grading"],
+    ["ops.ai_grading_review_due", "Bài chấm AI chờ duyệt", "warning", "ops"],
+    ["ops.ai_grading_daily_budget", "Cảnh báo vận hành", "danger", "ops"],
+    ["ops.ai_grading_failure_rate", "Cảnh báo vận hành", "danger", "ops"],
+    ["ops.ai_grading_paused", "Cảnh báo vận hành", "danger", "ops"],
+    ["ops.ai_grading_queue_stalled", "Cảnh báo vận hành", "danger", "ops"],
   ])("%s → %s (%s, %s)", (code, label, tone, family) => {
     expect(getNotificationEventLabel(code)).toBe(label);
     expect(getNotificationEventTone(code)).toBe(tone);
