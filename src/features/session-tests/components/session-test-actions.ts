@@ -1,9 +1,12 @@
 import {
   cancelSessionTestKeyExtractionAction,
   confirmSessionTestKeyAction,
+  copyLessonPagesAction,
   copySessionTestKeyAction,
   createSessionTestAction,
+  registerLessonPagesAction,
   registerSessionTestAssetsAction,
+  removeLessonPageAction,
   removeSessionTestAssetAction,
   reorderSessionTestAssetsAction,
   requestSessionTestKeyExtractionAction,
@@ -20,11 +23,15 @@ export interface SessionTestActions {
   cancelExtraction: typeof cancelSessionTestKeyExtractionAction;
   confirm: typeof confirmSessionTestKeyAction;
   copy: typeof copySessionTestKeyAction;
+  /** "Ảnh bài giảng": reuse, record and remove slides. Absent in stand-ins written before slides. */
+  copyLessonPages?: typeof copyLessonPagesAction;
   create: typeof createSessionTestAction;
   /** Shrinks and re-encodes one photo in the browser. */
   prepareImage: (file: File) => Promise<PreparedTestImage>;
   registerAssets: typeof registerSessionTestAssetsAction;
+  registerLessonPages?: typeof registerLessonPagesAction;
   removeAsset: typeof removeSessionTestAssetAction;
+  removeLessonPage?: typeof removeLessonPageAction;
   reorderAssets: typeof reorderSessionTestAssetsAction;
   requestExtraction: typeof requestSessionTestKeyExtractionAction;
   saveDraft: typeof saveSessionTestDraftAction;
@@ -48,10 +55,13 @@ export const sessionTestServerActions: SessionTestActions = {
   cancelExtraction: cancelSessionTestKeyExtractionAction,
   confirm: confirmSessionTestKeyAction,
   copy: copySessionTestKeyAction,
+  copyLessonPages: copyLessonPagesAction,
   create: createSessionTestAction,
   prepareImage: (file) => prepareTestImage(file),
   registerAssets: registerSessionTestAssetsAction,
+  registerLessonPages: registerLessonPagesAction,
   removeAsset: removeSessionTestAssetAction,
+  removeLessonPage: removeLessonPageAction,
   reorderAssets: reorderSessionTestAssetsAction,
   requestExtraction: requestSessionTestKeyExtractionAction,
   saveDraft: saveSessionTestDraftAction,

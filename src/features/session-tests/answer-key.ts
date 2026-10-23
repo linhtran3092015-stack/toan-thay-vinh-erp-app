@@ -14,6 +14,7 @@ export const ANSWER_KEY_LIMITS = {
   finalAnswerLength: 500,
   labelLength: 20,
   markingGuideLength: 2000,
+  methodsLength: 4000,
   promptLength: 4000,
   questions: 50,
   reasonLength: 500,
@@ -35,6 +36,11 @@ export interface AnswerKeyQuestion {
 }
 
 export interface AnswerKey {
+  /**
+   * "Phương pháp của thầy": the teacher's methods for this lesson, summarised by AI from the
+   * lesson slides and confirmed with the key. Empty or absent when there were no slides.
+   */
+  methods?: string;
   questions: AnswerKeyQuestion[];
 }
 
@@ -48,12 +54,13 @@ const storedQuestionSchema = z.object({
   solution_steps: z.array(z.string()).default([]),
 });
 
-export const storedAnswerKeySchema = z.object({ questions: z.array(storedQuestionSchema) });
+export const storedAnswerKeySchema = z.object({ methods: z.string().optional(), questions: z.array(storedQuestionSchema) });
 
 export type StoredAnswerKey = z.input<typeof storedAnswerKeySchema>;
 
 export function answerKeyFromStored(stored: z.output<typeof storedAnswerKeySchema>): AnswerKey {
   return {
+    ...(stored.methods?.trim() ? { methods: stored.methods } : {}),
     questions: stored.questions.map((question) => ({
       acceptedEquivalents: question.accepted_equivalents,
       finalAnswer: question.final_answer,
@@ -65,8 +72,11 @@ export function answerKeyFromStored(stored: z.output<typeof storedAnswerKeySchem
   };
 }
 
+/** Same shape normalize_session_test_answer_key returns: "methods" only when there is text. */
 export function answerKeyToStored(key: AnswerKey): StoredAnswerKey {
+  const methods = key.methods?.trim() ?? "";
   return {
+    ...(methods ? { methods } : {}),
     questions: key.questions.map((question) => ({
       accepted_equivalents: question.acceptedEquivalents,
       final_answer: question.finalAnswer,

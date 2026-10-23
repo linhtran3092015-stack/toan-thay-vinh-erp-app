@@ -9,6 +9,8 @@
 
 export const GRADE_PROMPT_VERSION = "grade-v3";
 export const KEY_PROMPT_VERSION = "key-v1";
+/** Added to KEY_INSTRUCTIONS when the test has lesson slides; such runs record "key-v1+lesson-v1". */
+export const LESSON_PROMPT_VERSION = "lesson-v1";
 
 export const GRADER_INSTRUCTIONS = `Bạn là trợ lý chấm bài cho câu lạc bộ Toán Thầy Vinh. Học sinh THCS gõ bài kiểm tra cuối buổi vào một form trên máy, nên ký hiệu toán viết dạng chữ (ví dụ x^2, x2, 1/2, can(3), sqrt(3), >=).
 
@@ -51,3 +53,17 @@ Yêu cầu:
 6. transcription_warnings: mọi chỗ ảnh mờ, bị che, số khó đọc, hoặc đề có vẻ thiếu dữ kiện; ghi rõ câu nào và vì sao. Không có thì để mảng rỗng.
 7. total_points_printed: tổng điểm nếu đề có ghi; không thì null.
 8. title: tên đề nếu có; không có thì để rỗng.`;
+
+/**
+ * Lesson-slide rules for "AI đọc đề" (pilot 23/10/2026 on two grade-4 tests: with the slide the
+ * reader understood a question the way the teacher does and wrote the teacher's methods).
+ */
+export const LESSON_KEY_INSTRUCTIONS = `
+
+Bài giảng của thầy: trước ảnh đề có ảnh slide bài giảng của buổi (các dạng bài, phương pháp "PP ...", công thức, lời giải mẫu thầy viết tay). Đề kiểm tra là các câu trong ảnh đề (thường là phần "LT 10'"); chỉ soạn đáp án cho các câu đó, không cho các ví dụ trong slide.
+Khi viết solution_steps:
+- Giải theo đúng phương pháp và cách trình bày thầy dùng cho dạng bài tương ứng trong slide; dòng đầu ghi tên dạng và phương pháp (ví dụ "Dạng Tổng – Hiệu, PP Sơ đồ đoạn thẳng").
+- Dùng công thức và ký hiệu thầy dùng (TBC, SSH, Tổng, Hiệu, ...), lần đầu viết rõ nghĩa ký hiệu.
+- Không dùng ẩn x hay cách giải của lớp trên nếu thầy không dạy cách đó cho dạng này.
+- Hiểu đề theo cách thầy hiểu ở lời giải mẫu của dạng tương tự; nếu cách hiểu đó khác cách hiểu thông thường, ghi vào transcription_warnings.
+teacher_methods: tóm tắt phương pháp của thầy trong slide để trợ giảng và AI chấm bài dùng lại. Mỗi dạng bài một đoạn ngắn: tên dạng, tên phương pháp, công thức, cách trình bày; cuối cùng là các ký hiệu viết tắt thầy dùng và nghĩa. Chỉ ghi điều có trong slide, không thêm kiến thức ngoài. Tối đa khoảng 2.500 ký tự, mỗi ý một dòng, tiếng Việt có dấu.`;

@@ -47,6 +47,12 @@ export function AnswerKeyView({
           </li>
         ))}
       </ol>
+      {answerKey.methods?.trim() ? (
+        <details className="grid gap-1 rounded-md border border-border-subtle p-3 text-caption text-text-default">
+          <summary className="cursor-pointer font-medium text-text-strong">Phương pháp của thầy</summary>
+          <p className="mt-1 whitespace-pre-line">{answerKey.methods}</p>
+        </details>
+      ) : null}
       {markingGuide ? (
         <p className="whitespace-pre-line text-caption text-text-muted">
           <span className="font-medium text-text-default">Ghi chú chấm: </span>

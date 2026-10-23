@@ -21,6 +21,8 @@ export interface KeyQuestion {
 }
 
 export interface StoredKey {
+  /** The teacher's methods summarised from the lesson slides (absent without slides). */
+  methods?: string;
   questions: KeyQuestion[];
 }
 
@@ -50,6 +52,16 @@ export function renderKeyForPrompt(key: StoredKey, title: string | null): string
       `Cách viết tương đương: ${question.accepted_equivalents?.length ? question.accepted_equivalents.join("; ") : "không có"}`,
     );
     if (question.solution_steps?.length) lines.push("Lời giải:", ...question.solution_steps);
+  }
+  // Part of the key block, so a key without methods renders exactly as before (grade-v3).
+  if (key.methods?.trim()) {
+    lines.push(
+      "",
+      "PHƯƠNG PHÁP THẦY DẠY TRONG BUỔI (tóm tắt từ slide bài giảng, trợ giảng đã chốt cùng đáp án):",
+      key.methods.trim(),
+      "",
+      "Dùng phần này để hiểu cách học sinh trình bày và viết tắt theo thầy. Khi viết note_for_parent cho câu sai, nhắc đúng tên dạng, phương pháp hoặc công thức thầy dạy cho dạng bài đó. Phần này không thay đổi quy tắc chấm đúng sai.",
+    );
   }
   return lines.join("\n");
 }
@@ -310,11 +322,26 @@ export const KEY_SCHEMA = {
   type: "object",
 } as const;
 
-export type KeyImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+/** With lesson slides the reader also returns the teacher's methods ("teacher_methods"). */
+export const KEY_SCHEMA_WITH_METHODS = {
+  ...KEY_SCHEMA,
+  properties: { ...KEY_SCHEMA.properties, teacher_methods: STRING },
+  required: [...KEY_SCHEMA.required, "teacher_methods"],
+} as const;
 
-/** Answer-key draft from the test photos: pages labelled and placed before the instruction. */
-export function buildKeyExtractionContent(pages: ReadonlyArray<{ base64: string; mediaType: KeyImageMediaType }>) {
+export type KeyImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+type KeyImage = { base64: string; mediaType: KeyImageMediaType };
+
+/**
+ * Answer-key draft from the test photos: pages labelled and placed before the instruction. Lesson
+ * slides, when there are any, come first and are labelled apart from the test pages.
+ */
+export function buildKeyExtractionContent(pages: ReadonlyArray<KeyImage>, lessonPages: ReadonlyArray<KeyImage> = []) {
   return [
+    ...lessonPages.flatMap((page, index) => [
+      { text: `Slide bài giảng ${index + 1}:`, type: "text" as const },
+      { source: { data: page.base64, media_type: page.mediaType, type: "base64" as const }, type: "image" as const },
+    ]),
     ...pages.flatMap((page, index) => [
       { text: `Trang ${index + 1}:`, type: "text" as const },
       { source: { data: page.base64, media_type: page.mediaType, type: "base64" as const }, type: "image" as const },
@@ -331,6 +358,9 @@ export interface KeyDraft {
 }
 
 export type ParsedKey = { draft: KeyDraft; ok: true } | { error: string; ok: false };
+
+/** Longest "teacher_methods" kept (normalize_session_test_answer_key refuses more). */
+const METHODS_MAX = 4000;
 
 export function parseKeyMessage(message: MessageLike): ParsedKey {
   if (message.stop_reason !== "end_turn") return { error: `stop_${message.stop_reason ?? "unknown"}`, ok: false };
@@ -350,9 +380,10 @@ export function parseKeyMessage(message: MessageLike): ParsedKey {
     prompt_text: String(question.prompt_text ?? ""),
     solution_steps: Array.isArray(question.solution_steps) ? question.solution_steps.map(String) : [],
   }));
+  const methods = typeof record.teacher_methods === "string" ? record.teacher_methods.trim().slice(0, METHODS_MAX) : "";
   return {
     draft: {
-      answer_key: { questions },
+      answer_key: methods ? { methods, questions } : { questions },
       title: typeof record.title === "string" ? record.title : "",
       total_points_printed: typeof record.total_points_printed === "number" ? record.total_points_printed : null,
       transcription_warnings: Array.isArray(record.transcription_warnings) ? record.transcription_warnings.map(String) : [],

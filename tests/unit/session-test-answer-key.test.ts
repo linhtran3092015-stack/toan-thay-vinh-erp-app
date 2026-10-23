@@ -178,3 +178,22 @@ describe("sessionTestStage", () => {
     expect(sessionTestStage({ ...base, answerKeyVersion: 1, status: "key_confirmed" })).toBe("confirmed");
   });
 });
+
+describe("teacher's methods in the key", () => {
+  const key: AnswerKey = { questions: [{ acceptedEquivalents: [], finalAnswer: "60", label: "2", maxPoints: 10, promptText: "", solutionSteps: [] }] };
+
+  it("round-trips methods and leaves them out when blank, like the database", () => {
+    const stored = answerKeyToStored({ ...key, methods: "  Dạng Tổng – Hiệu  " });
+    expect(stored.methods).toBe("Dạng Tổng – Hiệu");
+    expect(answerKeyFromStored(storedAnswerKeySchema.parse(stored)).methods).toBe("Dạng Tổng – Hiệu");
+    expect("methods" in answerKeyToStored({ ...key, methods: "   " })).toBe(false);
+    expect(answerKeyFromStored(storedAnswerKeySchema.parse({ questions: [] }))).toEqual({ questions: [] });
+  });
+
+  it("treats a change of methods as a change of the key", () => {
+    expect(answerKeysEqual({ ...key, methods: "A" }, { ...key, methods: "A" })).toBe(true);
+    expect(answerKeysEqual({ ...key, methods: "A" }, { ...key, methods: "B" })).toBe(false);
+    expect(answerKeysEqual(key, { ...key, methods: "" })).toBe(true);
+  });
+});
+

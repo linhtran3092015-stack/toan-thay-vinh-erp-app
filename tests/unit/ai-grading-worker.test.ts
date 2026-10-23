@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const routeMocks = vi.hoisted(() => ({ cron: vi.fn(), key: vi.fn(), run: vi.fn() }));
 
 import { classifyApiError } from "@/features/ai-grading/api-errors";
-import { KEY_INSTRUCTIONS } from "@/features/ai-grading/prompts";
+import { KEY_INSTRUCTIONS, LESSON_KEY_INSTRUCTIONS } from "@/features/ai-grading/prompts";
 import { runGradingWorker, type ClaimedRun, type ClaudeCaller, type ClaudeMessage } from "@/features/ai-grading/worker";
 
 const KEY = {
@@ -104,7 +104,11 @@ function gradeRun(id: string, payload: Record<string, unknown>, attempt = 1): Cl
   };
 }
 
-function fakeSupabase(batches: ClaimedRun[][], completeReturns: (args: Record<string, unknown>) => string = (args) => (args.p_outcome === "paused" ? "paused" : "applied")) {
+function fakeSupabase(
+  batches: ClaimedRun[][],
+  completeReturns: (args: Record<string, unknown>) => string = (args) => (args.p_outcome === "paused" ? "paused" : "applied"),
+  lessonPages: Array<{ mime_type: string; page_no: number; storage_path: string }> = [],
+) {
   const queue = [...batches];
   const completed: Array<Record<string, unknown>> = [];
   const download = vi.fn(async (path: string) => ({ data: new Blob([`image:${path}`]), error: null }));
@@ -117,6 +121,8 @@ function fakeSupabase(batches: ClaimedRun[][], completeReturns: (args: Record<st
       }
       throw new Error(`unexpected rpc ${name}`);
     }),
+    // Only session_test_lesson_pages is read directly (the slides of a key reading).
+    from: vi.fn(() => ({ select: () => ({ eq: () => ({ order: async () => ({ data: lessonPages, error: null }) }) }) })),
     storage: { from: vi.fn(() => ({ download })) },
   };
   return { completed, download, supabase: supabase as never };
@@ -231,6 +237,50 @@ describe("runGradingWorker: key reading", () => {
     ]);
     expect(fake.completed[0]).toMatchObject({ p_outcome: "succeeded", p_run_id: "k" });
     expect(fake.completed[0].p_result).toMatchObject({ fallback_used: false, served_by: "claude-opus-5-5", title: "LT", transcription_warnings: ["mờ"] });
+  });
+
+  it("reads the lesson slides before the test and asks for the teacher's methods", async () => {
+    const fake = fakeSupabase([[keyRun]], undefined, [{ mime_type: "image/webp", page_no: 1, storage_path: "t/s1.webp" }]);
+    const readKey = vi.fn<ClaudeCaller["readKey"]>(async () => ({
+      message: {
+        content: [
+          {
+            text: JSON.stringify({
+              questions: [{ final_answer: "60", label: "2", max_points: null }],
+              teacher_methods: "  Dạng Tổng – Hiệu, PP Sơ đồ đoạn thẳng: Bé = (T − H) : 2  ",
+              title: "LT 10'",
+              total_points_printed: null,
+              transcription_warnings: [],
+            }),
+            type: "text",
+          },
+        ],
+        model: "claude-opus-5-5",
+        stop_reason: "end_turn",
+        usage: { input_tokens: 6000, iterations: [{ type: "message" }], output_tokens: 2400 },
+      } as ClaudeMessage,
+      requestId: "req_l",
+    }));
+    await runGradingWorker({ caller: { grade: vi.fn(), readKey }, supabase: fake.supabase });
+
+    expect(fake.download.mock.calls.map((call) => call[0])).toEqual(["t/s1.webp", "t/p1.jpg", "t/p2.png"]);
+    const params = readKey.mock.calls[0][0] as unknown as Record<string, unknown> & {
+      messages: Array<{ content: Array<Record<string, unknown>> }>;
+      output_config: { format: { schema: { required: string[] } } };
+    };
+    expect(params.system).toBe(KEY_INSTRUCTIONS + LESSON_KEY_INSTRUCTIONS);
+    expect(params.messages[0].content[0]).toEqual({ text: "Slide bài giảng 1:", type: "text" });
+    expect(params.messages[0].content.filter((block) => block.type === "image").map((block) => (block.source as { media_type: string }).media_type)).toEqual([
+      "image/webp",
+      "image/jpeg",
+      "image/png",
+    ]);
+    expect(params.output_config.format.schema.required).toContain("teacher_methods");
+    expect(fake.completed[0].p_result).toMatchObject({
+      answer_key: { methods: "Dạng Tổng – Hiệu, PP Sơ đồ đoạn thẳng: Bé = (T − H) : 2" },
+      lesson_pages: 1,
+      prompt_version: "key-v1+lesson-v1",
+    });
   });
 
   it("retries when a page cannot be downloaded", async () => {

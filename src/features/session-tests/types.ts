@@ -46,6 +46,17 @@ export interface SessionTestKeyWarning {
   wrong: number;
 }
 
+/** A confirmed-or-not test of a same-grade session within 6 days that has lesson slides to reuse. */
+export interface SessionTestLessonSource {
+  classCode: string;
+  className: string;
+  classSessionId: string;
+  pageCount: number;
+  sessionDate: string;
+  startTime: string;
+  testId: string;
+}
+
 export interface SessionTestDetail {
   answerKey: AnswerKey;
   /** Number of times the key was confirmed; 0 = never. */
@@ -58,6 +69,8 @@ export interface SessionTestDetail {
   id: string;
   /** Absent in fixtures written before the warning existed. */
   keyWarnings?: SessionTestKeyWarning[];
+  /** "Ảnh bài giảng": the teacher's slides AI reads with the test. Absent in older fixtures. */
+  lessonPages?: SessionTestAsset[];
   markingGuide: string | null;
   /** The session this key was copied from ("Dùng đề có sẵn"). */
   source: { classCode: string; classSessionId: string; startTime: string; testId: string } | null;
@@ -93,6 +106,8 @@ export interface SessionTestState {
   /** The session is neither locked nor cancelled. */
   editable: boolean;
   sessionId: string;
+  /** Slides of same-grade sessions within 6 days to reuse; empty unless the viewer manages tests. */
+  lessonSources?: SessionTestLessonSource[];
   /** Confirmed tests to reuse; empty unless the viewer can manage and confirm. */
   sources: SessionTestSource[];
   test: SessionTestDetail | null;
