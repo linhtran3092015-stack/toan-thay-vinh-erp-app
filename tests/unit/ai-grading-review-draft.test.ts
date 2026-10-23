@@ -1,5 +1,5 @@
 // Value: protects=what a TA sees before approving an AI-graded paper: the score preview matches the SQL rules (correct points only, round .5 up, +1 only below 10, rank of the final score), the bonus line wording, the draft comment's 4 parts in order with each wrong question's right answer, phrases rotating per student but stable for the same one, and the 1,200-character cap;
-// fails_when=the bonus is added before rounding or pushes past 10, a paper at 10 still says "cộng 1", the rank uses the paper score, a wrong question loses its right answer, the AI note is kept after the TA flips that question, phrases change on every render, or a long comment exceeds the database limit;
+// fails_when=the bonus is added before rounding or pushes past 10, a paper at 10 still says "cộng 1", the rank uses the paper score, a wrong question loses its right answer, a unit reminder on a right question is lost, the AI note is kept after the TA flips that question, phrases change on every render, or a long comment exceeds the database limit;
 // why_new=phase 3b review panel and bulk approval share these helpers; seam=none (pure); no_claim=the SQL approve_grading_submission (pgTAP)
 import { describe, expect, it } from "vitest";
 
@@ -71,6 +71,20 @@ describe("draft comment", () => {
     expect(text).toContain("Câu 14: con chưa làm, đáp án đúng là x = 8.");
     expect(text).toContain("Câu 16: con ghi \"7cm\", đáp án đúng là 7 cm.");
     expect(DEFAULT_COMMENT_PHRASES.y3_quiet).toContain(text.split("\n")[2]);
+  });
+
+  it("keeps the AI's unit reminder on a right question, after the wrong ones, and drops it if the TA flips that question", () => {
+    const unit = AI.map((question) =>
+      question.label === "16" ? { ...question, extractedFinalAnswer: "7 cm²", noteForParent: "Con tính đúng 7 nhưng đơn vị là cm, không phải cm²" } : question,
+    );
+    const kept = draftComment({ aiQuestions: unit, key: KEY, praise: false, seed: "s", verdicts: initialVerdicts(KEY, unit) });
+    expect(kept.split("\n")[0]).toBe(
+      "Con làm đúng 2/3 câu. Câu 13: Con lấy 36 trừ 18 thay vì cộng; đáp án đúng là x = 54. Câu 16: Con tính đúng 7 nhưng đơn vị là cm, không phải cm².",
+    );
+    const allRight = draftComment({ aiQuestions: unit, key: KEY, praise: false, seed: "s", verdicts: { "13": "correct", "14": "correct", "16": "correct" } });
+    expect(allRight.split("\n")[0]).toMatch(/ Câu 16: Con tính đúng 7 nhưng đơn vị là cm, không phải cm²\.$/);
+    const flipped = draftComment({ aiQuestions: unit, key: KEY, praise: false, seed: "s", verdicts: { "13": "incorrect", "14": "correct", "16": "incorrect" } });
+    expect(flipped.split("\n")[0]).toContain('Câu 16: con ghi "7 cm²", đáp án đúng là 7 cm.');
   });
 
   it("praises a full paper and never mentions the bonus twice", () => {

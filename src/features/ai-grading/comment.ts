@@ -101,6 +101,7 @@ export function composeComment({
   phrases = DEFAULT_COMMENT_PHRASES,
   praised,
   questionCount,
+  reminders = [],
   seed,
   wrong,
 }: {
@@ -109,6 +110,8 @@ export function composeComment({
   phrases?: CommentPhrases;
   praised: boolean;
   questionCount: number;
+  /** Right questions the AI still left a note on (a wrong unit, grade-v3): said after the wrong ones. */
+  reminders?: ReadonlyArray<{ label: string; note: string }>;
   /** Rotates the phrases; use student id + session id. */
   seed: string;
   wrong: readonly WrongQuestion[];
@@ -116,10 +119,11 @@ export function composeComment({
   const lines: string[] = [];
   const bonus = bonusLine(paperScore, praised);
   if (bonus) lines.push(bonus);
+  const notes = reminders.filter((item) => item.note.trim()).map((item) => `Câu ${item.label}: ${ensureSentence(item.note)}`);
   if (wrong.length === 0) {
-    lines.push(pick(phrases, "y1_correct", seed));
+    lines.push([pick(phrases, "y1_correct", seed), ...notes].join(" "));
   } else {
-    lines.push(`Con làm đúng ${questionCount - wrong.length}/${questionCount} câu. ${wrong.map(wrongLine).join(" ")}`);
+    lines.push(`Con làm đúng ${questionCount - wrong.length}/${questionCount} câu. ${[...wrong.map(wrongLine), ...notes].join(" ")}`);
   }
   lines.push(pick(phrases, wrong.length === 0 ? "y2_correct" : "y2_wrong", seed));
   lines.push(pick(phrases, praised ? "y3_praised" : "y3_quiet", seed));
