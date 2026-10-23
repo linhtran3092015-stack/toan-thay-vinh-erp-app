@@ -18,9 +18,9 @@ Tab `Data`, cột A–P giữ nguyên ý nghĩa. Lần nộp đầu tiên tự t
 
 Câu 6 (học thử tiếng Anh) và câu 7 (SĐT phụ huynh) chỉ ghi vào Sheet, **không** gửi sang ERP.
 
-## Cập nhật ngày 23/10/2026: hướng dẫn cách gõ toán
+## Cập nhật ngày 23/10/2026: hướng dẫn cách gõ toán, sửa danh sách tên bị lặp
 
-Chỉ `FormHocSinh.html` đổi. Dán lại file này vào dự án Apps Script, bấm Save, rồi Deploy → Manage deployments → sửa bản web app đang dùng → Version: New version → Deploy. Không cần chạy lại `testErpConnection` hay `installResendTrigger`.
+Chỉ `FormHocSinh.html` đổi: thêm hướng dẫn cách gõ toán, và sửa lỗi ô họ tên hiện danh sách hai lần khi học sinh chọn năm sinh trước khi form tải xong (bản 0.34.0.1). Dán lại file này vào dự án Apps Script, bấm Save, rồi Deploy → Manage deployments → sửa bản web app đang dùng → Version: New version → Deploy. Không cần chạy lại `testErpConnection` hay `installResendTrigger`.
 
 ## Cài đặt
 
