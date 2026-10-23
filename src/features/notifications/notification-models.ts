@@ -59,6 +59,7 @@ interface NotificationEventPresentation {
  * codes (the review reminder and the worker's ops alerts) arrived in phase 3.
  */
 const EVENT_PRESENTATION: Readonly<Record<string, NotificationEventPresentation>> = {
+  "ai_grading.resubmitted_after_review": { label: "Nộp lại bài đã duyệt", tone: "warning" },
   "ai_grading.review_due": { label: "Bài chấm AI chờ duyệt", tone: "warning" },
   "crm.follow_up_due": { label: "Hẹn theo dõi lead", tone: "warning" },
   "crm.lead_assigned": { label: "Lead mới được giao", tone: "info" },

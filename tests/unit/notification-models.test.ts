@@ -41,6 +41,7 @@ describe("notification event vocabulary", () => {
     ["ops.sepay_webhook_failed", "Cảnh báo vận hành", "danger", "ops"],
     ["ops.sepay_webhook_processing_failed", "Cảnh báo vận hành", "danger", "ops"],
     ["ai_grading.review_due", "Bài chấm AI chờ duyệt", "warning", "ai_grading"],
+    ["ai_grading.resubmitted_after_review", "Nộp lại bài đã duyệt", "warning", "ai_grading"],
     ["ops.ai_grading_review_due", "Bài chấm AI chờ duyệt", "warning", "ops"],
     ["ops.ai_grading_daily_budget", "Cảnh báo vận hành", "danger", "ops"],
     ["ops.ai_grading_failure_rate", "Cảnh báo vận hành", "danger", "ops"],

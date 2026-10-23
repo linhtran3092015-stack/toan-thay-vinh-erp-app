@@ -129,12 +129,16 @@ export function AiGradingQueuePage({
                       <Badge tone={testLabels[session.testStatus].tone}>{testLabels[session.testStatus].label}</Badge>
                       {session.lockedAt ? <Badge tone="neutral">Đã khóa</Badge> : null}
                       {locksSoon ? <Badge tone="danger">Tự khóa lúc {formatDateTime(session.autoLockAt!)}</Badge> : null}
+                      {session.suspectQuestions > 0 ? (
+                        <Badge tone="danger">Kiểm tra đáp án: {session.suspectQuestions} câu hơn 70% bài sai</Badge>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-secondary">
                       <span className="text-text-default">{session.submissions} bài tính điểm</span>
                       {session.greenPending > 0 ? <Badge tone="success">{session.greenPending} xanh chờ duyệt</Badge> : null}
                       {session.yellowPending > 0 ? <Badge tone="warning">{session.yellowPending} vàng chờ duyệt</Badge> : null}
                       {session.redPending > 0 ? <Badge tone="danger">{session.redPending} đỏ (chấm tay)</Badge> : null}
+                      {session.resubmittedPending > 0 ? <Badge tone="warning">{session.resubmittedPending} nộp lại sau khi duyệt</Badge> : null}
                       {session.grading > 0 ? <Badge tone="info">{session.grading} AI đang chấm</Badge> : null}
                       {session.waitingKey > 0 ? <Badge tone="neutral">{session.waitingKey} chờ đáp án</Badge> : null}
                       {session.approved > 0 ? <Badge tone="neutral">{session.approved} đã duyệt</Badge> : null}
