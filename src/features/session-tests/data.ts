@@ -37,7 +37,9 @@ const testSchema = z.object({
       error_code: z.string().nullable(),
       finished_at: z.string().nullable(),
       id: z.string().uuid(),
+      outcome: z.string().nullable().optional(),
       status: runStatusSchema,
+      warnings: z.array(z.string()).optional().catch([]),
     })
     .nullable(),
   id: z.string().uuid(),
@@ -115,7 +117,9 @@ async function loadTest(supabase: ServerClient, sessionId: string): Promise<Grad
             errorCode: row.extraction.error_code,
             finishedAt: row.extraction.finished_at,
             id: row.extraction.id,
+            outcome: row.extraction.outcome ?? null,
             status: row.extraction.status,
+            warnings: row.extraction.warnings ?? [],
           }
         : null,
       id: row.id,

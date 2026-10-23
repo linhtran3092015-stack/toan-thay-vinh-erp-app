@@ -45,6 +45,7 @@ export const DATABASE_PERMISSION_CODES = [
   "ai_grading.view",
   "ai_grading.manage_tests",
   "ai_grading.confirm_key",
+  "ai_grading.review",
   "session_ledger.view",
   "session_ledger.reverse",
   "audit.view",

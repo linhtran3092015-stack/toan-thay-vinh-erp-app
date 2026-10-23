@@ -8,6 +8,8 @@ import type {
   SessionParticipantReadModel,
 } from "@/features/sessions/detail-read-models";
 import { SessionDetailPage } from "@/features/sessions/session-detail-page";
+import { DEFAULT_COMMENT_PHRASES } from "@/features/ai-grading/comment";
+import type { ReviewActions } from "@/features/grading-submissions/components/submission-review-panel";
 import { DATABASE_PERMISSION_CODES, type PermissionCode } from "@/lib/permissions/types";
 
 import { buildSessionTestState, previewSessionTestActions, type SessionTestPreviewState } from "./session-test-fixtures";
@@ -123,14 +125,56 @@ function buildSubmissions(participants: SessionParticipantReadModel[]): SessionG
     studentMatchMethod: "student_code",
     studentName: participants[index].studentName ?? "",
     submittedAt: "2026-10-12T14:31:00Z",
+    review: {
+      attendanceStatus: participants[index].attendanceStatus,
+      feedbackText: null,
+      finalScore: null,
+      finalVerdicts: null,
+      keyVersion: null,
+      messageStatus: null,
+      note: null,
+      paperScore: null,
+      praiseBonus: false,
+      rankLabel: null,
+      result: null,
+      reviewedAt: null,
+      reviewedByName: null,
+      status: "pending",
+    },
     ...overrides,
   });
+  // AI results (phase 3a): green, yellow with a flag, still grading, red.
+  const question = (label: string, verdict: "correct" | "incorrect", answer: string, reason: string, errorLocation = "") => ({
+    errorLocation,
+    extractedFinalAnswer: answer,
+    label,
+    noteForParent: "",
+    reasonForTeacher: reason,
+    verdict,
+  });
+  const graded = {
+    color: "green" as const,
+    confidence: "high" as const,
+    flags: [],
+    gradedAt: "2026-10-12T14:35:00Z",
+    keyVersion: 1,
+    questions: [
+      question("13", "incorrect", "x = 18", "Đáp số 18 sai, đúng là x = 54.", "dòng 1: lấy 36 - 18 thay vì 36 + 18"),
+      question("14", "correct", "8 cm", "Đúng đáp án."),
+      question("15", "correct", "257", "Đúng đáp án."),
+    ],
+    rawScore: 6,
+    state: "graded" as const,
+  };
   return [
-    submission(0, { attemptNo: 2, id: "sub-0b", submittedAt: "2026-10-12T14:34:00Z" }),
-    submission(0, { answerText: "13. 17\n14. 8", attemptNo: 1, countsForScore: false, id: "sub-0a" }),
-    submission(2, { answerText: "Câu 13: x=18\nCâu 14: BM = 14:2 = 7 cm\nCâu 15: 257" }),
-    submission(3, { sessionMatchMethod: "time_window", studentMatchMethod: "name_birth_year" }),
-    submission(1, { issues: ["outside_window"], submittedAt: "2026-10-12T17:05:00Z" }),
+    submission(0, { ai: graded, attemptNo: 2, id: "sub-0b", submittedAt: "2026-10-12T14:34:00Z" }),
+    submission(0, { ai: { ...graded, state: "not_counted" }, answerText: "13. 17\n14. 8", attemptNo: 1, countsForScore: false, id: "sub-0a" }),
+    submission(2, {
+      ai: { ...graded, color: "yellow", confidence: "low", flags: ["ambiguous_notation"], rawScore: 7.5 },
+      answerText: "Câu 13: x=18\nCâu 14: BM = 14:2 = 7 cm\nCâu 15: 257",
+    }),
+    submission(3, { ai: { ...graded, color: null, questions: [], rawScore: null, state: "grading" }, sessionMatchMethod: "time_window", studentMatchMethod: "name_birth_year" }),
+    submission(1, { ai: { ...graded, color: "red", questions: [], rawScore: null, state: "failed" }, issues: ["outside_window"], submittedAt: "2026-10-12T17:05:00Z" }),
   ];
 }
 
@@ -147,11 +191,20 @@ const taPermissions: readonly PermissionCode[] = [
   "ai_grading.view",
   "ai_grading.manage_tests",
   "ai_grading.confirm_key",
+  "ai_grading.review",
   "students.view",
   "timekeeping.view",
   "timekeeping.check",
   "notifications.view",
 ];
+
+/** Review actions in the preview never reach the server. */
+const previewReviewActions: ReviewActions = {
+  approve: async () => ({ message: "Xem trước: không ghi điểm thật.", ok: true }),
+  regrade: async () => ({ message: "Xem trước: không chấm lại thật.", ok: true }),
+  setPraise: async () => ({ message: "Xem trước: không lưu.", ok: true }),
+  skip: async () => ({ message: "Xem trước: không bỏ qua thật.", ok: true }),
+};
 
 export function SessionPreview({
   role,
@@ -167,6 +220,7 @@ export function SessionPreview({
     ? DATABASE_PERMISSION_CODES.filter((code) => code !== "student_care.view")
     : taPermissions;
   const detail = buildDetail(state);
+  const testState = buildSessionTestState(test, state === "locked");
 
   return (
     <AppShell
@@ -197,8 +251,29 @@ export function SessionPreview({
         gradingSubmissions={
           permissions.includes("ai_grading.view") ? { data: buildSubmissions(detail.participants), ok: true } : null
         }
-        sessionTest={{ data: buildSessionTestState(test, state === "locked"), ok: true }}
+        sessionTest={{ data: testState, ok: true }}
         sessionTestActions={previewSessionTestActions}
+        submissionReview={
+          permissions.includes("ai_grading.review")
+            ? {
+                actions: previewReviewActions,
+                bands: [
+                  { label: "Tiến bộ ít", minScore: 0 },
+                  { label: "Tiến bộ vừa", minScore: 5 },
+                  { label: "Tiến bộ", minScore: 8 },
+                  { label: "Tiến bộ nhiều", minScore: 9 },
+                  { label: "Rất tiến bộ", minScore: 10 },
+                ],
+                canReview: true,
+                canWriteResults: permissions.includes("results.manage"),
+                editable: detail.lockedAt === null && (detail.status === "in_progress" || detail.status === "completed"),
+                key: testState.test?.status === "key_confirmed" ? testState.test.answerKey : null,
+                keyVersion: testState.test?.status === "key_confirmed" ? testState.test.answerKeyVersion : 0,
+                phrases: DEFAULT_COMMENT_PHRASES,
+                sessionId: detail.id,
+              }
+            : undefined
+        }
         messageContact={
           state === "ready" || state === "locked"
             ? { saved: { phone: "0912 345 678", supervisorName: "Cô Lê Bích Ngọc", updatedAt: "2026-10-12T13:00:00Z" }, suggestion: null }

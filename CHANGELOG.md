@@ -2,6 +2,77 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.33.0.0] - 2026-10-22
+
+Danh sách học sinh xếp theo tên (chữ cuối của họ tên), danh sách tổng xếp theo khối từ lớp 12 xuống, và các ô chọn học sinh không còn bỏ sót em nào.
+
+### Changed
+- **Danh sách học sinh** (`/students`): xếp theo khối từ lớp 12 xuống, trong mỗi khối xếp theo tên (chữ cuối của họ tên) theo bảng chữ tiếng Việt (An, Anh, Ánh, Ăn, Ân… D trước Đ); trùng tên thì xét tiếp họ và tên đệm. Vì thứ tự đổi, link `/students?page=N` đã lưu sẽ mở ra trang khác.
+- **Xếp theo tên ở các danh sách học sinh khác:**
+  - Trang lớp: tab Học sinh, Kết quả, Học phí, cảnh báo vắng liên tiếp, ô thêm học sinh vào lớp.
+  - Buổi học: điểm danh, kết quả, ô chọn học sinh học thêm.
+  - Học phí: bảng kiểm tra trước khi chốt kỳ và 2 file Excel xuất từ bảng đó, bảng kỳ đã chốt. In phiếu học phí hàng loạt vẫn theo khối tăng dần, sau đó theo tên.
+  - Tài chính: ô chọn học sinh khi tạo yêu cầu thanh toán, kết quả tìm học sinh khi phân bổ SePay thủ công.
+  - Coaching: ô chọn học sinh khi tạo, bộ lọc học viên trong danh sách phản hồi.
+  - Kết quả học tập: các buổi vẫn mới nhất trước, học sinh trong mỗi buổi xếp theo tên.
+  - Chăm sóc học viên: "Phân công lâu dài" và "Theo dõi riêng" (xếp ngay trong cơ sở dữ liệu nên đúng thứ tự qua mọi trang 50 em).
+
+### Fixed
+- **Ô chọn học sinh bị thiếu em:** ô học thêm trong buổi học, ô chọn học sinh khi tạo yêu cầu thanh toán và khi tạo coaching chỉ tải tối đa 500 em, lấy theo họ, nên các em có họ đứng sau trong bảng chữ cái (Trần, Võ, Vũ…) không chọn được. Giờ các ô này tải đủ mọi học sinh.
+
+## [0.32.1.1] - 2026-10-21
+
+### Changed
+- **"Sao chép tin Zalo"** chép cả tin trong một lần bấm, kể cả tin dài, không chia thành nhiều phần nữa.
+
+## [0.32.1.0] - 2026-10-21
+
+### Added
+- **"Sao chép tin Zalo"** trên bảng kết quả buổi học (mỗi dòng đã có nhận xét): chép đúng tin nhận xét gửi phụ huynh theo mẫu đã chốt (tiêu đề, điểm "(đã cộng 1)", điểm vở, xếp hạng, bài làm, bài chữa, nhận xét, thông tin cuối) để dán tay vào Zalo khi học sinh chưa liên kết nhóm Zalo. Tin dài hơn 2.000 ký tự có nút chép từng phần (2–3 phần) như hàng chờ Zalo.
+
+## [0.32.0.2] - 2026-10-21
+
+### Fixed
+- **AI đọc đề xong mà ô đáp án vẫn trống:** bản nháp AI đã ghi vào hệ thống nhưng ô sửa đáp án giữ nội dung lúc mở trang (ví dụ "1 câu, chưa có điểm") cho tới khi tải lại trang. Giờ ô đáp án tự nạp bản nháp AI ngay khi AI đọc xong.
+
+## [0.32.0.0] - 2026-10-21
+
+Chấm bài AI, Giai đoạn 3c: trang "Chấm bài AI" gom các buổi cần duyệt, owner sửa câu mẫu nhận xét và xem chi phí 30 ngày, nhắc khi buổi sắp tự khóa mà còn bài chưa duyệt.
+
+### Added
+- **Trang Chấm bài AI** (`/ai-grading`, quyền xem chấm bài AI; có trong menu Kết quả học tập): các buổi có đề hoặc bài nộp trong khoảng ngày (mặc định 7 ngày, tối đa 62), lọc "Cần duyệt" / "Đang chấm / chờ đáp án" / "Đã xong" / "Tất cả". Mỗi buổi hiện trạng thái đề, số bài xanh/vàng/đỏ chờ duyệt, đang chấm, chờ đáp án, đã duyệt, bỏ qua, và giờ tự khóa nếu dưới 24 giờ; nút "Mở buổi để duyệt N bài". Ô số liệu hôm nay: AI đã chấm, xanh, vàng, đỏ, đã duyệt.
+- **Cài đặt → Chấm bài AI → Câu mẫu nhận xét** (chỉ owner sửa): thêm, sửa, xóa câu theo từng ô (Ý 1 đúng hết, Ý 2 đúng hết / có câu sai, Ý 3 tích cực / còn trầm, Ý 4), mỗi ô 1–20 câu, mỗi câu tối đa 500 ký tự; có ghi nhật ký. Bản nháp nhận xét dùng ngay câu mới; nhận xét đã duyệt không đổi.
+- **Chi phí 30 ngày** trong Cài đặt → Chấm bài AI: cột theo ngày so với trần ngày, tổng 30 ngày và ngày cao nhất.
+- **Nhắc duyệt trước khi tự khóa** (pg_cron mỗi giờ): buổi đã hoàn thành sẽ tự khóa trong 24 giờ mà còn bài chưa duyệt thì báo người hoàn thành buổi (một lần mỗi buổi) và gửi owner một bản tổng hợp mỗi ngày.
+
+## [0.31.0.0] - 2026-10-21
+
+Chấm bài AI, Giai đoạn 3b: trợ giảng duyệt bài AI đã chấm ngay trên trang buổi học; duyệt là ghi điểm và nhận xét vào kết quả buổi (giữ nguyên điểm vở), tin Zalo có bài làm của học sinh, bài chữa cả đề và "(đã cộng 1)".
+
+### Added
+- **Duyệt bài** (quyền mới `ai_grading.review` cho owner, hai quản lý, trợ giảng; cần thêm quyền nhập kết quả buổi): mỗi bài nộp có "Xem và duyệt" để sửa đúng/sai/bỏ trống từng câu, tick "Tích cực tương tác (+1)", xem trước điểm và xếp hạng, sửa nhận xét rồi "Duyệt và ghi điểm". Điểm tính trong cơ sở dữ liệu theo quy tắc đã chốt: câu đúng được trọn điểm, tổng làm tròn số nguyên (.5 lên) rồi mới cộng 1, tối đa 10; xếp hạng theo điểm cuối.
+- **Nhận xét soạn sẵn 4 ý** theo mẫu Thầy Vinh: câu báo cộng điểm (nếu tick), kết quả (khen khi đúng hết, hoặc từng câu sai kèm đáp án đúng và chỗ sai), lời nhờ phụ huynh, tương tác, lời chúc. Câu mẫu lấy từ bản demo (bảng `grading_comment_phrases`), xoay vòng theo học sinh; trợ giảng sửa thoải mái trước khi duyệt. Bài đã 10 điểm mà được tick thì chỉ khen, không nhắc cộng điểm.
+- **"Duyệt N bài xanh"**: duyệt một lần mọi bài xanh của buổi (theo đáp án hiện tại, em có mặt, chưa có điểm nhập tay) với kết quả AI, tick đã chọn và nhận xét soạn sẵn.
+- **"Chấm lại AI"** (kể cả bài đã duyệt hoặc đã bỏ qua; kết quả buổi giữ nguyên tới khi duyệt lại) và **"Bỏ qua"** (bắt buộc lý do; trợ giảng chấm tay).
+- **Tin Zalo nhận xét**: dòng Kết quả ghi "Điểm luyện tập cuối buổi: 9 (đã cộng 1)"; mục "Bài làm của học sinh" (tối đa 1.500 ký tự) và "Bài chữa chi tiết của thầy cô" (lời giải cả đề từ đáp án đã chốt, tối đa 2.500 ký tự) chỉ có ở bài chấm AI đã duyệt; buổi nhập tay vẫn tự ẩn hai mục này.
+
+### Changed
+- Người duyệt là người chấm (`graded_by`) nên nhận công chấm khi khóa buổi, như nhập tay. Sửa điểm tay sau khi duyệt thì bỏ hậu tố "(đã cộng 1)".
+- Sửa đáp án sau khi chốt không còn tự chấm lại bài đã duyệt; trang hiện "Đáp án đã đổi sau khi duyệt" để trợ giảng bấm "Chấm lại" nếu cần.
+- Thẻ bài nộp hiện điểm danh, điểm nhập tay đang có, trạng thái tin Zalo và người duyệt.
+
+## [0.30.0.0] - 2026-10-21
+
+Chấm bài AI, Giai đoạn 3a: ERP tự gọi Claude để đọc ảnh đề và chấm bài nộp qua form, theo đáp án trợ giảng đã chốt. Kết quả AI hiện trên từng bài ở buổi học để trợ giảng tham khảo; duyệt điểm vào kết quả buổi và tin Zalo ở Giai đoạn 3b.
+
+### Added
+- **Chấm bài tự động:** chốt đáp án (hoặc sửa sau khi chốt) là mọi bài đang tính điểm của buổi được xếp lượt chấm; bài nộp sau khi đã có đáp án cũng vậy. Bài nộp lại thay bài cũ thì lượt chờ của bài cũ bị hủy. Mỗi bài chấm hai lần (mặc định Claude Haiku 5.5, mức suy luận vừa); hai lần khớp từng câu thì "xanh", lệch thì hỏi Claude Sonnet 5.5 làm trọng tài, có cờ hay AI không chắc thì "vàng", không có kết quả dùng được thì "đỏ" để chấm tay. Bài trống được 0 điểm mà không gọi AI. Không gửi họ tên, mã hay SĐT học sinh cho AI.
+- **AI đọc đề chạy thật:** lượt "AI đọc đề" (mặc định Claude Opus 5.5) đọc các trang ảnh đề, điền bản nháp đáp án vào ô sửa và liệt kê chỗ ảnh khó đọc. Bản nháp đã sửa sau khi yêu cầu thì không bị ghi đè. Khu Bài kiểm tra và Bài nộp qua form tự cập nhật trong lúc AI đang đọc/chấm.
+- **Bài nộp qua form** trên trang buổi học hiện kết quả AI: "AI đang chấm", "AI: 8 điểm · chấm 2 lần khớp" (hoặc "cần trợ giảng xem"), "AI không chấm được · chấm tay", kèm kết quả từng câu và chỗ sai. Điểm AI là tổng điểm câu đúng, chưa cộng điểm tích cực.
+- **Cài đặt → Chấm bài AI** (chỉ owner sửa): bật/tắt, model chấm, mức suy luận, chấm hai lần, model trọng tài, model đọc đề, trần chi phí ngày (mặc định 20 USD). Trang hiện chi phí hôm nay/tháng này, số bài đã chấm, hàng đợi, lỗi, và lý do khi hàng đợi tạm dừng kèm nút "Chạy lại ngay".
+- **Tiến trình nền:** chạy ngay sau khi có việc (bài nộp mới, chốt đáp án, AI đọc đề, mở trang buổi còn việc chờ) và qua lịch GitHub Actions 5 phút/lần gọi `/api/internal/ai-grading/worker` với `CRON_SECRET`. Lỗi tạm thời (quá tải, giới hạn theo phút) tự thử lại tối đa 3 lần; hết tín dụng, chạm trần chi tiêu, khóa API sai thì dừng cả hàng đợi 1 giờ và báo owner; chạm trần ngày thì dừng tới 0 giờ hôm sau. pg_cron 10 phút/lần cảnh báo khi có lượt chờ quá 20 phút hoặc lỗi trên 20% trong 1 giờ.
+- Cần đặt trên Vercel: `ANTHROPIC_API_KEY` (workspace ai-grading) và `CRON_SECRET` (ít nhất 32 ký tự); trên GitHub: secret `CRON_SECRET` và `AI_GRADING_WORKER_URL`. Chấm bài AI mặc định tắt cho tới khi owner bật trong Cài đặt.
+
 ## [0.29.0.1] - 2026-10-21
 
 Form nộp bài Apps Script: câu 6 có lại lựa chọn "Khác" như form gốc, tên tiếng Việt lấy từ ERP luôn hiện đúng dấu, và hàm kiểm tra kết nối nói rõ vì sao không gọi được ERP.

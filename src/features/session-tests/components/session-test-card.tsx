@@ -149,8 +149,11 @@ export function SessionTestCard({
                   markingGuide: test?.markingGuide ?? null,
                   title: test?.title ?? null,
                 }}
-                // A new confirmed version starts a fresh editor; draft saves and photo uploads keep the typing.
-                key={test?.answerKeyVersion ?? 0}
+                // A new confirmed version, or an "AI đọc đề" draft the server just wrote, starts a fresh
+                // editor; draft saves and photo uploads keep the typing.
+                key={`${test?.answerKeyVersion ?? 0}:${
+                  test?.extraction?.status === "succeeded" && test.extraction.outcome === "applied" ? test.extraction.id : "typed"
+                }`}
                 mode={confirmed ? "revision" : "draft"}
                 onCancel={confirmed ? () => setEditing(false) : undefined}
                 onSaved={done}

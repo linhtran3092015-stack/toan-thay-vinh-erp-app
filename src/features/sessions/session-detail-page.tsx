@@ -6,6 +6,7 @@ import { getButtonClassName } from "@/components/ui/button";
 import { PageHeader } from "@/components/patterns/page-header";
 import { TableHeaderCell } from "@/components/patterns/data-table-frame";
 import { SessionSubmissionsCard } from "@/features/grading-submissions/components/session-submissions-card";
+import type { ReviewContext } from "@/features/grading-submissions/components/submission-review-panel";
 import type { GradingDataResult, SessionGradingSubmission } from "@/features/grading-submissions/data";
 import { SessionMessageContactCard } from "@/features/parent-messages/components/session-message-contact-card";
 import type { SessionMessageContactState } from "@/features/parent-messages/data";
@@ -64,6 +65,8 @@ interface SessionDetailPageProps {
   messageContact?: SessionMessageContactState | null;
   /** "Bài kiểm tra": test photos and answer key (ai_grading.view or ai_grading.manage_tests); null hides the card. */
   sessionTest?: GradingDataResult<SessionTestState> | null;
+  /** Phase 3b: approve AI-graded submissions (ai_grading.review); absent hides the review tools. */
+  submissionReview?: ReviewContext;
   /** Stand-ins for the dev preview; the real page uses the server actions. */
   sessionTestActions?: SessionTestActions;
 }
@@ -89,6 +92,7 @@ export function SessionDetailPage({
   messageContact = null,
   sessionTest = null,
   sessionTestActions,
+  submissionReview,
 }: SessionDetailPageProps) {
   // Display counts cover everyone on the page, walk-ins included.
   const participantCount = detail.participants.length;
@@ -235,6 +239,7 @@ export function SessionDetailPage({
                   canViewStudents={canViewStudents}
                   participants={detail.participants}
                   result={gradingSubmissions}
+                  review={submissionReview}
                 />
               ) : null}
               <SessionResultManagement

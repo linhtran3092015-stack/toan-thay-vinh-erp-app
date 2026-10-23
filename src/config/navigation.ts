@@ -249,6 +249,12 @@ export const navigationGroups: readonly NavigationGroup[] = [
           },
           {
             available: true,
+            href: "/ai-grading",
+            label: "Chấm bài AI",
+            permission: "ai_grading.view",
+          },
+          {
+            available: true,
             href: "/grading-submissions",
             label: "Bài nộp chưa ghép",
             permission: "ai_grading.view",

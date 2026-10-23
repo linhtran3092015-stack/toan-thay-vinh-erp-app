@@ -15,6 +15,7 @@
  */
 import { buildLockedVietQrPaymentDetails } from "@/features/finance/vietqr";
 import { formatNumber, formatVnd } from "@/lib/format";
+import { compareStudentNames } from "@/lib/student-order";
 
 export const FEE_NOTICE_DEFAULT_TITLE = "HỌC PHÍ {PERIOD_NAME}";
 export const FEE_NOTICE_DEFAULT_CENTER_NAME = "Trung tâm Toán Thầy Vinh";
@@ -429,11 +430,11 @@ export function parseFeeNoticeItemIds(value: string | readonly string[] | null |
   return [...new Set(raw.map((entry) => entry.trim().toLowerCase()).filter(isFeeNoticeItemId))];
 }
 
-/** Bulk print order: grade (unknown grade last), then full name (vi). */
+/** Bulk print order: grade (unknown grade last), then given name. */
 export function sortFeeNoticesForPrint(notices: readonly FeeNoticeModel[]): FeeNoticeModel[] {
   const gradeKey = (grade: number) => (grade > 0 ? grade : Number.POSITIVE_INFINITY);
   return [...notices].sort(
-    (a, b) => gradeKey(a.student.grade) - gradeKey(b.student.grade) || a.student.fullName.localeCompare(b.student.fullName, "vi"),
+    (a, b) => gradeKey(a.student.grade) - gradeKey(b.student.grade) || compareStudentNames(a.student.fullName, b.student.fullName),
   );
 }
 

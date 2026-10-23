@@ -8,12 +8,16 @@ import type { SettingsActionOverrides } from "@/features/settings/settings-actio
 import type { SystemSettingKey, SystemSettings } from "@/features/settings/system-settings";
 import { SystemSettingsForm, SystemSettingsReadOnly, type SystemSettingsFields } from "@/features/settings/system-settings-form";
 import { ZaloMessageSettings } from "@/features/settings/zalo-message-settings";
+import { AiGradingSettingsPanel } from "@/features/ai-grading/components/ai-grading-settings";
+import { PhraseLibraryEditor } from "@/features/ai-grading/components/phrase-library-editor";
+import { DEFAULT_COMMENT_PHRASES } from "@/features/ai-grading/comment";
+import { AI_GRADING_DEFAULTS } from "@/features/ai-grading/settings";
 import type { SettingsPermission, SettingsPermissionMatrix, SettingsRole } from "@/features/settings/types";
 import { WebsiteEditor } from "@/features/website/editor";
 import { createDefaultWebsite, type Website } from "@/features/website/schema";
 import { DATABASE_PERMISSION_CODES, type PermissionCode } from "@/lib/permissions/types";
 
-export type SettingsPreviewView = "general" | "zalo" | "branding" | "website" | "permissions";
+export type SettingsPreviewView = "general" | "zalo" | "ai-grading" | "branding" | "website" | "permissions";
 export type SettingsPreviewRole = "owner" | "manager" | "viewer";
 export type SettingsPreviewState = "normal" | "dirty" | "error";
 
@@ -263,6 +267,41 @@ export function SettingsPreview({
             initialFooter={settingsFixture["zalo.comment_footer"]}
             initialTemplate={settingsFixture["zalo.comment_template"]}
           />
+        ) : null}
+        {view === "ai-grading" ? (
+          <div className="grid gap-5">
+          <AiGradingSettingsPanel
+            actions={{
+              resume: async () => ({ message: "Xem trước: không gọi máy chủ.", ok: true }),
+              save: async () => ({ message: "Xem trước: không lưu thật.", ok: true }),
+            }}
+            apiKeyConfigured
+            canManage={canManageSettings}
+            cronConfigured={false}
+            overview={{
+              dailySpend: Array.from({ length: 30 }, (_, index) => ({
+                costUsd: index % 7 === 5 || index % 7 === 6 ? 0 : Math.round((0.6 + ((index * 37) % 11) / 10) * 100) / 100,
+                date: `2026-${index < 9 ? "09" : "10"}-${String(index < 9 ? 22 + index : index - 8).padStart(2, "0")}`,
+                runs: index % 7 === 5 || index % 7 === 6 ? 0 : 80 + ((index * 13) % 40),
+              })),
+              failedToday: 1,
+              gradedToday: 86,
+              keysReadToday: 4,
+              pauseReason: state === "error" ? "credit_exhausted" : null,
+              pausedUntil: state === "error" ? "2026-10-21T13:00:00Z" : null,
+              queued: 3,
+              running: 2,
+              settings: { ...AI_GRADING_DEFAULTS, enabled: true },
+              spentMonthUsd: 18.4,
+              spentTodayUsd: 1.37,
+            }}
+          />
+          <PhraseLibraryEditor
+            canManage={canManageSettings}
+            initial={DEFAULT_COMMENT_PHRASES}
+            save={async () => ({ message: "Xem trước: không lưu thật.", ok: true })}
+          />
+          </div>
         ) : null}
         {view === "branding" || view === "website" ? (
           <WebsiteEditor

@@ -6,8 +6,9 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // The service-role client bypasses RLS. Only the HMAC-signed webhooks, the
-  // signed grading-form roster and the SePay history sync (permission-checked)
-  // may use it.
+  // signed grading-form roster, the SePay history sync (permission-checked) and
+  // the AI grading worker (service_role-only claim/complete RPCs, started from
+  // after() or the CRON_SECRET route) may use it.
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: [
@@ -15,6 +16,7 @@ const eslintConfig = defineConfig([
       "src/app/api/webhooks/**",
       "src/app/api/integrations/grading-roster/route.ts",
       "src/features/finance/sepay-history-sync-actions.ts",
+      "src/features/ai-grading/worker.ts",
     ],
     rules: {
       "no-restricted-imports": [

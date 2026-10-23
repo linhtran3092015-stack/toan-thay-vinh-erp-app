@@ -31,6 +31,7 @@ import {
 import type { SessionKind, SessionStatus } from "@/features/sessions/read-models";
 import { summarizeDirectoryDebt } from "@/features/students/student-directory-metrics";
 import { getVietnamToday } from "@/lib/datetime";
+import { compareStudentNames, sortByStudentName } from "@/lib/student-order";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /** PostgREST returns at most this many rows per request; bigger reads are paged. */
@@ -405,7 +406,7 @@ async function loadActiveStudents(
     .map((row) => (Array.isArray(row.student) ? row.student[0] ?? null : row.student))
     .filter((student): student is NonNullable<typeof student> => student !== null)
     .map((student) => ({ fullName: student.full_name, id: student.id, publicCode: student.public_code }))
-    .sort((a, b) => a.fullName.localeCompare(b.fullName, "vi"));
+    .sort((a, b) => compareStudentNames(a.fullName, b.fullName));
 
   return { ids, students };
 }
@@ -813,14 +814,14 @@ async function queryEnrollmentCandidates(
       query = query.or(`full_name.ilike.${value},public_code.ilike.${value}`);
     }
 
-    const { data, error } = await query.order("full_name", { ascending: true }).limit(limit + 1);
+    const { data, error } = await query.order("full_name", { ascending: true }).order("id", { ascending: true }).limit(limit + 1);
 
     if (error) return null;
 
     const rows = data ?? [];
 
     return {
-      candidates: rows.slice(0, limit).map((row) => ({
+      candidates: sortByStudentName(rows.slice(0, limit), (row) => row.full_name).map((row) => ({
         fullName: row.full_name,
         grade: row.current_grade,
         id: row.id,

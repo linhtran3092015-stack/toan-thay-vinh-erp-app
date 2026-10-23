@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
   alert: vi.fn(),
+  kick: vi.fn(),
   rpc: vi.fn(),
 }));
 
@@ -12,6 +13,7 @@ vi.mock("@/lib/supabase/service-role", () => ({
   createSupabaseServiceRoleClient: vi.fn(() => ({ rpc: harness.rpc })),
 }));
 vi.mock("@/lib/ops-alerts", () => ({ raiseOpsAlert: harness.alert }));
+vi.mock("@/features/ai-grading/kick", () => ({ kickGradingWorker: harness.kick }));
 
 import { GET } from "@/app/api/integrations/grading-roster/route";
 import { POST } from "@/app/api/webhooks/grading-submissions/route";
@@ -86,6 +88,7 @@ beforeEach(() => {
   vi.mocked(getGradingFormEnv).mockReturnValue({ secret: SECRET });
   harness.rpc.mockReset();
   harness.alert.mockReset();
+  harness.kick.mockReset();
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -116,6 +119,8 @@ describe("POST /api/webhooks/grading-submissions", () => {
         p_submitted_at: "2026-10-18T12:35:00.000Z",
       }),
     );
+    // A new matched submission is graded right away when its session has a confirmed key.
+    expect(harness.kick).toHaveBeenCalledWith("submission");
   });
 
   it("uses the Vietnam date of the submission for candidates (00:30 in Vietnam is still the previous UTC day)", async () => {
@@ -146,6 +151,7 @@ describe("POST /api/webhooks/grading-submissions", () => {
     mockRpc({ ...happyRpc, record_grading_submission: { data: [{ counts_for_score: true, inserted: false, match_status: "matched", submission_id: SUBMISSION_ID }], error: null } });
     const response = await POST(webhookRequest(JSON.stringify(payload)));
     expect(await response.json()).toEqual({ duplicate: true, matchStatus: "matched", ok: true });
+    expect(harness.kick).not.toHaveBeenCalled();
   });
 
   it("rejects a bad signature, a stale timestamp, a non-JSON request, an invalid body and a missing secret", async () => {

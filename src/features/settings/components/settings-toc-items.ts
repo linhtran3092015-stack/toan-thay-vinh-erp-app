@@ -29,6 +29,7 @@ export function getSettingsTocGroups({ canViewAudit, canViewUsers }: SettingsToc
         { exact: true, href: SETTINGS_OVERVIEW_HREF, label: "Tổng quan" },
         { href: "/settings/general", label: "Chung" },
         { href: "/settings/zalo", label: "Tin Zalo" },
+        { href: "/settings/ai-grading", label: "Chấm bài AI" },
         { href: "/settings/branding", label: "Thương hiệu & giao diện" },
         { href: "/settings/website", label: "Trang web công khai" },
       ],

@@ -14,6 +14,7 @@ import type {
   ClassTuitionView,
 } from "@/features/classes/detail/class-tuition-models";
 import { resolveReissueChains } from "@/features/tuition/reissue-chains";
+import { compareStudentNames } from "@/lib/student-order";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /** Periods offered in the tab's picker, newest first: two school years of monthly periods. */
@@ -158,7 +159,7 @@ async function loadLockedRows(
     });
   }
 
-  return rows.sort((a, b) => a.fullName.localeCompare(b.fullName, "vi"));
+  return rows.sort((a, b) => compareStudentNames(a.fullName, b.fullName));
 }
 
 interface PreviewQueryRow {
@@ -218,7 +219,7 @@ function toDraftRows(preview: readonly PreviewQueryRow[], students: Map<string, 
     byStudent.set(line.student_id, row);
   }
 
-  return [...byStudent.values()].sort((a, b) => a.fullName.localeCompare(b.fullName, "vi"));
+  return [...byStudent.values()].sort((a, b) => compareStudentNames(a.fullName, b.fullName));
 }
 
 /**

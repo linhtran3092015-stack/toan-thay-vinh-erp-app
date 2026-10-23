@@ -36,7 +36,7 @@ function enrollment(overrides: Partial<ClassEnrollmentRow> & Pick<ClassEnrollmen
 }
 
 describe("pickLatestEnrollments", () => {
-  it("prefers the open active enrolment over a newer closed one, else the latest start, sorted by Vietnamese name", () => {
+  it("prefers the open active enrolment over a newer closed one, else the latest start, sorted by given name", () => {
     const rows = pickLatestEnrollments([
       // Student a: reserved earlier, resumed into the class; the closed row started later than the open one.
       enrollment({ effectiveFrom: "2026-09-01", enrollmentId: "a-open", fullName: "Đào An", studentId: "a" }),
@@ -44,11 +44,11 @@ describe("pickLatestEnrollments", () => {
       // Student b: nothing open, so the latest start wins.
       enrollment({ effectiveFrom: "2026-08-01", effectiveTo: "2026-08-31", enrollmentId: "b-old", fullName: "Bảo", status: "transferred", studentId: "b" }),
       enrollment({ effectiveFrom: "2026-09-05", effectiveTo: "2026-09-25", enrollmentId: "b-new", fullName: "Bảo", status: "completed", studentId: "b" }),
-      // Student c sorts before Đ in Vietnamese collation.
+      // Rows sort by given name: "Đào An" (An) comes before "Bảo" and "Cường" despite the family name Đào.
       enrollment({ enrollmentId: "c-1", fullName: "Cường", studentId: "c" }),
     ]);
 
-    expect(rows.map((row) => row.enrollmentId)).toEqual(["b-new", "c-1", "a-open"]);
+    expect(rows.map((row) => row.enrollmentId)).toEqual(["a-open", "b-new", "c-1"]);
   });
 
   it("keeps the open enrolment whichever order the rows arrive in", () => {
@@ -283,6 +283,24 @@ describe("buildClassResultMatrix", () => {
       ["An", null],
       ["Xuân", { label: "Đã chuyển lớp", tone: "neutral" }],
     ]);
+  });
+
+  // Value: protects=the class results tab lists current and former students together by given name, a shared given name broken by family name;
+  // fails_when=buildClassResultMatrix goes back to full-name (family-first) order or lists former students after the current ones;
+  // why_new=existing matrix fixtures use one-word names, where full-name and given-name order agree;
+  // seam=none; no_claim=pure function only; does not prove the loader passes these students
+  it("lists current and former students together by given name", () => {
+    const matrix = buildClassResultMatrix({
+      activeStudents: [student("yen", "Bùi Thị Yến"), student("an-tran", "Trần Minh An"), student("an-do", "Đỗ Văn An")],
+      attendance: [],
+      enrollments: [
+        enrollment({ effectiveTo: "2026-10-03", enrollmentId: "e-binh", fullName: "Lê Văn Bình", status: "transferred", studentId: "binh" }),
+      ],
+      results: [result("s1", "binh", 7)],
+      sessions,
+    });
+
+    expect(matrix.rows.map((row) => row.student.fullName)).toEqual(["Đỗ Văn An", "Trần Minh An", "Lê Văn Bình", "Bùi Thị Yến"]);
   });
 });
 
