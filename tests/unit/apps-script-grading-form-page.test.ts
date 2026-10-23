@@ -2,10 +2,20 @@
 // fails_when=a second answer for the same year (the saved-progress restore reloading a year the student already picked, or switching years while a load is pending) adds the names again after "Tên con không có trong danh sách", or a stale answer for another year replaces the list;
 // why_new=duplicate list reported on 23/10/2026; seam=google.script.run stand-in whose answers the test releases one by one; no_claim=Code.gs (apps-script-grading-form.test.ts) and the real Apps Script runtime
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 
-import { JSDOM } from "jsdom";
 import { afterEach, describe, expect, it } from "vitest";
+
+// jsdom ships without type declarations here; this is the part of its API the test uses.
+interface Dom {
+  window: Window & typeof globalThis;
+}
+type JsdomConstructor = new (
+  html: string,
+  options: { beforeParse(window: Window): void; pretendToBeVisual: boolean; runScripts: "dangerously"; url: string },
+) => Dom;
+const { JSDOM } = createRequire(import.meta.url)("jsdom") as { JSDOM: JsdomConstructor };
 
 const HTML = readFileSync(path.join(process.cwd(), "integrations/apps-script/grading-form/FormHocSinh.html"), "utf8");
 
@@ -20,7 +30,7 @@ function roster(names: string[]) {
   return { source: "erp", students: names.map((label, index) => ({ code: `TV-${label}-${index}`, label })) };
 }
 
-const opened: JSDOM[] = [];
+const opened: Dom[] = [];
 
 afterEach(() => {
   for (const dom of opened.splice(0)) dom.window.close();
