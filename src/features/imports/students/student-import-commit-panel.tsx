@@ -1,476 +1,311 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 
-import {
-  useMemo,
-  useState,
-  useTransition,
-} from "react";
-
+import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
+import { GuardedActionPanel, type GuardedCondition } from "@/components/patterns/guarded-action-panel";
+import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  commitStudentImportRowsAction,
-} from "@/features/imports/students/actions";
+import { getButtonClassName } from "@/components/ui/button";
+import { Label, Textarea } from "@/components/ui/field";
+import { formatImportTimestamp } from "@/features/imports/components/import-labels";
+import { ImportSummaryStrip } from "@/features/imports/components/import-summary-strip";
 import type {
+  StudentImportActionFailure,
   StudentImportCommitResult,
-  StudentImportRowInput,
   StudentImportValidationResult,
 } from "@/features/imports/students/types";
+import { formatNumber } from "@/lib/format";
+import { permissionLabel } from "@/lib/permissions/labels";
+
+/** Same cap as the server's zod schema ("Lý do import không được vượt quá 1.500 ký tự."). */
+export const STUDENT_IMPORT_REASON_MAX_LENGTH = 1500;
+
+const REASON_MAX_TEXT = formatNumber(STUDENT_IMPORT_REASON_MAX_LENGTH);
+
+/**
+ * A commit whose answer never arrived. Retrying in place is safe: the commit
+ * RPC refuses a second commit of the same file
+ * (STUDENT_IMPORT_FILE_ALREADY_COMMITTED) and says so.
+ */
+const COMMIT_UNKNOWN_RESULT = "Bấm xác nhận lại: máy chủ không ghi hai lần và sẽ báo nếu lần trước đã ghi xong.";
+
+/**
+ * The commit action's message for STUDENT_IMPORT_FILE_ALREADY_COMMITTED
+ * (actions.ts getRpcFailure, code "conflict"). The action passes no database
+ * code through, and "conflict" also means a duplicate student, so the message
+ * tells the two apart.
+ */
+export const STUDENT_IMPORT_ALREADY_COMMITTED_MESSAGE = "File này đã được import thành công trước đó.";
+
+export interface StudentImportCommitGateInput {
+  canCreateStudents: boolean;
+  /** Rows mapped from the file currently chosen (0 when no file is held). */
+  mappedRowCount: number;
+  validation: StudentImportValidationResult;
+  reason: string;
+  confirmed: boolean;
+  isPending: boolean;
+  isCommitted: boolean;
+  /** The commit refused this file as already committed (an earlier press landed): locked, with its reason. */
+  isAlreadyCommitted?: boolean;
+}
+
+export interface StudentImportCommitGate {
+  canCommit: boolean;
+  conditions: GuardedCondition[];
+  /** Why the commit is unavailable, in words (the first unmet condition); null when it can run or is running. */
+  reason: string | null;
+}
+
+/**
+ * The commit gate of today's panel, condition by condition and in the same
+ * order as its checks: `students.create`, 0 invalid rows, the dry-run still
+ * matches the mapped file (same row count, at least one row), a reason of
+ * 1–1,500 characters, the confirmation checkbox, not pending, not committed
+ * (here or by an earlier press the server reports).
+ */
+export function getStudentImportCommitGate({
+  canCreateStudents,
+  confirmed,
+  isAlreadyCommitted = false,
+  isCommitted,
+  isPending,
+  mappedRowCount,
+  reason,
+  validation,
+}: StudentImportCommitGateInput): StudentImportCommitGate {
+  const trimmedReason = reason.trim();
+  const rowsMatch = validation.row_count > 0 && mappedRowCount === validation.row_count;
+  const reasonOk = trimmedReason.length > 0 && trimmedReason.length <= STUDENT_IMPORT_REASON_MAX_LENGTH;
+
+  const checks: Array<{ ok: boolean; met: string; unmet: string; why: string }> = [
+    {
+      met: `Có quyền ${permissionLabel("students.create")}`,
+      ok: canCreateStudents,
+      unmet: `Chưa có quyền ${permissionLabel("students.create")}`,
+      why: `Tài khoản này chưa có quyền ${permissionLabel("students.create")}.`,
+    },
+    {
+      met: "0 dòng lỗi",
+      ok: validation.invalid_count === 0,
+      unmet: `Còn ${formatNumber(validation.invalid_count)} dòng lỗi`,
+      why: "Bật khi không còn dòng lỗi. Sửa file Excel rồi chọn lại file.",
+    },
+    {
+      met: `Kết quả kiểm tra khớp file đang chọn (${formatNumber(validation.row_count)} dòng)`,
+      ok: rowsMatch,
+      unmet: "Kết quả kiểm tra không khớp file đang chọn",
+      why: "Chọn lại file và kiểm tra các dòng trước khi nhập.",
+    },
+    {
+      met: "Đã nhập lý do",
+      ok: reasonOk,
+      unmet: trimmedReason.length > STUDENT_IMPORT_REASON_MAX_LENGTH ? `Lý do dài quá ${REASON_MAX_TEXT} ký tự` : "Chưa nhập lý do",
+      why: trimmedReason.length > STUDENT_IMPORT_REASON_MAX_LENGTH ? `Rút gọn lý do còn tối đa ${REASON_MAX_TEXT} ký tự.` : "Nhập lý do nhập dữ liệu.",
+    },
+    {
+      met: "Đã đánh dấu xác nhận",
+      ok: confirmed,
+      unmet: "Chưa đánh dấu xác nhận",
+      why: "Đánh dấu ô xác nhận trước khi nhập.",
+    },
+  ];
+
+  const firstUnmet = checks.find((check) => !check.ok);
+
+  return {
+    canCommit: !firstUnmet && !isPending && !isCommitted && !isAlreadyCommitted,
+    conditions: checks.map((check) => ({ label: check.ok ? check.met : check.unmet, state: check.ok ? "met" : "unmet" })),
+    reason: isAlreadyCommitted ? "File này đã được nhập; không cần nhập lại." : firstUnmet && !isPending ? firstUnmet.why : null,
+  };
+}
+
+export type StudentImportCommitError =
+  | { kind: "error"; message: string }
+  | { kind: "unknown" }
+  /** The server's refusal of a file it already committed; `message` is its words. */
+  | { kind: "already_committed"; message: string };
+
+/** A refused commit in the panel's terms: the already-committed refusal is told apart from the rest. */
+export function toStudentImportCommitError(failure: Pick<StudentImportActionFailure, "code" | "message">): StudentImportCommitError {
+  return failure.code === "conflict" && failure.message === STUDENT_IMPORT_ALREADY_COMMITTED_MESSAGE
+    ? { kind: "already_committed", message: failure.message }
+    : { kind: "error", message: failure.message };
+}
 
 interface StudentImportCommitPanelProps {
-  canCreateStudents: boolean;
-  rows: StudentImportRowInput[];
-  sourceFilename: string;
-  sourceSha256: string;
-  validationResult: StudentImportValidationResult;
+  gate: StudentImportCommitGate;
+  validation: StudentImportValidationResult;
+  reusedGuardianCount: number;
+  reason: string;
+  onReasonChange: (value: string) => void;
+  confirmed: boolean;
+  onConfirmedChange: (value: boolean) => void;
+  /** Inputs locked (pending, no permission, rows still invalid, file already committed). */
+  inputsDisabled: boolean;
+  error: StudentImportCommitError | null;
+  /** Where the already-committed banner sends people to see the students (the /dev preview keeps it under /dev). */
+  studentListHref: string;
 }
 
-function formatCommittedAt(
-  value: string,
-): string {
-  const parsedDate = new Date(value);
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(
-    "vi-VN",
-    {
-      dateStyle: "medium",
-      timeStyle: "medium",
-    },
-  ).format(parsedDate);
-}
-
+/**
+ * Step "Xác nhận nhập" (design 17c step 4): the consequence in words (all or
+ * nothing), the gate's conditions, the reason and the confirmation checkbox.
+ * The commit button itself is the step's primary in the wizard's action bar.
+ */
 export function StudentImportCommitPanel({
-  canCreateStudents,
-  rows,
-  sourceFilename,
-  sourceSha256,
-  validationResult,
+  confirmed,
+  error,
+  gate,
+  inputsDisabled,
+  onConfirmedChange,
+  onReasonChange,
+  reason,
+  reusedGuardianCount,
+  studentListHref,
+  validation,
 }: StudentImportCommitPanelProps) {
-  const [
-    reason,
-    setReason,
-  ] = useState("");
-
-  const [
-    confirmed,
-    setConfirmed,
-  ] = useState(false);
-
-  const [
-    actionError,
-    setActionError,
-  ] = useState<string | null>(null);
-
-  const [
-    commitResult,
-    setCommitResult,
-  ] = useState<StudentImportCommitResult | null>(
-    null,
-  );
-
-  const [
-    isPending,
-    startTransition,
-  ] = useTransition();
-
-  const normalizedReason = reason.trim();
-
-  const canCommit = useMemo(
-    () =>
-      canCreateStudents &&
-      validationResult.invalid_count === 0 &&
-      validationResult.row_count > 0 &&
-      rows.length === validationResult.row_count &&
-      normalizedReason.length > 0 &&
-      normalizedReason.length <= 1500 &&
-      confirmed &&
-      !isPending &&
-      commitResult === null,
-    [
-      canCreateStudents,
-      commitResult,
-      confirmed,
-      isPending,
-      normalizedReason.length,
-      rows.length,
-      validationResult.invalid_count,
-      validationResult.row_count,
-    ],
-  );
-
-  function handleCommit(): void {
-    setActionError(null);
-
-    if (!canCreateStudents) {
-      setActionError(
-        "Tài khoản hiện tại không có quyền tạo học viên.",
-      );
-      return;
-    }
-
-    if (validationResult.invalid_count > 0) {
-      setActionError(
-        "Không thể import khi kết quả dry-run vẫn còn dòng không hợp lệ.",
-      );
-      return;
-    }
-
-    if (
-      rows.length !==
-      validationResult.row_count
-    ) {
-      setActionError(
-        "Dữ liệu hiện tại không còn khớp với kết quả dry-run. Hãy kiểm tra lại.",
-      );
-      return;
-    }
-
-    if (normalizedReason.length === 0) {
-      setActionError(
-        "Bắt buộc nhập lý do import.",
-      );
-      return;
-    }
-
-    if (normalizedReason.length > 1500) {
-      setActionError(
-        "Lý do import không được vượt quá 1.500 ký tự.",
-      );
-      return;
-    }
-
-    if (!confirmed) {
-      setActionError(
-        "Hãy xác nhận dữ liệu trước khi import.",
-      );
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        const result =
-          await commitStudentImportRowsAction({
-            reason: normalizedReason,
-            rows,
-            sourceFilename,
-            sourceSha256,
-          });
-
-        if (!result.ok) {
-          setActionError(result.message);
-          return;
-        }
-
-        setCommitResult(result.data);
-        setConfirmed(false);
-      } catch {
-        setActionError(
-          "Không thể hoàn tất import. Dữ liệu chưa được xác nhận là đã tạo.",
-        );
-      }
-    });
-  }
-
-  if (commitResult) {
-    return (
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle>
-              Import học viên thành công
-            </CardTitle>
-
-            <Badge tone="success">
-              Đã commit
-            </Badge>
-          </div>
-        </CardHeader>
-
-        <CardContent className="grid gap-5">
-          <div
-            aria-live="polite"
-            className="rounded-md border border-success-border bg-success-bg p-4 text-sm text-success"
-          >
-            Toàn bộ batch đã được ghi trong một
-            transaction. Không có dòng nào được commit
-            một phần.
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-md border border-hairline bg-canvas p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Học viên đã tạo
-              </p>
-              <p className="mt-1 text-2xl font-bold text-ink">
-                {commitResult.student_count}
-              </p>
-            </div>
-
-            <div className="rounded-md border border-hairline bg-canvas p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Phụ huynh tạo mới
-              </p>
-              <p className="mt-1 text-2xl font-bold text-ink">
-                {commitResult.guardian_created_count}
-              </p>
-            </div>
-
-            <div className="rounded-md border border-hairline bg-canvas p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Phụ huynh dùng lại
-              </p>
-              <p className="mt-1 text-2xl font-bold text-ink">
-                {commitResult.guardian_reused_count}
-              </p>
-            </div>
-
-            <div className="rounded-md border border-hairline bg-canvas p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Thời điểm commit
-              </p>
-              <p className="mt-1 text-sm font-semibold text-ink">
-                {formatCommittedAt(
-                  commitResult.committed_at,
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-2 rounded-md border border-hairline bg-canvas p-4 text-sm">
-            <p>
-              <span className="font-semibold text-ink">
-                Batch ID:
-              </span>{" "}
-              <span className="break-all font-mono text-xs text-ink-muted">
-                {commitResult.batch_id}
-              </span>
-            </p>
-
-            <p>
-              <span className="font-semibold text-ink">
-                File:
-              </span>{" "}
-              <span className="text-ink-muted">
-                {commitResult.source_filename}
-              </span>
-            </p>
-
-            <p>
-              <span className="font-semibold text-ink">
-                SHA-256:
-              </span>{" "}
-              <span className="break-all font-mono text-xs text-ink-muted">
-                {commitResult.source_sha256}
-              </span>
-            </p>
-          </div>
-
-          <div className="overflow-x-auto rounded-lg border border-hairline">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="bg-canvas">
-                <tr className="border-b border-hairline text-xs font-semibold uppercase text-ink-subtle">
-                  <th className="px-4 py-3">
-                    Dòng
-                  </th>
-                  <th className="px-4 py-3">
-                    Mã học viên
-                  </th>
-                  <th className="px-4 py-3">
-                    Student ID
-                  </th>
-                  <th className="px-4 py-3">
-                    Phụ huynh
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-hairline">
-                {commitResult.students.map(
-                  (student) => (
-                    <tr key={student.student_id}>
-                      <td className="px-4 py-3 font-mono text-xs text-ink-muted">
-                        {student.row_number}
-                      </td>
-
-                      <td className="px-4 py-3 font-semibold text-ink">
-                        {student.student_public_code}
-                      </td>
-
-                      <td className="px-4 py-3 font-mono text-xs text-ink-muted">
-                        {student.student_id}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <Badge
-                          tone={
-                            student.guardian_reused
-                              ? "info"
-                              : "neutral"
-                          }
-                        >
-                          {student.guardian_reused
-                            ? "Dùng lại"
-                            : "Tạo mới"}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ),
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Link
-              className="inline-flex h-10 items-center justify-center rounded-md border border-primary bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
-              href="/students"
-            >
-              Mở danh sách học viên
-            </Link>
-
-            <Link
-              className="inline-flex h-10 items-center justify-center rounded-md border border-hairline bg-surface-1 px-4 text-sm font-semibold text-ink transition-colors hover:bg-canvas"
-              href="/audit"
-            >
-              Xem nhật ký thao tác
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const total = formatNumber(validation.row_count);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          4. Xác nhận import
-        </CardTitle>
-      </CardHeader>
+    <GuardedActionPanel
+      conditions={gate.conditions}
+      consequence={
+        <>
+          Ghi toàn bộ <strong>{total} học sinh</strong> trong một lần; nếu máy chủ từ chối thì không ghi dòng nào.
+        </>
+      }
+      result={
+        error ? (
+          error.kind === "unknown" ? (
+            <ResultBanner description={COMMIT_UNKNOWN_RESULT} title="Không rõ kết quả." tone="conflict" />
+          ) : error.kind === "already_committed" ? (
+            <ResultBanner
+              action={
+                <Link className={getButtonClassName({ className: "max-md:h-11", size: "sm", variant: "secondary" })} href={studentListHref}>
+                  Mở danh sách học viên
+                </Link>
+              }
+              description={`${error.message} Hồ sơ đã tạo có trong danh sách học viên.`}
+              title="File này đã được nhập."
+              tone="info"
+            />
+          ) : (
+            <ResultBanner description={error.message} title="Chưa nhập." tone="error" />
+          )
+        ) : null
+      }
+      title="Xác nhận nhập học sinh"
+      titleId="student-import-commit-title"
+    >
+      <p className="mt-2 max-w-[720px] text-secondary text-text-muted">
+        Học sinh mới ở trạng thái Đang quan tâm.
+        {reusedGuardianCount > 0
+          ? ` ${formatNumber(reusedGuardianCount)} phụ huynh đã có trong hệ thống được dùng lại theo số điện thoại; thông tin phụ huynh trong file không ghi đè hồ sơ đó.`
+          : null}{" "}
+        Máy chủ kiểm tra lại toàn bộ dòng ngay trước khi ghi.
+      </p>
 
-      <CardContent className="grid gap-4">
-        {!canCreateStudents ? (
-          <div className="rounded-md border border-warning-border bg-warning-bg p-4 text-sm text-warning">
-            Tài khoản hiện tại thiếu quyền
-            students.create nên không thể commit batch.
-          </div>
-        ) : null}
-
-        {validationResult.invalid_count > 0 ? (
-          <div className="rounded-md border border-danger-border bg-danger-bg p-4 text-sm text-danger">
-            Còn {validationResult.invalid_count} dòng
-            không hợp lệ. Hãy sửa file hoặc mapping và
-            chạy dry-run lại.
-          </div>
-        ) : (
-          <div className="rounded-md border border-success-border bg-success-bg p-4 text-sm text-success">
-            Dry-run không có dòng lỗi. Có thể xác nhận
-            tạo {validationResult.row_count} học viên.
-          </div>
-        )}
-
-        {validationResult.warning_count > 0 ? (
-          <div className="rounded-md border border-warning-border bg-warning-bg p-4 text-sm text-warning">
-            Có {validationResult.warning_count} dòng cảnh
-            báo. Hãy đọc kỹ bảng kết quả trước khi commit.
-          </div>
-        ) : null}
-
-        <div className="grid gap-2">
-          <label
-            className="text-sm font-semibold text-ink"
-            htmlFor="student-import-reason"
-          >
-            Lý do import
-            <span className="ml-1 text-danger">
-              *
-            </span>
-          </label>
-
-          <textarea
-            className="min-h-28 w-full resize-y rounded-md border border-hairline bg-surface-1 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-canvas"
-            disabled={
-              isPending ||
-              validationResult.invalid_count > 0 ||
-              !canCreateStudents
-            }
+      <div className="mt-4 grid max-w-[720px] gap-4">
+        <div className="grid gap-1.5">
+          <Label htmlFor="student-import-reason" required>
+            Lý do nhập
+          </Label>
+          <Textarea
+            aria-describedby="student-import-reason-count"
+            disabled={inputsDisabled}
             id="student-import-reason"
-            maxLength={1500}
-            onChange={(event) => {
-              setReason(event.target.value);
-              setActionError(null);
-            }}
-            placeholder="Ví dụ: Import danh sách học viên đang quan tâm từ file vận hành tháng 8/2026."
+            maxLength={STUDENT_IMPORT_REASON_MAX_LENGTH}
+            onChange={(event) => onReasonChange(event.target.value)}
+            placeholder="Ví dụ: Nhập danh sách học sinh đang quan tâm từ file vận hành tháng 10."
             value={reason}
           />
-
-          <p className="text-right text-xs text-ink-muted">
-            {reason.length}/1.500 ký tự
+          <p className="text-caption text-text-muted tabular-nums" id="student-import-reason-count">
+            {formatNumber(reason.length)}/{REASON_MAX_TEXT} ký tự
           </p>
         </div>
 
-        <label className="flex items-start gap-3 rounded-md border border-hairline bg-canvas p-4">
+        <label className="flex min-h-11 items-start gap-3 rounded-md border border-border-subtle bg-surface-sunken px-4 py-3 text-body text-text-default">
           <input
             checked={confirmed}
-            className="mt-1 size-4 rounded border-hairline"
-            disabled={
-              isPending ||
-              validationResult.invalid_count > 0 ||
-              !canCreateStudents
-            }
-            onChange={(event) => {
-              setConfirmed(event.target.checked);
-              setActionError(null);
-            }}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--action-primary)]"
+            disabled={inputsDisabled}
+            onChange={(event) => onConfirmedChange(event.target.checked)}
             type="checkbox"
           />
-
-          <span className="text-sm text-ink">
-            Tôi đã kiểm tra kết quả dry-run và xác nhận
-            tạo toàn bộ {validationResult.row_count} học
-            viên trong một transaction. Tôi hiểu rằng
-            thao tác này sẽ ghi dữ liệu thật.
-          </span>
+          <span>Tôi đã xem kết quả kiểm tra và đồng ý ghi toàn bộ {total} học sinh trong một lần.</span>
         </label>
+      </div>
+    </GuardedActionPanel>
+  );
+}
 
-        {actionError ? (
-          <div
-            aria-live="polite"
-            className="rounded-md border border-danger-border bg-danger-bg p-3 text-sm text-danger"
-          >
-            {actionError}
-          </div>
-        ) : null}
+/**
+ * Result of a successful commit: what was written (students, new and reused
+ * guardians), when, from which file, and the created student codes. Links to
+ * the student list and the audit log sit in the wizard's action bar.
+ */
+export function StudentImportCommitResultView({ result }: { result: StudentImportCommitResult }) {
+  return (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
+      <ResultBanner
+        description="Toàn bộ dòng được ghi trong một lần; không có dòng nào ghi dở."
+        title={`Đã nhập ${formatNumber(result.student_count)} học sinh.`}
+        tone="success"
+      />
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            disabled={!canCommit}
-            onClick={handleCommit}
-            type="button"
-          >
-            {isPending
-              ? "Đang import..."
-              : `Xác nhận import ${validationResult.row_count} học viên`}
-          </Button>
+      <ImportSummaryStrip
+        cells={[
+          { label: "Học sinh đã tạo", tone: "success", value: result.student_count },
+          { label: "Phụ huynh tạo mới", value: result.guardian_created_count },
+          { label: "Phụ huynh dùng lại", value: result.guardian_reused_count },
+        ]}
+        label="Kết quả nhập"
+      />
 
-          <span className="text-xs text-ink-muted">
-            Database sẽ kiểm tra lại toàn bộ dữ liệu ngay
-            trước khi commit.
-          </span>
-        </div>
-      </CardContent>
-    </Card>
+      <dl className="grid gap-3 rounded-lg border border-border-subtle bg-surface-base px-4 py-3 shadow-[var(--panel-shadow)] sm:grid-cols-2 xl:grid-cols-4">
+        <ResultFact label="Thời điểm ghi">{formatImportTimestamp(result.committed_at)}</ResultFact>
+        <ResultFact label="File">
+          <span className="break-all">{result.source_filename}</span>
+        </ResultFact>
+        <ResultFact label="SHA-256">
+          <span className="break-all font-mono text-caption font-normal">{result.source_sha256}</span>
+        </ResultFact>
+        <ResultFact label="Mã lô">
+          <span className="break-all font-mono text-caption font-normal">{result.batch_id}</span>
+        </ResultFact>
+      </dl>
+
+      <DataTableFrame
+        body={result.students.map((student) => (
+          <TableRow key={student.student_id}>
+            <TableCell className="text-text-muted tabular-nums">{student.row_number}</TableCell>
+            <TableCell className="font-semibold text-text-strong tabular-nums">{student.student_public_code}</TableCell>
+            <TableCell>
+              <Badge tone={student.guardian_reused ? "info" : "neutral"}>{student.guardian_reused ? "Dùng lại" : "Tạo mới"}</Badge>
+            </TableCell>
+          </TableRow>
+        ))}
+        caption={`Học sinh đã tạo (${formatNumber(result.students.length)})`}
+        header={
+          <tr>
+            <TableHeaderCell style={{ width: "80px" }}>Dòng</TableHeaderCell>
+            <TableHeaderCell>Mã học sinh</TableHeaderCell>
+            <TableHeaderCell>Phụ huynh</TableHeaderCell>
+          </tr>
+        }
+      />
+    </div>
+  );
+}
+
+function ResultFact({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-caption text-text-muted">{label}</dt>
+      <dd className="mt-0.5 text-body font-semibold text-text-strong">{children}</dd>
+    </div>
   );
 }
