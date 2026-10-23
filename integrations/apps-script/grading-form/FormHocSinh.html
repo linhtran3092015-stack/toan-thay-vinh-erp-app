@@ -391,6 +391,8 @@
             "Con không rõ"
         ];
         const rosterByYear = {};
+        // Mỗi lần đổi năm sinh là một lượt tải mới; chỉ kết quả của lượt mới nhất được ghi vào ô họ tên.
+        let rosterRequest = 0;
         let currentStudents = [];
         let restoring = null;
 
@@ -441,6 +443,7 @@
             const year = document.getElementById("namSinh").value;
             const select = document.getElementById("hoTen");
             const hint = document.getElementById("rosterHint");
+            const request = ++rosterRequest;
 
             select.innerHTML = "";
             select.appendChild(makeOption("", "-- Chọn họ tên --"));
@@ -467,11 +470,11 @@
             google.script.run
                 .withSuccessHandler(result => {
                     rosterByYear[year] = result;
-                    if (document.getElementById("namSinh").value === year) fillNames(result);
+                    if (request === rosterRequest) fillNames(result);
                 })
                 .withFailureHandler(() => {
                     const fallback = { source: "none", students: [] };
-                    if (document.getElementById("namSinh").value === year) fillNames(fallback);
+                    if (request === rosterRequest) fillNames(fallback);
                 })
                 .getStudentsByBirthYear(year);
         }
@@ -482,6 +485,9 @@
             select.disabled = false;
             currentStudents = result.students || [];
 
+            // Dựng lại cả danh sách, không nối thêm vào danh sách đang có.
+            select.innerHTML = "";
+            select.appendChild(makeOption("", "-- Chọn họ tên --"));
             currentStudents.forEach((student, index) => {
                 // Mã ERP làm giá trị; khi ERP lỗi (danh sách từ Sheet) dùng số thứ tự.
                 select.appendChild(makeOption(student.code || "IDX:" + index, student.label));

@@ -2,6 +2,14 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.34.0.1] - 2026-10-23
+
+### Fixed
+- **Form nộp bài hiện danh sách tên hai lần** (hết danh sách, mục "Tên con không có trong danh sách", rồi lại từ chữ A). Xảy ra khi học sinh chọn năm sinh trước khi form tải xong danh sách năm (form khôi phục bài làm dở và tải lại danh sách tên của năm đó), hoặc đổi năm sinh qua lại khi danh sách đang tải: mỗi lần tải xong lại nối thêm cả danh sách. Giờ chỉ lần tải mới nhất được ghi vào ô họ tên, và ô được dựng lại từ đầu. Lỗi có từ bản form đầu tiên, không do bản 0.34.0.0. Owner dán lại `FormHocSinh.html` vào Apps Script rồi Deploy bản mới.
+
+### For contributors
+- Test mới `tests/unit/apps-script-grading-form-page.test.ts` chạy chính `FormHocSinh.html` trong jsdom với `google.script.run` giả, trả kết quả theo thứ tự test chọn.
+
 ## [0.34.0.0] - 2026-10-23
 
 Bốn việc rút ra sau hai ngày chấm bài AI thật (193 bài): báo khi đáp án có thể chốt nhầm, thống kê trợ giảng sửa kết quả AI, đánh dấu bài nộp lại sau khi đã duyệt, và hướng dẫn cách gõ toán trên form.
