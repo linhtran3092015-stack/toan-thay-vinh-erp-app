@@ -18,6 +18,7 @@ async function callRpc(name: string, args: Record<string, unknown> = {}) {
 
 function errorMessage(message: string) {
   if (message.includes("SELF_REVIEW_FORBIDDEN")) return "Bạn không thể tự duyệt công của mình.";
+  if (message.includes("TIME_ENTRY_LOCKED_BY_PAYROLL")) return "Lượt chấm công thuộc kỳ lương đã khoá (đang duyệt hoặc đã duyệt). Hãy mở lại kỳ lương về nháp trước khi duyệt; kỳ đã chi trả thì không mở lại được, hãy bù trừ ở kỳ sau.";
   if (message.includes("ALREADY_DECIDED")) return "Yêu cầu đã được xử lý. Vui lòng tải lại trang.";
   if (message.includes("NOT_CLOSED")) return "Chờ nhân sự kết thúc ca trước khi duyệt.";
   if (message.includes("OPEN_ENTRY_ALREADY_EXISTS")) return "Bạn đang có ca mở. Vui lòng tải lại trang để check-out.";

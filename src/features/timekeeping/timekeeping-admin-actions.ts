@@ -10,8 +10,10 @@ import {
 import {
   adminAdjustTimeEntrySchema,
   adminCreateTimeEntrySchema,
+  adminDeleteTimeEntrySchema,
   type AdminAdjustTimeEntryInput,
   type AdminCreateTimeEntryInput,
+  type AdminDeleteTimeEntryInput,
 } from "@/features/timekeeping/timekeeping-admin-schemas";
 import type {
   TimekeepingCenterMonthlyOverviewResult,
@@ -40,11 +42,27 @@ function getAdminRpcErrorMessage(message: string): string {
   const knownMessages: Record<string, string> = {
     AUTHENTICATED_USER_REQUIRED: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
     STAFF_PROFILE_NOT_FOUND: "Không tìm thấy hồ sơ nhân sự được chỉ định.",
+    TIME_ENTRY_ADJUSTMENT_NO_CHANGE: "Giờ và hình thức không thay đổi so với hiện tại.",
     TIME_ENTRY_ADJUSTMENT_REASON_REQUIRED: "Vui lòng nhập lý do điều chỉnh công.",
     TIME_ENTRY_CHECK_IN_AND_OUT_REQUIRED: "Thời điểm vào và ra là bắt buộc.",
     TIME_ENTRY_CHECK_OUT_MUST_BE_AFTER_CHECK_IN: "Thời điểm ra phải sau hoặc bằng thời điểm vào.",
-    TIME_ENTRY_NOT_FOUND: "Không tìm thấy lượt chấm công cần điều chỉnh.",
+    TIME_ENTRY_DELETE_REASON_REQUIRED: "Vui lòng nhập lý do xóa lượt chấm công.",
+    TIME_ENTRY_DELETE_WOULD_RESTORE_IMPORTED_TIMEKEEPING:
+      "Ngày này có công import từ Excel; xóa lượt chấm công cuối cùng sẽ làm bảng lương tính lại công import. Hãy sửa giờ thay vì xóa.",
+    TIME_ENTRY_ADJUSTMENT_CANNOT_USE_FUTURE_TIME: "Không thể điều chỉnh sang thời điểm trong tương lai.",
+    TIME_ENTRY_ADJUSTMENT_WORK_DATE_INVALID:
+      "Giờ vào phải thuộc ngày làm việc của lượt chấm công và giờ ra không quá ngày hôm sau.",
+    TIME_ENTRY_LOCKED_BY_PAYROLL:
+      "Lượt chấm công thuộc kỳ lương đã khoá (đang duyệt hoặc đã duyệt). Hãy mở lại kỳ lương về nháp trước khi thay đổi công; kỳ đã chi trả thì không mở lại được, hãy bù trừ ở kỳ sau.",
+    TIME_ENTRY_MODE_INVALID: "Hình thức chấm công không hợp lệ.",
+    TIME_ENTRY_NOT_FOUND: "Không tìm thấy lượt chấm công.",
+    TIME_ENTRY_OPEN_CANNOT_BE_DELETED:
+      "Ca đang diễn ra không thể xóa. Hãy sửa giờ ra hoặc chờ ca kết thúc.",
+    TIME_ENTRY_REFERENCED_BY_PAYROLL_HISTORY:
+      "Lượt chấm công đã nằm trong bảng lương tính trước đây nên không thể xóa.",
     TIMEKEEPING_APPROVE_ADJUSTMENT_PERMISSION_REQUIRED:
+      "Tài khoản không có quyền điều chỉnh công của nhân sự.",
+    TIMEKEEPING_MANAGE_PERMISSION_REQUIRED:
       "Tài khoản không có quyền điều chỉnh công của nhân sự.",
     WORK_DATE_REQUIRED: "Ngày làm việc là bắt buộc.",
   };
@@ -55,7 +73,7 @@ function getAdminRpcErrorMessage(message: string): string {
     }
   }
 
-  return "Không thể hoàn tất thao tác điều chỉnh. Dữ liệu chưa được cập nhật.";
+  return "Không thể hoàn tất thao tác. Dữ liệu chưa được cập nhật.";
 }
 
 export async function adminAdjustTimeEntryAction(
@@ -85,6 +103,7 @@ export async function adminAdjustTimeEntryAction(
     const { data, error } = await supabase.rpc("admin_adjust_time_entry", {
       p_check_in_at: parsed.data.checkInAt,
       p_check_out_at: parsed.data.checkOutAt,
+      p_mode: parsed.data.mode,
       p_reason: parsed.data.reason,
       p_time_entry_id: parsed.data.timeEntryId,
     });
@@ -158,6 +177,53 @@ export async function adminCreateTimeEntryAction(
   } catch {
     return createErrorState(
       "Không thể kết nối tới máy chủ để tạo công. Vui lòng thử lại.",
+    );
+  }
+}
+
+export async function adminDeleteTimeEntryAction(
+  input: AdminDeleteTimeEntryInput,
+): Promise<AdminTimekeepingActionState> {
+  // Same check as admin_delete_time_entry, so the action never promises more than the RPC allows.
+  const hasPermission = await hasAnyPermission(["timekeeping.approve_adjustment"]);
+
+  if (!hasPermission) {
+    return createErrorState(
+      "Tài khoản hiện tại không có quyền xóa lượt chấm công.",
+    );
+  }
+
+  const parsed = adminDeleteTimeEntrySchema.safeParse(input);
+  if (!parsed.success) {
+    return createErrorState(
+      "Dữ liệu xóa lượt chấm công chưa hợp lệ.",
+      parsed.error.flatten().fieldErrors,
+    );
+  }
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.rpc("admin_delete_time_entry", {
+      p_reason: parsed.data.reason,
+      p_time_entry_id: parsed.data.timeEntryId,
+    });
+
+    if (error) {
+      return createErrorState(getAdminRpcErrorMessage(error.message));
+    }
+
+    if (!data?.id) {
+      return createErrorState("Database không trả về lượt chấm công vừa xóa.");
+    }
+
+    revalidatePath("/timekeeping");
+    return {
+      message: "Đã xóa lượt chấm công.",
+      status: "success",
+    };
+  } catch {
+    return createErrorState(
+      "Không thể kết nối tới máy chủ để xóa lượt chấm công. Vui lòng thử lại.",
     );
   }
 }

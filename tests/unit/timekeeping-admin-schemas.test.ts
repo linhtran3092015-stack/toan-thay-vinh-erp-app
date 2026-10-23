@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   adminAdjustTimeEntrySchema,
   adminCreateTimeEntrySchema,
+  adminDeleteTimeEntrySchema,
 } from "@/features/timekeeping/timekeeping-admin-schemas";
 
 describe("adminAdjustTimeEntrySchema", () => {
@@ -47,6 +48,19 @@ describe("adminAdjustTimeEntrySchema", () => {
         "Lý do điều chỉnh không được để trống.",
       );
     }
+  });
+
+  it("accepts an optional attendance mode and rejects unknown modes", () => {
+    const base = {
+      checkInAt: "2026-09-07T08:00:00+07:00",
+      checkOutAt: "2026-09-07T17:00:00+07:00",
+      reason: "Ca dạy trực tuyến",
+      timeEntryId: "c1111111-1111-4111-8111-111111111111",
+    };
+
+    expect(adminAdjustTimeEntrySchema.safeParse({ ...base, mode: "online" }).success).toBe(true);
+    expect(adminAdjustTimeEntrySchema.safeParse(base).success).toBe(true);
+    expect(adminAdjustTimeEntrySchema.safeParse({ ...base, mode: "hybrid" }).success).toBe(false);
   });
 
   it("fails when timeEntryId is not a valid UUID", () => {
@@ -128,6 +142,34 @@ describe("adminCreateTimeEntrySchema", () => {
       expect(result.error.flatten().fieldErrors.checkOutAt).toContain(
         "Thời điểm ra phải sau hoặc bằng thời điểm vào.",
       );
+    }
+  });
+});
+
+describe("adminDeleteTimeEntrySchema", () => {
+  it("requires a trimmed reason", () => {
+    const result = adminDeleteTimeEntrySchema.safeParse({
+      reason: "  ",
+      timeEntryId: "c1111111-1111-4111-8111-111111111111",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.reason).toContain(
+        "Lý do xóa không được để trống.",
+      );
+    }
+  });
+
+  it("accepts a valid delete request", () => {
+    const result = adminDeleteTimeEntrySchema.safeParse({
+      reason: " Chấm trùng ca ",
+      timeEntryId: "c1111111-1111-4111-8111-111111111111",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.reason).toBe("Chấm trùng ca");
     }
   });
 });

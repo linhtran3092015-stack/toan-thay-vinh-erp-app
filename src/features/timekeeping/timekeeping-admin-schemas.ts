@@ -4,6 +4,7 @@ export const adminAdjustTimeEntrySchema = z
   .object({
     checkInAt: z.string().min(1, "Thời điểm vào là bắt buộc."),
     checkOutAt: z.string().min(1, "Thời điểm ra là bắt buộc."),
+    mode: z.enum(["online", "offline"]).optional(),
     reason: z
       .string()
       .trim()
@@ -54,3 +55,14 @@ export const adminCreateTimeEntrySchema = z
   );
 
 export type AdminCreateTimeEntryInput = z.infer<typeof adminCreateTimeEntrySchema>;
+
+export const adminDeleteTimeEntrySchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(1, "Lý do xóa không được để trống.")
+    .max(500, "Lý do tối đa 500 ký tự."),
+  timeEntryId: z.string().uuid("ID lượt chấm công không hợp lệ."),
+});
+
+export type AdminDeleteTimeEntryInput = z.infer<typeof adminDeleteTimeEntrySchema>;
