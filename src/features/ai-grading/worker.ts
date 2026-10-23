@@ -13,6 +13,7 @@ import {
   combineRuns,
   KEY_MAX_TOKENS,
   KEY_SCHEMA,
+  KEY_SCHEMA_WITH_METHODS,
   needsTiebreak,
   parseGradeMessage,
   parseKeyMessage,
@@ -24,7 +25,7 @@ import {
   type StoredKey,
 } from "@/features/ai-grading/grading";
 import { estimateCostUsd, type TokenUsage } from "@/features/ai-grading/models";
-import { KEY_INSTRUCTIONS, KEY_PROMPT_VERSION } from "@/features/ai-grading/prompts";
+import { KEY_INSTRUCTIONS, KEY_PROMPT_VERSION, LESSON_KEY_INSTRUCTIONS, LESSON_PROMPT_VERSION } from "@/features/ai-grading/prompts";
 import { storedAnswerKeySchema } from "@/features/session-tests/answer-key";
 import { SESSION_TEST_BUCKET } from "@/features/session-tests/storage";
 import { getAnthropicApiKey } from "@/lib/env";
@@ -250,6 +251,27 @@ export async function extractRun(supabase: ServiceClient, run: ClaimedRun, calle
     return { errorCode: "no_pages", errorMessage: "Đề chưa có trang ảnh.", outcome: "failed" };
   }
 
+  // Lesson slides (optional): read with the test so the key follows the teacher's methods.
+  const { data: lessonRows, error: lessonError } = await supabase
+    .from("session_test_lesson_pages")
+    .select("storage_path, mime_type, page_no")
+    .eq("test_id", run.test_id)
+    .order("page_no");
+  if (lessonError) {
+    return { errorCode: "storage_error", errorMessage: "Không đọc được danh sách ảnh bài giảng.", outcome: "retry" };
+  }
+  const lessonImages: Array<{ base64: string; mediaType: KeyImageMediaType }> = [];
+  for (const page of lessonRows ?? []) {
+    const mediaType = page.mime_type as KeyImageMediaType;
+    if (!KEY_MEDIA_TYPES.has(mediaType)) continue;
+    const { data, error } = await supabase.storage.from(SESSION_TEST_BUCKET).download(page.storage_path);
+    if (error || !data) {
+      return { errorCode: "storage_error", errorMessage: `Không tải được ảnh bài giảng ${page.page_no}.`, outcome: "retry" };
+    }
+    lessonImages.push({ base64: Buffer.from(await data.arrayBuffer()).toString("base64"), mediaType });
+  }
+  const withLesson = lessonImages.length > 0;
+
   const images: Array<{ base64: string; mediaType: KeyImageMediaType }> = [];
   for (const page of pages) {
     const mediaType = page.mime_type as KeyImageMediaType;
@@ -267,10 +289,13 @@ export async function extractRun(supabase: ServiceClient, run: ClaimedRun, calle
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     max_tokens: KEY_MAX_TOKENS,
-    messages: [{ content: buildKeyExtractionContent(images), role: "user" }],
+    messages: [{ content: buildKeyExtractionContent(images, lessonImages), role: "user" }],
     model: run.model,
-    output_config: { effort: "high", format: { schema: KEY_SCHEMA as unknown as Record<string, unknown>, type: "json_schema" } },
-    system: KEY_INSTRUCTIONS,
+    output_config: {
+      effort: "high",
+      format: { schema: (withLesson ? KEY_SCHEMA_WITH_METHODS : KEY_SCHEMA) as unknown as Record<string, unknown>, type: "json_schema" },
+    },
+    system: withLesson ? KEY_INSTRUCTIONS + LESSON_KEY_INSTRUCTIONS : KEY_INSTRUCTIONS,
   };
   const call = await callOnce(caller.readKey, params, { effort: "high", requestedModel: run.model, role: "key" });
   const usage = usageSummary([call]) as unknown as Json;
@@ -287,7 +312,8 @@ export async function extractRun(supabase: ServiceClient, run: ClaimedRun, calle
     result: {
       ...parsed.draft,
       fallback_used: fallbackUsed,
-      prompt_version: KEY_PROMPT_VERSION,
+      lesson_pages: lessonImages.length,
+      prompt_version: withLesson ? `${KEY_PROMPT_VERSION}+${LESSON_PROMPT_VERSION}` : KEY_PROMPT_VERSION,
       served_by: call.message!.model,
     } as unknown as Json,
     usage,

@@ -13,6 +13,7 @@ import { AiKeyReading } from "@/features/session-tests/components/ai-key-reading
 import { AnswerKeyEditor, type EditorOutcome } from "@/features/session-tests/components/answer-key-editor";
 import { AnswerKeyView } from "@/features/session-tests/components/answer-key-view";
 import { KeyWarnings } from "@/features/session-tests/components/key-warnings";
+import { LessonPagesPanel } from "@/features/session-tests/components/lesson-pages-panel";
 import { ReuseTestPanel } from "@/features/session-tests/components/reuse-test-panel";
 import { sessionTestServerActions, type SessionTestActions } from "@/features/session-tests/components/session-test-actions";
 import { TestPagesPanel } from "@/features/session-tests/components/test-pages-panel";
@@ -171,12 +172,22 @@ export function SessionTestCard({
             )}
           </section>
 
+          <LessonPagesPanel
+            actions={actions}
+            canEdit={state.canManage && state.editable}
+            pages={test?.lessonPages ?? []}
+            sessionId={state.sessionId}
+            sources={state.lessonSources ?? []}
+            testId={test?.id ?? null}
+          />
+
           {state.canManage && state.editable && !confirmed ? (
             <AiKeyReading
               actions={actions}
               aiConfigured={state.aiConfigured}
               extraction={test?.extraction ?? null}
               hasPages={(test?.assets.length ?? 0) > 0}
+              lessonPageCount={test?.lessonPages?.length ?? 0}
               onChanged={() => router.refresh()}
               testId={test?.id ?? null}
             />

@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { GradingDataResult } from "@/features/grading-submissions/data";
 import { answerKeyFromStored, storedAnswerKeySchema } from "@/features/session-tests/answer-key";
 import { SESSION_TEST_BUCKET } from "@/features/session-tests/storage";
-import type { SessionTestDetail, SessionTestSource, SessionTestState } from "@/features/session-tests/types";
+import type { SessionTestAsset, SessionTestDetail, SessionTestLessonSource, SessionTestSource, SessionTestState } from "@/features/session-tests/types";
 import { getAnthropicApiKey } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -14,20 +14,20 @@ const SIGNED_URL_SECONDS = 15 * 60;
 
 const runStatusSchema = z.enum(["queued", "running", "succeeded", "failed", "cancelled"]);
 
+const pageSchema = z.object({
+  height: z.number().int(),
+  id: z.string().uuid(),
+  mime_type: z.string(),
+  page_no: z.number().int(),
+  sha256: z.string(),
+  storage_path: z.string(),
+  width: z.number().int(),
+});
+
 const testSchema = z.object({
   answer_key: storedAnswerKeySchema,
   answer_key_version: z.number().int(),
-  assets: z.array(
-    z.object({
-      height: z.number().int(),
-      id: z.string().uuid(),
-      mime_type: z.string(),
-      page_no: z.number().int(),
-      sha256: z.string(),
-      storage_path: z.string(),
-      width: z.number().int(),
-    }),
-  ),
+  assets: z.array(pageSchema),
   class_session_id: z.string().uuid(),
   confirmed_at: z.string().nullable(),
   confirmed_by_name: z.string().nullable(),
@@ -56,6 +56,7 @@ const testSchema = z.object({
     )
     .optional()
     .catch([]),
+  lesson_pages: z.array(pageSchema).optional().catch([]),
   marking_guide: z.string().nullable(),
   source: z
     .object({
@@ -106,21 +107,23 @@ async function loadTest(supabase: ServerClient, sessionId: string): Promise<Grad
   const parsed = testSchema.safeParse(data);
   if (!parsed.success) return { error: "Dữ liệu đề kiểm tra không hợp lệ.", ok: false };
   const row = parsed.data;
-  const urls = await signAssetUrls(supabase, row.assets.map((asset) => asset.storage_path));
+  const lessonRows = row.lesson_pages ?? [];
+  const urls = await signAssetUrls(supabase, [...row.assets, ...lessonRows].map((asset) => asset.storage_path));
+  const toAsset = (asset: z.infer<typeof pageSchema>): SessionTestAsset => ({
+    height: asset.height,
+    id: asset.id,
+    mimeType: asset.mime_type,
+    pageNo: asset.page_no,
+    sha256: asset.sha256,
+    storagePath: asset.storage_path,
+    url: urls.get(asset.storage_path) ?? null,
+    width: asset.width,
+  });
   return {
     data: {
       answerKey: answerKeyFromStored(row.answer_key),
       answerKeyVersion: row.answer_key_version,
-      assets: row.assets.map((asset) => ({
-        height: asset.height,
-        id: asset.id,
-        mimeType: asset.mime_type,
-        pageNo: asset.page_no,
-        sha256: asset.sha256,
-        storagePath: asset.storage_path,
-        url: urls.get(asset.storage_path) ?? null,
-        width: asset.width,
-      })),
+      assets: row.assets.map(toAsset),
       classSessionId: row.class_session_id,
       confirmedAt: row.confirmed_at,
       confirmedByName: row.confirmed_by_name,
@@ -144,6 +147,7 @@ async function loadTest(supabase: ServerClient, sessionId: string): Promise<Grad
         papers: warning.papers,
         wrong: warning.wrong,
       })),
+      lessonPages: lessonRows.map(toAsset),
       markingGuide: row.marking_guide,
       source: row.source
         ? {
@@ -186,6 +190,33 @@ async function loadSources(supabase: ServerClient, sessionId: string): Promise<G
   };
 }
 
+const lessonSourceSchema = z.object({
+  class_code: z.string(),
+  class_name: z.string(),
+  class_session_id: z.string().uuid(),
+  page_count: z.number().int(),
+  session_date: z.string(),
+  start_time: z.string(),
+  test_id: z.string().uuid(),
+});
+
+async function loadLessonSources(supabase: ServerClient, sessionId: string): Promise<SessionTestLessonSource[]> {
+  // Optional helper list: a failure only hides the "Dùng slide của buổi khác" choices.
+  const { data, error } = await supabase.rpc("list_session_lesson_sources", { p_class_session_id: sessionId });
+  if (error) return [];
+  const parsed = z.array(lessonSourceSchema).safeParse(data ?? []);
+  if (!parsed.success) return [];
+  return parsed.data.map((row) => ({
+    classCode: row.class_code,
+    className: row.class_name,
+    classSessionId: row.class_session_id,
+    pageCount: row.page_count,
+    sessionDate: row.session_date,
+    startTime: row.start_time,
+    testId: row.test_id,
+  }));
+}
+
 /**
  * Everything the "Bài kiểm tra" card needs: the test (or null), signed photo links, the
  * confirmed tests of the same date and grade it could reuse, and whether the AI key exists.
@@ -199,9 +230,10 @@ export async function getSessionTestState(input: {
   try {
     const supabase = await createSupabaseServerClient();
     const canReuse = input.canManage && input.canConfirm && input.editable;
-    const [test, sources] = await Promise.all([
+    const [test, sources, lessonSources] = await Promise.all([
       loadTest(supabase, input.sessionId),
       canReuse ? loadSources(supabase, input.sessionId) : Promise.resolve({ data: [], ok: true as const }),
+      input.canManage && input.editable ? loadLessonSources(supabase, input.sessionId) : Promise.resolve([]),
     ]);
     if (!test.ok) return test;
     if (!sources.ok) return sources;
@@ -211,6 +243,7 @@ export async function getSessionTestState(input: {
         canConfirm: input.canConfirm,
         canManage: input.canManage,
         editable: input.editable,
+        lessonSources,
         sessionId: input.sessionId,
         sources: sources.data,
         test: test.data,

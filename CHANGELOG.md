@@ -2,7 +2,7 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
-## [0.36.0.0] - 2026-10-23
+## [0.38.0.0] - 2026-10-23
 
 Bốn màn nhập dữ liệu từ Excel (học sinh, ghi danh, lớp & lịch, số dư buổi đầu kỳ) dựng lại theo phong cách Stumana (bước 15b): mỗi màn là các bước rõ ràng, mỗi lần một bước, bảng kiểm tra dòng nêu lỗi bằng chữ, và nút xác nhận ghi rõ điều kiện còn thiếu.
 
@@ -21,6 +21,45 @@ Bốn màn nhập dữ liệu từ Excel (học sinh, ghi danh, lớp & lịch, 
 
 ### Fixed
 - Đổi file, ánh xạ cột, ngày hiệu lực hoặc năm học trong lúc đang kiểm tra không còn làm kết quả kiểm tra cũ hiện như kết quả của dữ liệu mới.
+
+## [0.37.0.0] - 2026-10-23
+
+Ảnh bài giảng cho chấm bài AI: AI đọc đề kèm slide cuối buổi của thầy, nên đáp án, lời giải gửi phụ huynh và nhận xét theo đúng dạng bài, phương pháp thầy dạy.
+
+### Added
+- **"Ảnh bài giảng" trong thẻ Bài kiểm tra** của buổi học (người quản lý đề):
+  - tải tối đa 10 ảnh slide (ảnh tự thu nhỏ như ảnh đề), bỏ ảnh có xác nhận;
+  - dùng lại slide của buổi cùng khối trong vòng 6 ngày mà không phải tải lại. Tuần của thầy tính từ thứ Bảy đến thứ Sáu nên không theo tuần lịch.
+  - Người chỉ có quyền xem thì thấy slide nhưng không sửa được.
+- **AI đọc đề kèm slide:**
+  - Slide đặt trước ảnh đề, kèm hướng dẫn giải theo đúng phương pháp và ký hiệu của thầy, và hiểu đề như lời giải mẫu của thầy.
+  - AI trả thêm phần **"Phương pháp của thầy"**: các dạng bài, phương pháp, công thức, ký hiệu viết tắt.
+  - Khung "AI đọc đề" cho biết lần đọc có kèm slide hay không.
+- **"Phương pháp của thầy" đi cùng đáp án:**
+  - Trợ giảng sửa trong ô đáp án và chốt cùng đáp án; phần này được chép theo khi "Dùng đề có sẵn".
+  - Khi chấm, AI dùng phần này để hiểu cách học sinh viết tắt và nhắc đúng phương pháp trong nhận xét câu sai.
+  - Đề không có slide chấm y như trước.
+
+### For contributors
+- Migration `20261023190000_session_test_lesson_pages.sql`:
+  - bảng `session_test_lesson_pages`: cùng bucket và mẫu đường dẫn với ảnh đề, có RLS, chỉ ghi qua RPC;
+  - RPC `add_session_test_lesson_pages`, `remove_session_test_lesson_page`, `list_session_lesson_sources`, `copy_session_test_lesson_pages`;
+  - `get_session_test` trả thêm `lesson_pages`;
+  - `normalize_session_test_answer_key` giữ `answer_key.methods` (chữ, tối đa 4.000 ký tự, rỗng thì bỏ);
+  - policy xóa ảnh Storage chỉ cho xóa khi không còn trang đề hay slide nào trỏ tới.
+- Worker:
+  - đọc slide của đề;
+  - dùng `KEY_INSTRUCTIONS + LESSON_KEY_INSTRUCTIONS` và `KEY_SCHEMA_WITH_METHODS` (thêm `teacher_methods`);
+  - ghi `prompt_version = key-v1+lesson-v1` và `lesson_pages`.
+- `renderKeyForPrompt` thêm khối phương pháp vào phần đáp án (đã cache) chỉ khi có. Prompt chấm `grade-v3` giữ nguyên.
+- Chạy thử 23/10 trên hai đề lớp 4 (Opus, 0,31 USD):
+  - có slide thì đọc đúng câu thùng dầu mà bản không slide giải sai;
+  - các câu khác cùng đáp số, lời giải theo đúng phương pháp của thầy;
+  - mỗi lần đọc đề tốn thêm khoảng 0,03 USD.
+- Test mới:
+  - pgTAP `session-test-lesson-pages` (28 kiểm tra);
+  - vitest `session-test-lesson-pages`;
+  - thêm ca trong `ai-grading-worker`, `ai-grading-grading`, `session-test-answer-key`.
 
 ## [0.35.1.0] - 2026-10-23
 

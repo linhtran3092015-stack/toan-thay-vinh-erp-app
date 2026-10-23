@@ -66,12 +66,17 @@ const RPC_MESSAGES: Record<string, string> = {
   SESSION_TEST_KEY_TOO_MANY_QUESTIONS: `Mỗi đề tối đa ${ANSWER_KEY_LIMITS.questions} câu.`,
   SESSION_TEST_KEY_TOTAL_NOT_TEN: "Tổng điểm các câu phải bằng 10.",
   SESSION_TEST_KEY_UNCHANGED: "Đáp án không khác bản đang dùng.",
+  SESSION_TEST_LESSON_PAGE_NOT_FOUND: "Ảnh bài giảng này đã bị bỏ. Tải lại trang.",
+  SESSION_TEST_LESSON_PAGES_INVALID: "Ảnh bài giảng không hợp lệ. Vui lòng thử lại.",
+  SESSION_TEST_LESSON_SOURCE_NOT_ELIGIBLE: "Chỉ dùng lại được slide của buổi cùng khối trong vòng 6 ngày.",
+  SESSION_TEST_LESSON_SOURCE_NOT_FOUND: "Không tìm thấy slide của buổi đó. Tải lại trang.",
   SESSION_TEST_NO_PAGES: "Tải ít nhất một trang ảnh đề trước.",
   SESSION_TEST_NOT_FOUND: "Không tìm thấy đề của buổi này. Tải lại trang.",
   SESSION_TEST_PAGE_ORDER_INVALID: "Danh sách trang vừa thay đổi. Tải lại trang rồi sắp xếp lại.",
   SESSION_TEST_SESSION_CLOSED: "Buổi học đã khóa hoặc đã hủy nên không sửa đề được nữa.",
   SESSION_TEST_SOURCE_NOT_ELIGIBLE: "Chỉ dùng lại được đề của buổi cùng ngày, cùng khối.",
   SESSION_TEST_SOURCE_NOT_FOUND: "Đề này không còn ở trạng thái đã chốt. Tải lại trang.",
+  SESSION_TEST_TOO_MANY_LESSON_PAGES: "Mỗi buổi tối đa 10 ảnh bài giảng.",
   SESSION_TEST_TOO_MANY_PAGES: "Mỗi đề tối đa 20 trang ảnh.",
   SESSION_TEST_VERSION_CONFLICT: "Đáp án vừa được người khác chốt hoặc sửa. Tải lại trang để xem bản mới nhất.",
 };
@@ -83,6 +88,7 @@ function rpcErrorMessage(error: { message: string }): string {
 const uuid = z.string().uuid();
 
 const answerKeySchema = z.object({
+  methods: z.string().max(ANSWER_KEY_LIMITS.methodsLength).optional(),
   questions: z
     .array(
       z.object({
@@ -350,3 +356,91 @@ export async function cancelSessionTestKeyExtractionAction(input: { testId: stri
   if (error) return { message: rpcErrorMessage(error), ok: false };
   return { message: "Đã hủy lượt AI đọc đề.", ok: true };
 }
+
+const uploadedPageSchema = z.object({
+  height: z.number().int().min(1).max(10000),
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  storagePath: z.string().regex(pathPattern),
+  width: z.number().int().min(1).max(10000),
+});
+
+/** "Ảnh bài giảng": records slides already uploaded under the test's folder (at most 10). */
+export async function registerLessonPagesAction(input: {
+  pages: Array<{ height: number; mimeType: string; sha256: string; storagePath: string; width: number }>;
+  testId: string;
+}): Promise<RegisterAssetsResult> {
+  const denied = await requirePermissions([MANAGE]);
+  if (denied) return { message: denied, ok: false };
+  const parsed = z.object({ pages: z.array(uploadedPageSchema).min(1).max(10), testId: uuid }).safeParse(input);
+  if (!parsed.success || parsed.data.pages.some((page) => !page.storagePath.startsWith(`${parsed.data.testId}/`))) {
+    return { message: "Ảnh bài giảng không hợp lệ. Vui lòng thử lại.", ok: false };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const paths = parsed.data.pages.map((page) => page.storagePath);
+  const { data, error } = await supabase.rpc("add_session_test_lesson_pages", {
+    p_pages: parsed.data.pages.map((page) => ({
+      height: page.height,
+      mime_type: page.mimeType,
+      sha256: page.sha256,
+      storage_path: page.storagePath,
+      width: page.width,
+    })) as unknown as Json,
+    p_test_id: parsed.data.testId,
+  });
+  if (error) {
+    await supabase.storage.from(SESSION_TEST_BUCKET).remove(paths);
+    return { message: rpcErrorMessage(error), ok: false };
+  }
+
+  const rows = data ?? [];
+  const added = rows.filter((row) => row.added).length;
+  const orphaned = paths.filter((path) => !rows.some((row) => row.added && row.storage_path === path));
+  if (orphaned.length > 0) await supabase.storage.from(SESSION_TEST_BUCKET).remove(orphaned);
+  const skipped = paths.length - added;
+  return {
+    added,
+    message:
+      added === 0
+        ? "Ảnh đã có trong bài giảng, không thêm ảnh mới."
+        : `Đã thêm ${added} ảnh bài giảng.${skipped > 0 ? ` ${skipped} ảnh trùng nên bỏ qua.` : ""}`,
+    ok: true,
+    skipped,
+  };
+}
+
+/** Removes a slide; the photo is deleted from Storage unless another test still shows it. */
+export async function removeLessonPageAction(input: { pageId: string }): Promise<SessionTestActionResult> {
+  const denied = await requirePermissions([MANAGE]);
+  if (denied) return { message: denied, ok: false };
+  const parsed = z.object({ pageId: uuid }).safeParse(input);
+  if (!parsed.success) return { message: "Ảnh bài giảng không hợp lệ.", ok: false };
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("remove_session_test_lesson_page", { p_page_id: parsed.data.pageId });
+  if (error) return { message: rpcErrorMessage(error), ok: false };
+  const removed = data?.[0];
+  if (removed && !removed.still_referenced) {
+    await supabase.storage.from(SESSION_TEST_BUCKET).remove([removed.storage_path]);
+  }
+  return { message: "Đã bỏ ảnh bài giảng.", ok: true };
+}
+
+/** Reuses the slides of a same-grade session within 6 days (same photos, nothing uploaded again). */
+export async function copyLessonPagesAction(input: { sourceTestId: string; testId: string }): Promise<SessionTestActionResult> {
+  const denied = await requirePermissions([MANAGE]);
+  if (denied) return { message: denied, ok: false };
+  const parsed = z.object({ sourceTestId: uuid, testId: uuid }).safeParse(input);
+  if (!parsed.success) return { message: "Buổi nguồn không hợp lệ.", ok: false };
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("copy_session_test_lesson_pages", {
+    p_source_test_id: parsed.data.sourceTestId,
+    p_test_id: parsed.data.testId,
+  });
+  if (error) return { message: rpcErrorMessage(error), ok: false };
+  const added = data ?? 0;
+  return { message: added > 0 ? `Đã dùng ${added} ảnh bài giảng của buổi đó.` : "Các ảnh đó đã có trong bài giảng.", ok: true };
+}
+

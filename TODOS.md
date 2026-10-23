@@ -2819,7 +2819,7 @@
 
 **Why:** Mỗi chỗ nhỏ, nhưng cùng một màn nói hai cách cho một việc. Nhiều câu đang bị test ghim (`enrollment-import-commit-counts`, `session-balance-approval-workflow`), nên đổi giữa lúc ship sẽ phải sửa test ghim; gom lại một lần thì sửa test có chủ đích.
 
-**Context:** Review /ship bước 15b (v0.36.0.0), chuyên gia design: `enrollment-import-page.tsx` (nút commit), `session-balance-batch-detail-page.tsx`, `session-balance-batch-list.tsx`, `session-balance-import-labels.ts`, `class-schedule-import-presentation.tsx` (cột "Kết quả"), `class-schedule-import-page.tsx` (nút "Tạo lô"), `class-schedule-batch-detail-page.tsx` (huy hiệu `previewed`), `classes/workbook.ts` (câu lỗi zip, file bị khóa phạm vi ở 15b).
+**Context:** Review /ship bước 15b (v0.38.0.0), chuyên gia design: `enrollment-import-page.tsx` (nút commit), `session-balance-batch-detail-page.tsx`, `session-balance-batch-list.tsx`, `session-balance-import-labels.ts`, `class-schedule-import-presentation.tsx` (cột "Kết quả"), `class-schedule-import-page.tsx` (nút "Tạo lô"), `class-schedule-batch-detail-page.tsx` (huy hiệu `previewed`), `classes/workbook.ts` (câu lỗi zip, file bị khóa phạm vi ở 15b).
 
 **Effort:** M
 **Priority:** P3
@@ -2831,7 +2831,7 @@
 
 **Why:** Trên điện thoại hoặc lô lớn, gõ bị chậm. Trang cũ trước redesign cũng vẽ lại như vậy, nên đây không phải lỗi mới.
 
-**Context:** Review /ship bước 15b (v0.36.0.0), chuyên gia hiệu năng: `session-balance-batch-detail-page.tsx`, `class-schedule-batch-detail-page.tsx`, `components/import-review-table.tsx`.
+**Context:** Review /ship bước 15b (v0.38.0.0), chuyên gia hiệu năng: `session-balance-batch-detail-page.tsx`, `class-schedule-batch-detail-page.tsx`, `components/import-review-table.tsx`.
 
 **Effort:** S
 **Priority:** P3
@@ -2879,7 +2879,7 @@
 
 **Why:** Bản trước bước 15b có đường kiểm tra lại gần hơn; câu lỗi bảo "kiểm tra lại" mà màn hình không có nút làm việc đó.
 
-**Context:** `src/features/imports/students/student-import-page.tsx` (`handleCommit`), `src/features/imports/students/actions.ts` (khoảng dòng 175). Review /ship bước 15b (v0.36.0.0), red team (hồi quy so với main).
+**Context:** `src/features/imports/students/student-import-page.tsx` (`handleCommit`), `src/features/imports/students/actions.ts` (khoảng dòng 175). Review /ship bước 15b (v0.38.0.0), red team (hồi quy so với main).
 
 **Effort:** S
 **Priority:** P2
@@ -2891,7 +2891,7 @@
 
 **Why:** Lịch lớp có thể bị tạo sai ngày mà không ai thấy. Có từ trước bước 15b (cùng dòng trên main).
 
-**Context:** `src/features/imports/classes/class-schedule-import-page.tsx` (dòng 163), `src/features/imports/classes/workbook.ts`. Review /ship bước 15b (v0.36.0.0), red team.
+**Context:** `src/features/imports/classes/class-schedule-import-page.tsx` (dòng 163), `src/features/imports/classes/workbook.ts`. Review /ship bước 15b (v0.38.0.0), red team.
 
 **Effort:** S
 **Priority:** P2
@@ -2903,7 +2903,7 @@
 
 **Why:** Người nhập tưởng lô sẵn sàng xác nhận; lô bị bỏ lại thì không xác nhận được nữa, và SHA-256 của file đã bị dùng.
 
-**Context:** `src/features/imports/enrollments/enrollment-import-page.tsx` (dòng 711, nút quay lại và chọn file). Review /ship bước 15b (v0.36.0.0), red team.
+**Context:** `src/features/imports/enrollments/enrollment-import-page.tsx` (dòng 711, nút quay lại và chọn file). Review /ship bước 15b (v0.38.0.0), red team.
 
 **Effort:** M
 **Priority:** P2
@@ -2915,7 +2915,7 @@
 
 **Why:** Số liệu lô sai lệch khi file lớn; lô kẹt không ai xử lý.
 
-**Context:** `src/features/imports/session-balances/queries.ts`, `session-balance-batch-detail-page.tsx`. Review /ship bước 15b (v0.36.0.0), red team.
+**Context:** `src/features/imports/session-balances/queries.ts`, `session-balance-batch-detail-page.tsx`. Review /ship bước 15b (v0.38.0.0), red team.
 
 **Effort:** M
 **Priority:** P3
@@ -2927,7 +2927,7 @@
 
 **Why:** Câu chữ đúng sự thật khi mất phản hồi, và bớt phụ thuộc vào câu chữ máy chủ.
 
-**Context:** banner kết quả ở bốn wizard trong `src/features/imports/`, `session-balance-batch-detail-page.tsx`, `enrollments/enrollment-import-page.tsx` (`computeSha256`, `BATCH_ALREADY_COMMITTED_CODE`), `students/student-import-commit-panel.tsx` (`toStudentImportCommitError`). Review /ship bước 15b (v0.36.0.0), red team.
+**Context:** banner kết quả ở bốn wizard trong `src/features/imports/`, `session-balance-batch-detail-page.tsx`, `enrollments/enrollment-import-page.tsx` (`computeSha256`, `BATCH_ALREADY_COMMITTED_CODE`), `students/student-import-commit-panel.tsx` (`toStudentImportCommitError`). Review /ship bước 15b (v0.38.0.0), red team.
 
 **Effort:** S
 **Priority:** P3
@@ -2939,7 +2939,7 @@
 
 **Why:** Không có lỗi người dùng thấy; giữ code và test dễ đổi về sau.
 
-**Context:** Review /ship bước 15b (v0.36.0.0), chuyên gia bảo mật, maintainability và testing.
+**Context:** Review /ship bước 15b (v0.38.0.0), chuyên gia bảo mật, maintainability và testing.
 
 **Effort:** S
 **Priority:** P4
