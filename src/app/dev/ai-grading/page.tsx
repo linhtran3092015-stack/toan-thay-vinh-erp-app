@@ -19,19 +19,21 @@ const base: Omit<AiGradingQueueSession, "id" | "classCode" | "className"> = {
   greenPending: 0,
   lockedAt: null,
   redPending: 0,
+  resubmittedPending: 0,
   sessionDate: "2026-10-20",
   sessionStatus: "completed",
   skipped: 0,
   startTime: "18:00:00",
   submissions: 0,
+  suspectQuestions: 0,
   testStatus: "key_confirmed",
   waitingKey: 0,
   yellowPending: 0,
 };
 
 const sessions: AiGradingQueueSession[] = [
-  { ...base, autoLockAt: new Date(Date.now() + 6 * 3_600_000).toISOString(), classCode: "L-9A26", className: "Toán 9A tối 2-4-6", greenPending: 14, id: "dev-1", redPending: 1, submissions: 22, yellowPending: 3 },
-  { ...base, classCode: "L-7CLC1", className: "Toán 7 CLC1", greenPending: 9, id: "dev-2", sessionDate: "2026-10-21", sessionStatus: "in_progress", submissions: 12, yellowPending: 1, grading: 2 },
+  { ...base, autoLockAt: new Date(Date.now() + 6 * 3_600_000).toISOString(), classCode: "L-9A26", className: "Toán 9A tối 2-4-6", greenPending: 14, id: "dev-1", redPending: 1, submissions: 22, suspectQuestions: 1, yellowPending: 3 },
+  { ...base, classCode: "L-7CLC1", className: "Toán 7 CLC1", greenPending: 9, id: "dev-2", resubmittedPending: 1, sessionDate: "2026-10-21", sessionStatus: "in_progress", submissions: 12, yellowPending: 1, grading: 2 },
   { ...base, classCode: "L-6B", className: "Toán 6B", grading: 4, id: "dev-3", sessionDate: "2026-10-21", sessionStatus: "in_progress", submissions: 8, waitingKey: 4 },
   { ...base, classCode: "L-5A", className: "Toán 5A", id: "dev-4", submissions: 6, testStatus: "key_review", waitingKey: 6 },
   { ...base, approved: 18, classCode: "L-8B", className: "Toán 8B", id: "dev-5", sessionDate: "2026-10-19", skipped: 1, submissions: 19 },

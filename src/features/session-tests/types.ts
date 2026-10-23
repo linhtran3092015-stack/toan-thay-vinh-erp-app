@@ -32,6 +32,20 @@ export interface SessionTestExtraction {
   warnings?: string[];
 }
 
+/**
+ * A question most graded papers got wrong on the confirmed key: over 70% of at least 5 papers
+ * (approved papers count with the reviewer's verdicts, blank forms are left out). Usually a key typo.
+ */
+export interface SessionTestKeyWarning {
+  /** The wrong answer given most often, when 2 or more papers share it (often the right answer). */
+  commonAnswer: string | null;
+  commonAnswerCount: number | null;
+  keyAnswer: string | null;
+  label: string;
+  papers: number;
+  wrong: number;
+}
+
 export interface SessionTestDetail {
   answerKey: AnswerKey;
   /** Number of times the key was confirmed; 0 = never. */
@@ -42,6 +56,8 @@ export interface SessionTestDetail {
   confirmedByName: string | null;
   extraction: SessionTestExtraction | null;
   id: string;
+  /** Absent in fixtures written before the warning existed. */
+  keyWarnings?: SessionTestKeyWarning[];
   markingGuide: string | null;
   /** The session this key was copied from ("Dùng đề có sẵn"). */
   source: { classCode: string; classSessionId: string; startTime: string; testId: string } | null;

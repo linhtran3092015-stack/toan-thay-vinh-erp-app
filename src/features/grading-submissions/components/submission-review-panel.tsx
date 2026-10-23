@@ -21,6 +21,7 @@ import {
 } from "@/features/grading-submissions/review-approval-actions";
 import type { RankBand } from "@/features/parent-messages/comment-template";
 import type { AnswerKey } from "@/features/session-tests/answer-key";
+import type { SessionTestKeyWarning } from "@/features/session-tests/types";
 import { formatDateTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +51,8 @@ export interface ReviewContext {
   editable: boolean;
   key: AnswerKey | null;
   keyVersion: number;
+  /** Questions most papers got wrong on the confirmed key (bulk approval asks to confirm first). */
+  keyWarnings?: SessionTestKeyWarning[];
   phrases: CommentPhrases;
   sessionId: string;
 }
@@ -103,6 +106,9 @@ export function SubmissionReviewPanel({ context, submission }: { context: Review
   const commentText = comment ?? draft;
   const attendanceOk = review.attendanceStatus !== null && PRESENT.has(review.attendanceStatus);
   const manualScore = review.result && !review.result.fromThisSubmission && review.result.testScore !== null ? review.result.testScore : null;
+  // Handed in again after an earlier attempt was approved: the score in the result is that approval's.
+  const priorAttempt = review.priorApproval?.resultFromIt ? (review.priorApproval.attemptNo ?? null) : undefined;
+  const replacedScore = manualScore === null ? "" : priorAttempt !== undefined ? `điểm ${manualScore} của lần nộp ${priorAttempt ?? "trước"} đã duyệt` : `điểm nhập tay ${manualScore}`;
   const keyChanged = review.status === "approved" && review.keyVersion !== null && review.keyVersion !== context.keyVersion;
   const aiStale = ai !== undefined && ai.keyVersion !== null && ai.keyVersion !== context.keyVersion;
   const canAct = context.canReview && context.editable;
@@ -117,7 +123,7 @@ export function SubmissionReviewPanel({ context, submission }: { context: Review
           : commentText.length > COMMENT_MAX_CHARS
             ? `Nhận xét tối đa ${COMMENT_MAX_CHARS.toLocaleString("vi-VN")} ký tự.`
             : manualScore !== null && reason.trim() === ""
-              ? "Nhập lý do thay điểm nhập tay."
+              ? `Nhập lý do thay ${replacedScore}.`
               : undefined;
 
   const run = (call: () => Promise<ReviewActionResult>, after?: () => void) => {
@@ -158,7 +164,11 @@ export function SubmissionReviewPanel({ context, submission }: { context: Review
           <Badge tone={review.messageStatus === "sent" ? "info" : "neutral"}>{messageStatusLabels[review.messageStatus]}</Badge>
         ) : null}
         {keyChanged ? <Badge tone="warning">Đáp án đã đổi sau khi duyệt</Badge> : null}
-        {manualScore !== null && review.status !== "approved" ? <Badge tone="warning">Đã có điểm nhập tay {manualScore}</Badge> : null}
+        {manualScore !== null && review.status !== "approved" ? (
+          <Badge tone="warning">
+            {priorAttempt !== undefined ? `Đang ghi ${manualScore} điểm của lần nộp ${priorAttempt ?? "trước"} đã duyệt` : `Đã có điểm nhập tay ${manualScore}`}
+          </Badge>
+        ) : null}
         {review.reviewedAt ? (
           <span className="text-caption text-text-muted">
             {review.reviewedByName ?? "Nhân sự"} · {formatDateTime(review.reviewedAt)}
@@ -301,7 +311,7 @@ export function SubmissionReviewPanel({ context, submission }: { context: Review
           ) : null}
 
           {manualScore !== null || review.status === "approved" ? (
-            <Field hint="Ghi vào nhật ký kết quả buổi." label={manualScore !== null ? `Lý do thay điểm nhập tay ${manualScore}` : "Lý do duyệt lại (không bắt buộc)"}>
+            <Field hint="Ghi vào nhật ký kết quả buổi." label={manualScore !== null ? `Lý do thay ${replacedScore}` : "Lý do duyệt lại (không bắt buộc)"}>
               {(props) => (
                 <input className={controlClassName} maxLength={500} onChange={(event) => setReason(event.target.value)} value={reason} {...props} />
               )}

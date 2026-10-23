@@ -12,6 +12,7 @@ import { ANSWER_KEY_TOTAL_POINTS, answerKeyTotal, formatPoints } from "@/feature
 import { AiKeyReading } from "@/features/session-tests/components/ai-key-reading";
 import { AnswerKeyEditor, type EditorOutcome } from "@/features/session-tests/components/answer-key-editor";
 import { AnswerKeyView } from "@/features/session-tests/components/answer-key-view";
+import { KeyWarnings } from "@/features/session-tests/components/key-warnings";
 import { ReuseTestPanel } from "@/features/session-tests/components/reuse-test-panel";
 import { sessionTestServerActions, type SessionTestActions } from "@/features/session-tests/components/session-test-actions";
 import { TestPagesPanel } from "@/features/session-tests/components/test-pages-panel";
@@ -161,7 +162,10 @@ export function SessionTestCard({
                 testId={test?.id ?? null}
               />
             ) : test ? (
-              <AnswerKeyView answerKey={test.answerKey} markingGuide={test.markingGuide} title={test.title} />
+              <>
+                {confirmed ? <KeyWarnings canEdit={canEditKey} warnings={test.keyWarnings ?? []} /> : null}
+                <AnswerKeyView answerKey={test.answerKey} markingGuide={test.markingGuide} title={test.title} />
+              </>
             ) : (
               <p className="text-secondary text-text-muted">Chưa có đáp án.</p>
             )}

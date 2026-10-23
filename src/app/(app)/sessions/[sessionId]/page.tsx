@@ -217,6 +217,7 @@ export default async function SessionDetailRoute({
         (detailResult.detail.status === "in_progress" || detailResult.detail.status === "completed"),
       key: confirmedTest?.answerKey ?? null,
       keyVersion: confirmedTest?.answerKeyVersion ?? 0,
+      keyWarnings: confirmedTest?.keyWarnings ?? [],
       phrases,
       sessionId,
     };

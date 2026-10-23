@@ -2,7 +2,7 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
-## [0.34.0.0] - 2026-10-23
+## [0.36.0.0] - 2026-10-23
 
 Bốn màn nhập dữ liệu từ Excel (học sinh, ghi danh, lớp & lịch, số dư buổi đầu kỳ) dựng lại theo phong cách Stumana (bước 15b): mỗi màn là các bước rõ ràng, mỗi lần một bước, bảng kiểm tra dòng nêu lỗi bằng chữ, và nút xác nhận ghi rõ điều kiện còn thiếu.
 
@@ -22,6 +22,87 @@ Bốn màn nhập dữ liệu từ Excel (học sinh, ghi danh, lớp & lịch, 
 ### Fixed
 - Đổi file, ánh xạ cột, ngày hiệu lực hoặc năm học trong lúc đang kiểm tra không còn làm kết quả kiểm tra cũ hiện như kết quả của dữ liệu mới.
 
+## [0.35.1.0] - 2026-10-23
+
+Lưới an toàn của hàng đợi chấm bài AI chạy trong cơ sở dữ liệu, 5 phút một lần. Lịch `*/5` của GitHub Actions thực tế chỉ chạy 3–5 giờ một lần.
+
+### Added
+- **Lịch `ai-grading-worker-kick`** (`pg_cron` + `pg_net`) gọi worker chấm bài AI 5 phút một lần, nhưng chỉ khi có lượt đến hạn hoặc lượt đang chạy mà tiến trình đã dừng. Lịch không gọi khi tắt chấm AI, khi hàng đợi tạm dừng, hoặc khi chưa cấu hình.
+- **URL worker và `CRON_SECRET` lưu trong Supabase Vault** (`ai_grading_worker_url`, `ai_grading_cron_secret`), không ghi trong mã nguồn. Chưa có hai secret này thì lịch không làm gì.
+- **Cảnh báo "Lịch gọi chấm bài AI bị lỗi"** (`ops.ai_grading_kick_failed`) gửi người quản lý cài đặt khi lần gọi trước bị từ chối (ví dụ khóa trên Vercel và trong Vault khác nhau), mỗi giờ một lần.
+
+### For contributors
+- Migration `20261023170000_ai_grading_worker_db_cron.sql`:
+  - bật `pg_net`;
+  - thêm `ai_grading_worker_state.last_kick_at` và `last_kick_request_id`;
+  - thêm hàm `kick_ai_grading_worker()` (chỉ cơ sở dữ liệu gọi được), trả về `disabled | paused | not_configured | idle | kicked`.
+- Workflow GitHub giữ làm dự phòng và nút chạy tay.
+- pgTAP mới: `ai-grading-db-cron` (16 kiểm tra).
+
+## [0.35.0.0] - 2026-10-23
+
+Chấm bài AI theo 4 quy tắc owner chốt ngày 23/10 (prompt `grade-v3`), và bộ đề hồi quy để đo lại mỗi khi đổi prompt hoặc model.
+
+### Changed
+- **Quy tắc chấm của AI** (prompt `grade-v3`):
+  - Câu hỏi nhiều đáp số mà học sinh chỉ ghi một phần là **sai** (ví dụ hỏi số lít của mỗi thùng, con chỉ ghi một thùng).
+  - **Đúng số nhưng sai đơn vị** (ví dụ 6,03 m² khi đáp án là 6,03 m) vẫn **đúng**; AI ghi một câu nhắc đơn vị và câu đó được đưa vào nhận xét gửi phụ huynh.
+  - **Đáp số mâu thuẫn** (hai đáp số khác nhau, chọn B nhưng ghi nội dung C): AI chấm theo kết luận cuối nhưng đánh vàng để trợ giảng quyết định.
+  - **Thiếu ngoặc** (ví dụ `2x+4√x/x-1`): AI hiểu theo ý học sinh muốn viết, vẫn đánh vàng.
+- Lượt chấm mới ghi `prompt_version = grade-v3`.
+
+### Added
+- **Bộ đề hồi quy:** chấm lại các bài trợ giảng đã duyệt bằng đúng cấu hình đang chạy, so với kết quả trợ giảng chốt. Kết quả ngày 23/10 trên 147 bài thuộc 7 đề, mỗi lần chạy khoảng 0,21 USD:
+  - `grade-v2`: khớp từng câu 95,9%; 3 bài xanh lệch trợ giảng, trong đó 2 bài lệch 2 điểm ở câu "hai đáp số chỉ ghi một".
+  - `grade-v2`, khi áp quy tắc mới vào 2 câu trợ giảng chấm dễ: khớp 97,3%; lệch ≤ 1 điểm 98,6%.
+  - `grade-v3`: khớp từng câu 98,0%; không còn bài xanh nào lệch trợ giảng.
+  - `grade-v3` còn 3 bài lệch 2 điểm, đều đã đánh vàng (gõ "y-1" thay "y=1", một bài mâu thuẫn, một bài ghi nhầm số câu). Tỉ lệ bài xanh giảm từ 67% xuống 58%, vì AI đánh vàng thêm các trường hợp mâu thuẫn và thiếu ngoặc.
+
+### For contributors
+- Bộ đề hồi quy gồm 4 lệnh `node scripts/ai-grading-regression.mjs export | estimate | submit --confirm [--max-usd 1] | collect [--run grade-v2]`:
+  - `export`: lấy bài đã duyệt từ production, chỉ đọc qua Supabase CLI đã link, không lấy tên, mã hay SĐT học sinh.
+  - `estimate`: ước tính số lượt gọi và chi phí.
+  - `submit`: gửi qua Message Batches API, dùng chính `buildGradeParams` của worker. Không chạy nếu ước tính vượt `--max-usd`.
+  - `collect`: gửi lượt trọng tài rồi viết báo cáo theo các mốc Giai đoạn 0.
+- Mỗi phiên bản prompt chạy trong thư mục riêng dưới `.ai-grading-eval/regression/`. Thư mục này nằm trong `.gitignore`.
+- `overrides.json` đính chính các kết quả trợ giảng mà quy tắc owner đã sửa.
+- `jiti` thành devDependency để chạy TypeScript với alias `@/`.
+- Migration `20261023150000_ai_grading_prompt_grade_v3.sql` chỉ đổi nhãn `prompt_version` trong `enqueue_submission_grading`.
+- `composeComment` nhận thêm `reminders`. `draftComment` lấy ghi chú của AI ở câu đúng: lần chạy `grade-v2` không có câu đúng nào kèm ghi chú, 0/674.
+
+## [0.34.0.1] - 2026-10-23
+
+### Fixed
+- **Form nộp bài hiện danh sách tên hai lần** (hết danh sách, mục "Tên con không có trong danh sách", rồi lại từ chữ A). Xảy ra khi học sinh chọn năm sinh trước khi form tải xong danh sách năm (form khôi phục bài làm dở và tải lại danh sách tên của năm đó), hoặc đổi năm sinh qua lại khi danh sách đang tải: mỗi lần tải xong lại nối thêm cả danh sách. Giờ chỉ lần tải mới nhất được ghi vào ô họ tên, và ô được dựng lại từ đầu. Lỗi có từ bản form đầu tiên, không do bản 0.34.0.0. Owner dán lại `FormHocSinh.html` vào Apps Script rồi Deploy bản mới.
+
+### For contributors
+- Test mới `tests/unit/apps-script-grading-form-page.test.ts` chạy chính `FormHocSinh.html` trong jsdom với `google.script.run` giả, trả kết quả theo thứ tự test chọn.
+
+## [0.34.0.0] - 2026-10-23
+
+Bốn việc rút ra sau hai ngày chấm bài AI thật (193 bài): báo khi đáp án có thể chốt nhầm, thống kê trợ giảng sửa kết quả AI, đánh dấu bài nộp lại sau khi đã duyệt, và hướng dẫn cách gõ toán trên form.
+
+### Added
+- **Cảnh báo "Kiểm tra lại đáp án"** cạnh đáp án đã chốt khi một câu có hơn 70% bài sai (tính trên ít nhất 5 bài; bài đã duyệt lấy kết quả trợ giảng, bài nộp trống không tính). Cảnh báo ghi số bài sai và câu trả lời sai nhiều em ghi giống nhau, ví dụ "Câu 15: 9/11 bài sai (82%); 6 em cùng ghi “41”, đáp án đang chốt “42”", vì nhiều em cùng ra một số khác đáp án thường là đáp án chốt nhầm. Sửa đáp án thì AI chấm lại các bài chưa duyệt.
+- **"Duyệt N bài xanh" hỏi lại** khi buổi đang có cảnh báo đáp án: hiện lý do, trợ giảng chọn "Vẫn duyệt" hoặc "Để kiểm tra đáp án".
+- **Trang Chấm bài AI** đánh dấu buổi có câu hơn 70% bài sai và buổi có bài nộp lại sau khi đã duyệt còn chờ.
+- **Cài đặt → Chấm bài AI → "Duyệt bài 30 ngày"** (người có quyền xem cài đặt): theo từng người duyệt, số bài đã duyệt (xanh, vàng, đỏ), số bài và số câu đổi đúng/sai so với AI, số bài xanh vẫn phải sửa, bài nộp trống chấm tay, số em được cộng điểm, kèm dòng tổng. Đổi "thiếu" thành "sai" (cùng 0 điểm) không tính là sửa.
+- **Bài nộp lại sau khi đã duyệt** có nhãn "Nộp lại sau khi đã duyệt". Khung duyệt ghi rõ "Đang ghi X điểm của lần nộp N đã duyệt" thay cho "Đã có điểm nhập tay", và hỏi lý do trước khi thay điểm đó. Điểm trong kết quả buổi giữ nguyên tới khi duyệt bài mới; bài này không nằm trong "Duyệt N bài xanh".
+- **Thông báo "Nộp lại bài đã duyệt"** gửi người đã duyệt bài trước, một lần cho mỗi bài nộp mới, khi buổi chưa khóa. Thông báo ghi buổi, không ghi tên học sinh.
+- **Form nộp bài** (`integrations/apps-script/grading-form/FormHocSinh.html`): dưới ô bài làm có hướng dẫn ghi số câu ở đầu mỗi dòng và cách gõ ký hiệu toán (`x^2` thay cho `x2`, `3/4`, `sqrt(16)`, `>=`). Owner dán lại file này vào Apps Script rồi Deploy bản mới (README có hướng dẫn).
+
+### For contributors
+- Migration `20261023090000_ai_grading_insights.sql`: `session_test_key_warnings(test_id)` (nội bộ), `get_session_test` thêm `key_warnings`, `get_session_grading_submissions` thêm `prior_approved_attempt_no` / `prior_approved_at` / `result_from_prior_approval`, `list_ai_grading_sessions` thêm `suspect_questions` / `resubmitted_pending`, RPC mới `get_ai_grading_review_stats(p_days)` (cần `settings.view`), trigger `grading_submissions_notify_resubmission` gửi `ai_grading.resubmitted_after_review`.
+- pgTAP `ai-grading-insights` (30 kiểm tra); vitest `ai-grading-insights` và thêm một ca trong `submission-review-panel`.
+
+## [0.33.0.1] - 2026-10-23
+
+Ba chỗ làm trợ giảng bối rối khi dạy một buổi: hộp nhập kết quả nói sai điều kiện khóa buổi, nhắc duyệt bài chấm AI hiện "Sự kiện chưa hỗ trợ", và trợ giảng không thấy mục Chấm công trong menu.
+
+### Fixed
+- **Hộp "Nhập kết quả" / "Cập nhật kết quả"** không còn nói buổi học chỉ được khóa khi mọi học viên có mặt hoặc học thêm đã có điểm kiểm tra. Từ 0.6.6.0 (migration `20261011090100`) điểm kiểm tra không còn là điều kiện khóa; hộp giờ ghi như khung Khóa buổi học: kết quả và điểm kiểm tra không phải là điều kiện khóa, nhưng khóa rồi thì không sửa được.
+- **Thông báo "Còn bài chấm AI chưa duyệt"** (`ai_grading.review_due`, nhắc trước khi buổi tự khóa) có nhãn "Bài chấm AI chờ duyệt", màu cảnh báo và biểu tượng Chấm bài AI riêng, thay cho "Sự kiện chưa hỗ trợ: review_due". Bản tổng hợp gửi owner (`ops.ai_grading_review_due`) cùng nhãn; bốn cảnh báo vận hành của Chấm bài AI (chạm trần chi phí ngày, Claude API từ chối, lượt chờ quá 20 phút, lỗi nhiều trong 1 giờ) hiện "Cảnh báo vận hành" như các cảnh báo khác.
+- **Mục "Chấm công" trong menu Nhân sự** hiện cho người có quyền chấm công (`timekeeping.check`), quản lý xác minh chấm công, hoặc xem chấm công, đúng như trang `/timekeeping` vẫn cho vào. Trợ giảng chỉ có `timekeeping.check` mở được bảng công tháng và "Yêu cầu điều chỉnh" của mình từ menu; trang vẫn chỉ hiện phần cá nhân, không có lịch phân công, ca làm hay bảng công toàn trung tâm.
 ## [0.33.0.0] - 2026-10-22
 
 Danh sách học sinh xếp theo tên (chữ cuối của họ tên), danh sách tổng xếp theo khối từ lớp 12 xuống, và các ô chọn học sinh không còn bỏ sót em nào.

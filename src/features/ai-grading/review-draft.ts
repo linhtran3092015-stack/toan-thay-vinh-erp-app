@@ -83,11 +83,18 @@ export function draftComment({
         verdict: verdicts[question.label] === "missing" ? "missing" : "incorrect",
       };
     });
+  // A right answer with a wrong unit stays right but keeps the AI's reminder (owner ruling 23/10).
+  const reminders = key.questions.flatMap((question) => {
+    const ai = byLabel.get(question.label);
+    return verdicts[question.label] === "correct" && ai?.verdict === "correct" && ai.noteForParent.trim()
+      ? [{ label: question.label, note: ai.noteForParent }]
+      : [];
+  });
   const paper = roundHalfUp(
     rawScore(
       key.questions.map((question) => ({ label: question.label, max_points: question.maxPoints })),
       verdicts,
     ),
   );
-  return composeComment({ paperScore: paper, phrases, praised: praise, questionCount: key.questions.length, seed, wrong });
+  return composeComment({ paperScore: paper, phrases, praised: praise, questionCount: key.questions.length, reminders, seed, wrong });
 }

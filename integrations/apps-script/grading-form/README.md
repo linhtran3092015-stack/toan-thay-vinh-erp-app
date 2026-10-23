@@ -12,10 +12,15 @@ Bản sửa của form "Nộp bài tốt nghiệp - Thầy Vinh". Chủ trung t�
 | Câu 5 "Hôm nay con học buổi" | 5 lựa chọn cố định + "Khác" | Buổi học hôm nay của em theo lịch ERP (1 buổi thì chọn sẵn). Không có buổi nào hoặc không có tên thì vẫn là các lựa chọn cũ |
 | Chọn "Khác" | Cột J (câu 5) và cột N (câu 6) ghi `Other`, mất chữ học sinh gõ | Cột J và cột N ghi `Khác: <chữ học sinh gõ>` |
 | Gửi ERP | Không | Ghi Sheet xong thì gửi một bản sang ERP. Gửi lỗi thì học sinh vẫn nộp thành công, trigger 10 phút/lần gửi lại |
+| Ô bài làm | Chỉ có ô trống | Dưới ô có hướng dẫn ghi số câu ở đầu mỗi dòng và cách gõ ký hiệu toán (`x^2`, `3/4`, `sqrt(16)`, `>=`), để AI không phải đoán `x2` là x² hay 2x |
 
 Tab `Data`, cột A–P giữ nguyên ý nghĩa. Lần nộp đầu tiên tự thêm 5 cột vào sau cột cuối cùng: `Mã HS ERP`, `Buổi học ERP`, `Mã bài ERP`, `Giờ nộp ERP`, `Đã gửi ERP`. Nếu có công thức hay tab khác đọc cả vùng `Data!A:Z`, kiểm tra lại sau lần nộp đầu tiên.
 
 Câu 6 (học thử tiếng Anh) và câu 7 (SĐT phụ huynh) chỉ ghi vào Sheet, **không** gửi sang ERP.
+
+## Cập nhật ngày 23/10/2026: hướng dẫn cách gõ toán, sửa danh sách tên bị lặp
+
+Chỉ `FormHocSinh.html` đổi: thêm hướng dẫn cách gõ toán, và sửa lỗi ô họ tên hiện danh sách hai lần khi học sinh chọn năm sinh trước khi form tải xong (bản 0.34.0.1). Dán lại file này vào dự án Apps Script, bấm Save, rồi Deploy → Manage deployments → sửa bản web app đang dùng → Version: New version → Deploy. Không cần chạy lại `testErpConnection` hay `installResendTrigger`.
 
 ## Cài đặt
 

@@ -73,6 +73,27 @@ describe("redesigned shell navigation", () => {
     expect(groups[1]?.domains.map((domain) => domain.key)).toEqual(["people"]);
   });
 
+  // Value: protects=a TA who holds timekeeping.check (not timekeeping.view) finds "Chấm công" in the sidebar, alone in Nhân sự (no module strip, no manager routes), and the item opens for any code the /timekeeping route admits;
+  // fails_when=the item goes back to timekeeping.view only (TAs lose the entry to their own timesheet), or an any-of list starts revealing items whose codes the user lacks;
+  // why_new=the route admitted timekeeping.check since the staff-only layout, but the single-code nav filter hid the entry; seam=pure function; no_claim=which panels the page renders (timekeeping-route.test.tsx)
+  it("shows Chấm công to a timekeeping.check holder without timekeeping.view", () => {
+    const groups = getVisibleNavigationGroups(["sessions.view", "timekeeping.check"]);
+    const people = groups[1]?.domains.find((domain) => domain.key === "people");
+
+    expect(groups.map((group) => group.key)).toEqual(["primary", "operations"]);
+    expect(groups[1]?.domains.map((domain) => domain.key)).toEqual(["people"]);
+    expect(people?.items.map((item) => item.href)).toEqual(["/timekeeping"]);
+    expect(getNavigationBreadcrumb("/timekeeping", getVisibleNavigationDomains(["timekeeping.check"]))).toEqual({
+      domain: undefined,
+      item: { href: "/timekeeping", label: "Chấm công" },
+    });
+
+    for (const code of ["timekeeping.view", "timekeeping.manage_verification"] as const) {
+      expect(getVisibleNavigationDomains([code]).flatMap((domain) => domain.items.map((item) => item.href))).toEqual(["/timekeeping"]);
+    }
+    expect(getVisibleNavigationDomains(["sessions.view"]).some((domain) => domain.key === "people")).toBe(false);
+  });
+
   it("builds a real-route breadcrumb: domain only when a module strip exists", () => {
     const domains = getVisibleNavigationDomains(ownerPermissions);
 

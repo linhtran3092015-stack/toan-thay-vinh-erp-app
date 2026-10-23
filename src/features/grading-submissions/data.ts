@@ -69,6 +69,11 @@ export interface SubmissionReview {
   note: string | null;
   paperScore: number | null;
   praiseBonus: boolean;
+  /**
+   * Set when the student handed this paper in after an earlier attempt was approved: which attempt,
+   * when, and whether the session result still holds that approval. Absent in fixtures written before it.
+   */
+  priorApproval?: { approvedAt: string | null; attemptNo: number | null; resultFromIt: boolean } | null;
   rankLabel: string | null;
   /** The student's current session result, whoever wrote it. */
   result: { comment: string | null; fromThisSubmission: boolean; id: string; testScore: number | null } | null;
@@ -173,6 +178,9 @@ const sessionRowSchema = z.object({
   result_comment: z.string().nullable().catch(null),
   result_from_this_submission: z.boolean().nullable().catch(null),
   message_status: z.string().nullable().catch(null),
+  prior_approved_attempt_no: z.number().int().nullable().catch(null),
+  prior_approved_at: z.string().nullable().catch(null),
+  result_from_prior_approval: z.boolean().nullable().catch(null),
 });
 
 function toSubmissionReview(row: z.infer<typeof sessionRowSchema>): SubmissionReview {
@@ -186,6 +194,9 @@ function toSubmissionReview(row: z.infer<typeof sessionRowSchema>): SubmissionRe
     note: row.review_note,
     paperScore: row.paper_score,
     praiseBonus: row.praise_bonus,
+    priorApproval: row.prior_approved_at
+      ? { approvedAt: row.prior_approved_at, attemptNo: row.prior_approved_attempt_no, resultFromIt: row.result_from_prior_approval === true }
+      : null,
     rankLabel: row.rank_label,
     result: row.result_id
       ? { comment: row.result_comment, fromThisSubmission: row.result_from_this_submission === true, id: row.result_id, testScore: row.result_test_score }

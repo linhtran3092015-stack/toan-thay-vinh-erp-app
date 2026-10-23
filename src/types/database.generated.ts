@@ -193,6 +193,8 @@ export type Database = {
       ai_grading_worker_state: {
         Row: {
           id: boolean
+          last_kick_at: string | null
+          last_kick_request_id: number | null
           pause_reason: string | null
           paused_at: string | null
           paused_until: string | null
@@ -200,6 +202,8 @@ export type Database = {
         }
         Insert: {
           id?: boolean
+          last_kick_at?: string | null
+          last_kick_request_id?: number | null
           pause_reason?: string | null
           paused_at?: string | null
           paused_until?: string | null
@@ -207,6 +211,8 @@ export type Database = {
         }
         Update: {
           id?: boolean
+          last_kick_at?: string | null
+          last_kick_request_id?: number | null
           pause_reason?: string | null
           paused_at?: string | null
           paused_until?: string | null
@@ -9814,6 +9820,24 @@ export type Database = {
         }
       }
       get_ai_grading_overview: { Args: never; Returns: Json }
+      get_ai_grading_review_stats: {
+        Args: { p_days?: number }
+        Returns: {
+          approved: number
+          blank: number
+          changed_green: number
+          changed_papers: number
+          changed_questions: number
+          compared: number
+          green: number
+          last_reviewed_at: string
+          praise_bonus: number
+          red: number
+          reviewer_id: string
+          reviewer_name: string
+          yellow: number
+        }[]
+      }
       get_ai_grading_today: { Args: never; Returns: Json }
       get_attendance_exception_reviews: { Args: never; Returns: Json }
       get_attendance_verification_config: { Args: never; Returns: Json }
@@ -10414,8 +10438,11 @@ export type Database = {
           message_status: string
           paper_score: number
           praise_bonus: boolean
+          prior_approved_at: string
+          prior_approved_attempt_no: number
           rank_label: string
           result_comment: string
+          result_from_prior_approval: boolean
           result_from_this_submission: boolean
           result_id: string
           result_test_score: number
@@ -10663,6 +10690,7 @@ export type Database = {
           link_id: string
         }[]
       }
+      kick_ai_grading_worker: { Args: never; Returns: string }
       link_student_zalo_group: {
         Args: {
           p_group_name: string
@@ -10714,11 +10742,13 @@ export type Database = {
           green_pending: number
           locked_at: string
           red_pending: number
+          resubmitted_pending: number
           session_date: string
           session_status: string
           skipped: number
           start_time: string
           submissions: number
+          suspect_questions: number
           test_status: string
           waiting_key: number
           yellow_pending: number
@@ -12263,6 +12293,7 @@ export type Database = {
         Args: { p_answer_key: Json }
         Returns: string
       }
+      session_test_key_warnings: { Args: { p_test_id: string }; Returns: Json }
       session_test_object_delete_allowed: {
         Args: { p_bucket_id: string; p_name: string }
         Returns: boolean
