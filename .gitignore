@@ -61,3 +61,5 @@ supabase/.temp/
 next-env.d.ts
 .gstack/
 /.tmp/
+# AI grading eval and regression data (student answers from production)
+/.ai-grading-eval/

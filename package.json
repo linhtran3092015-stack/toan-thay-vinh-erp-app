@@ -61,6 +61,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
+    "jiti": "^2.7.0",
     "jsdom": "^30.0.1",
     "prettier": "^3.9.10",
     "supabase": "^2.109.1",
