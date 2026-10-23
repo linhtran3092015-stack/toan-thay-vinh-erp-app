@@ -30,6 +30,7 @@ export function AiKeyReading({
   aiConfigured,
   extraction,
   hasPages,
+  lessonPageCount = 0,
   onChanged,
   testId,
 }: {
@@ -37,6 +38,8 @@ export function AiKeyReading({
   aiConfigured: boolean;
   extraction: SessionTestExtraction | null;
   hasPages: boolean;
+  /** Lesson slides AI reads along with the test ("Ảnh bài giảng"). */
+  lessonPageCount?: number;
   onChanged: () => void;
   testId: string | null;
 }) {
@@ -68,6 +71,11 @@ export function AiKeyReading({
       </h3>
       <p className="text-caption text-text-muted">
         AI đọc ảnh đề, đề xuất đáp án và lời giải từng câu. Trợ giảng vẫn kiểm tra, sửa và bấm chốt; AI không tự chốt.
+      </p>
+      <p className="text-caption text-text-muted">
+        {lessonPageCount > 0
+          ? `AI đọc kèm ${lessonPageCount} ảnh bài giảng: lời giải theo phương pháp thầy dạy, kèm phần "Phương pháp của thầy" để chấm bài.`
+          : "Chưa có ảnh bài giảng: AI tự giải theo cách thông thường."}
       </p>
       <AutoRefresh active={active} />
       {extraction && extraction.status !== "cancelled" ? (

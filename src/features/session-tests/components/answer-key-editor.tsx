@@ -75,13 +75,14 @@ export function AnswerKeyEditor({
   );
   const [title, setTitle] = useState(initial.title ?? "");
   const [markingGuide, setMarkingGuide] = useState(initial.markingGuide ?? "");
+  const [methods, setMethods] = useState(initial.answerKey.methods ?? "");
   const [reason, setReason] = useState("");
   const [feedback, setFeedback] = useState<EditorOutcome | null>(null);
   const [pending, startTransition] = useTransition();
 
   const fieldErrors = questionDraftErrors(drafts);
   const blocked = hasDraftErrors(fieldErrors);
-  const key = answerKeyFromDrafts(drafts);
+  const key: AnswerKey = { ...answerKeyFromDrafts(drafts), ...(methods.trim() ? { methods: methods.trim() } : {}) };
   const total = answerKeyTotal(key);
   const confirmProblems = answerKeyConfirmProblems(key);
   const unchanged =
@@ -91,11 +92,12 @@ export function AnswerKeyEditor({
     markingGuide.trim() === (initial.markingGuide ?? "");
   const titleTooLong = title.trim().length > ANSWER_KEY_LIMITS.titleLength;
   const guideTooLong = markingGuide.trim().length > ANSWER_KEY_LIMITS.markingGuideLength;
+  const methodsTooLong = methods.trim().length > ANSWER_KEY_LIMITS.methodsLength;
   const reasonTooLong = reason.trim().length > ANSWER_KEY_LIMITS.reasonLength;
 
   const confirmBlockedReason = !canConfirm
     ? permissionDeniedMessage("ai_grading.confirm_key")
-    : blocked || titleTooLong || guideTooLong
+    : blocked || titleTooLong || guideTooLong || methodsTooLong
       ? "Sửa các ô đang báo lỗi trước."
       : confirmProblems.length > 0
         ? confirmProblems[0]
@@ -142,7 +144,7 @@ export function AnswerKeyEditor({
   };
 
   const saveDraft = () => {
-    if (pending || blocked || titleTooLong || guideTooLong) return;
+    if (pending || blocked || titleTooLong || guideTooLong || methodsTooLong) return;
     setFeedback(null);
     startTransition(async () => {
       const id = await ensureTestId();
@@ -321,6 +323,14 @@ export function AnswerKeyEditor({
 
       <Field error={guideTooLong ? `Tối đa ${ANSWER_KEY_LIMITS.markingGuideLength} ký tự.` : null} hint="Ví dụ: thiếu đơn vị cm vẫn tính đúng." label="Ghi chú chấm (tùy chọn)">
         {(props) => <Textarea {...props} onChange={(event) => setMarkingGuide(event.target.value)} value={markingGuide} />}
+      </Field>
+
+      <Field
+        error={methodsTooLong ? `Tối đa ${ANSWER_KEY_LIMITS.methodsLength.toLocaleString("vi-VN")} ký tự.` : null}
+        hint="AI tóm tắt từ ảnh bài giảng khi đọc đề. Khi chấm, AI dùng phần này để hiểu cách học sinh viết và nhắc đúng phương pháp trong nhận xét. Không có slide thì để trống."
+        label="Phương pháp của thầy (tùy chọn)"
+      >
+        {(props) => <Textarea {...props} onChange={(event) => setMethods(event.target.value)} rows={6} value={methods} />}
       </Field>
 
       <div className="grid gap-2 rounded-lg border border-border-subtle bg-surface-sunken p-3">

@@ -145,6 +145,36 @@ describe("key reading", () => {
     expect(content[3]).toEqual({ source: { data: "BBB", media_type: "image/png", type: "base64" }, type: "image" });
   });
 
+  it("puts lesson slides before the test pages, labelled apart", () => {
+    const content = buildKeyExtractionContent([{ base64: "TEST", mediaType: "image/jpeg" }], [{ base64: "SLIDE", mediaType: "image/webp" }]);
+    expect(content.map((block) => (block.type === "text" ? block.text : (block as { source: { data: string } }).source.data))).toEqual([
+      "Slide bài giảng 1:",
+      "SLIDE",
+      "Trang 1:",
+      "TEST",
+      "Soạn bản nháp đáp án cho đề trên theo đúng khuôn JSON.",
+    ]);
+  });
+
+  it("keeps the teacher's methods from a slide reading, trimmed and capped", () => {
+    const parsed = parseKeyMessage(message({ questions: [], teacher_methods: `  Dạng TBC: TBC = Tổng : SSH  `, title: "", total_points_printed: null, transcription_warnings: [] }));
+    expect(parsed.ok && parsed.draft.answer_key).toEqual({ methods: "Dạng TBC: TBC = Tổng : SSH", questions: [] });
+    const long = parseKeyMessage(message({ questions: [], teacher_methods: "x".repeat(5000), title: "", total_points_printed: null, transcription_warnings: [] }));
+    expect(long.ok && long.draft.answer_key.methods?.length).toBe(4000);
+    const blank = parseKeyMessage(message({ questions: [], teacher_methods: "  ", title: "", total_points_printed: null, transcription_warnings: [] }));
+    expect(blank.ok && blank.draft.answer_key).toEqual({ questions: [] });
+  });
+
+  it("adds the teacher's methods to the grading key block only when there are some", () => {
+    const plain = renderKeyForPrompt(KEY, "LT");
+    expect(plain).not.toContain("PHƯƠNG PHÁP THẦY DẠY");
+    const withMethods = renderKeyForPrompt({ ...KEY, methods: "Dạng Tổng – Hiệu: Bé = (T − H) : 2" }, "LT");
+    expect(withMethods.startsWith(plain)).toBe(true);
+    expect(withMethods).toContain("PHƯƠNG PHÁP THẦY DẠY TRONG BUỔI");
+    expect(withMethods).toContain("Dạng Tổng – Hiệu: Bé = (T − H) : 2");
+    expect(withMethods).toContain("không thay đổi quy tắc chấm đúng sai");
+  });
+
   it("parses a draft and fills missing fields", () => {
     const parsed = parseKeyMessage(
       message({ questions: [{ final_answer: "54", label: "13", max_points: null }], title: "LT", total_points_printed: null, transcription_warnings: ["Câu 13 mờ"] }),
