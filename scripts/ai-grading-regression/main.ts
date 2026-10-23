@@ -17,7 +17,7 @@ import {
   type StoredKey,
 } from "@/features/ai-grading/grading";
 import { CLAUDE_MODELS, estimateCostUsd, type TokenUsage } from "@/features/ai-grading/models";
-import { GRADER_INSTRUCTIONS } from "@/features/ai-grading/prompts";
+import { GRADE_PROMPT_VERSION, GRADER_INSTRUCTIONS } from "@/features/ai-grading/prompts";
 import type { Verdict } from "@/features/ai-grading/scoring";
 
 import { comparePaper, excludeReason, summarize, type PaperComparison, type RegressionPaper } from "./compare";
@@ -27,18 +27,32 @@ import { comparePaper, excludeReason, summarize, type PaperComparison, type Regr
  *   export                 approved papers from production (read-only, via the linked Supabase CLI)
  *   estimate               request count and expected cost
  *   submit --confirm       primary runs through the Message Batches API (half price); --max-usd caps the estimate
- *   collect                exit 2 while a batch runs; sends the tiebreak batch, then writes the report
- * Data stays in .ai-grading-eval/regression/ (git-ignored). Same request as the worker (buildGradeParams).
+ *   collect [--run <v>]    exit 2 while a batch runs; sends the tiebreak batch, then writes the report
+ * Data stays in .ai-grading-eval/regression/ (git-ignored); each prompt version runs in its own
+ * folder (grade-v2/, grade-v3/…). Same request as the worker (buildGradeParams, GRADER_INSTRUCTIONS).
+ * overrides.json ({submission id: {label: verdict}}) corrects TA verdicts an owner ruling overturned.
  */
 
 const ROOT = process.cwd();
 const DIR = path.join(ROOT, ".ai-grading-eval", "regression");
+// `collect --run grade-v2` re-reports an earlier prompt's run (e.g. after adding overrides).
+let RUN = GRADE_PROMPT_VERSION;
+const runDir = () => path.join(DIR, RUN);
 const FILES = {
   dataset: path.join(DIR, "dataset.json"),
-  primary: path.join(DIR, "primary.jsonl"),
-  results: path.join(DIR, "results.json"),
-  state: path.join(DIR, "state.json"),
-  tiebreak: path.join(DIR, "tiebreak.jsonl"),
+  overrides: path.join(DIR, "overrides.json"),
+  get primary() {
+    return path.join(runDir(), "primary.jsonl");
+  },
+  get results() {
+    return path.join(runDir(), "results.json");
+  },
+  get state() {
+    return path.join(runDir(), "state.json");
+  },
+  get tiebreak() {
+    return path.join(runDir(), "tiebreak.jsonl");
+  },
 };
 const BATCH_DISCOUNT = 0.5;
 const WAITING = 2;
@@ -60,7 +74,7 @@ interface BatchLine {
 }
 
 function writePrivate(file: string, text: string) {
-  mkdirSync(DIR, { mode: 0o700, recursive: true });
+  mkdirSync(path.dirname(file), { mode: 0o700, recursive: true });
   writeFileSync(file, text, { mode: 0o600 });
   chmodSync(file, 0o600);
 }
@@ -81,10 +95,17 @@ function paramsFor(paper: RegressionPaper, model: string, effort: GradeEffort) {
 // custom_id allows [a-zA-Z0-9_-]{1,64}: submission uuid + run.
 const customId = (paper: RegressionPaper, run: string) => `${paper.submissionId}_${run}`;
 
-function loadPapers(): { excluded: RegressionPaper[]; papers: RegressionPaper[] } {
+function loadPapers(): { excluded: RegressionPaper[]; overridden: number; papers: RegressionPaper[] } {
   if (!existsSync(FILES.dataset)) throw new Error("Run `export` first.");
-  const all = readJson<RegressionPaper[]>(FILES.dataset);
-  return { excluded: all.filter((paper) => excludeReason(paper)), papers: all.filter((paper) => !excludeReason(paper)) };
+  const overrides = existsSync(FILES.overrides) ? readJson<Record<string, Record<string, Verdict>>>(FILES.overrides) : {};
+  let overridden = 0;
+  const all = readJson<RegressionPaper[]>(FILES.dataset).map((paper) => {
+    const fix = overrides[paper.submissionId];
+    if (!fix) return paper;
+    overridden += Object.keys(fix).length;
+    return { ...paper, ta: { ...paper.ta, verdicts: { ...paper.ta.verdicts, ...fix } } };
+  });
+  return { excluded: all.filter((paper) => excludeReason(paper)), overridden, papers: all.filter((paper) => !excludeReason(paper)) };
 }
 
 /** Rough expected cost: ~3 characters per token in, 1,500 tokens out per call, batch price. */
@@ -192,9 +213,10 @@ async function submit(args: string[]) {
   console.log(`submitted ${requests.length} requests as batch ${batch.id}`);
 }
 
-async function collect() {
+async function collect(args: string[]) {
+  RUN = flag(args, "run") ?? GRADE_PROMPT_VERSION;
   const state = readJson<State>(FILES.state);
-  const { papers, excluded } = loadPapers();
+  const { papers, excluded, overridden } = loadPapers();
   const client = new Anthropic({ maxRetries: 2, timeout: 120_000 });
 
   let primary = readLines(FILES.primary);
@@ -238,8 +260,8 @@ async function collect() {
   const cost = spent(primary) + spent(tiebreak);
   const failedCalls = [...primary, ...tiebreak].filter((line) => !line.message).length;
   writePrivate(FILES.results, JSON.stringify({ comparisons, cost, failedCalls, state, summary }, null, 1));
-  const reportFile = path.join(DIR, `report-${state.submittedAt.slice(0, 10)}.md`);
-  writePrivate(reportFile, report(papers, excluded, comparisons, summary, state, cost, failedCalls));
+  const reportFile = path.join(runDir(), `report-${state.submittedAt.slice(0, 10)}.md`);
+  writePrivate(reportFile, report(papers, excluded, overridden, comparisons, summary, state, cost, failedCalls));
   console.log(readFileSync(reportFile, "utf8"));
   return 0;
 }
@@ -249,6 +271,7 @@ const pct = (part: number, whole: number) => (whole === 0 ? "–" : `${((part / 
 function report(
   papers: RegressionPaper[],
   excluded: RegressionPaper[],
+  overridden: number,
   comparisons: PaperComparison[],
   summary: ReturnType<typeof summarize>,
   state: State,
@@ -258,10 +281,10 @@ function report(
   const byId = new Map(papers.map((paper) => [paper.submissionId, paper]));
   const ok = (value: boolean) => (value ? "đạt" : "CHƯA ĐẠT");
   const lines = [
-    `# Bộ đề hồi quy chấm bài AI (${state.submittedAt.slice(0, 10)})`,
+    `# Bộ đề hồi quy chấm bài AI, prompt ${RUN} (${state.submittedAt.slice(0, 10)})`,
     "",
     `Cấu hình: ${state.model} effort ${state.effort} chấm 2 lần, trọng tài ${state.tiebreakModel ?? "không"}. Chi phí thật ≈ $${cost.toFixed(3)} (giá batch). Lượt gọi lỗi: ${failedCalls}.`,
-    `Bài: ${papers.length} bài đã duyệt được chấm lại; ${excluded.length} bài nộp trống (làm trên giấy) không tính.`,
+    `Bài: ${papers.length} bài đã duyệt được chấm lại; ${excluded.length} bài nộp trống (làm trên giấy) không tính; ${overridden} câu lấy kết quả đã đính chính theo quy tắc owner thay cho kết quả trợ giảng.`,
     "",
     "| Chỉ số | Kết quả | Mốc kế hoạch |",
     "|---|---|---|",
@@ -297,9 +320,9 @@ export async function main(args: string[]): Promise<number> {
   if (command === "export") await exportDataset();
   else if (command === "estimate") estimate(rest);
   else if (command === "submit") await submit(rest);
-  else if (command === "collect") return collect();
+  else if (command === "collect") return collect(rest);
   else {
-    console.error("usage: node scripts/ai-grading-regression.mjs export | estimate | submit --confirm [--max-usd 1] | collect");
+    console.error("usage: node scripts/ai-grading-regression.mjs export | estimate | submit --confirm [--max-usd 1] | collect [--run grade-v2]");
     return 1;
   }
   return 0;

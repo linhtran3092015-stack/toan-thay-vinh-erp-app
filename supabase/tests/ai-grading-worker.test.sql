@@ -126,7 +126,7 @@ select lives_ok(
 select is(
   (select array[status, model, effort, prompt_version, answer_key_version::text] from public.grading_runs
    where submission_id = (select id from ids where name = 'subA1') and run_type = 'grade'),
-  array['queued', 'claude-haiku-5-5', 'medium', 'grade-v2', '1'],
+  array['queued', 'claude-haiku-5-5', 'medium', 'grade-v3', '1'],
   'confirming the key queues the counted submission with the settings model');
 
 insert into ids select 'subB', submission_id from public.record_grading_submission(

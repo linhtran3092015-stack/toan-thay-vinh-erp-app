@@ -2,23 +2,36 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
-## [0.34.0.2] - 2026-10-23
+## [0.35.0.0] - 2026-10-23
 
-Bộ đề hồi quy cho chấm bài AI (kế hoạch mục 7): chấm lại các bài trợ giảng đã duyệt bằng đúng cấu hình đang chạy, so với kết quả trợ giảng chốt. Chạy lại mỗi khi đổi model hoặc prompt.
+Chấm bài AI theo 4 quy tắc owner chốt ngày 23/10 (prompt `grade-v3`), và bộ đề hồi quy để đo lại mỗi khi đổi prompt hoặc model.
+
+### Changed
+- **Quy tắc chấm của AI** (prompt `grade-v3`):
+  - Câu hỏi nhiều đáp số mà học sinh chỉ ghi một phần là **sai** (ví dụ hỏi số lít của mỗi thùng, con chỉ ghi một thùng).
+  - **Đúng số nhưng sai đơn vị** (ví dụ 6,03 m² khi đáp án là 6,03 m) vẫn **đúng**; AI ghi một câu nhắc đơn vị và câu đó được đưa vào nhận xét gửi phụ huynh.
+  - **Đáp số mâu thuẫn** (hai đáp số khác nhau, chọn B nhưng ghi nội dung C): AI chấm theo kết luận cuối nhưng đánh vàng để trợ giảng quyết định.
+  - **Thiếu ngoặc** (ví dụ `2x+4√x/x-1`): AI hiểu theo ý học sinh muốn viết, vẫn đánh vàng.
+- Lượt chấm mới ghi `prompt_version = grade-v3`.
+
+### Added
+- **Bộ đề hồi quy:** chấm lại các bài trợ giảng đã duyệt bằng đúng cấu hình đang chạy, so với kết quả trợ giảng chốt. Kết quả ngày 23/10 trên 147 bài thuộc 7 đề, mỗi lần chạy khoảng 0,21 USD:
+  - `grade-v2`: khớp từng câu 95,9%; 3 bài xanh lệch trợ giảng, trong đó 2 bài lệch 2 điểm ở câu "hai đáp số chỉ ghi một".
+  - `grade-v2`, khi áp quy tắc mới vào 2 câu trợ giảng chấm dễ: khớp 97,3%; lệch ≤ 1 điểm 98,6%.
+  - `grade-v3`: khớp từng câu 98,0%; không còn bài xanh nào lệch trợ giảng.
+  - `grade-v3` còn 3 bài lệch 2 điểm, đều đã đánh vàng (gõ "y-1" thay "y=1", một bài mâu thuẫn, một bài ghi nhầm số câu). Tỉ lệ bài xanh giảm từ 67% xuống 58%, vì AI đánh vàng thêm các trường hợp mâu thuẫn và thiếu ngoặc.
 
 ### For contributors
-- `node scripts/ai-grading-regression.mjs export | estimate | submit --confirm [--max-usd 1] | collect`. Có 4 lệnh:
-  - `export`: lấy bài đã duyệt từ production (chỉ đọc, qua Supabase CLI đã link; không lấy tên, mã hay SĐT học sinh).
+- Bộ đề hồi quy gồm 4 lệnh `node scripts/ai-grading-regression.mjs export | estimate | submit --confirm [--max-usd 1] | collect [--run grade-v2]`:
+  - `export`: lấy bài đã duyệt từ production, chỉ đọc qua Supabase CLI đã link, không lấy tên, mã hay SĐT học sinh.
   - `estimate`: ước tính số lượt gọi và chi phí.
-  - `submit`: gửi lượt chấm qua Message Batches API (nửa giá), dùng chính `buildGradeParams` của worker (2 lần chấm + trọng tài). Không chạy nếu ước tính vượt `--max-usd`.
-  - `collect`: chờ batch, gửi lượt trọng tài, rồi viết báo cáo theo các mốc Giai đoạn 0 (≥ 90% khớp từng câu, ≥ 98% lệch ≤ 1 điểm, không bài lệch ≥ 2 điểm mà vẫn xanh).
-- Dữ liệu và báo cáo nằm trong `.ai-grading-eval/regression/`, thư mục này nằm trong `.gitignore`. Bài nộp trống (làm trên giấy) không tính.
-- `jiti` (đã có trong cây phụ thuộc qua eslint và vite) thành devDependency để chạy TypeScript với alias `@/`.
-- Lần chạy đầu ngày 23/10: 147 bài thuộc 7 đề, chi phí khoảng 0,21 USD.
-  - Khớp từng câu với trợ giảng 95,9%.
-  - Lệch ≤ 1 điểm 97,3%; có 2 bài xanh lệch 2 điểm, cùng một câu hai đáp số mà học sinh chỉ ghi một.
-  - Câu lệch 0,7% (6/914).
-  - Hai lần chấm khớp nhau 93,2%; khớp lần chấm thật trước đó 98%.
+  - `submit`: gửi qua Message Batches API, dùng chính `buildGradeParams` của worker. Không chạy nếu ước tính vượt `--max-usd`.
+  - `collect`: gửi lượt trọng tài rồi viết báo cáo theo các mốc Giai đoạn 0.
+- Mỗi phiên bản prompt chạy trong thư mục riêng dưới `.ai-grading-eval/regression/`. Thư mục này nằm trong `.gitignore`.
+- `overrides.json` đính chính các kết quả trợ giảng mà quy tắc owner đã sửa.
+- `jiti` thành devDependency để chạy TypeScript với alias `@/`.
+- Migration `20261023150000_ai_grading_prompt_grade_v3.sql` chỉ đổi nhãn `prompt_version` trong `enqueue_submission_grading`.
+- `composeComment` nhận thêm `reminders`. `draftComment` lấy ghi chú của AI ở câu đúng: lần chạy `grade-v2` không có câu đúng nào kèm ghi chú, 0/674.
 
 ## [0.34.0.1] - 2026-10-23
 
