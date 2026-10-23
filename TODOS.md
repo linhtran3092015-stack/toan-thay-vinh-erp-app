@@ -2819,7 +2819,7 @@
 
 **Why:** Mỗi chỗ nhỏ, nhưng cùng một màn nói hai cách cho một việc. Nhiều câu đang bị test ghim (`enrollment-import-commit-counts`, `session-balance-approval-workflow`), nên đổi giữa lúc ship sẽ phải sửa test ghim; gom lại một lần thì sửa test có chủ đích.
 
-**Context:** Review /ship bước 15b (v0.30.0.0), chuyên gia design: `enrollment-import-page.tsx` (nút commit), `session-balance-batch-detail-page.tsx`, `session-balance-batch-list.tsx`, `session-balance-import-labels.ts`, `class-schedule-import-presentation.tsx` (cột "Kết quả"), `class-schedule-import-page.tsx` (nút "Tạo lô"), `class-schedule-batch-detail-page.tsx` (huy hiệu `previewed`), `classes/workbook.ts` (câu lỗi zip, file bị khóa phạm vi ở 15b).
+**Context:** Review /ship bước 15b (v0.34.0.0), chuyên gia design: `enrollment-import-page.tsx` (nút commit), `session-balance-batch-detail-page.tsx`, `session-balance-batch-list.tsx`, `session-balance-import-labels.ts`, `class-schedule-import-presentation.tsx` (cột "Kết quả"), `class-schedule-import-page.tsx` (nút "Tạo lô"), `class-schedule-batch-detail-page.tsx` (huy hiệu `previewed`), `classes/workbook.ts` (câu lỗi zip, file bị khóa phạm vi ở 15b).
 
 **Effort:** M
 **Priority:** P3
@@ -2831,7 +2831,7 @@
 
 **Why:** Trên điện thoại hoặc lô lớn, gõ bị chậm. Trang cũ trước redesign cũng vẽ lại như vậy, nên đây không phải lỗi mới.
 
-**Context:** Review /ship bước 15b (v0.30.0.0), chuyên gia hiệu năng: `session-balance-batch-detail-page.tsx`, `class-schedule-batch-detail-page.tsx`, `components/import-review-table.tsx`.
+**Context:** Review /ship bước 15b (v0.34.0.0), chuyên gia hiệu năng: `session-balance-batch-detail-page.tsx`, `class-schedule-batch-detail-page.tsx`, `components/import-review-table.tsx`.
 
 **Effort:** S
 **Priority:** P3
@@ -2873,13 +2873,73 @@
 **Priority:** P2
 **Depends on:** Quyết định của anh (sửa server action)
 
+### Nhập học sinh: không có nút kiểm tra lại sau lời từ chối "Dữ liệu đã thay đổi"
+
+**What:** Khi xác nhận nhập học sinh bị máy chủ từ chối với `STUDENT_IMPORT_VALIDATION_FAILED` ("Dữ liệu đã thay đổi hoặc còn dòng lỗi. Hãy kiểm tra lại trước khi xác nhận import."), bước Xác nhận chỉ hiện lỗi; người nhập phải tự quay lại bước Ánh xạ để chạy kiểm tra lại. Thêm nút "Kiểm tra lại" ngay ở lỗi đó (chạy lại dry-run với file và ánh xạ hiện tại) hoặc tự quay về bước Kết quả kiểm tra.
+
+**Why:** Bản trước bước 15b có đường kiểm tra lại gần hơn; câu lỗi bảo "kiểm tra lại" mà màn hình không có nút làm việc đó.
+
+**Context:** `src/features/imports/students/student-import-page.tsx` (`handleCommit`), `src/features/imports/students/actions.ts` (khoảng dòng 175). Review /ship bước 15b (v0.34.0.0), red team (hồi quy so với main).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Không
+
+### Nhập lớp: thứ trong tuần không đọc được bị ghi thành thứ Hai
+
+**What:** `weekday: parsedWeekday ?? (Number(rawWeekday) || 1)` trong `class-schedule-import-page.tsx` đổi một giá trị thứ không đọc được thành 1 (thứ Hai) thay vì báo dòng lỗi. Cho dòng đó thành lỗi ở bước kiểm tra ("Không đọc được thứ trong tuần").
+
+**Why:** Lịch lớp có thể bị tạo sai ngày mà không ai thấy. Có từ trước bước 15b (cùng dòng trên main).
+
+**Context:** `src/features/imports/classes/class-schedule-import-page.tsx` (dòng 163), `src/features/imports/classes/workbook.ts`. Review /ship bước 15b (v0.34.0.0), red team.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Không
+
+### Nhập ghi danh: lô bị máy chủ từ chối vẫn báo "Đã tạo lô.", và lô đã tạo bị bỏ lại khi chọn file khác
+
+**What:** (1) Khi máy chủ trả lô ở trạng thái bị từ chối, bước Tạo lô vẫn hiện "Đã tạo lô." (có từ trước bước 15b). Đọc trạng thái lô trả về và báo đúng. (2) Đã tạo lô rồi bấm Quay lại và "Chọn file khác" thì lô đó không còn đường mở lại trên giao diện (chưa có trang lô ghi danh). Cảnh báo trước khi rời một lô đã tạo, hoặc làm trang lô (xem mục "Trang lô cho nhập học sinh và nhập ghi danh").
+
+**Why:** Người nhập tưởng lô sẵn sàng xác nhận; lô bị bỏ lại thì không xác nhận được nữa, và SHA-256 của file đã bị dùng.
+
+**Context:** `src/features/imports/enrollments/enrollment-import-page.tsx` (dòng 711, nút quay lại và chọn file). Review /ship bước 15b (v0.34.0.0), red team.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Không
+
+### Lô số dư buổi: trang lô đọc tối đa 1000 dòng, và lô có dòng lỗi không đi tiếp được
+
+**What:** (1) Trang lô số dư buổi đọc các dòng bằng một truy vấn không phân trang, nên chỉ nhận tối đa 1000 dòng (giới hạn `max_rows` của PostgREST); lô lớn hơn hiện thiếu dòng mà không báo. (2) Lô có dòng không hợp lệ thì không ghi sổ được, và giao diện không có cách sửa nhanh: người nhập phải loại từng dòng hoặc bỏ lô. Cần quyết định của anh: cho loại hàng loạt các dòng lỗi, hay chặn tạo lô khi còn dòng lỗi.
+
+**Why:** Số liệu lô sai lệch khi file lớn; lô kẹt không ai xử lý.
+
+**Context:** `src/features/imports/session-balances/queries.ts`, `session-balance-batch-detail-page.tsx`. Review /ship bước 15b (v0.34.0.0), red team.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Quyết định của anh (phần 2)
+
+### Review đối kháng bước 15b: các điểm nhỏ còn lại
+
+**What:** (1) Khi không biết kết quả (mất phản hồi), tiêu đề banner vẫn ghi "Chưa ghi sổ", "Chưa phê duyệt", "Chưa đối soát", "Chưa tạo được lô", "Chưa nhập" dù phần mô tả nói có thể đã ghi; đổi tiêu đề thành "Chưa rõ kết quả". (2) Lỗi loại dòng ở trang lô số dư buổi có thể hiện dưới một dòng khác; gắn lỗi theo mã dòng. (3) File kéo thả được băm SHA-256 trước khi kiểm tra giới hạn 5 MB; kiểm tra kích thước trước. (4) Nhận biết "đã nhập/đã ghi danh" dựa vào chữ trong lỗi của server action; nên trả mã lỗi có cấu trúc.
+
+**Why:** Câu chữ đúng sự thật khi mất phản hồi, và bớt phụ thuộc vào câu chữ máy chủ.
+
+**Context:** banner kết quả ở bốn wizard trong `src/features/imports/`, `session-balance-batch-detail-page.tsx`, `enrollments/enrollment-import-page.tsx` (`computeSha256`, `BATCH_ALREADY_COMMITTED_CODE`), `students/student-import-commit-panel.tsx` (`toStudentImportCommitError`). Review /ship bước 15b (v0.34.0.0), red team.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Không
+
 ### Dọn nhỏ sau bước 15b
 
 **What:** (1) `canImport` và `canReconcile` của trang số dư buổi mặc định `true`; đổi thành bắt buộc hoặc mặc định `false` (cả hai route đều truyền rõ; máy chủ vẫn chặn). (2) Trang lô lớp và wizard lớp tính vị trí bước theo chỉ số (`buildClassImportSteps(4, …)`, `index === 4`, `CLASS_IMPORT_STEP_TITLES[0]`); đặt theo khóa bước như wizard số dư. (3) Test `session-balance-import-page` "keeps the screen's four-eyes rule" chỉ tìm một dòng trong mã nguồn; thay bằng kiểm tra hành vi hoặc bỏ (hành vi đã có test ở `session-balance-approval-workflow`). (4) Test `enrollment-import-mapping` ghim việc tiêu đề không dấu ("Ma hoc vien") không khớp; tách thành ca riêng ghi rõ là hành vi hiện tại (ánh xạ ghi danh chưa chuẩn hóa dấu như học sinh và số dư).
 
 **Why:** Không có lỗi người dùng thấy; giữ code và test dễ đổi về sau.
 
-**Context:** Review /ship bước 15b (v0.30.0.0), chuyên gia bảo mật, maintainability và testing.
+**Context:** Review /ship bước 15b (v0.34.0.0), chuyên gia bảo mật, maintainability và testing.
 
 **Effort:** S
 **Priority:** P4
