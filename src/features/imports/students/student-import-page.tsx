@@ -149,6 +149,11 @@ function fieldIssueText(issue: StudentImportMappingIssue): string {
   return issue.message;
 }
 
+/** An edit on the confirm step clears a refusal, except the one only "Kiểm tra lại" resolves. */
+function keepRecheckRefusal(current: StudentImportCommitError | null): StudentImportCommitError | null {
+  return current?.kind === "needs_recheck" ? current : null;
+}
+
 function getRowSeverity(row: StudentImportValidationRow): ImportRowSeverity {
   // An exact duplicate is an error row (the server marks it invalid; commit refuses it).
   if (row.status === "invalid" || row.exact_student_duplicate) return "error";
@@ -209,6 +214,10 @@ export function StudentImportPage({
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [isTemplateDownloading, setIsTemplateDownloading] = useState(false);
   const [validateError, setValidateError] = useState<string | null>(null);
+  // A failed "Kiểm tra lại": shown with the refusal on the confirm step, never as a mapping-step error.
+  const [recheckError, setRecheckError] = useState<string | null>(null);
+  // The review holds a result from "Kiểm tra lại": it says so, since the confirmation must be given again.
+  const [isRecheckedResult, setIsRecheckedResult] = useState(false);
 
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -256,6 +265,8 @@ export function StudentImportPage({
     setCommitResult(null);
     setFileError(null);
     setValidateError(null);
+    setRecheckError(null);
+    setIsRecheckedResult(false);
     clearCommitState();
   }
 
@@ -299,29 +310,40 @@ export function StudentImportPage({
     setMapping((current) => ({ ...current, [fieldKey]: columnKey.length > 0 ? columnKey : null }));
     setValidation(null);
     setValidateError(null);
+    setRecheckError(null);
+    setIsRecheckedResult(false);
     clearCommitState();
   }
 
-  function handleValidate() {
+  /**
+   * The dry-run of the file and mapping held. With `recheck`, it is "Kiểm tra lại" on a commit
+   * refused because the rows no longer pass: its failure stays with that refusal on the confirm step.
+   */
+  function handleValidate({ recheck = false }: { recheck?: boolean } = {}) {
     if (!workbook || !mappingValidation?.isValid) return;
     const rows = mapStudentImportWorkbookRows(workbook, mapping);
     const run = ++checkRun.current;
+    const setError = recheck ? setRecheckError : setValidateError;
     setValidateError(null);
+    setRecheckError(null);
     startValidating(async () => {
       try {
         const result = await validateRows({ rows });
         // The file or the mapping changed while the check ran: this answer is for other rows.
         if (run !== checkRun.current) return;
         if (!result.ok) {
-          setValidateError(result.message);
+          setError(result.message);
           return;
         }
         setValidation(result.data);
-        clearCommitState();
+        setIsRecheckedResult(recheck);
+        // The confirmation was for the old result; a reason typed before a re-check from the confirm step is kept.
+        setConfirmed(false);
+        setCommitError(null);
         setStep("review");
       } catch {
         if (run !== checkRun.current) return;
-        setValidateError("Không kết nối được tới máy chủ. Kiểm tra kết nối rồi thử lại; bước này không ghi dữ liệu.");
+        setError("Không kết nối được tới máy chủ. Kiểm tra kết nối rồi thử lại; bước này không ghi dữ liệu.");
       }
     });
   }
@@ -334,8 +356,10 @@ export function StudentImportPage({
         confirmed,
         isAlreadyCommitted,
         isCommitted: commitResult !== null,
-        isPending: isCommitting,
+        // A re-check after a refused commit is running: its answer replaces the result being confirmed.
+        isPending: isCommitting || isValidating,
         mappedRowCount: mappedRows.length,
+        needsRecheck: commitError?.kind === "needs_recheck",
         reason,
         validation,
       })
@@ -533,7 +557,7 @@ export function StudentImportPage({
               aria-describedby={mappingValidation.isValid ? undefined : primaryReasonId}
               disabled={!mappingValidation.isValid}
               isLoading={isValidating}
-              onClick={handleValidate}
+              onClick={() => handleValidate()}
             >
               {`Kiểm tra ${formatNumber(workbook.rowCount)} dòng`}
             </Button>
@@ -553,6 +577,13 @@ export function StudentImportPage({
     const hasErrors = validation.invalid_count > 0;
     body = (
       <>
+        {isRecheckedResult ? (
+          <ResultBanner
+            description="Kết quả dưới đây là của lần kiểm tra mới với file và ánh xạ cột đang chọn. Ở bước Xác nhận nhập cần đánh dấu xác nhận lại."
+            title="Đã kiểm tra lại."
+            tone="info"
+          />
+        ) : null}
         <ImportSummaryStrip
           cells={[
             { label: "Tổng dòng", value: validation.row_count },
@@ -590,16 +621,17 @@ export function StudentImportPage({
         confirmed={confirmed}
         error={commitError}
         gate={gate}
-        inputsDisabled={isCommitting || validation.invalid_count > 0 || !canCreateStudents || isAlreadyCommitted}
+        inputsDisabled={isCommitting || isValidating || validation.invalid_count > 0 || !canCreateStudents || isAlreadyCommitted}
         onConfirmedChange={(value) => {
           setConfirmed(value);
-          setCommitError(null);
+          setCommitError(keepRecheckRefusal);
         }}
         onReasonChange={(value) => {
           setReason(value);
-          setCommitError(null);
+          setCommitError(keepRecheckRefusal);
         }}
         reason={reason}
+        recheck={{ error: recheckError, isPending: isValidating, onRecheck: () => handleValidate({ recheck: true }) }}
         reusedGuardianCount={reusedGuardianCount}
         studentListHref={resultLinks.studentList}
         validation={validation}
@@ -607,7 +639,7 @@ export function StudentImportPage({
     );
     actionBar = (
       <ImportActionBar
-        back={{ disabled: isCommitting, label: "Kiểm tra dòng", onClick: () => setStep("review") }}
+        back={{ disabled: isCommitting || isValidating, label: "Kiểm tra dòng", onClick: () => setStep("review") }}
         primary={
           <Button
             aria-describedby={gate.reason ? primaryReasonId : undefined}
