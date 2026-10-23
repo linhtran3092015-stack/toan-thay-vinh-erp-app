@@ -2,6 +2,26 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.34.0.0] - 2026-10-23
+
+Bốn màn nhập dữ liệu từ Excel (học sinh, ghi danh, lớp & lịch, số dư buổi đầu kỳ) dựng lại theo phong cách Stumana (bước 15b): mỗi màn là các bước rõ ràng, mỗi lần một bước, bảng kiểm tra dòng nêu lỗi bằng chữ, và nút xác nhận ghi rõ điều kiện còn thiếu.
+
+### Added
+- **Nhập học sinh** (`/imports/students`): 4 bước Tải mẫu & chọn file · Ánh xạ cột · Kiểm tra dòng · Xác nhận nhập. Bảng kiểm tra có chip "Cần xem" (lỗi trước, rồi cảnh báo) và "Tất cả", tô màu dòng kèm chữ "Lỗi"/"Cảnh báo"/"Hợp lệ"; điều kiện để nhập hiện thành danh sách ngay cạnh nút xác nhận.
+- **Nhập ghi danh** (`/imports/enrollments`): 5 bước, ánh xạ cột tự động; chỉ xác nhận được sau khi đã tạo lô ngay trên trang, có kết quả kiểm tra mới nhất, 0 xung đột và gõ đúng câu xác nhận. Hộp hỏi của trình duyệt được thay bằng khung xác nhận trên trang.
+- **Nhập lớp & lịch** (`/imports/classes`): các bước Tải mẫu & chọn file · Ánh xạ cột (hai sheet trong hai tab) · Kiểm tra dòng · Tạo lô, rồi Xác nhận nhập ở trang lô với thanh trạng thái lô. Thứ trong tuần ghi "Thứ Hai … Chủ nhật", giờ theo giờ Việt Nam, lỗi hiện ngay trên trang thay vì hộp thông báo.
+- **Nhập số dư buổi đầu kỳ** (`/imports/session-balances`): danh sách lô hiện trước, rồi 4 bước Ngày hiệu lực & file · Ánh xạ cột · Kiểm tra dòng · Tạo lô đối soát; lời nhắn từng dòng bằng tiếng Việt. Trang lô có thanh trạng thái (Tạo lô · Đối soát · Phê duyệt · Ghi sổ), mỗi trạng thái một khung thao tác ghi rõ điều kiện; "Ghi sổ" nói rõ là không hoàn tác được.
+- Trên điện thoại và màn hẹp, bảng kiểm tra dòng chuyển thành thẻ; nút và link hành động cao 44px cho dễ bấm.
+- Trang xem trước `/dev/imports` cho cả bốn màn với `role` và `state` (trả 404 trên production; không ghi dữ liệu).
+
+### Changed
+- Nhập lớp: nút "Tạo lô" khóa kèm lý do khi kết quả kiểm tra còn dòng xung đột hoặc không hợp lệ. Trước đây vẫn tạo được một lô không bao giờ xác nhận được và làm file đó không nhập lại được nữa.
+- Nhập số dư buổi: người chỉ có quyền duyệt thấy danh sách lô, không thấy màn tạo lô; người không có quyền nhập không thấy nút loại dòng và đối soát ở trang lô (máy chủ vẫn chặn như trước).
+- Khi không nhận được phản hồi lúc ghi (mất mạng, quá thời gian), các màn nói rõ là chưa biết kết quả và hướng dẫn bấm lại, thay vì báo "chưa ghi". Bấm lại khi lần trước đã ghi xong thì hiện "File này đã được nhập." hoặc "Lô này đã được ghi danh." và khóa nút xác nhận.
+
+### Fixed
+- Đổi file, ánh xạ cột, ngày hiệu lực hoặc năm học trong lúc đang kiểm tra không còn làm kết quả kiểm tra cũ hiện như kết quả của dữ liệu mới.
+
 ## [0.33.0.0] - 2026-10-22
 
 Danh sách học sinh xếp theo tên (chữ cuối của họ tên), danh sách tổng xếp theo khối từ lớp 12 xuống, và các ô chọn học sinh không còn bỏ sót em nào.
