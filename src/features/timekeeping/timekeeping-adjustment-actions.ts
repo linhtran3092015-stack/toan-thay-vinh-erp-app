@@ -43,8 +43,8 @@ function getRequestRpcErrorMessage(message: string): string {
     STAFF_PROFILE_NOT_FOUND: "Không tìm thấy hồ sơ nhân sự của bạn.",
     TIMEKEEPING_CHECK_PERMISSION_REQUIRED:
       permissionDeniedMessage("timekeeping.check"),
-    TIME_ENTRY_ADJUSTMENT_ALREADY_APPROVED:
-      "Lượt chấm công này đã có điều chỉnh được duyệt.",
+    TIME_ENTRY_ALREADY_HAS_APPROVED_ADJUSTMENT:
+      "Lượt chấm công này đã được điều chỉnh và duyệt. Liên hệ chủ trung tâm nếu cần sửa thêm.",
     TIME_ENTRY_ADJUSTMENT_NO_CHANGE: "Thời điểm đề xuất không khác dữ liệu gốc.",
     TIME_ENTRY_ADJUSTMENT_PENDING_ALREADY_EXISTS:
       "Lượt chấm công này đang có yêu cầu điều chỉnh chờ duyệt.",
@@ -66,12 +66,15 @@ function getRequestRpcErrorMessage(message: string): string {
 function getDecisionRpcErrorMessage(message: string): string {
   const knownMessages: Record<string, string> = {
     AUTHENTICATED_USER_REQUIRED: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-    TIME_ENTRY_ADJUSTMENT_ALREADY_DECIDED:
-      "Yêu cầu này đã được xử lý trước đó.",
-    TIME_ENTRY_ADJUSTMENT_NOT_FOUND: "Không tìm thấy yêu cầu điều chỉnh.",
-    TIME_ENTRY_ADJUSTMENT_SELF_REVIEW_FORBIDDEN:
+    // Keys are the codes decide_time_entry_adjustment raises.
+    TIME_ENTRY_ADJUSTMENT_REQUEST_ALREADY_DECIDED:
+      "Yêu cầu này đã được xử lý trước đó (có thể chủ trung tâm đã điều chỉnh trực tiếp lượt chấm công).",
+    TIME_ENTRY_ADJUSTMENT_REQUEST_NOT_FOUND: "Không tìm thấy yêu cầu điều chỉnh.",
+    TIME_ENTRY_ADJUSTMENT_SELF_APPROVAL_FORBIDDEN:
       "Bạn không thể tự duyệt yêu cầu điều chỉnh của mình.",
-    TIMEKEEPING_ADJUSTMENT_APPROVAL_PERMISSION_REQUIRED:
+    TIME_ENTRY_LOCKED_BY_PAYROLL:
+      "Lượt chấm công thuộc kỳ lương đã khoá (đang duyệt hoặc đã duyệt). Hãy mở lại kỳ lương về nháp trước khi duyệt; kỳ đã chi trả thì không mở lại được, hãy bù trừ ở kỳ sau.",
+    TIMEKEEPING_APPROVE_ADJUSTMENT_PERMISSION_REQUIRED:
       permissionDeniedMessage("timekeeping.approve_adjustment"),
   };
 

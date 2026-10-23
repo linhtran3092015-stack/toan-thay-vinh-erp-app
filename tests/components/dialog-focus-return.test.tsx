@@ -64,4 +64,42 @@ describe("Dialog focus return", () => {
     expect(onClosedCommit.mock.calls[0][0]).toBe(trigger);
     expect(trigger).toHaveFocus();
   });
+
+  // Value: protects=closing a dialog whose invoker is still on the page returns focus there; when the invoker was removed
+  // (its row deleted) focus lands on the fallback instead of <body>; fails_when=the fallback is applied even though the invoker
+  // exists, or ignored when it is gone; why_new=only returnFocusRef was covered; seam=none; no_claim=jsdom focus, not a screen reader
+  it("returns focus to a still-present invoker, and to the fallback only when the invoker is gone", () => {
+    function FallbackHarness() {
+      const [isOpen, setIsOpen] = useState(false);
+      const [showRow, setShowRow] = useState(true);
+      const fallbackRef = useRef<HTMLButtonElement>(null);
+
+      return (
+        <>
+          <button ref={fallbackRef} type="button">Thêm công bù</button>
+          {showRow ? (
+            <button onClick={() => setIsOpen(true)} type="button">Xóa dòng</button>
+          ) : null}
+          <Dialog ariaLabelledBy="fallback-title" fallbackFocusRef={fallbackRef} isOpen={isOpen} onClose={() => setIsOpen(false)}>
+            <h2 id="fallback-title">Xác nhận</h2>
+            <button onClick={() => setShowRow(false)} type="button">Xóa</button>
+          </Dialog>
+        </>
+      );
+    }
+
+    render(<FallbackHarness />);
+    const rowButton = screen.getByRole("button", { name: "Xóa dòng" });
+    rowButton.focus();
+    fireEvent.click(rowButton);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(rowButton).toHaveFocus();
+
+    rowButton.focus();
+    fireEvent.click(rowButton);
+    fireEvent.click(screen.getByRole("button", { name: "Xóa" }));
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.queryByRole("button", { name: "Xóa dòng" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Thêm công bù" })).toHaveFocus();
+  });
 });

@@ -14,6 +14,8 @@ interface DialogProps {
   ariaLabelledBy: string;
   children: ReactNode;
   className?: string;
+  /** Focus target on close when the element that opened the dialog is gone (e.g. its row was removed). */
+  fallbackFocusRef?: RefObject<HTMLElement | null>;
   initialFocusRef?: RefObject<HTMLElement | null>;
   isOpen: boolean;
   onClose: () => void;
@@ -38,6 +40,7 @@ export function Dialog({
   ariaLabelledBy,
   children,
   className,
+  fallbackFocusRef,
   initialFocusRef,
   isOpen,
   onClose,
@@ -55,6 +58,7 @@ export function Dialog({
     }
 
     const returnFocusTarget = returnFocusRef?.current;
+    const fallbackFocusTarget = fallbackFocusRef?.current;
     previousFocusRef.current = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
@@ -70,9 +74,14 @@ export function Dialog({
 
     return () => {
       window.cancelAnimationFrame(frame);
-      (returnFocusTarget ?? previousFocusRef.current)?.focus();
+      const previous = previousFocusRef.current;
+      const restoreTarget =
+        returnFocusTarget ??
+        (previous && !previous.isConnected ? fallbackFocusTarget : null) ??
+        previous;
+      restoreTarget?.focus();
     };
-  }, [initialFocusRef, isOpen, returnFocusRef]);
+  }, [fallbackFocusRef, initialFocusRef, isOpen, returnFocusRef]);
 
   if (!isOpen) {
     return null;

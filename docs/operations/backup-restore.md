@@ -36,7 +36,7 @@ Thư mục `backups/` không được commit (chứa dữ liệu cá nhân). Lư
 2. Sau khi khôi phục, kiểm tra migration đã áp: `npx supabase migration list --linked`. Nếu bản sao lưu cũ hơn migration mới nhất, chạy `npx supabase db push --linked` để áp phần còn thiếu.
 3. Tạo lại types nếu cần: `npm run typecheck` phải xanh với `src/types/database.generated.ts` hiện tại.
 4. Thông báo cho kế toán kiểm tra lại giao dịch SePay từ mốc khôi phục: Giao dịch SePay → **Đồng bộ lịch sử** cho khoảng ngày bị mất để webhook đã đến trong lúc gián đoạn được ghi nhận lại.
-5. Chấm công trong khoảng bị mất: quản lý nhập bù qua "Tạo bản ghi chấm công" (quyền quản trị chấm công) với lý do.
+5. Chấm công trong khoảng bị mất: quản lý nhập bù qua "Thêm công bù" trong bảng công tháng (quyền quản trị chấm công) với lý do. Tháng có kỳ lương đã gửi duyệt hoặc đã duyệt bị khóa công (lỗi `TIME_ENTRY_LOCKED_BY_PAYROLL`): mở lại kỳ lương về nháp trước khi nhập; kỳ đã chi trả không mở lại được.
 
 ### 3b. Khôi phục một bảng / một nhóm dòng
 

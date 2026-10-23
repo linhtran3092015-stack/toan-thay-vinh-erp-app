@@ -7745,6 +7745,7 @@ export type Database = {
         Args: {
           p_check_in_at: string
           p_check_out_at: string
+          p_mode?: string
           p_reason: string
           p_time_entry_id: string
         }
@@ -7783,6 +7784,34 @@ export type Database = {
           p_staff_id: string
           p_work_date: string
         }
+        Returns: {
+          auto_ended_at: string | null
+          check_in_at: string
+          check_in_mode: string
+          check_out_at: string | null
+          check_out_mode: string | null
+          clock_out_reason: string | null
+          created_at: string
+          id: string
+          last_latitude: number | null
+          last_location_accuracy: number | null
+          last_location_at: string | null
+          last_longitude: number | null
+          staff_id: string
+          staff_shift_assignment_id: string | null
+          status: string
+          updated_at: string
+          work_date: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "time_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_delete_time_entry: {
+        Args: { p_reason: string; p_time_entry_id: string }
         Returns: {
           auto_ended_at: string | null
           check_in_at: string
@@ -7997,6 +8026,10 @@ export type Database = {
       }
       assert_payroll_configuration_date_allowed: {
         Args: { p_effective_from: string }
+        Returns: undefined
+      }
+      assert_time_entry_month_unlocked: {
+        Args: { p_work_date: string }
         Returns: undefined
       }
       assign_user_role: {
@@ -12682,6 +12715,10 @@ export type Database = {
           transfer_content: string
           unit_price_vnd: number
         }[]
+      }
+      supersede_time_entry_adjustment: {
+        Args: { p_time_entry_id: string }
+        Returns: undefined
       }
       sync_payroll_order_facts: {
         Args: { p_period_month: string }

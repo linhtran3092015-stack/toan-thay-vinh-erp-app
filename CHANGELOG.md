@@ -2,6 +2,40 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.36.0.0] - 2026-10-23
+
+Chủ trung tâm xóa được lượt chấm công, sửa lại lượt đã điều chỉnh và đổi hình thức (tại trung tâm / trực tuyến) ngay trong bảng công tháng. Công của tháng đã chốt lương thì được khóa.
+
+### Added
+- **Xóa lượt chấm công** (nút "Xóa" trong chi tiết bảng công, chỉ tài khoản có quyền duyệt điều chỉnh):
+  - bắt buộc nhập lý do, hộp thoại nói rõ thao tác không hoàn tác được;
+  - xóa kèm các lần điều chỉnh, bằng chứng chấm công và yêu cầu ngoại lệ của ca;
+  - nhật ký hệ thống giữ lại bản ghi để tra cứu, không giữ tọa độ GPS hay Wi-Fi;
+  - ca đang mở thì nút bị khóa kèm lý do "Sửa giờ ra trước khi xóa".
+- **Đổi hình thức khi sửa giờ:** hộp thoại có ô "Hình thức". Không chọn lại thì giữ hình thức lúc nhân sự chấm công.
+- **Khóa công theo kỳ lương:** khi kỳ lương của tháng đã gửi duyệt, đã duyệt hoặc đã chi trả, hệ thống từ chối xóa, sửa giờ, duyệt yêu cầu điều chỉnh, thêm công bù và duyệt ngoại lệ chấm công của tháng đó. Muốn sửa thì mở lại kỳ lương về nháp.
+
+### Changed
+- **Sửa lại lượt đã điều chỉnh:** trước đây lần sửa thứ hai (và mọi lần sửa công bù tạo tay) đều báo lỗi. Giờ lưu được; bản điều chỉnh cũ chuyển "Đã thay thế" và vẫn có trong lịch sử.
+- Khi chủ trung tâm sửa trực tiếp một ca đang có yêu cầu điều chỉnh của nhân sự, yêu cầu đó tự chuyển "Đã từ chối" kèm lý do. Bảng công hiện nhãn "Chờ duyệt điều chỉnh" và hộp thoại báo trước điều này.
+- Hộp thoại sửa chỉ lấy giờ từ bản điều chỉnh đã duyệt, không lấy giờ nhân sự mới đề nghị hoặc đã bị từ chối.
+- Bấm lưu mà không đổi gì thì hệ thống báo "không thay đổi" thay vì tạo thêm một bản điều chỉnh. Sửa riêng hình thức không làm tròn giờ đã chấm.
+- Không sửa được sang giờ tương lai, sang ngày khác ngày làm việc, hay giờ ra quá ngày hôm sau.
+
+### Fixed
+- Sửa giờ trực tiếp một ca trực tuyến không còn ghi ca đó thành "tại trung tâm" (lỗi cũ làm bảng lương trả 100% thay vì mức trực tuyến). 11 ca tháng 9/2026 bị lỗi này chưa được sửa dữ liệu; ca nào được sửa giờ lại sẽ tự về đúng hình thức lúc chấm công.
+- Thông báo lỗi khi duyệt yêu cầu điều chỉnh (đã xử lý, không tìm thấy, tự duyệt, thiếu quyền) hiện đúng nội dung thay vì câu chung chung.
+
+### For contributors
+- Migration `20261023180000_timekeeping_readjust_mode_and_delete.sql` (đẩy lên prod trước khi deploy app):
+  - trạng thái `superseded` cho `time_entry_adjustment_requests`;
+  - `admin_adjust_time_entry` thêm `p_mode`;
+  - hàm mới `admin_delete_time_entry`, `assert_time_entry_month_unlocked`, `supersede_time_entry_adjustment`;
+  - `decide_time_entry_adjustment` khóa `time_entries` trước và báo bảng lương tạm tính;
+  - `admin_create_time_entry` và `decide_attendance_exception` gọi khóa kỳ lương.
+- pgTAP mới: `timekeeping-readjust-mode-delete` (70 kiểm tra) và `timekeeping-admin-adjust-keeps-mode` (10 kiểm tra, gồm số tiền từ `compute_payroll_projection`).
+- `Dialog` có thêm `fallbackFocusRef`: chỉ dùng khi phần tử mở hộp thoại không còn trên trang.
+
 ## [0.35.1.0] - 2026-10-23
 
 Lưới an toàn của hàng đợi chấm bài AI chạy trong cơ sở dữ liệu, 5 phút một lần. Lịch `*/5` của GitHub Actions thực tế chỉ chạy 3–5 giờ một lần.

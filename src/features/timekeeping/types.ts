@@ -179,7 +179,8 @@ export type TimekeepingDayEntriesResult =
       error: TimekeepingEntriesError;
     };
 
-export type TimekeepingAdjustmentStatus = "pending" | "approved" | "rejected";
+// `superseded`: an approval replaced by a later adjustment of the same entry.
+export type TimekeepingAdjustmentStatus = "pending" | "approved" | "rejected" | "superseded";
 
 export interface TimekeepingAdjustableEntry {
   adjustmentStatus: TimekeepingAdjustmentStatus | null;

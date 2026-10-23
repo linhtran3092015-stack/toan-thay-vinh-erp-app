@@ -12,6 +12,7 @@
 ## Vòng đời dữ liệu
 
 - Không hard delete dữ liệu nghiệp vụ quan trọng. Dùng trạng thái, thời điểm vô hiệu hóa hoặc bản ghi đảo ngược phù hợp với domain.
+- Ngoại lệ đã được chủ trung tâm duyệt: xóa hẳn chỉ qua một hàm database đã review (`SECURITY DEFINER`, kiểm tra quyền, bắt buộc lý do) có ghi snapshot dòng bị xóa vào `audit_logs`; nếu bảng có trigger chặn xóa thì chỉ mở bằng GUC cục bộ trong transaction đó rồi tắt lại. Hiện có: xóa lượt chấm công (`admin_delete_time_entry`, từ chối khi kỳ lương của tháng đã rời nháp) và đảo phân bổ giao dịch SePay (`reverse_sepay_allocation`). Xóa tài khoản nhân sự (`delete_staff_account`) không thuộc ngoại lệ này: hàm luôn đánh dấu hồ sơ đã xóa, thu hồi vai trò và lời mời; chỉ khi không còn bản ghi nào tham chiếu tài khoản mới xóa hẳn hồ sơ, các dòng gán vai trò và tài khoản đăng nhập, ngược lại hồ sơ giữ ở trạng thái đã xóa mềm.
 - Audit log là append-only, không ghi đè bản ghi cũ.
 - Migration đã chạy trên môi trường dùng chung là bất biến; mọi thay đổi tiếp theo phải là migration mới.
 

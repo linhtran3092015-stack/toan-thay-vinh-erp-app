@@ -27,14 +27,15 @@ interface TimekeepingAdjustmentRequestsProps {
 
 function getStatusTone(
   status: TimekeepingAdjustmentStatus,
-): "danger" | "success" | "warning" {
+): "danger" | "neutral" | "success" | "warning" {
   const tones: Record<
     TimekeepingAdjustmentStatus,
-    "danger" | "success" | "warning"
+    "danger" | "neutral" | "success" | "warning"
   > = {
     approved: "success",
     pending: "warning",
     rejected: "danger",
+    superseded: "neutral",
   };
 
   return tones[status];

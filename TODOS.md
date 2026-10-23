@@ -1642,6 +1642,8 @@
 
 **What:** Đồng bộ bảng thông báo lỗi trong `timekeeping-adjustment-actions.ts` với mã mà `request_time_entry_adjustment` thật sự raise (`TIME_ENTRY_ALREADY_HAS_APPROVED_ADJUSTMENT`, `..._WORK_DATE_INVALID`, `TIME_ENTRY_MUST_BE_CLOSED_FOR_ADJUSTMENT`, `TIME_ENTRY_NOT_AVAILABLE_FOR_ADJUSTMENT`, lỗi trùng chỉ mục yêu cầu chờ duyệt, `..._REASON_REQUIRED`, `..._TIME_RANGE_INVALID`, `..._CANNOT_USE_FUTURE_TIME`, `..._VALUES_INVALID`).
 
+**Progress:** v0.36.0.0 sửa khóa `TIME_ENTRY_ALREADY_HAS_APPROVED_ADJUSTMENT` và toàn bộ map duyệt (`decide_time_entry_adjustment`). Từ khi chủ trung tâm xóa được công, nhân sự gửi yêu cầu cho ca vừa bị xóa sẽ gặp `TIME_ENTRY_NOT_AVAILABLE_FOR_ADJUSTMENT` (hiện câu chung chung), nên các khóa còn lại đáng làm sớm.
+
 **Why:** Hầu hết lỗi rơi về câu chung "Không thể gửi yêu cầu điều chỉnh. Dữ liệu chưa được cập nhật.", kể cả khi gửi lại một yêu cầu đã được ghi nhận (lỗi trùng), nên nhân sự không biết phải làm gì.
 
 **Context:** `supabase/migrations/20260729090000_*` (dòng 289–399) và chỉ mục `time_entry_adjustment_one_pending_request_idx`; file action là server action nên bước 12 (chỉ trình bày) không sửa.
@@ -1781,6 +1783,102 @@
 **Effort:** M
 **Priority:** P3
 **Depends on:** Bước 16
+
+### Hiện "hình thức đang tính lương" trong bảng công và hộp thoại sửa
+
+**What:** `get_staff_monthly_timekeeping_entries` (và bản của nhân sự) trả thêm hình thức của bản điều chỉnh đã duyệt; cột "Hình thức", hộp thoại sửa và hộp thoại xóa hiện hình thức đó, và hộp thoại luôn gửi hình thức đã chọn.
+
+**Why:** Từ v0.36.0.0, sửa giờ mà không chọn hình thức thì lấy hình thức lúc chấm công (chủ trung tâm chốt). Ca mà nhân sự đã được duyệt đổi hình thức sẽ bị đưa về hình thức lúc chấm nếu chủ trung tâm chỉ sửa giờ. Trên prod lúc ship có đúng 1 ca như vậy (04/10/2026, chấm trực tuyến, được duyệt tính tại trung tâm), cần chọn "Tại trung tâm" khi sửa. Ngoài ra 11 ca tháng 9/2026 bị ghi sai "tại trung tâm" không nhìn thấy được trên màn hình.
+
+**Context:** Review đối kháng của /ship v0.36.0.0 xếp mức cao, chủ trung tâm chọn ship trước và làm việc này riêng. Truy vấn tìm các ca lệch: bản `approved` có `requested_check_in_mode <> time_entries.check_in_mode`.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** None
+
+### Test hộp thoại xóa công đọc nút gửi lúc nhãn còn "Đang xóa…"
+
+**What:** Trong `tests/components/center-monthly-timesheet-management.test.tsx`, ca "keeps the delete dialog open on a blank reason, a refusal, and while the delete is running": đổi `getByRole("button", { name: "Xóa lượt chấm công" })` sau thông báo từ chối thành `findByRole`, và sửa tiêu đề ca thành công ("hides" → "disables").
+
+**Why:** Coverage audit chạy 5 lần thì 1 lần fail: thông báo hiện trước khi transition kết thúc nên nút còn nhãn "Đang xóa…". CI có thể đỏ ngẫu nhiên.
+
+**Context:** Phát hiện ở vòng review 3 của /ship v0.36.0.0, chủ trung tâm chọn không sửa thêm trong PR đó.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** None
+
+### Xóa hoặc sửa công trong tháng có kỳ lương nháp đã tính không đánh dấu lượt tính cũ
+
+**What:** Khi xóa/sửa/duyệt công của tháng có `payroll_periods.status = 'draft'` và `current_calculation_run_id`, đánh dấu lượt tính cũ là lỗi thời (hoặc `submit_payroll_for_review` so `payroll_live_revisions.changed_at` với lúc tính).
+
+**Why:** Dòng lương của engine hiện tại trỏ lượt công bằng `source_kind='time_entry'`/`source_id` (text, không FK). Xóa công xong mà không bấm "Tính lại" thì gửi duyệt vẫn trả ca đã xóa. Tháng 9/2026 trên prod đang nháp và đã có lượt tính.
+
+**Context:** Có từ trước với sửa giờ; xóa công làm tình huống dễ gặp hơn. Tạm thời: sau khi xóa/sửa công tháng 9 phải bấm "Tính lại" trước khi gửi duyệt.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** None
+
+### Chỉnh nhỏ hộp thoại sửa/xóa công và bảng chi tiết
+
+**What:** (1) hộp thoại sửa khóa form trong 1,2 giây sau khi lưu thành công như hộp thoại xóa; (2) giữ banner "đã điều chỉnh trước đó"/"đang có yêu cầu chờ duyệt" khi có lỗi; (3) sau khi xóa xong, nút "Hủy" đổi thành "Đóng"; (4) xóa timer tự đóng khi hộp thoại unmount (timer cũ có thể đóng hộp thoại của dòng khác); (5) ô Thao tác dùng `sm:items-start` để "Sửa giờ" thẳng hàng với "Xóa" có chú thích; (6) gom các badge trạng thái vào một cột `gap-1`; (7) `fallbackFocusRef` cho hộp thoại chi tiết nhân sự khi dòng của họ biến mất khỏi bảng tổng.
+
+**Why:** Các điểm review 3 của /ship v0.36.0.0, đều nhỏ, chủ trung tâm để làm sau.
+
+**Context:** `admin-adjust-time-entry-dialog.tsx`, `admin-delete-time-entry-dialog.tsx`, `center-monthly-timesheet-management.tsx`.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### "Thêm công bù" chưa kiểm tra ngày và giờ tương lai như sửa giờ
+
+**What:** `admin_create_time_entry` áp cùng quy tắc với `admin_adjust_time_entry`: giờ vào thuộc `p_work_date`, giờ ra không quá ngày hôm sau, không ở tương lai.
+
+**Why:** Công bù nhập lệch ngày thì sau đó không sửa được (mọi lần lưu báo `TIME_ENTRY_ADJUSTMENT_WORK_DATE_INVALID`), chỉ còn cách xóa. Lúc ship prod chưa có lượt nào lệch ngày.
+
+**Context:** Hàm đã được định nghĩa lại trong migration `20261023180000` (thêm khóa kỳ lương).
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Lượt công có ngoại lệ chấm công chưa duyệt không hiện trong bảng công tháng của chủ
+
+**What:** Read model quản lý trả cả lượt `time_entry_is_verified = false` kèm trạng thái xác minh (không cộng vào tổng), để chủ xóa hoặc sửa được.
+
+**Why:** Lượt có ngoại lệ bị từ chối không bao giờ hiện lại, nên không xóa hay sửa được từ màn hình.
+
+**Context:** `get_staff_monthly_timekeeping_entries` lọc `time_entry_is_verified(id)` từ `20260915170000`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Kiểm soát sửa đồng thời và tự sửa công khi mở rộng quyền duyệt
+
+**What:** (1) `admin_adjust_time_entry`/`admin_delete_time_entry` nhận `p_expected_updated_at` và báo 40001 khi lượt công vừa bị người khác đổi; (2) xem lại việc chặn người duyệt tự sửa/xóa công của chính mình nếu sau này trao `timekeeping.approve_adjustment` cho nhân sự hưởng lương.
+
+**Why:** Hiện chỉ vai trò owner có quyền duyệt (chủ trung tâm chốt không chặn tự sửa), nên rủi ro thấp; sẽ cao hơn khi có nhiều người duyệt.
+
+**Context:** `save_weekly_shift_assignment` đã dùng mẫu `p_expected_updated_at` / `WEEKLY_SCHEDULE_CONFLICT`.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Test còn thiếu cho xóa/sửa công
+
+**What:** `TIME_ENTRY_REFERENCED_BY_PAYROLL_HISTORY` (cần fixture payroll statement), map lỗi khóa kỳ lương của `attendance-exception-actions.ts`, mã quyền trong test map duyệt, giờ ra ngày hôm sau (được) và 2 ngày sau (bị từ chối), audit `requested/approved/rejected`, test thứ tự khóa bằng pgTAP thay cho regex; sửa chú thích "Far-future months" trong fixture pgTAP (fixture giờ ở năm 2020 vì không được sửa sang giờ tương lai).
+
+**Why:** Coverage audit /ship v0.36.0.0 dừng ở 63% (mục tiêu 80%); chủ trung tâm chọn ship và ghi phần còn lại.
+
+**Context:** `supabase/tests/timekeeping-readjust-mode-delete.test.sql`, `tests/unit/timekeeping-adjustment-actions.test.ts`, `tests/unit/timekeeping-readjust-delete-migration.test.ts`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
 
 ## Phiếu học phí
 

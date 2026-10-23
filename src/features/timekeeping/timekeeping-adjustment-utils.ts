@@ -1,6 +1,7 @@
 import type {
   TimeEntryMode,
   TimekeepingAdjustmentStatus,
+  TimekeepingMonthlyEntry,
 } from "@/features/timekeeping/types";
 
 export function formatVietnamDate(value: string): string {
@@ -58,7 +59,23 @@ export function getAdjustmentStatusLabel(status: TimekeepingAdjustmentStatus): s
     approved: "Đã duyệt",
     pending: "Chờ duyệt",
     rejected: "Đã từ chối",
+    superseded: "Đã thay thế",
   };
 
   return labels[status];
+}
+
+/**
+ * The times an entry currently stands at. The monthly read models also return a
+ * pending or rejected request's proposal as adjusted*, so only an approved
+ * adjustment replaces the recorded check-in/check-out.
+ */
+export function getEffectiveEntryTimes(
+  entry: Pick<TimekeepingMonthlyEntry, "adjustedCheckInAt" | "adjustedCheckOutAt" | "adjustmentStatus" | "checkInAt" | "checkOutAt">,
+): { checkInAt: string; checkOutAt: string | null } {
+  const isApproved = entry.adjustmentStatus === "approved";
+  return {
+    checkInAt: (isApproved && entry.adjustedCheckInAt) || entry.checkInAt,
+    checkOutAt: (isApproved && entry.adjustedCheckOutAt) || entry.checkOutAt,
+  };
 }

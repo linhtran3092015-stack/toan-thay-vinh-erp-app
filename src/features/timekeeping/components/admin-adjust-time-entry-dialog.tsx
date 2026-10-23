@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useState, useTransition, type FormEvent, type RefObject } from "react";
 import { Edit3, X } from "lucide-react";
 
 import { ResultBanner } from "@/components/shared/result-banner";
@@ -16,15 +16,20 @@ import {
 import {
   formatVietnamDate,
   formatVietnamDateTimeInput,
+  getEffectiveEntryTimes,
+  getTimeEntryModeLabel,
   vietnamDatetimeInputToIso,
 } from "@/features/timekeeping/timekeeping-adjustment-utils";
-import type { TimekeepingMonthlyEntry } from "@/features/timekeeping/types";
+import { formatVietnamClockTime } from "@/features/timekeeping/timekeeping-staff-presentation";
+import type { TimeEntryMode, TimekeepingMonthlyEntry } from "@/features/timekeeping/types";
 
 const formInputClassName =
   "min-h-11 w-full rounded-md border border-hairline bg-white px-3 text-sm font-normal text-ink outline-none transition focus:border-border-focus focus:ring-[3px] focus:ring-focus-ring/20 disabled:cursor-not-allowed disabled:bg-slate-100";
 
 interface AdminAdjustTimeEntryDialogProps {
   entry: TimekeepingMonthlyEntry | null;
+  /** A successful save refreshes the table and removes the invoking row button. */
+  fallbackFocusRef?: RefObject<HTMLElement | null>;
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
@@ -33,6 +38,7 @@ interface AdminAdjustTimeEntryDialogProps {
 
 export function AdminAdjustTimeEntryDialog({
   entry,
+  fallbackFocusRef,
   isOpen,
   onClose,
   onSuccess,
@@ -45,6 +51,7 @@ export function AdminAdjustTimeEntryDialog({
       ariaDescribedBy="admin-adjust-time-entry-desc"
       ariaLabelledBy="admin-adjust-time-entry-title"
       className="max-w-lg p-6"
+      fallbackFocusRef={fallbackFocusRef}
       isOpen={isOpen}
       onClose={onClose}
     >
@@ -70,8 +77,10 @@ function AdminAdjustTimeEntryForm({
   onSuccess?: () => void;
   staffDisplayName?: string;
 }) {
-  const initialIn = entry.adjustedCheckInAt || entry.checkInAt;
-  const initialOut = entry.adjustedCheckOutAt || entry.checkOutAt || entry.checkInAt;
+  const isApproved = entry.adjustmentStatus === "approved";
+  const effectiveTimes = getEffectiveEntryTimes(entry);
+  const initialIn = effectiveTimes.checkInAt;
+  const initialOut = effectiveTimes.checkOutAt || effectiveTimes.checkInAt;
 
   const [isPending, startTransition] = useTransition();
   const [checkInInput, setCheckInInput] = useState<string>(() =>
@@ -80,6 +89,7 @@ function AdminAdjustTimeEntryForm({
   const [checkOutInput, setCheckOutInput] = useState<string>(() =>
     formatVietnamDateTimeInput(initialOut),
   );
+  const [mode, setMode] = useState<TimeEntryMode>(entry.checkInMode);
   const [reason, setReason] = useState<string>("");
   const [actionState, setActionState] = useState<AdminTimekeepingActionState>(
     initialAdminTimekeepingActionState,
@@ -103,6 +113,8 @@ function AdminAdjustTimeEntryForm({
         const result = await adminAdjustTimeEntryAction({
           checkInAt: vietnamDatetimeInputToIso(checkInInput),
           checkOutAt: vietnamDatetimeInputToIso(checkOutInput),
+          // Unchanged → the server keeps the entry's check-in mode.
+          mode: mode === entry.checkInMode ? undefined : mode,
           reason: reason.trim(),
           timeEntryId: entry.id,
         });
@@ -136,7 +148,7 @@ function AdminAdjustTimeEntryForm({
               className="font-display text-lg font-bold text-ink"
               id="admin-adjust-time-entry-title"
             >
-              Điều chỉnh giờ chấm công
+              Điều chỉnh lượt chấm công
             </h3>
             <p className="text-xs text-ink-muted" id="admin-adjust-time-entry-desc">
               {staffDisplayName ? `Nhân sự: ${staffDisplayName} · ` : ""}
@@ -165,6 +177,26 @@ function AdminAdjustTimeEntryForm({
                 : "Không thể điều chỉnh"
             }
             tone={actionState.status === "success" ? "success" : "error"}
+          />
+        ) : null}
+
+        {isApproved && actionState.status === "idle" ? (
+          <ResultBanner
+            description="Lưu lần này sẽ thay thế điều chỉnh cũ; lịch sử vẫn được giữ trong nhật ký."
+            title="Lượt chấm công này đã được điều chỉnh trước đó"
+            tone="info"
+          />
+        ) : null}
+
+        {entry.adjustmentStatus === "pending" && actionState.status === "idle" ? (
+          <ResultBanner
+            description={
+              entry.adjustedCheckInAt && entry.adjustedCheckOutAt
+                ? `Nhân sự đề nghị ${formatVietnamClockTime(entry.adjustedCheckInAt)} → ${formatVietnamClockTime(entry.adjustedCheckOutAt)}. Lưu điều chỉnh trực tiếp sẽ đóng yêu cầu này.`
+                : "Lưu điều chỉnh trực tiếp sẽ đóng yêu cầu này."
+            }
+            title="Nhân sự đang có yêu cầu điều chỉnh chờ duyệt"
+            tone="warning"
           />
         ) : null}
 
@@ -199,6 +231,22 @@ function AdminAdjustTimeEntryForm({
             ) : null}
           </label>
         </div>
+
+        <label className="grid gap-1.5 text-xs font-semibold text-ink">
+          Hình thức
+          <select
+            className={formInputClassName}
+            disabled={isPending}
+            onChange={(e) => setMode(e.target.value as TimeEntryMode)}
+            value={mode}
+          >
+            <option value="offline">{getTimeEntryModeLabel("offline")}</option>
+            <option value="online">{getTimeEntryModeLabel("online")}</option>
+          </select>
+          {fieldErrors.mode?.[0] ? (
+            <span className="text-xs font-normal text-danger">{fieldErrors.mode[0]}</span>
+          ) : null}
+        </label>
 
         <label className="grid gap-1.5 text-xs font-semibold text-ink">
           Lý do điều chỉnh (bắt buộc)

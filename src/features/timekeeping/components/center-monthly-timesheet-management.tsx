@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   AlertTriangle,
   Clock,
@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   Plus,
   Search,
+  Trash2,
   UserCheck,
   Users,
   X,
@@ -20,11 +21,12 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { AdminAdjustTimeEntryDialog } from "@/features/timekeeping/components/admin-adjust-time-entry-dialog";
 import { AdminCreateTimeEntryDialog } from "@/features/timekeeping/components/admin-create-time-entry-dialog";
+import { AdminDeleteTimeEntryDialog } from "@/features/timekeeping/components/admin-delete-time-entry-dialog";
 import {
   fetchCenterMonthlyOverviewAction,
   fetchStaffMonthlyTimesheetAction,
 } from "@/features/timekeeping/timekeeping-admin-actions";
-import { formatVietnamDate } from "@/features/timekeeping/timekeeping-adjustment-utils";
+import { formatVietnamDate, getEffectiveEntryTimes } from "@/features/timekeeping/timekeeping-adjustment-utils";
 import type {
   TimekeepingCenterMonthlyOverviewEntry,
   TimekeepingMonthlyEntry,
@@ -91,8 +93,10 @@ export function CenterMonthlyTimesheetManagement({
   const [staffEntries, setStaffEntries] = useState<readonly TimekeepingMonthlyEntry[]>([]);
   const [isStaffDetailPending, startStaffDetailTransition] = useTransition();
 
-  // Adjust dialog state
+  // Adjust / delete dialog state
   const [entryToAdjust, setEntryToAdjust] = useState<TimekeepingMonthlyEntry | null>(null);
+  const [entryToDelete, setEntryToDelete] = useState<TimekeepingMonthlyEntry | null>(null);
+  const addEntryButtonRef = useRef<HTMLButtonElement>(null);
 
   const loadOverview = (month: number, year: number) => {
     setOverview([]);
@@ -521,6 +525,7 @@ export function CenterMonthlyTimesheetManagement({
                   setCreateDialogResetKey((k) => k + 1);
                   setIsCreateDialogOpen(true);
                 }}
+                ref={addEntryButtonRef}
                 size="sm"
               >
                 <Plus size={15} /> Thêm công bù
@@ -558,12 +563,15 @@ export function CenterMonthlyTimesheetManagement({
                     <th className="px-3 py-2.5 font-semibold">Thời lượng</th>
                     <th className="px-3 py-2.5 font-semibold">Hình thức</th>
                     <th className="px-3 py-2.5 font-semibold">Trạng thái</th>
-                    <th className="px-3 py-2.5 font-semibold text-right">Điều chỉnh</th>
+                    <th className="px-3 py-2.5 font-semibold text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
                   {staffEntries.map((entry) => {
                     const isApproved = entry.adjustmentStatus === "approved";
+                    // A staff member can have several entries on one day, so row labels name the shift and time.
+                    const rowLabel = `${formatVietnamDate(entry.workDate)}, ${entry.workShiftName ?? "ngoài ca"}, ${formatTimeOnly(getEffectiveEntryTimes(entry).checkInAt)}`;
+                    const isOpenShift = entry.status === "open";
                     return (
                       <tr className="hover:bg-surface-2/60" key={entry.id}>
                         <td className="px-3 py-3 font-semibold text-ink">
@@ -633,16 +641,36 @@ export function CenterMonthlyTimesheetManagement({
                           ) : (
                             <Badge tone="success">Hoàn thành</Badge>
                           )}
+                          {entry.adjustmentStatus === "pending" ? (
+                            <Badge className="mt-1" tone="info">Chờ duyệt điều chỉnh</Badge>
+                          ) : null}
                         </td>
 
                         <td className="px-3 py-3 text-right">
-                          <Button
-                            onClick={() => setEntryToAdjust(entry)}
-                            size="sm"
-                            variant="outline"
-                          >
-                            Sửa giờ
-                          </Button>
+                          <div className="flex flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:justify-end">
+                            <Button
+                              aria-label={`${isApproved ? "Sửa lại" : "Sửa giờ"} lượt chấm công ${rowLabel}`}
+                              className="max-sm:min-h-11"
+                              onClick={() => setEntryToAdjust(entry)}
+                              size="sm"
+                              variant="outline"
+                            >
+                              {isApproved ? "Sửa lại" : "Sửa giờ"}
+                            </Button>
+                            {canApproveAdjustments ? (
+                              <Button
+                                aria-label={`Xóa lượt chấm công ${rowLabel}`}
+                                className="max-sm:min-h-11"
+                                disabled={isOpenShift}
+                                disabledReason={isOpenShift ? "Sửa giờ ra trước khi xóa" : undefined}
+                                onClick={() => setEntryToDelete(entry)}
+                                size="sm"
+                                variant="danger-outline"
+                              >
+                                <Trash2 size={14} /> Xóa
+                              </Button>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -659,10 +687,22 @@ export function CenterMonthlyTimesheetManagement({
         <AdminAdjustTimeEntryDialog
           entry={entryToAdjust}
           isOpen={Boolean(entryToAdjust)}
+          fallbackFocusRef={addEntryButtonRef}
           onClose={() => setEntryToAdjust(null)}
           onSuccess={() => {
             refreshActiveStaffDetail();
           }}
+          staffDisplayName={activeStaff?.staffDisplayName}
+        />
+      ) : null}
+
+      {/* Delete Entry Dialog */}
+      {entryToDelete ? (
+        <AdminDeleteTimeEntryDialog
+          entry={entryToDelete}
+          onClose={() => setEntryToDelete(null)}
+          fallbackFocusRef={addEntryButtonRef}
+          onSuccess={refreshActiveStaffDetail}
           staffDisplayName={activeStaff?.staffDisplayName}
         />
       ) : null}
