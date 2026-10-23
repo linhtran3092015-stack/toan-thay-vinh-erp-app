@@ -2,6 +2,24 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.34.0.2] - 2026-10-23
+
+Bộ đề hồi quy cho chấm bài AI (kế hoạch mục 7): chấm lại các bài trợ giảng đã duyệt bằng đúng cấu hình đang chạy, so với kết quả trợ giảng chốt. Chạy lại mỗi khi đổi model hoặc prompt.
+
+### For contributors
+- `node scripts/ai-grading-regression.mjs export | estimate | submit --confirm [--max-usd 1] | collect`. Có 4 lệnh:
+  - `export`: lấy bài đã duyệt từ production (chỉ đọc, qua Supabase CLI đã link; không lấy tên, mã hay SĐT học sinh).
+  - `estimate`: ước tính số lượt gọi và chi phí.
+  - `submit`: gửi lượt chấm qua Message Batches API (nửa giá), dùng chính `buildGradeParams` của worker (2 lần chấm + trọng tài). Không chạy nếu ước tính vượt `--max-usd`.
+  - `collect`: chờ batch, gửi lượt trọng tài, rồi viết báo cáo theo các mốc Giai đoạn 0 (≥ 90% khớp từng câu, ≥ 98% lệch ≤ 1 điểm, không bài lệch ≥ 2 điểm mà vẫn xanh).
+- Dữ liệu và báo cáo nằm trong `.ai-grading-eval/regression/`, thư mục này nằm trong `.gitignore`. Bài nộp trống (làm trên giấy) không tính.
+- `jiti` (đã có trong cây phụ thuộc qua eslint và vite) thành devDependency để chạy TypeScript với alias `@/`.
+- Lần chạy đầu ngày 23/10: 147 bài thuộc 7 đề, chi phí khoảng 0,21 USD.
+  - Khớp từng câu với trợ giảng 95,9%.
+  - Lệch ≤ 1 điểm 97,3%; có 2 bài xanh lệch 2 điểm, cùng một câu hai đáp số mà học sinh chỉ ghi một.
+  - Câu lệch 0,7% (6/914).
+  - Hai lần chấm khớp nhau 93,2%; khớp lần chấm thật trước đó 98%.
+
 ## [0.34.0.1] - 2026-10-23
 
 ### Fixed
