@@ -518,9 +518,9 @@ describe("StudentImportPage wizard", () => {
     expect(screen.getByRole("button", { name: "Xác nhận nhập 4 học sinh" })).toBeDisabled();
   });
 
-  // Value: protects=a refusal other than the two the panel tells apart (duplicate conflict, invalid_request for a bad reason) reads "Chưa nhập." with no re-check button;
-  // fails_when=toStudentImportCommitError matches the re-check refusal by code alone, so any invalid_request offers a dry-run that cannot fix it;
-  // why_new=the re-check tests only answer with STUDENT_IMPORT_VALIDATION_FAILED_MESSAGE, so the message half of the invalid_request match never ran;
+  // Value: protects=a refusal other than the two the panel tells apart (duplicate conflict, invalid_request for a bad reason) reads "Chưa nhập." with no re-check button, and fixing what it names (editing the reason) clears it, since only the re-check refusal outlives an edit;
+  // fails_when=toStudentImportCommitError matches the re-check refusal by code alone, so any invalid_request offers a dry-run that cannot fix it, or keepRecheckRefusal keeps every kind of refusal across an edit so a corrected reason still sits under "Chưa nhập.";
+  // why_new=the re-check tests only answer with STUDENT_IMPORT_VALIDATION_FAILED_MESSAGE, so the message half of the invalid_request match never ran, and no test edited the reason after an ordinary refusal (the clear branch of keepRecheckRefusal);
   // seam=none; no_claim=does not prove which refusals the commit RPC raises
   it("keeps a refused commit inline and says the result is unknown when the call itself fails", async () => {
     const { actions } = renderPage({ initialDryRun: cleanResult(), initialStep: "confirm", initialWorkbook: workbook() });
@@ -549,6 +549,11 @@ describe("StudentImportPage wizard", () => {
     expect(within(screen.getByRole("alert")).queryByRole("button", { name: "Kiểm tra lại" })).not.toBeInTheDocument();
     expect(currentStep()).toHaveTextContent("4. Xác nhận nhập");
     await waitFor(() => expect(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" })).toBeEnabled());
+
+    // Correcting the reason the server refused takes the refusal away; the commit stays available.
+    fireEvent.change(screen.getByLabelText("Lý do nhập"), { target: { value: "Lý do đã sửa" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" }));
     await waitFor(() =>
@@ -601,10 +606,10 @@ describe("StudentImportPage wizard", () => {
     );
   });
 
-  // Value: protects=a commit the server refuses with STUDENT_IMPORT_VALIDATION_FAILED ("Dữ liệu đã thay đổi hoặc còn dòng lỗi…") offers "Kiểm tra lại" on that refusal and locks the commit with that reason until a re-check answers (editing the reason keeps the refusal); the re-check reruns the dry-run with the file and mapping held, locks commit, back and inputs while it runs, and opens "Kiểm tra dòng" on the new result saying it was re-checked; a re-check that fails keeps its error with the refusal (never on "Ánh xạ cột") and can be pressed again;
-  // fails_when=toStudentImportCommitError stops telling that refusal apart (or the action's message drifts from STUDENT_IMPORT_VALIDATION_FAILED_MESSAGE), the button goes, an edit removes it, the commit stays usable after the refusal or during the re-check, the re-check sends other rows, its failure shows on the mapping step, or the new result is not shown;
+  // Value: protects=a commit the server refuses with STUDENT_IMPORT_VALIDATION_FAILED ("Dữ liệu đã thay đổi hoặc còn dòng lỗi…") offers "Kiểm tra lại" on that refusal and locks the commit with that reason until a re-check answers (editing the reason or the confirmation checkbox keeps the refusal); the re-check reruns the dry-run with the file and mapping held, locks commit, back and inputs while it runs, and opens "Kiểm tra dòng" on the new result saying it was re-checked; a re-check that fails, by a lost connection or by the server's own refusal, keeps its error with the refusal (never on "Ánh xạ cột") and can be pressed again;
+  // fails_when=toStudentImportCommitError stops telling that refusal apart (or the action's message drifts from STUDENT_IMPORT_VALIDATION_FAILED_MESSAGE), the button goes, an edit of the reason or the checkbox removes it, the commit stays usable after the refusal or during the re-check, the re-check sends other rows, its failure (thrown or refused) shows on the mapping step, or the new result is not shown;
   // why_new=red-team finding of the step 15b review (regression vs the pre-15b single-page form, whose check button stayed next to the commit); no test answered a commit with this refusal;
-  // seam=the page's `actions` override props (the re-check answers are promises the test settles by hand); actions.ts is read as text to keep its message in step; no_claim=does not prove when the RPC raises STUDENT_IMPORT_VALIDATION_FAILED (tests/unit/student-import-commit-refusals.test.ts maps the action's answer)
+  // seam=the page's `actions` override props (the re-check answers are promises the test settles by hand); no_claim=does not prove when the RPC raises STUDENT_IMPORT_VALIDATION_FAILED (tests/unit/student-import-commit-refusals.test.ts maps the action's real answer, code and message)
   it("offers 'Kiểm tra lại' on a commit refused because the rows no longer pass, and reruns the check", async () => {
     const { actions } = renderPage({ initialDryRun: cleanResult(), initialStep: "confirm", initialWorkbook: workbook() });
     actions.commitStudentImportRows.mockResolvedValueOnce({
@@ -614,7 +619,10 @@ describe("StudentImportPage wizard", () => {
     } as never);
     const failedCheck = deferred<Awaited<ReturnType<Overrides["validateStudentImportRows"]>>>();
     const recheck = deferred<Awaited<ReturnType<Overrides["validateStudentImportRows"]>>>();
-    actions.validateStudentImportRows.mockReturnValueOnce(failedCheck.promise).mockReturnValueOnce(recheck.promise);
+    actions.validateStudentImportRows
+      .mockReturnValueOnce(failedCheck.promise)
+      .mockResolvedValueOnce({ code: "forbidden", message: "Tài khoản không có quyền import.", ok: false } as never)
+      .mockReturnValueOnce(recheck.promise);
     const recheckReason = "Dữ liệu đã thay đổi: bấm “Kiểm tra lại” trước khi nhập.";
 
     fireEvent.change(screen.getByLabelText("Lý do nhập"), { target: { value: "Nhập học sinh khối 7" } });
@@ -626,14 +634,21 @@ describe("StudentImportPage wizard", () => {
     // The commit waits for a re-check: pressing it again would only be refused again.
     await waitFor(() => expect(describedBy(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" }))).toBe(recheckReason));
     expect(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" })).toBeDisabled();
+    expect(conditionTexts()[2]).toBe("Chưa đạt:Máy chủ báo dữ liệu đã thay đổi: cần kiểm tra lại");
     // Editing the reason keeps the refusal and its only way forward.
     fireEvent.change(screen.getByLabelText("Lý do nhập"), { target: { value: "Nhập học sinh khối 7 (lần 2)" } });
+    expect(within(screen.getByRole("alert")).getByRole("button", { name: "Kiểm tra lại" })).toBeEnabled();
+    // So does the confirmation checkbox, unticked and ticked again.
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("checkbox"));
     expect(within(screen.getByRole("alert")).getByRole("button", { name: "Kiểm tra lại" })).toBeEnabled();
     fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Kiểm tra lại" }));
 
     // While the re-check runs: no commit, no way back, no edits.
     expect(within(screen.getByRole("alert")).getByRole("button", { name: "Đang kiểm tra…" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" })).toBeDisabled();
+    // The button was pressed: the commit no longer says to press it.
+    expect(describedBy(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" }))).toBe("");
     expect(screen.getByRole("button", { name: "Quay lại bước Kiểm tra dòng" })).toBeDisabled();
     expect(screen.getByLabelText("Lý do nhập")).toBeDisabled();
     expect(actions.validateStudentImportRows).toHaveBeenCalledTimes(1);
@@ -647,6 +662,16 @@ describe("StudentImportPage wizard", () => {
     expect(screen.getByText("Chưa kiểm tra được.").closest('[role="alert"]')).toHaveTextContent(
       "Không kết nối được tới máy chủ. Kiểm tra kết nối rồi thử lại; bước này không ghi dữ liệu.",
     );
+    await waitFor(() => expect(screen.getByRole("button", { name: "Kiểm tra lại" })).toBeEnabled());
+    expect(describedBy(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" }))).toBe(recheckReason);
+
+    // A re-check the server refuses reads the same way, with the server's words in place of the lost connection's.
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra lại" }));
+    await waitFor(() =>
+      expect(screen.getByText("Chưa kiểm tra được.").closest('[role="alert"]')).toHaveTextContent("Tài khoản không có quyền import."),
+    );
+    expect(screen.queryByText(/Không kết nối được tới máy chủ/)).not.toBeInTheDocument();
+    expect(currentStep()).toHaveTextContent("4. Xác nhận nhập");
     await waitFor(() => expect(screen.getByRole("button", { name: "Kiểm tra lại" })).toBeEnabled());
     expect(describedBy(screen.getByRole("button", { name: "Xác nhận nhập 3 học sinh" }))).toBe(recheckReason);
 
@@ -664,18 +689,15 @@ describe("StudentImportPage wizard", () => {
       recheck.resolve({ data: result([row(2), row(3), row(4, { errors: [{ code: "EXACT_STUDENT_DUPLICATE", field: "student_full_name", message: "Học viên đã tồn tại với cùng họ tên, năm sinh và số điện thoại phụ huynh." }], exact_student_duplicate: true, status: "invalid" })]), ok: true });
     });
     await waitFor(() => expect(currentStep()).toHaveTextContent("3. Kiểm tra dòng"));
-    expect(screen.getByText("Đã kiểm tra lại.").closest('[role="status"]')).toHaveTextContent(
-      "Đã kiểm tra lại. Kết quả dưới đây là của lần kiểm tra mới với file và ánh xạ cột đang chọn. Ở bước Xác nhận nhập cần đánh dấu xác nhận lại.",
+    // Rows now fail, so the note does not point at a confirm step that cannot be reached.
+    expect(screen.getByText("Đã kiểm tra lại.").closest('[role="status"]')?.textContent).toBe(
+      "Đã kiểm tra lại. Kết quả dưới đây là của lần kiểm tra mới với file và ánh xạ cột đang chọn.",
     );
     expect(screen.getByLabelText("Kết quả kiểm tra")).toHaveTextContent("Lỗi (phải sửa trong file)1");
     expect(screen.getByRole("button", { name: "Tiếp: Xác nhận nhập" })).toBeDisabled();
-    expect(actions.validateStudentImportRows).toHaveBeenCalledTimes(2);
-    expect(actions.validateStudentImportRows.mock.calls[1]?.[0]).toEqual(actions.validateStudentImportRows.mock.calls[0]?.[0]);
+    expect(actions.validateStudentImportRows).toHaveBeenCalledTimes(3);
+    expect(actions.validateStudentImportRows.mock.calls[2]?.[0]).toEqual(actions.validateStudentImportRows.mock.calls[0]?.[0]);
     expect(actions.commitStudentImportRows).toHaveBeenCalledTimes(1);
-    // The action's own words: a reworded message would quietly drop the button.
-    expect(readFileSync(join(process.cwd(), "src/features/imports/students/actions.ts"), "utf8")).toContain(
-      `"${STUDENT_IMPORT_VALIDATION_FAILED_MESSAGE}"`,
-    );
   });
 
   // Value: protects=after "Kiểm tra lại" answers with a clean result, the confirm step opens with the reason still typed, the confirmation cleared, no stale refusal and the commit available again once ticked;
@@ -696,7 +718,9 @@ describe("StudentImportPage wizard", () => {
     fireEvent.click(within(await screen.findByRole("alert")).getByRole("button", { name: "Kiểm tra lại" }));
 
     await waitFor(() => expect(currentStep()).toHaveTextContent("3. Kiểm tra dòng"));
-    expect(screen.getByText("Đã kiểm tra lại.")).toBeInTheDocument();
+    expect(screen.getByText("Đã kiểm tra lại.").closest('[role="status"]')?.textContent).toBe(
+      "Đã kiểm tra lại. Kết quả dưới đây là của lần kiểm tra mới với file và ánh xạ cột đang chọn. Ở bước Xác nhận nhập, cần đánh dấu xác nhận lại.",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Tiếp: Xác nhận nhập" }));
 
     expect(screen.getByLabelText("Lý do nhập")).toHaveValue("Nhập học sinh khối 7");
@@ -707,6 +731,9 @@ describe("StudentImportPage wizard", () => {
     await waitFor(() => expect(describedBy(commit)).toBe("Đánh dấu ô xác nhận trước khi nhập."));
     fireEvent.click(screen.getByRole("checkbox"));
     expect(commit).toBeEnabled();
+    // The note was read on the way here: back on "Kiểm tra dòng" it no longer asks to confirm again.
+    fireEvent.click(screen.getByRole("button", { name: "Quay lại bước Kiểm tra dòng" }));
+    expect(screen.queryByText("Đã kiểm tra lại.")).not.toBeInTheDocument();
   });
 
   it("falls back to the real actions and clamps a seeded step to the data it has", async () => {

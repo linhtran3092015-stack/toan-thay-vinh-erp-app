@@ -403,14 +403,19 @@ export function ClassScheduleImportPage({
     setStep("file");
   }
 
-  /** A mapping change makes the last check stale (see isStale) and drops an answer still in flight. */
+  /**
+   * A mapping change makes the last check stale (see isStale), drops an answer still in flight and
+   * clears the last check's error, which was about the mapping before the change.
+   */
   function handleClassesMappingChange(key: keyof ClassImportColumnMapping, value: string | null) {
     checkRun.current += 1;
+    setDryRunError(null);
     setClassesMapping((previous) => ({ ...previous, [key]: value }));
   }
 
   function handleSchedulesMappingChange(key: keyof ScheduleImportColumnMapping, value: string | null) {
     checkRun.current += 1;
+    setDryRunError(null);
     setSchedulesMapping((previous) => ({ ...previous, [key]: value }));
   }
 
@@ -470,7 +475,8 @@ export function ClassScheduleImportPage({
   }
 
   function handleCreateBatch() {
-    // Rows with an unreadable weekday are not in the payload: never stage a batch without them.
+    // Rows with an unreadable weekday are not in the payload. blockingCount already counts them (every
+    // check result includes them as invalid rows); this guard only keeps a later change from staging a batch without them.
     const hasUnreadableWeekday = preparedScheduleInputs.unreadableWeekdayRows.length > 0;
     if (!workbook || !dryRunResult || isStale || blockingCount > 0 || hasUnreadableWeekday || !confirmationChecked || !trimmedReason) return;
 

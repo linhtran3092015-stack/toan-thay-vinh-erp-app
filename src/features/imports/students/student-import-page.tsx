@@ -579,7 +579,9 @@ export function StudentImportPage({
       <>
         {isRecheckedResult ? (
           <ResultBanner
-            description="Kết quả dưới đây là của lần kiểm tra mới với file và ánh xạ cột đang chọn. Ở bước Xác nhận nhập cần đánh dấu xác nhận lại."
+            description={`Kết quả dưới đây là của lần kiểm tra mới với file và ánh xạ cột đang chọn.${
+              hasErrors ? "" : " Ở bước Xác nhận nhập, cần đánh dấu xác nhận lại."
+            }`}
             title="Đã kiểm tra lại."
             tone="info"
           />
@@ -600,7 +602,14 @@ export function StudentImportPage({
       <ImportActionBar
         back={{ label: "Ánh xạ cột", onClick: () => setStep("mapping") }}
         primary={
-          <Button aria-describedby={hasErrors ? primaryReasonId : undefined} disabled={hasErrors} onClick={() => setStep("confirm")}>
+          <Button
+            aria-describedby={hasErrors ? primaryReasonId : undefined}
+            disabled={hasErrors}
+            onClick={() => {
+              setIsRecheckedResult(false);
+              setStep("confirm");
+            }}
+          >
             Tiếp: Xác nhận nhập
           </Button>
         }

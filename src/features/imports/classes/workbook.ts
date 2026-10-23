@@ -48,20 +48,24 @@ function getExcelColumnKey(columnIndex: number): string {
   return result;
 }
 
-/** A short code ("T2", "CN") standing on its own in the cell, not inside a longer word. */
-function hasCode(text: string, code: string): boolean {
-  return new RegExp(`(^|[^A-Z0-9])${code}([^A-Z0-9]|$)`).test(text);
+/**
+ * A spelling standing as a whole word on NFC upper-case text: a letter or digit
+ * on either side means it is part of another word ("THU" in "LÝ THUYẾT", "SUN"
+ * in "BỔ SUNG", "T2" in "T2B"). No lookbehind, so older Safari still parses it.
+ */
+function wholeWord(spellings: readonly string[]): RegExp {
+  return new RegExp(`(?:^|[^\\p{L}\\p{N}])(?:${spellings.join("|")})(?=[^\\p{L}\\p{N}]|$)`, "u");
 }
 
-/** The spellings each ISO weekday (1 = Thứ Hai … 7 = Chủ nhật) is read from, on NFC upper-case text. */
-const WEEKDAY_SPELLINGS: ReadonlyArray<{ iso: number; matches: (text: string) => boolean }> = [
-  { iso: 1, matches: (text) => hasCode(text, "T2") || text.includes("THỨ 2") || text.includes("THỨ HAI") || text.includes("MON") },
-  { iso: 2, matches: (text) => hasCode(text, "T3") || text.includes("THỨ 3") || text.includes("THỨ BA") || text.includes("TUE") },
-  { iso: 3, matches: (text) => hasCode(text, "T4") || text.includes("THỨ 4") || text.includes("THỨ TƯ") || text.includes("WED") },
-  { iso: 4, matches: (text) => hasCode(text, "T5") || text.includes("THỨ 5") || text.includes("THỨ NĂM") || text.includes("THU") },
-  { iso: 5, matches: (text) => hasCode(text, "T6") || text.includes("THỨ 6") || text.includes("THỨ SÁU") || text.includes("FRI") },
-  { iso: 6, matches: (text) => hasCode(text, "T7") || text.includes("THỨ 7") || text.includes("THỨ BẢY") || text.includes("SAT") },
-  { iso: 7, matches: (text) => hasCode(text, "CN") || text.includes("CHỦ NHẬT") || text.includes("SUN") },
+/** The spellings each ISO weekday (1 = Thứ Hai … 7 = Chủ nhật) is read from. */
+const WEEKDAY_SPELLINGS: ReadonlyArray<{ iso: number; pattern: RegExp }> = [
+  { iso: 1, pattern: wholeWord(["T2", "THỨ 2", "THỨ HAI", "MON", "MONDAY"]) },
+  { iso: 2, pattern: wholeWord(["T3", "THỨ 3", "THỨ BA", "TUE", "TUES", "TUESDAY"]) },
+  { iso: 3, pattern: wholeWord(["T4", "THỨ 4", "THỨ TƯ", "WED", "WEDNESDAY"]) },
+  { iso: 4, pattern: wholeWord(["T5", "THỨ 5", "THỨ NĂM", "THU", "THUR", "THURS", "THURSDAY"]) },
+  { iso: 5, pattern: wholeWord(["T6", "THỨ 6", "THỨ SÁU", "FRI", "FRIDAY"]) },
+  { iso: 6, pattern: wholeWord(["T7", "THỨ 7", "THỨ BẢY", "SAT", "SATURDAY"]) },
+  { iso: 7, pattern: wholeWord(["CN", "CHỦ NHẬT", "SUN", "SUNDAY"]) },
 ];
 
 /**
@@ -79,10 +83,11 @@ export function parseWeekdayValue(value: unknown): number | null {
   if (typeof value === "string") {
     // NFC first: decomposed Vietnamese ("ư" typed as "u" + combining marks) would otherwise read "THỨ" as English "THU".
     const str = value.normalize("NFC").trim().toUpperCase();
-    if (/^[1-7]$/.test(str)) return parseInt(str, 10);
+    // A number typed as text ("3", "03", "3.0") reads as that number would.
+    if (/^\+?\d+(\.\d+)?$/.test(str)) return parseWeekdayValue(Number(str));
 
-    const days = new Set(WEEKDAY_SPELLINGS.filter((day) => day.matches(str)).map((day) => day.iso));
-    return days.size === 1 ? [...days][0] : null;
+    const days = WEEKDAY_SPELLINGS.filter((day) => day.pattern.test(str));
+    return days.length === 1 ? days[0].iso : null;
   }
 
   return null;

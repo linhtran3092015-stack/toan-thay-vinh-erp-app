@@ -107,9 +107,11 @@ export function getStudentImportCommitGate({
     },
     {
       met: `Kết quả kiểm tra khớp file đang chọn (${formatNumber(validation.row_count)} dòng)`,
-      ok: rowsMatch,
-      unmet: "Kết quả kiểm tra không khớp file đang chọn",
-      why: "Chọn lại file và kiểm tra các dòng trước khi nhập.",
+      ok: rowsMatch && !needsRecheck,
+      unmet: needsRecheck ? "Máy chủ báo dữ liệu đã thay đổi: cần kiểm tra lại" : "Kết quả kiểm tra không khớp file đang chọn",
+      why: needsRecheck
+        ? "Dữ liệu đã thay đổi: bấm “Kiểm tra lại” trước khi nhập."
+        : "Chọn lại file và kiểm tra các dòng trước khi nhập.",
     },
     {
       met: "Đã nhập lý do",
@@ -128,15 +130,9 @@ export function getStudentImportCommitGate({
   const firstUnmet = checks.find((check) => !check.ok);
 
   return {
-    canCommit: !firstUnmet && !isPending && !isCommitted && !isAlreadyCommitted && !needsRecheck,
+    canCommit: !firstUnmet && !isPending && !isCommitted && !isAlreadyCommitted,
     conditions: checks.map((check) => ({ label: check.ok ? check.met : check.unmet, state: check.ok ? "met" : "unmet" })),
-    reason: isAlreadyCommitted
-      ? "File này đã được nhập; không cần nhập lại."
-      : isPending
-        ? null
-        : needsRecheck
-          ? "Dữ liệu đã thay đổi: bấm “Kiểm tra lại” trước khi nhập."
-          : (firstUnmet?.why ?? null),
+    reason: isAlreadyCommitted ? "File này đã được nhập; không cần nhập lại." : firstUnmet && !isPending ? firstUnmet.why : null,
   };
 }
 
@@ -167,7 +163,7 @@ interface StudentImportCommitPanelProps {
   onReasonChange: (value: string) => void;
   confirmed: boolean;
   onConfirmedChange: (value: boolean) => void;
-  /** Inputs locked (pending, no permission, rows still invalid, file already committed). */
+  /** Inputs locked (a commit or a re-check running, no permission, rows still invalid, file already committed). */
   inputsDisabled: boolean;
   error: StudentImportCommitError | null;
   /**

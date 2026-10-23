@@ -374,8 +374,8 @@ describe("ClassScheduleImportPage: review", () => {
     expect(within(table).getAllByText("Lỗi:", { exact: false }).length).toBe(2);
   });
 
-  // Value: protects=a schedule row whose weekday cannot be read ("Thứ Tám", an empty cell) is an invalid row of the check, "Không đọc được thứ trong tuần", counted in the Schedules strip and blocking "Tạo lô"; it is never sent as Monday (it stays out of the dry-run payload), and under "Tất cả" it sits in file order among the server's rows;
-  // fails_when=prepareScheduleInputs falls back to a weekday (the old `Number(raw) || 1`), the held-back rows are dropped from the review or the counts, the review lets "Tạo lô" through, or withUnreadableWeekdayRows appends them without sorting;
+  // Value: protects=a schedule row whose weekday cannot be read ("Thứ Tám", an empty cell) is an invalid row of the check, "Không đọc được thứ trong tuần", counted in the Schedules strip and blocking "Tạo lô"; it is never sent as Monday (it stays out of the dry-run payload), and under "Tất cả" it sits in file order among the server's rows; going back to "Ánh xạ cột" afterwards does not call the check stale (nothing was changed), so "Tiếp tục: Kiểm tra dòng" stays the way on;
+  // fails_when=prepareScheduleInputs falls back to a weekday (the old `Number(raw) || 1`), the held-back rows are dropped from the review or the counts, the review lets "Tạo lô" through, or withUnreadableWeekdayRows appends them without sorting, or the row count recorded for the check includes the held-back rows while the stale rule counts the rows sent, so an untouched mapping reads as stale;
   // why_new=red-team finding of the step 15b review (pre-existing on main: an unreadable weekday silently became Thứ Hai); no test had a weekday the parser could not read;
   // seam=the actions override answers from the payload it gets (the clean fixture's rows for the rows sent); no_claim=does not prove the RPC's own INVALID_WEEKDAY check or the parser's spellings (tests/unit/class-schedule-import-weekday.test.ts)
   it("makes an unreadable weekday an invalid row of the check instead of Monday", async () => {
@@ -434,10 +434,16 @@ describe("ClassScheduleImportPage: review", () => {
       "10",
       "11",
     ]);
+
+    // Nothing was changed since the check: the way back to "Ánh xạ cột" does not call it stale.
+    fireEvent.click(screen.getByRole("button", { name: "Quay lại bước Ánh xạ cột" }));
+    expectStep(1);
+    expect(screen.queryByText("Kết quả kiểm tra trước không còn đúng.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Tiếp tục: Kiểm tra dòng" })).toBeEnabled();
   });
 
-  // Value: protects=when no row of the Schedules sheet has a readable weekday (most likely the wrong column for "Thứ"), the check stops on "Ánh xạ cột" with that sentence instead of calling the server;
-  // fails_when=the page sends an empty schedules list (the action's schema needs one row and answers a bare "Dữ liệu đầu vào không hợp lệ.") or sends the rows with a made-up weekday;
+  // Value: protects=when no row of the Schedules sheet has a readable weekday (most likely the wrong column for "Thứ"), the check stops on "Ánh xạ cột" with that sentence instead of calling the server, and the sentence goes once the mapping changes;
+  // fails_when=the page sends an empty schedules list (the action's schema needs one row and answers a bare "Dữ liệu đầu vào không hợp lệ.") or sends the rows with a made-up weekday, or the error outlives the mapping change it asked for;
   // why_new=holding unreadable rows back can leave nothing to send, a case the old Monday fallback never reached;
   // seam=none; no_claim=does not prove the action's schema
   it("stays on the mapping step when no weekday of the Schedules sheet can be read", async () => {
@@ -451,10 +457,15 @@ describe("ClassScheduleImportPage: review", () => {
     );
     expectStep(1);
     expect(actions.dryRunClassScheduleImport).not.toHaveBeenCalled();
+
+    // Following the advice (another column for "Thứ") takes the error away.
+    fireEvent.click(screen.getByRole("tab", { name: /Sheet Schedules/ }));
+    fireEvent.change(screen.getByLabelText("Thứ"), { target: { value: "D" } });
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   // Value: protects=a seeded check (the /dev preview) gets the same held-back rows as a real one, so "Tạo lô" is never offered enabled for a file with an unreadable weekday;
-  // fails_when=the seeded initialDryRun skips withUnreadableWeekdayRows, leaving "Tạo lô" enabled while handleCreateBatch silently refuses it;
+  // fails_when=the seeded initialDryRun skips withUnreadableWeekdayRows, leaving "Tạo lô" enabled for rows the batch would not hold;
   // why_new=maintainability and testing review of this change: only the dry-run answer path merged the held-back rows;
   // seam=none (seeding props); no_claim=does not prove the /dev preview fixtures, which have no unreadable weekday
   it("adds the held-back rows to a seeded check too, so 'Tạo lô' stays blocked", () => {
