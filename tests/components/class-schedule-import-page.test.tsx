@@ -18,7 +18,7 @@ import {
 import * as realActions from "@/features/imports/classes/actions";
 import { ClassScheduleImportPage, type ClassScheduleImportPageProps } from "@/features/imports/classes/class-schedule-import-page";
 import { downloadClassScheduleImportTemplate } from "@/features/imports/classes/template-browser";
-import type { ClassScheduleImportParsedWorkbook } from "@/features/imports/classes/types";
+import type { ClassScheduleImportCellValue, ClassScheduleImportParsedWorkbook } from "@/features/imports/classes/types";
 import { parseClassScheduleImportWorkbook } from "@/features/imports/classes/workbook";
 
 const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }));
@@ -85,6 +85,22 @@ function withoutYear(workbook: ClassScheduleImportParsedWorkbook): ClassSchedule
     classesSheet: {
       ...workbook.classesSheet,
       rows: workbook.classesSheet.rows.map((row) => ({ ...row, values: { ...row.values, A: null } })),
+    },
+  };
+}
+
+/** The Schedules sheet with the "Thứ" cell (column C) of some rows replaced. */
+function withWeekdays(
+  workbook: ClassScheduleImportParsedWorkbook,
+  weekdays: Readonly<Record<number, ClassScheduleImportCellValue>>,
+): ClassScheduleImportParsedWorkbook {
+  return {
+    ...workbook,
+    schedulesSheet: {
+      ...workbook.schedulesSheet,
+      rows: workbook.schedulesSheet.rows.map((row) =>
+        Object.hasOwn(weekdays, row.rowNumber) ? { ...row, values: { ...row.values, C: weekdays[row.rowNumber] } } : row,
+      ),
     },
   };
 }
@@ -356,6 +372,111 @@ describe("ClassScheduleImportPage: review", () => {
     expect(within(table).getByText("Xung đột")).toBeInTheDocument();
     expect(within(table).getByText("Không hợp lệ")).toBeInTheDocument();
     expect(within(table).getAllByText("Lỗi:", { exact: false }).length).toBe(2);
+  });
+
+  // Value: protects=a schedule row whose weekday cannot be read ("Thứ Tám", an empty cell) is an invalid row of the check, "Không đọc được thứ trong tuần", counted in the Schedules strip and blocking "Tạo lô"; it is never sent as Monday (it stays out of the dry-run payload), and under "Tất cả" it sits in file order among the server's rows;
+  // fails_when=prepareScheduleInputs falls back to a weekday (the old `Number(raw) || 1`), the held-back rows are dropped from the review or the counts, the review lets "Tạo lô" through, or withUnreadableWeekdayRows appends them without sorting;
+  // why_new=red-team finding of the step 15b review (pre-existing on main: an unreadable weekday silently became Thứ Hai); no test had a weekday the parser could not read;
+  // seam=the actions override answers from the payload it gets (the clean fixture's rows for the rows sent); no_claim=does not prove the RPC's own INVALID_WEEKDAY check or the parser's spellings (tests/unit/class-schedule-import-weekday.test.ts)
+  it("makes an unreadable weekday an invalid row of the check instead of Monday", async () => {
+    actions.dryRunClassScheduleImport.mockImplementationOnce(async (input) => {
+      const sent = new Set(input.schedules.map((row) => row.source_row_number));
+      const scheduleRows = CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_rows.filter((row) => sent.has(row.source_row_number));
+      return {
+        data: {
+          ...CLASS_IMPORT_PREVIEW_DRY_RUN,
+          schedule_rows: scheduleRows,
+          schedule_summary: { existing_conflict: 0, existing_matching: 2, invalid: 0, new: scheduleRows.length - 2, total: scheduleRows.length },
+        },
+        ok: true,
+      };
+    });
+    renderPage({ initialWorkbook: withWeekdays(CLASS_IMPORT_PREVIEW_WORKBOOK, { 3: "Thứ Tám", 5: null }) });
+
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra dòng" }));
+    await waitFor(() => expectStep(2));
+
+    const payload = actions.dryRunClassScheduleImport.mock.calls[0][0];
+    expect(payload.schedules.map((row) => row.source_row_number)).toEqual([2, 4, 6, 7, 8, 9, 10, 11]);
+    expect(within(screen.getByLabelText("Tổng quan Lịch học (sheet Schedules)")).getAllByRole("definition").map((value) => value.textContent)).toEqual([
+      "10",
+      "6",
+      "2",
+      "0",
+      "2",
+    ]);
+    const next = screen.getByRole("button", { name: "Tiếp tục: Tạo lô" });
+    expect(next).toBeDisabled();
+    expect(next).toHaveAccessibleDescription("Còn 2 dòng xung đột hoặc không hợp lệ. Sửa file Excel rồi chọn lại file.");
+
+    fireEvent.click(screen.getByRole("tab", { name: /Lịch học/ }));
+    const table = screen.getByRole("table", { name: "Kết quả kiểm tra 10 dòng lịch học" });
+    expect(within(screen.getByRole("group", { name: "Lọc dòng cần xem" })).getByRole("button", { name: "Cần xem2", pressed: true })).toBeInTheDocument();
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows.map((item) => within(item).getAllByRole("cell")[0].textContent)).toEqual(["3", "5"]);
+    expect(rows[0]).toHaveTextContent("Không rõ thứ");
+    expect(rows[0]).toHaveTextContent("Không hợp lệ");
+    expect(rows[0]).toHaveTextContent("Lỗi: Không đọc được thứ trong tuần: “Thứ Tám”.");
+    expect(rows[1]).toHaveTextContent("Lỗi: Không đọc được thứ trong tuần: ô để trống.");
+    for (const item of rows) expect(item).not.toHaveTextContent("Thứ Hai");
+
+    // "Tất cả" is file order: the held-back rows sit between the server's rows, not after them.
+    fireEvent.click(within(screen.getByRole("group", { name: "Lọc dòng cần xem" })).getByRole("button", { name: "Tất cả10" }));
+    expect(within(table).getAllByRole("row").slice(1).map((item) => within(item).getAllByRole("cell")[0].textContent)).toEqual([
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+    ]);
+  });
+
+  // Value: protects=when no row of the Schedules sheet has a readable weekday (most likely the wrong column for "Thứ"), the check stops on "Ánh xạ cột" with that sentence instead of calling the server;
+  // fails_when=the page sends an empty schedules list (the action's schema needs one row and answers a bare "Dữ liệu đầu vào không hợp lệ.") or sends the rows with a made-up weekday;
+  // why_new=holding unreadable rows back can leave nothing to send, a case the old Monday fallback never reached;
+  // seam=none; no_claim=does not prove the action's schema
+  it("stays on the mapping step when no weekday of the Schedules sheet can be read", async () => {
+    const unreadable = Object.fromEntries(CLASS_IMPORT_PREVIEW_WORKBOOK.schedulesSheet.rows.map((row) => [row.rowNumber, "x"]));
+    renderPage({ initialWorkbook: withWeekdays(CLASS_IMPORT_PREVIEW_WORKBOOK, unreadable) });
+
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra dòng" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Không kiểm tra được dữ liệu. Không đọc được thứ trong tuần ở cả 10 dòng lịch học. Kiểm tra cột chọn cho “Thứ” ở sheet Schedules, hoặc sửa file Excel rồi chọn lại file.",
+    );
+    expectStep(1);
+    expect(actions.dryRunClassScheduleImport).not.toHaveBeenCalled();
+  });
+
+  // Value: protects=a seeded check (the /dev preview) gets the same held-back rows as a real one, so "Tạo lô" is never offered enabled for a file with an unreadable weekday;
+  // fails_when=the seeded initialDryRun skips withUnreadableWeekdayRows, leaving "Tạo lô" enabled while handleCreateBatch silently refuses it;
+  // why_new=maintainability and testing review of this change: only the dry-run answer path merged the held-back rows;
+  // seam=none (seeding props); no_claim=does not prove the /dev preview fixtures, which have no unreadable weekday
+  it("adds the held-back rows to a seeded check too, so 'Tạo lô' stays blocked", () => {
+    const sent = CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_rows.filter((row) => row.source_row_number !== 3);
+    renderPage({
+      initialDryRun: {
+        ...CLASS_IMPORT_PREVIEW_DRY_RUN,
+        schedule_rows: sent,
+        schedule_summary: { ...CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_summary, new: 7, total: 9 },
+      },
+      initialStep: "batch",
+      initialWorkbook: withWeekdays(CLASS_IMPORT_PREVIEW_WORKBOOK, { 3: "Thứ Tám" }),
+    });
+
+    expectStep(3);
+    fireEvent.change(screen.getByLabelText("Lý do tạo lô"), { target: { value: "Nhập lớp đầu năm" } });
+    fireEvent.click(screen.getByLabelText("Tôi đã xem kết quả kiểm tra và muốn lưu file này thành lô chờ xác nhận."));
+    const create = screen.getByRole("button", { name: "Tạo lô" });
+    expect(create).toBeDisabled();
+    expect(create).toHaveAccessibleDescription("Còn 1 dòng xung đột hoặc không hợp lệ. Sửa file Excel rồi chọn lại file.");
+    fireEvent.click(create);
+    expect(actions.createClassScheduleImportBatch).not.toHaveBeenCalled();
   });
 });
 

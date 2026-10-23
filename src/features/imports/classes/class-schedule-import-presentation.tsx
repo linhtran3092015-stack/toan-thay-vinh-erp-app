@@ -51,8 +51,10 @@ export type ScheduleReviewRow = Pick<
   | "source_row_number"
   | "start_time"
   | "validation_message"
-  | "weekday"
->;
+> & {
+  /** Null on a row the wizard held back from the check because its weekday could not be read. */
+  weekday: number | null;
+};
 
 /** Accessible name of the Stepper on both pages. */
 export const CLASS_IMPORT_STEPPER_LABEL = "Các bước nhập lớp & lịch học";

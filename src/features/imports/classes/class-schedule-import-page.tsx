@@ -27,6 +27,7 @@ import {
   CLASS_IMPORT_STEPPER_LABEL,
   CLASS_IMPORT_STEP_TITLES,
   countBlockingRows,
+  type ScheduleReviewRow,
 } from "./class-schedule-import-presentation";
 import { ClassScheduleRowsTabs } from "./class-schedule-import-rows";
 import { CLASS_IMPORT_FIELDS, SCHEDULE_IMPORT_FIELDS } from "./fields";
@@ -125,13 +126,34 @@ function prepareClassInputs(workbook: ClassScheduleImportParsedWorkbook | null, 
   return { academicYearCode: targetYearCode || FALLBACK_ACADEMIC_YEAR_CODE, rows, yearFromFile: targetYearCode !== "" };
 }
 
+interface PreparedScheduleInputs {
+  /** Rows sent to the dry-run and the batch. */
+  rows: ScheduleImportRowInput[];
+  /**
+   * Rows whose weekday could not be read, as invalid check rows. They stay out
+   * of the payload (the actions' schema refuses the whole request over one bad
+   * weekday) and the check adds them back, so they block the batch instead of
+   * becoming Monday.
+   */
+  unreadableWeekdayRows: ScheduleReviewRow[];
+}
+
+/** The check as the review shows it: the server's answer plus the rows held back for an unreadable weekday. */
+type CheckedResult = Omit<DryRunClassScheduleImportResult, "schedule_rows"> & { schedule_rows: ScheduleReviewRow[] };
+
+function unreadableWeekdayMessage(raw: unknown): string {
+  const text = raw === null || raw === undefined ? "" : String(raw).trim();
+  return text ? `Không đọc được thứ trong tuần: “${text}”.` : "Không đọc được thứ trong tuần: ô để trống.";
+}
+
 function prepareScheduleInputs(
   workbook: ClassScheduleImportParsedWorkbook | null,
   schedulesMapping: ScheduleImportColumnMapping,
-): ScheduleImportRowInput[] {
-  if (!workbook) return [];
+): PreparedScheduleInputs {
+  const prepared: PreparedScheduleInputs = { rows: [], unreadableWeekdayRows: [] };
+  if (!workbook) return prepared;
 
-  return workbook.schedulesSheet.rows.map((row) => {
+  for (const row of workbook.schedulesSheet.rows) {
     const rawWeekday = schedulesMapping.weekday ? row.values[schedulesMapping.weekday] : null;
     const parsedWeekday = parseWeekdayValue(rawWeekday);
 
@@ -147,7 +169,7 @@ function prepareScheduleInputs(
     const rawTo = schedulesMapping.effective_to ? row.values[schedulesMapping.effective_to] : null;
     const parsedTo = parseDateValue(rawTo);
 
-    return {
+    const input = {
       class_code: schedulesMapping.class_code ? String(row.values[schedulesMapping.class_code] ?? "").trim() : "",
       component_code: schedulesMapping.component_code ? String(row.values[schedulesMapping.component_code] ?? "").trim() : "",
       effective_from: parsedFrom,
@@ -160,9 +182,38 @@ function prepareScheduleInputs(
       room_name: schedulesMapping.room_name ? String(row.values[schedulesMapping.room_name] ?? "").trim() : null,
       source_row_number: row.rowNumber,
       start_time: parsedStartTime,
-      weekday: parsedWeekday ?? (Number(rawWeekday) || 1),
     };
-  });
+
+    if (parsedWeekday === null) {
+      prepared.unreadableWeekdayRows.push({
+        ...input,
+        classification: "invalid",
+        validation_message: unreadableWeekdayMessage(rawWeekday),
+        weekday: null,
+      });
+    } else {
+      prepared.rows.push({ ...input, weekday: parsedWeekday });
+    }
+  }
+
+  return prepared;
+}
+
+/** The server's check with the rows it never saw (unreadable weekday) added back as invalid rows, in file order. */
+function withUnreadableWeekdayRows(
+  result: DryRunClassScheduleImportResult,
+  unreadableRows: readonly ScheduleReviewRow[],
+): CheckedResult {
+  if (unreadableRows.length === 0) return result;
+  return {
+    ...result,
+    schedule_rows: [...result.schedule_rows, ...unreadableRows].sort((a, b) => a.source_row_number - b.source_row_number),
+    schedule_summary: {
+      ...result.schedule_summary,
+      invalid: result.schedule_summary.invalid + unreadableRows.length,
+      total: result.schedule_summary.total + unreadableRows.length,
+    },
+  };
 }
 
 function snapshotDryRunState(
@@ -175,7 +226,7 @@ function snapshotDryRunState(
     academicYearCode: classInputs.academicYearCode,
     classesCount: classInputs.rows.length,
     classesMapping: { ...classesMapping },
-    schedulesCount: prepareScheduleInputs(workbook, schedulesMapping).length,
+    schedulesCount: prepareScheduleInputs(workbook, schedulesMapping).rows.length,
     schedulesMapping: { ...schedulesMapping },
     sha256: workbook.sourceSha256,
   };
@@ -199,7 +250,10 @@ export interface ClassScheduleImportPageProps {
   initialStep?: ClassScheduleImportStep;
   /** A workbook already read (tests, previews); columns are auto-mapped as after a real read. */
   initialWorkbook?: ClassScheduleImportParsedWorkbook | null;
-  /** A dry-run result for `initialWorkbook` as auto-mapped (not stale). */
+  /**
+   * A dry-run result for `initialWorkbook` as auto-mapped (not stale): the server's answer for the rows
+   * sent, so rows held back for an unreadable weekday are added to it as after a real check.
+   */
   initialDryRun?: DryRunClassScheduleImportResult | null;
 }
 
@@ -245,7 +299,11 @@ export function ClassScheduleImportPage({
   );
   const [mappingTab, setMappingTab] = useState<"classes" | "schedules">("classes");
 
-  const [dryRunResult, setDryRunResult] = useState<DryRunClassScheduleImportResult | null>(initialWorkbook ? initialDryRun : null);
+  const [dryRunResult, setDryRunResult] = useState<CheckedResult | null>(() =>
+    initialWorkbook && initialDryRun
+      ? withUnreadableWeekdayRows(initialDryRun, prepareScheduleInputs(initialWorkbook, schedulesMapping).unreadableWeekdayRows)
+      : null,
+  );
   const [lastDryRunState, setLastDryRunState] = useState<LastDryRunState | null>(() =>
     initialWorkbook && initialDryRun ? snapshotDryRunState(initialWorkbook, classesMapping, schedulesMapping) : null,
   );
@@ -283,7 +341,7 @@ export function ClassScheduleImportPage({
     if (lastDryRunState.sha256 !== workbook.sourceSha256) return true;
     if (lastDryRunState.academicYearCode !== preparedClassInputs.academicYearCode) return true;
     if (lastDryRunState.classesCount !== preparedClassInputs.rows.length) return true;
-    if (lastDryRunState.schedulesCount !== preparedScheduleInputs.length) return true;
+    if (lastDryRunState.schedulesCount !== preparedScheduleInputs.rows.length) return true;
     if (JSON.stringify(lastDryRunState.classesMapping) !== JSON.stringify(classesMapping)) return true;
     if (JSON.stringify(lastDryRunState.schedulesMapping) !== JSON.stringify(schedulesMapping)) return true;
     return false;
@@ -367,11 +425,18 @@ export function ClassScheduleImportPage({
 
     const classInputs = preparedClassInputs;
     const scheduleInputs = preparedScheduleInputs;
+    if (scheduleInputs.rows.length === 0 && scheduleInputs.unreadableWeekdayRows.length > 0) {
+      // No schedule row left to send (the server needs at least one): most likely the wrong column for "Thứ".
+      setDryRunError(
+        `Không đọc được thứ trong tuần ở cả ${formatNumber(scheduleInputs.unreadableWeekdayRows.length)} dòng lịch học. Kiểm tra cột chọn cho “Thứ” ở sheet Schedules, hoặc sửa file Excel rồi chọn lại file.`,
+      );
+      return;
+    }
     const checkedState: LastDryRunState = {
       academicYearCode: classInputs.academicYearCode,
       classesCount: classInputs.rows.length,
       classesMapping: { ...classesMapping },
-      schedulesCount: scheduleInputs.length,
+      schedulesCount: scheduleInputs.rows.length,
       schedulesMapping: { ...schedulesMapping },
       sha256: workbook.sourceSha256,
     };
@@ -383,7 +448,7 @@ export function ClassScheduleImportPage({
         res = await dryRunClassScheduleImport({
           academic_year_code: classInputs.academicYearCode,
           classes: classInputs.rows,
-          schedules: scheduleInputs,
+          schedules: scheduleInputs.rows,
         });
       } catch {
         if (run !== checkRun.current) return;
@@ -397,7 +462,7 @@ export function ClassScheduleImportPage({
         setDryRunError(res.message);
         return;
       }
-      setDryRunResult(res.data);
+      setDryRunResult(withUnreadableWeekdayRows(res.data, scheduleInputs.unreadableWeekdayRows));
       setLastDryRunState(checkedState);
       setConfirmationChecked(false);
       setStep("review");
@@ -405,7 +470,9 @@ export function ClassScheduleImportPage({
   }
 
   function handleCreateBatch() {
-    if (!workbook || !dryRunResult || isStale || blockingCount > 0 || !confirmationChecked || !trimmedReason) return;
+    // Rows with an unreadable weekday are not in the payload: never stage a batch without them.
+    const hasUnreadableWeekday = preparedScheduleInputs.unreadableWeekdayRows.length > 0;
+    if (!workbook || !dryRunResult || isStale || blockingCount > 0 || hasUnreadableWeekday || !confirmationChecked || !trimmedReason) return;
 
     setCreateError(null);
     setExistingBatchId(null);
@@ -418,7 +485,7 @@ export function ClassScheduleImportPage({
           classes: preparedClassInputs.rows,
           explicit_confirmation: true,
           reason: trimmedReason,
-          schedules: preparedScheduleInputs,
+          schedules: preparedScheduleInputs.rows,
           source_filename: workbook.sourceFilename,
           source_sha256: workbook.sourceSha256,
         });
@@ -668,7 +735,7 @@ export function ClassScheduleImportPage({
           conditions={conditions}
           consequence={
             <>
-              Lưu {formatNumber(preparedClassInputs.rows.length)} dòng lớp và {formatNumber(preparedScheduleInputs.length)} dòng lịch học của file{" "}
+              Lưu {formatNumber(preparedClassInputs.rows.length)} dòng lớp và {formatNumber(preparedScheduleInputs.rows.length)} dòng lịch học của file{" "}
               <strong>{workbook.sourceFilename}</strong> (năm học {preparedClassInputs.academicYearCode}) thành một lô chờ xác nhận.{" "}
               <strong>Chưa tạo lớp hay lịch học nào</strong>: việc đó ở bước “Xác nhận nhập” trên trang lô. Mỗi file chỉ tạo được một lô.
             </>

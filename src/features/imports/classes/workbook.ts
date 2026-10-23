@@ -48,25 +48,41 @@ function getExcelColumnKey(columnIndex: number): string {
   return result;
 }
 
+/** A short code ("T2", "CN") standing on its own in the cell, not inside a longer word. */
+function hasCode(text: string, code: string): boolean {
+  return new RegExp(`(^|[^A-Z0-9])${code}([^A-Z0-9]|$)`).test(text);
+}
+
+/** The spellings each ISO weekday (1 = Thứ Hai … 7 = Chủ nhật) is read from, on NFC upper-case text. */
+const WEEKDAY_SPELLINGS: ReadonlyArray<{ iso: number; matches: (text: string) => boolean }> = [
+  { iso: 1, matches: (text) => hasCode(text, "T2") || text.includes("THỨ 2") || text.includes("THỨ HAI") || text.includes("MON") },
+  { iso: 2, matches: (text) => hasCode(text, "T3") || text.includes("THỨ 3") || text.includes("THỨ BA") || text.includes("TUE") },
+  { iso: 3, matches: (text) => hasCode(text, "T4") || text.includes("THỨ 4") || text.includes("THỨ TƯ") || text.includes("WED") },
+  { iso: 4, matches: (text) => hasCode(text, "T5") || text.includes("THỨ 5") || text.includes("THỨ NĂM") || text.includes("THU") },
+  { iso: 5, matches: (text) => hasCode(text, "T6") || text.includes("THỨ 6") || text.includes("THỨ SÁU") || text.includes("FRI") },
+  { iso: 6, matches: (text) => hasCode(text, "T7") || text.includes("THỨ 7") || text.includes("THỨ BẢY") || text.includes("SAT") },
+  { iso: 7, matches: (text) => hasCode(text, "CN") || text.includes("CHỦ NHẬT") || text.includes("SUN") },
+];
+
+/**
+ * The ISO weekday of a "Thứ" cell, or null when the cell does not name exactly
+ * one day: a fraction, a number outside 1–7, an unknown spelling, or a cell
+ * naming two days ("Thứ 2, Thứ 4") is never rounded or guessed onto a day.
+ */
 export function parseWeekdayValue(value: unknown): number | null {
   if (value === null || value === undefined) return null;
 
   if (typeof value === "number") {
-    const intVal = Math.floor(value);
-    return intVal >= 1 && intVal <= 7 ? intVal : null;
+    return Number.isInteger(value) && value >= 1 && value <= 7 ? value : null;
   }
 
   if (typeof value === "string") {
-    const str = value.trim().toUpperCase();
+    // NFC first: decomposed Vietnamese ("ư" typed as "u" + combining marks) would otherwise read "THỨ" as English "THU".
+    const str = value.normalize("NFC").trim().toUpperCase();
     if (/^[1-7]$/.test(str)) return parseInt(str, 10);
 
-    if (str === "T2" || str.includes("THỨ 2") || str.includes("THỨ HAI") || str.includes("MON")) return 1;
-    if (str === "T3" || str.includes("THỨ 3") || str.includes("THỨ BA") || str.includes("TUE")) return 2;
-    if (str === "T4" || str.includes("THỨ 4") || str.includes("THỨ TƯ") || str.includes("WED")) return 3;
-    if (str === "T5" || str.includes("THỨ 5") || str.includes("THỨ NĂM") || str.includes("THU")) return 4;
-    if (str === "T6" || str.includes("THỨ 6") || str.includes("THỨ SÁU") || str.includes("FRI")) return 5;
-    if (str === "T7" || str.includes("THỨ 7") || str.includes("THỨ BẢY") || str.includes("SAT")) return 6;
-    if (str === "CN" || str.includes("CHỦ NHẬT") || str.includes("SUN")) return 7;
+    const days = new Set(WEEKDAY_SPELLINGS.filter((day) => day.matches(str)).map((day) => day.iso));
+    return days.size === 1 ? [...days][0] : null;
   }
 
   return null;
