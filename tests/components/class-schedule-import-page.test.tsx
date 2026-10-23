@@ -309,6 +309,33 @@ describe("ClassScheduleImportPage: mapping", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Không kiểm tra được dữ liệu. Lỗi kiểm tra dữ liệu từ cơ sở dữ liệu: timeout");
     expectStep(1);
+
+    // The error was about the mapping before the change: a Classes column change takes it away too.
+    fireEvent.change(screen.getByLabelText("Tên lớp"), { target: { value: "unassigned" } });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  // Value: protects=a long unreadable "Thứ" cell (a notes column mapped by mistake) is echoed in the row message cut to 40 characters, so the reason stays readable in the table and the phone card;
+  // fails_when=unreadableWeekdayMessage echoes the whole cell again;
+  // why_new=design review (third pass) of the unreadable-weekday message; no test had a long cell;
+  // seam=the actions override answers with the clean fixture's rows for the rows sent; no_claim=does not prove the table's wrapping
+  it("cuts a long unreadable weekday cell to 40 characters in the row message", async () => {
+    actions.dryRunClassScheduleImport.mockImplementationOnce(async (input) => {
+      const sent = new Set(input.schedules.map((row) => row.source_row_number));
+      const scheduleRows = CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_rows.filter((row) => sent.has(row.source_row_number));
+      return {
+        data: { ...CLASS_IMPORT_PREVIEW_DRY_RUN, schedule_rows: scheduleRows, schedule_summary: { ...CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_summary, new: 7, total: 9 } },
+        ok: true,
+      };
+    });
+    renderPage({ initialWorkbook: withWeekdays(CLASS_IMPORT_PREVIEW_WORKBOOK, { 4: `Ghi chú ${"x".repeat(60)}` }) });
+
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra dòng" }));
+    await waitFor(() => expectStep(2));
+    fireEvent.click(screen.getByRole("tab", { name: /Lịch học/ }));
+    const row = within(screen.getByRole("table", { name: "Kết quả kiểm tra 10 dòng lịch học" })).getAllByRole("row")[1];
+    expect(row).toHaveTextContent(`Lỗi: Không đọc được thứ trong tuần: “Ghi chú ${"x".repeat(32)}…”.`);
+    expect(row).not.toHaveTextContent("x".repeat(33));
   });
 });
 

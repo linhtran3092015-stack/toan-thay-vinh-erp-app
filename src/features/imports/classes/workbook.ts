@@ -49,24 +49,45 @@ function getExcelColumnKey(columnIndex: number): string {
 }
 
 /**
- * A spelling standing as a whole word on NFC upper-case text: a letter or digit
- * on either side means it is part of another word ("THU" in "LÝ THUYẾT", "SUN"
- * in "BỔ SUNG", "T2" in "T2B"). No lookbehind, so older Safari still parses it.
+ * Spellings (regex fragments) standing as whole words on NFC upper-case text: a
+ * letter or digit on either side means part of another word ("THU" in "LÝ THUYẾT",
+ * "SUN" in "BỔ SUNG", "T2" in "T2B"). No lookbehind, so older Safari still parses it.
  */
 function wholeWord(spellings: readonly string[]): RegExp {
   return new RegExp(`(?:^|[^\\p{L}\\p{N}])(?:${spellings.join("|")})(?=[^\\p{L}\\p{N}]|$)`, "u");
 }
 
-/** The spellings each ISO weekday (1 = Thứ Hai … 7 = Chủ nhật) is read from. */
-const WEEKDAY_SPELLINGS: ReadonlyArray<{ iso: number; pattern: RegExp }> = [
-  { iso: 1, pattern: wholeWord(["T2", "THỨ 2", "THỨ HAI", "MON", "MONDAY"]) },
-  { iso: 2, pattern: wholeWord(["T3", "THỨ 3", "THỨ BA", "TUE", "TUES", "TUESDAY"]) },
-  { iso: 3, pattern: wholeWord(["T4", "THỨ 4", "THỨ TƯ", "WED", "WEDNESDAY"]) },
-  { iso: 4, pattern: wholeWord(["T5", "THỨ 5", "THỨ NĂM", "THU", "THUR", "THURS", "THURSDAY"]) },
-  { iso: 5, pattern: wholeWord(["T6", "THỨ 6", "THỨ SÁU", "FRI", "FRIDAY"]) },
-  { iso: 6, pattern: wholeWord(["T7", "THỨ 7", "THỨ BẢY", "SAT", "SATURDAY"]) },
-  { iso: 7, pattern: wholeWord(["CN", "CHỦ NHẬT", "SUN", "SUNDAY"]) },
+/**
+ * The spellings each ISO weekday (1 = Thứ Hai … 7 = Chủ nhật) is read from: the Vietnamese
+ * ones first, the English names only when no Vietnamese spelling is in the cell (so a
+ * teacher named Thu in "Thứ 2 (cô Thu)" is not read as Thursday).
+ */
+const VIETNAMESE_WEEKDAYS: ReadonlyArray<{ iso: number; pattern: RegExp }> = [
+  { iso: 1, pattern: wholeWord(["T2", "THỨ ?2", "THỨ HAI"]) },
+  { iso: 2, pattern: wholeWord(["T3", "THỨ ?3", "THỨ BA"]) },
+  { iso: 3, pattern: wholeWord(["T4", "THỨ ?4", "THỨ TƯ"]) },
+  { iso: 4, pattern: wholeWord(["T5", "THỨ ?5", "THỨ NĂM"]) },
+  { iso: 5, pattern: wholeWord(["T6", "THỨ ?6", "THỨ SÁU"]) },
+  { iso: 6, pattern: wholeWord(["T7", "THỨ ?7", "THỨ BẢY", "THỨ BẨY"]) },
+  { iso: 7, pattern: wholeWord(["CN", "CHỦ NHẬT"]) },
 ];
+
+const ENGLISH_WEEKDAYS: ReadonlyArray<{ iso: number; pattern: RegExp }> = [
+  { iso: 1, pattern: wholeWord(["MON", "MONDAY"]) },
+  { iso: 2, pattern: wholeWord(["TUE", "TUES", "TUESDAY"]) },
+  { iso: 3, pattern: wholeWord(["WED", "WEDNESDAY"]) },
+  { iso: 4, pattern: wholeWord(["THU", "THUR", "THURS", "THURSDAY"]) },
+  { iso: 5, pattern: wholeWord(["FRI", "FRIDAY"]) },
+  { iso: 6, pattern: wholeWord(["SAT", "SATURDAY"]) },
+  { iso: 7, pattern: wholeWord(["SUN", "SUNDAY"]) },
+];
+
+/** The one day the spellings name in `text`, null for two or more, undefined for none. */
+function namedDay(text: string, spellings: ReadonlyArray<{ iso: number; pattern: RegExp }>): number | null | undefined {
+  const days = spellings.filter((day) => day.pattern.test(text));
+  if (days.length === 0) return undefined;
+  return days.length === 1 ? days[0].iso : null;
+}
 
 /**
  * The ISO weekday of a "Thứ" cell, or null when the cell does not name exactly
@@ -82,12 +103,14 @@ export function parseWeekdayValue(value: unknown): number | null {
 
   if (typeof value === "string") {
     // NFC first: decomposed Vietnamese ("ư" typed as "u" + combining marks) would otherwise read "THỨ" as English "THU".
-    const str = value.normalize("NFC").trim().toUpperCase();
+    // Any run of spaces (non-breaking ones pasted from Word, tabs, doubles) counts as one.
+    const str = value.normalize("NFC").replace(/\s+/gu, " ").trim().toUpperCase();
     // A number typed as text ("3", "03", "3.0") reads as that number would.
     if (/^\+?\d+(\.\d+)?$/.test(str)) return parseWeekdayValue(Number(str));
 
-    const days = WEEKDAY_SPELLINGS.filter((day) => day.pattern.test(str));
-    return days.length === 1 ? days[0].iso : null;
+    const vietnamese = namedDay(str, VIETNAMESE_WEEKDAYS);
+    if (vietnamese !== undefined) return vietnamese;
+    return namedDay(str, ENGLISH_WEEKDAYS) ?? null;
   }
 
   return null;

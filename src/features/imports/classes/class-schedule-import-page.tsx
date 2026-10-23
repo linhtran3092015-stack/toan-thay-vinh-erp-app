@@ -141,9 +141,14 @@ interface PreparedScheduleInputs {
 /** The check as the review shows it: the server's answer plus the rows held back for an unreadable weekday. */
 type CheckedResult = Omit<DryRunClassScheduleImportResult, "schedule_rows"> & { schedule_rows: ScheduleReviewRow[] };
 
+/** Characters of the cell echoed in the row message (a wrongly mapped notes column can hold long text). */
+const UNREADABLE_WEEKDAY_ECHO_MAX = 40;
+
 function unreadableWeekdayMessage(raw: unknown): string {
   const text = raw === null || raw === undefined ? "" : String(raw).trim();
-  return text ? `Không đọc được thứ trong tuần: “${text}”.` : "Không đọc được thứ trong tuần: ô để trống.";
+  if (!text) return "Không đọc được thứ trong tuần: ô để trống.";
+  const shown = text.length > UNREADABLE_WEEKDAY_ECHO_MAX ? `${text.slice(0, UNREADABLE_WEEKDAY_ECHO_MAX)}…` : text;
+  return `Không đọc được thứ trong tuần: “${shown}”.`;
 }
 
 function prepareScheduleInputs(

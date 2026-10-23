@@ -305,6 +305,8 @@ describe("StudentImportPage wizard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Kiểm tra 3 dòng" }));
     await waitFor(() => expect(currentStep()).toHaveTextContent("3. Kiểm tra dòng"));
+    // A first check is a plain result, never a re-check note.
+    expect(screen.queryByText("Đã kiểm tra lại.")).not.toBeInTheDocument();
     expect(actions.validateStudentImportRows).toHaveBeenLastCalledWith({
       rows: [2, 3, 4].map((rowNumber, index) => ({
         birth_year: 2014,
@@ -701,7 +703,7 @@ describe("StudentImportPage wizard", () => {
   });
 
   // Value: protects=after "Kiểm tra lại" answers with a clean result, the confirm step opens with the reason still typed, the confirmation cleared, no stale refusal and the commit available again once ticked;
-  // fails_when=a successful check clears the reason (it was typed for this file), keeps the confirmation or the old refusal, or leaves the commit locked;
+  // fails_when=a successful check clears the reason (it was typed for this file), keeps the confirmation or the old refusal, leaves the commit locked, or leaves keyboard focus on the page body after "Kiểm tra lại" unmounts;
   // why_new=the re-check path is new in this change (TODOS "Nhập học sinh: không có nút kiểm tra lại…");
   // seam=the page's `actions` override props; no_claim=does not prove the second commit succeeds on the server
   it("keeps the typed reason across a clean re-check and asks for the confirmation again", async () => {
@@ -721,6 +723,8 @@ describe("StudentImportPage wizard", () => {
     expect(screen.getByText("Đã kiểm tra lại.").closest('[role="status"]')?.textContent).toBe(
       "Đã kiểm tra lại. Kết quả dưới đây là của lần kiểm tra mới với file và ánh xạ cột đang chọn. Ở bước Xác nhận nhập, cần đánh dấu xác nhận lại.",
     );
+    // The pressed button is gone with the confirm step: focus moves to the note.
+    await waitFor(() => expect(screen.getByText("Đã kiểm tra lại.").closest('[tabindex="-1"]')).toHaveFocus());
     fireEvent.click(screen.getByRole("button", { name: "Tiếp: Xác nhận nhập" }));
 
     expect(screen.getByLabelText("Lý do nhập")).toHaveValue("Nhập học sinh khối 7");

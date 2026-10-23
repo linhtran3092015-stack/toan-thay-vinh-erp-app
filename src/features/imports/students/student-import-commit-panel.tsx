@@ -72,10 +72,10 @@ export interface StudentImportCommitGate {
 /**
  * The commit gate of today's panel, condition by condition and in the same
  * order as its checks: `students.create`, 0 invalid rows, the dry-run still
- * matches the mapped file (same row count, at least one row), a reason of
- * 1–1,500 characters, the confirmation checkbox, not pending, not committed
- * (here or by an earlier press the server reports), and not refused for rows
- * that no longer pass (until "Kiểm tra lại" answers).
+ * matches the mapped file (same row count, at least one row, and no commit
+ * refused for rows that no longer pass until "Kiểm tra lại" answers), a reason
+ * of 1–1,500 characters, the confirmation checkbox; then not pending and not
+ * committed (here or by an earlier press the server reports).
  */
 export function getStudentImportCommitGate({
   canCreateStudents,

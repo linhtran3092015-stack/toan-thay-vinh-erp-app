@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
 import type { StepperStep } from "@/components/patterns/stepper";
@@ -229,6 +229,8 @@ export function StudentImportPage({
   // Bumped by every input change that invalidates a check (a new or cleared file, a mapping change)
   // and by each check: a dry-run answer is applied only while its run is still the latest.
   const checkRun = useRef(0);
+  // "Kiểm tra lại" unmounts with the confirm step: focus lands on the note that says what happened.
+  const recheckNoticeRef = useRef<HTMLDivElement>(null);
 
   const mappingValidation = useMemo(
     () => (workbook ? validateStudentImportColumnMapping(workbook.columns, mapping) : null),
@@ -244,6 +246,10 @@ export function StudentImportPage({
   );
 
   const currentStep: StudentImportStep = commitResult ? "confirm" : resolveStep(step, { validation, workbook });
+
+  useEffect(() => {
+    if (isRecheckedResult && currentStep === "review") recheckNoticeRef.current?.focus();
+  }, [currentStep, isRecheckedResult]);
   const currentIndex = STEPS.findIndex((item) => item.key === currentStep);
   const steps: StepperStep[] = STEPS.map((item, index) => ({
     state: commitResult || index < currentIndex ? "done" : index === currentIndex ? "current" : "upcoming",
@@ -578,13 +584,19 @@ export function StudentImportPage({
     body = (
       <>
         {isRecheckedResult ? (
-          <ResultBanner
-            description={`Kết quả dưới đây là của lần kiểm tra mới với file và ánh xạ cột đang chọn.${
-              hasErrors ? "" : " Ở bước Xác nhận nhập, cần đánh dấu xác nhận lại."
-            }`}
-            title="Đã kiểm tra lại."
-            tone="info"
-          />
+          <div
+            className="rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+            ref={recheckNoticeRef}
+            tabIndex={-1}
+          >
+            <ResultBanner
+              description={`Kết quả dưới đây là của lần kiểm tra mới với file và ánh xạ cột đang chọn.${
+                hasErrors ? "" : " Ở bước Xác nhận nhập, cần đánh dấu xác nhận lại."
+              }`}
+              title="Đã kiểm tra lại."
+              tone="info"
+            />
+          </div>
         ) : null}
         <ImportSummaryStrip
           cells={[
