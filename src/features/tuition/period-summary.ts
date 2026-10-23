@@ -10,6 +10,7 @@
 import { getPaymentRemaining } from "@/features/classes/detail/class-tuition-models";
 import { resolveReissueChains } from "@/features/tuition/reissue-chains";
 import type { PermissionCode } from "@/lib/permissions/types";
+import { compareStudentNames } from "@/lib/student-order";
 
 /** student_payment_requests RLS (split_finance_payment_permissions): any of these reads the requests. */
 export const PAYMENT_READ_PERMISSIONS: readonly PermissionCode[] = ["finance.view", "payments.view", "payments.manage"];
@@ -104,7 +105,7 @@ export function toCurrentTuitionItemRows(items: readonly TuitionPeriodItemQueryR
         studentName: snapshot?.full_name ?? "Học sinh",
       } satisfies TuitionPeriodItemRow;
     })
-    .sort((a, b) => a.studentName.localeCompare(b.studentName, "vi"));
+    .sort((a, b) => compareStudentNames(a.studentName, b.studentName));
 }
 
 /**

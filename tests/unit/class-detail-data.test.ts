@@ -852,6 +852,28 @@ describe("getClassEnrollmentCandidates", () => {
     tables({ students: { data: null, error: { message: "denied" } } });
     await expect(getClassEnrollmentCandidates()).resolves.toBeNull();
   });
+
+  // Value: protects=the enroll dialog offers never-enrolled students by given name (last word), not in the database's full_name order;
+  // fails_when=queryEnrollmentCandidates drops the given-name sort and returns PostgREST's family-name order;
+  // why_new=candidate fixtures are one-word or "HS 000"-style names, where full-name and given-name order agree;
+  // seam=none; no_claim=mocked PostgREST; does not prove which 500 students a truncated list keeps or that the dialog keeps the order
+  it("lists candidates by given name", async () => {
+    const candidate = (id: string, fullName: string) => ({
+      current_grade: 9,
+      full_name: fullName,
+      id,
+      lifecycle_status: "trial",
+      public_code: `HS-${id}`,
+      registered_mode: null,
+      student_enrollments: [],
+    });
+    // PostgREST orders by full_name, i.e. by family name.
+    tables({ students: { data: [candidate("yen", "Bùi Thị Yến"), candidate("binh", "Lê Văn Bình"), candidate("an", "Trần Minh An")], error: null } });
+
+    const result = await getClassEnrollmentCandidates();
+
+    expect(result?.candidates.map((row) => row.fullName)).toEqual(["Trần Minh An", "Lê Văn Bình", "Bùi Thị Yến"]);
+  });
 });
 
 const candidateRow = (index: number) => ({

@@ -2,7 +2,7 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
-## [0.32.0.2] - 2026-10-21
+## [0.33.0.1] - 2026-10-23
 
 Ba chỗ làm trợ giảng bối rối khi dạy một buổi: hộp nhập kết quả nói sai điều kiện khóa buổi, nhắc duyệt bài chấm AI hiện "Sự kiện chưa hỗ trợ", và trợ giảng không thấy mục Chấm công trong menu.
 
@@ -10,6 +10,38 @@ Ba chỗ làm trợ giảng bối rối khi dạy một buổi: hộp nhập k�
 - **Hộp "Nhập kết quả" / "Cập nhật kết quả"** không còn nói buổi học chỉ được khóa khi mọi học viên có mặt hoặc học thêm đã có điểm kiểm tra. Từ 0.6.6.0 (migration `20261011090100`) điểm kiểm tra không còn là điều kiện khóa; hộp giờ ghi như khung Khóa buổi học: kết quả và điểm kiểm tra không phải là điều kiện khóa, nhưng khóa rồi thì không sửa được.
 - **Thông báo "Còn bài chấm AI chưa duyệt"** (`ai_grading.review_due`, nhắc trước khi buổi tự khóa) có nhãn "Bài chấm AI chờ duyệt", màu cảnh báo và biểu tượng Chấm bài AI riêng, thay cho "Sự kiện chưa hỗ trợ: review_due". Bản tổng hợp gửi owner (`ops.ai_grading_review_due`) cùng nhãn; bốn cảnh báo vận hành của Chấm bài AI (chạm trần chi phí ngày, Claude API từ chối, lượt chờ quá 20 phút, lỗi nhiều trong 1 giờ) hiện "Cảnh báo vận hành" như các cảnh báo khác.
 - **Mục "Chấm công" trong menu Nhân sự** hiện cho người có quyền chấm công (`timekeeping.check`), quản lý xác minh chấm công, hoặc xem chấm công, đúng như trang `/timekeeping` vẫn cho vào. Trợ giảng chỉ có `timekeeping.check` mở được bảng công tháng và "Yêu cầu điều chỉnh" của mình từ menu; trang vẫn chỉ hiện phần cá nhân, không có lịch phân công, ca làm hay bảng công toàn trung tâm.
+## [0.33.0.0] - 2026-10-22
+
+Danh sách học sinh xếp theo tên (chữ cuối của họ tên), danh sách tổng xếp theo khối từ lớp 12 xuống, và các ô chọn học sinh không còn bỏ sót em nào.
+
+### Changed
+- **Danh sách học sinh** (`/students`): xếp theo khối từ lớp 12 xuống, trong mỗi khối xếp theo tên (chữ cuối của họ tên) theo bảng chữ tiếng Việt (An, Anh, Ánh, Ăn, Ân… D trước Đ); trùng tên thì xét tiếp họ và tên đệm. Vì thứ tự đổi, link `/students?page=N` đã lưu sẽ mở ra trang khác.
+- **Xếp theo tên ở các danh sách học sinh khác:**
+  - Trang lớp: tab Học sinh, Kết quả, Học phí, cảnh báo vắng liên tiếp, ô thêm học sinh vào lớp.
+  - Buổi học: điểm danh, kết quả, ô chọn học sinh học thêm.
+  - Học phí: bảng kiểm tra trước khi chốt kỳ và 2 file Excel xuất từ bảng đó, bảng kỳ đã chốt. In phiếu học phí hàng loạt vẫn theo khối tăng dần, sau đó theo tên.
+  - Tài chính: ô chọn học sinh khi tạo yêu cầu thanh toán, kết quả tìm học sinh khi phân bổ SePay thủ công.
+  - Coaching: ô chọn học sinh khi tạo, bộ lọc học viên trong danh sách phản hồi.
+  - Kết quả học tập: các buổi vẫn mới nhất trước, học sinh trong mỗi buổi xếp theo tên.
+  - Chăm sóc học viên: "Phân công lâu dài" và "Theo dõi riêng" (xếp ngay trong cơ sở dữ liệu nên đúng thứ tự qua mọi trang 50 em).
+
+### Fixed
+- **Ô chọn học sinh bị thiếu em:** ô học thêm trong buổi học, ô chọn học sinh khi tạo yêu cầu thanh toán và khi tạo coaching chỉ tải tối đa 500 em, lấy theo họ, nên các em có họ đứng sau trong bảng chữ cái (Trần, Võ, Vũ…) không chọn được. Giờ các ô này tải đủ mọi học sinh.
+
+## [0.32.1.1] - 2026-10-21
+
+### Changed
+- **"Sao chép tin Zalo"** chép cả tin trong một lần bấm, kể cả tin dài, không chia thành nhiều phần nữa.
+
+## [0.32.1.0] - 2026-10-21
+
+### Added
+- **"Sao chép tin Zalo"** trên bảng kết quả buổi học (mỗi dòng đã có nhận xét): chép đúng tin nhận xét gửi phụ huynh theo mẫu đã chốt (tiêu đề, điểm "(đã cộng 1)", điểm vở, xếp hạng, bài làm, bài chữa, nhận xét, thông tin cuối) để dán tay vào Zalo khi học sinh chưa liên kết nhóm Zalo. Tin dài hơn 2.000 ký tự có nút chép từng phần (2–3 phần) như hàng chờ Zalo.
+
+## [0.32.0.2] - 2026-10-21
+
+### Fixed
+- **AI đọc đề xong mà ô đáp án vẫn trống:** bản nháp AI đã ghi vào hệ thống nhưng ô sửa đáp án giữ nội dung lúc mở trang (ví dụ "1 câu, chưa có điểm") cho tới khi tải lại trang. Giờ ô đáp án tự nạp bản nháp AI ngay khi AI đọc xong.
 
 ## [0.32.0.0] - 2026-10-21
 

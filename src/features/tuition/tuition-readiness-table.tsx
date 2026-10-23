@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/field";
 import { formatIsoDate } from "@/lib/datetime";
 import { formatNumber, formatVnd } from "@/lib/format";
-import { compareValues } from "@/lib/sorting";
+import { compareStudentNames, sortByStudentName } from "@/lib/student-order";
 import { cn } from "@/lib/utils";
 
 import { setTuitionPeriodRatesAction, setTuitionPeriodSourcesAction, type TuitionActionResult } from "./actions";
@@ -101,6 +101,10 @@ function matchesFilter(student: StudentReadiness, filter: ReadinessFilter): bool
 }
 
 const labelFor = (labels: Record<string, string>, student: StudentReadiness) => labels[student.studentId] ?? `Học sinh ${student.studentId}`;
+const NO_STUDENT_DETAILS: Record<string, TuitionStudentDetail> = {};
+// Labels read "Name (code)", so the roll order needs the bare name to find the given name.
+const nameFor = (details: Record<string, TuitionStudentDetail>, labels: Record<string, string>, student: StudentReadiness) =>
+  details[student.studentId]?.fullName ?? labelFor(labels, student);
 
 /** `2026-11-02` → `02/11`. */
 const formatDayMonth = (value: string) => formatIsoDate(value).slice(0, 5);
@@ -124,7 +128,7 @@ export function TuitionReadinessTable({
   periodId,
   students,
   labels,
-  studentDetails = {},
+  studentDetails = NO_STUDENT_DETAILS,
   leadSources = [],
   setRatesAction = setTuitionPeriodRatesAction,
   setSourcesAction = setTuitionPeriodSourcesAction,
@@ -211,9 +215,10 @@ export function TuitionReadinessTable({
         .filter((student) => matchesFilter(student, filter) && (searchLabels.get(student.studentId) ?? "").includes(normalizedQuery))
         .sort(
           (a, b) =>
-            Number(b.issues.length > 0) - Number(a.issues.length > 0) || compareValues(labelFor(labels, a), labelFor(labels, b)),
+            Number(b.issues.length > 0) - Number(a.issues.length > 0) ||
+            compareStudentNames(nameFor(studentDetails, labels, a), nameFor(studentDetails, labels, b)),
         ),
-    [filter, labels, normalizedQuery, searchLabels, students],
+    [filter, labels, normalizedQuery, searchLabels, studentDetails, students],
   );
   const visibleEligible = visible.filter(isEligible).map((student) => student.studentId);
   const visibleSelectedCount = visibleEligible.filter((id) => selected.has(id)).length;
@@ -357,27 +362,33 @@ export function TuitionReadinessTable({
   const downloadMissingRates = () =>
     download("rate_missing", () =>
       downloadTuitionRateExcel(
-        studentsMissingRate.map((student) => {
-          const detail = studentDetails[student.studentId];
-          return {
-            effectiveFrom: student.missingRateFrom ?? "",
-            fullName: detail?.fullName ?? labels[student.studentId] ?? "Học viên",
-            publicCode: detail?.publicCode ?? student.studentId,
-            reason: "Học phí khóa hiện tại",
-          };
-        }),
+        sortByStudentName(
+          studentsMissingRate.map((student) => {
+            const detail = studentDetails[student.studentId];
+            return {
+              effectiveFrom: student.missingRateFrom ?? "",
+              fullName: detail?.fullName ?? labels[student.studentId] ?? "Học viên",
+              publicCode: detail?.publicCode ?? student.studentId,
+              reason: "Học phí khóa hiện tại",
+            };
+          }),
+          (row) => row.fullName,
+        ),
       ),
     );
   const downloadSourceTemplate = () =>
     download("source_blank", () => {
-      const rows = studentsMissingSource.map((student) => {
-        const detail = studentDetails[student.studentId];
-        return {
-          fullName: detail?.fullName ?? labels[student.studentId] ?? "Học viên",
-          publicCode: detail?.publicCode ?? student.studentId,
-          reason: "Khởi tạo dữ liệu ban đầu",
-        };
-      });
+      const rows = sortByStudentName(
+        studentsMissingSource.map((student) => {
+          const detail = studentDetails[student.studentId];
+          return {
+            fullName: detail?.fullName ?? labels[student.studentId] ?? "Học viên",
+            publicCode: detail?.publicCode ?? student.studentId,
+            reason: "Khởi tạo dữ liệu ban đầu",
+          };
+        }),
+        (row) => row.fullName,
+      );
       return downloadTuitionSourceExcel(leadSources, rows.length > 0 ? rows : undefined);
     });
 

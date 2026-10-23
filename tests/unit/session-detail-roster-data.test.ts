@@ -98,6 +98,56 @@ describe("Session detail composite roster transport", () => {
     ]);
   });
 
+  // Value: protects=the session page's attendance and result roster lists students by given name (last word), then family and middle names;
+  // fails_when=getSessionDetail goes back to full-name (family-first) order or keeps the roster RPC's order;
+  // why_new=the existing cases load one participant, so no test saw the roster order;
+  // seam=none; no_claim=mocked Supabase client; does not prove the attendance/result components keep this order
+  it("lists the session roster by given name, not by family name", async () => {
+    const roster = (studentId: string) => ({
+      enrollment_class_id: "official-5a1",
+      registered_mode: "offline",
+      student_enrollment_id: `enrollment-${studentId}`,
+      student_id: studentId,
+    });
+    dependencies.rpc.mockResolvedValue({
+      data: [roster("student-yen"), roster("student-an"), roster("student-binh")],
+      error: null,
+    });
+    const sessionTable = dependencies.from.getMockImplementation();
+    dependencies.from.mockImplementation((table: string) => {
+      if (table !== "students") return sessionTable?.(table);
+      const studentQuery = {
+        in: vi.fn(async () => ({
+          // The database hands names back in full_name order, i.e. by family name.
+          data: [
+            { current_grade: 5, full_name: "Bùi Thị Yến", id: "student-yen", public_code: "TTV-1" },
+            { current_grade: 5, full_name: "Lê Văn Bình", id: "student-binh", public_code: "TTV-2" },
+            { current_grade: 5, full_name: "Trần Minh An", id: "student-an", public_code: "TTV-3" },
+          ],
+          error: null,
+        })),
+        select: vi.fn(),
+      };
+      studentQuery.select.mockReturnValue(studentQuery);
+      return studentQuery;
+    });
+
+    const result = await getSessionDetail("session-5a", {
+      includeRoster: true,
+      includeStudentIdentity: true,
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) {
+      throw new Error("Expected session detail result");
+    }
+    expect(result.detail.participants.map((participant) => participant.studentName)).toEqual([
+      "Trần Minh An",
+      "Lê Văn Bình",
+      "Bùi Thị Yến",
+    ]);
+  });
+
   it("returns a roster-specific failure without fabricating direct enrollment data", async () => {
     dependencies.rpc.mockResolvedValue({
       data: null,

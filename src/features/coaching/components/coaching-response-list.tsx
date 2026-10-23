@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import type { CoachingResponseSummary } from "@/features/coaching/coaching-form-data";
+import { compareStudentNames } from "@/lib/student-order";
 
 const formatter = new Intl.DateTimeFormat("vi-VN", {
   dateStyle: "short",
@@ -18,7 +19,7 @@ export function CoachingResponseList({ responses }: { responses: CoachingRespons
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const forms = useMemo(() => [...new Set(responses.map((response) => response.formName))].sort(), [responses]);
-  const students = useMemo(() => [...new Set(responses.map((response) => response.studentName))].sort(), [responses]);
+  const students = useMemo(() => [...new Set(responses.map((response) => response.studentName))].sort(compareStudentNames), [responses]);
   const filtered = responses.filter((response) => {
     const day = response.submittedAt.slice(0, 10);
     return (!form || response.formName === form)

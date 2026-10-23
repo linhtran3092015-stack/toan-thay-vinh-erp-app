@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
+import { sortByStudentName } from "@/lib/student-order";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { allocationRequestSchema, manualAllocationSchema, type AllocationStudent, type AllocationDetail, type ManualAllocationInput } from "./manual-allocation-schema";
 
@@ -39,7 +40,7 @@ export async function searchAllocationStudentsAction(query: string): Promise<Res
     const client = await createSupabaseServerClient();
     const { data, error } = await client.rpc("search_sepay_allocation_students", { p_search: parsed.data });
     if (error) return { ok: false, message: "Không tải được học sinh. Vui lòng thử lại." };
-    const students = (data ?? []).map((s) => ({
+    const students = sortByStudentName(data ?? [], (s) => s.student_name).map((s) => ({
       id: s.student_id, name: s.student_name, publicCode: s.student_code, birthYear: s.birth_year,
       guardianName: s.guardian_name, guardianPhone: s.guardian_phone,
       requests: z.array(allocationRequestSchema).parse(s.pending_requests),

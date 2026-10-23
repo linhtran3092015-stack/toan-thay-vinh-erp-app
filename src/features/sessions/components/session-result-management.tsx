@@ -26,6 +26,7 @@ import { attendanceStatusLabels, attendanceStatusTones, formatScore, notebookSta
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Button } from "@/components/ui/button";
+import { CopyZaloMessageButton } from "@/features/sessions/components/copy-zalo-message-button";
 import {
   Card,
   CardContent,
@@ -527,9 +528,14 @@ function ParticipantIdentity({ canViewStudents, index, participant }: { canViewS
 }
 
 function ResultAction({ canEdit, eligible, fullWidth = false, isPending, onEdit, participant }: { canEdit: boolean; eligible: boolean; fullWidth?: boolean; isPending: boolean; onEdit: (participant: SessionParticipantReadModel) => void; participant: SessionParticipantReadModel }) {
-  if (!canEdit || !eligible) return <span className="text-caption text-text-muted">Chỉ đọc</span>;
+  // "Sao chép tin Zalo": the parent message as the Zalo queue renders it, for sending by hand.
+  const copy = participant.resultId && participant.resultComment?.trim() ? <CopyZaloMessageButton resultId={participant.resultId} /> : null;
+  if (!canEdit || !eligible) {
+    return copy ? <div className="flex flex-wrap items-center justify-end gap-1">{copy}<span className="text-caption text-text-muted">Chỉ đọc</span></div> : <span className="text-caption text-text-muted">Chỉ đọc</span>;
+  }
   const action = participant.resultId ? "Sửa kết quả" : "Nhập kết quả";
-  return <Button aria-label={`${action} cho học viên`} className={fullWidth ? "w-full" : undefined} disabled={isPending} onClick={() => onEdit(participant)} size={fullWidth ? "lg" : "sm"} type="button" variant={fullWidth ? "secondary" : "ghost"}>{action}</Button>;
+  const edit = <Button aria-label={`${action} cho học viên`} className={fullWidth ? "w-full" : undefined} disabled={isPending} onClick={() => onEdit(participant)} size={fullWidth ? "lg" : "sm"} type="button" variant={fullWidth ? "secondary" : "ghost"}>{action}</Button>;
+  return copy ? <div className={fullWidth ? "grid gap-2" : "flex flex-wrap items-center justify-end gap-1"}>{copy}{edit}</div> : edit;
 }
 
 function ResultEditor({

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { sortByStudentName } from "@/lib/student-order";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export interface AdditionalStudyCandidate {
@@ -33,28 +35,32 @@ interface CandidateQueryRow {
   registered_mode: string | null;
 }
 
-const CANDIDATE_LIMIT = 500;
-
 export async function getAdditionalStudyCandidates():
   Promise<AdditionalStudyCandidatesResult> {
   try {
     const supabase =
       await createSupabaseServerClient();
 
-    const { data, error } = await supabase
-      .from("students")
-      .select(`
-        id,
-        public_code,
-        full_name,
-        current_grade,
-        registered_mode
-      `)
-      .eq("lifecycle_status", "active")
-      .order("full_name", {
-        ascending: true,
-      })
-      .limit(CANDIDATE_LIMIT);
+    // Every active student: a capped read silently drops whoever sorts last.
+    const { data, error } = await fetchAllPages<CandidateQueryRow>((from, to) =>
+      supabase
+        .from("students")
+        .select(`
+          id,
+          public_code,
+          full_name,
+          current_grade,
+          registered_mode
+        `)
+        .eq("lifecycle_status", "active")
+        .order("full_name", {
+          ascending: true,
+        })
+        .order("id", {
+          ascending: true,
+        })
+        .range(from, to),
+    );
 
     if (error) {
       return {
@@ -90,7 +96,7 @@ export async function getAdditionalStudyCandidates():
 
     return {
       ok: true,
-      students: rows.map((row) => ({
+      students: sortByStudentName(rows, (row) => row.full_name).map((row) => ({
         currentGrade: row.current_grade,
         fullName: row.full_name,
         id: row.id,
