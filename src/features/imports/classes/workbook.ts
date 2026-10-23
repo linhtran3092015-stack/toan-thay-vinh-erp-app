@@ -57,42 +57,58 @@ function wholeWord(spellings: readonly string[]): RegExp {
   return new RegExp(`(?:^|[^\\p{L}\\p{N}])(?:${spellings.join("|")})(?=[^\\p{L}\\p{N}]|$)`, "u");
 }
 
-/**
- * The spellings each ISO weekday (1 = Thứ Hai … 7 = Chủ nhật) is read from: the Vietnamese
- * ones first, the English names only when no Vietnamese spelling is in the cell (so a
- * teacher named Thu in "Thứ 2 (cô Thu)" is not read as Thursday).
- */
-const VIETNAMESE_WEEKDAYS: ReadonlyArray<{ iso: number; pattern: RegExp }> = [
-  { iso: 1, pattern: wholeWord(["T2", "THỨ ?2", "THỨ HAI"]) },
-  { iso: 2, pattern: wholeWord(["T3", "THỨ ?3", "THỨ BA"]) },
-  { iso: 3, pattern: wholeWord(["T4", "THỨ ?4", "THỨ TƯ"]) },
-  { iso: 4, pattern: wholeWord(["T5", "THỨ ?5", "THỨ NĂM"]) },
-  { iso: 5, pattern: wholeWord(["T6", "THỨ ?6", "THỨ SÁU"]) },
-  { iso: 6, pattern: wholeWord(["T7", "THỨ ?7", "THỨ BẢY", "THỨ BẨY"]) },
-  { iso: 7, pattern: wholeWord(["CN", "CHỦ NHẬT"]) },
+type WeekdaySpellings = ReadonlyArray<{ iso: number; pattern: RegExp }>;
+
+/** Vietnamese day names: when one is in the cell, it decides the day ("Thứ 2 (cô Thu)" is Monday). */
+const VIETNAMESE_DAY_NAMES: WeekdaySpellings = [
+  { iso: 1, pattern: wholeWord(["THỨ ?2", "THỨ HAI"]) },
+  { iso: 2, pattern: wholeWord(["THỨ ?3", "THỨ BA"]) },
+  { iso: 3, pattern: wholeWord(["THỨ ?4", "THỨ TƯ"]) },
+  { iso: 4, pattern: wholeWord(["THỨ ?5", "THỨ NĂM"]) },
+  { iso: 5, pattern: wholeWord(["THỨ ?6", "THỨ SÁU"]) },
+  { iso: 6, pattern: wholeWord(["THỨ ?7", "THỨ BẢY", "THỨ BẨY"]) },
+  { iso: 7, pattern: wholeWord(["CHỦ NHẬT"]) },
 ];
 
-const ENGLISH_WEEKDAYS: ReadonlyArray<{ iso: number; pattern: RegExp }> = [
-  { iso: 1, pattern: wholeWord(["MON", "MONDAY"]) },
-  { iso: 2, pattern: wholeWord(["TUE", "TUES", "TUESDAY"]) },
-  { iso: 3, pattern: wholeWord(["WED", "WEDNESDAY"]) },
-  { iso: 4, pattern: wholeWord(["THU", "THUR", "THURS", "THURSDAY"]) },
-  { iso: 5, pattern: wholeWord(["FRI", "FRIDAY"]) },
-  { iso: 6, pattern: wholeWord(["SAT", "SATURDAY"]) },
-  { iso: 7, pattern: wholeWord(["SUN", "SUNDAY"]) },
+/** Short codes: they also name floors, branches or teachers ("tầng T2", "CN Cầu Giấy"). */
+const VIETNAMESE_DAY_CODES: WeekdaySpellings = [
+  { iso: 1, pattern: wholeWord(["T2"]) },
+  { iso: 2, pattern: wholeWord(["T3"]) },
+  { iso: 3, pattern: wholeWord(["T4"]) },
+  { iso: 4, pattern: wholeWord(["T5"]) },
+  { iso: 5, pattern: wholeWord(["T6"]) },
+  { iso: 6, pattern: wholeWord(["T7"]) },
+  { iso: 7, pattern: wholeWord(["CN"]) },
 ];
 
-/** The one day the spellings name in `text`, null for two or more, undefined for none. */
-function namedDay(text: string, spellings: ReadonlyArray<{ iso: number; pattern: RegExp }>): number | null | undefined {
-  const days = spellings.filter((day) => day.pattern.test(text));
-  if (days.length === 0) return undefined;
-  return days.length === 1 ? days[0].iso : null;
+/** English names: "THU" is also a Vietnamese given name, so they never outrank a Vietnamese day name. */
+const ENGLISH_DAY_NAMES: WeekdaySpellings = [
+  { iso: 1, pattern: wholeWord(["MON", "MONDAYS?"]) },
+  { iso: 2, pattern: wholeWord(["TUE", "TUES", "TUESDAYS?"]) },
+  { iso: 3, pattern: wholeWord(["WED", "WEDS", "WEDNESDAYS?"]) },
+  { iso: 4, pattern: wholeWord(["THU", "THUR", "THURS", "THURSDAYS?"]) },
+  { iso: 5, pattern: wholeWord(["FRI", "FRIDAYS?"]) },
+  { iso: 6, pattern: wholeWord(["SAT", "SATURDAYS?"]) },
+  { iso: 7, pattern: wholeWord(["SUN", "SUNDAYS?"]) },
+];
+
+/** The ISO days the spellings name in `text`. */
+function namedDays(text: string, spellings: WeekdaySpellings): Set<number> {
+  return new Set(spellings.filter((day) => day.pattern.test(text)).map((day) => day.iso));
+}
+
+/** The one day in `days`, or null. */
+function onlyDay(days: ReadonlySet<number>): number | null {
+  return days.size === 1 ? [...days][0] : null;
 }
 
 /**
  * The ISO weekday of a "Thứ" cell, or null when the cell does not name exactly
  * one day: a fraction, a number outside 1–7, an unknown spelling, or a cell
  * naming two days ("Thứ 2, Thứ 4") is never rounded or guessed onto a day.
+ * Vietnamese day names and codes decide together; English names count only
+ * without them, and a code that an English name contradicts ("Sat - tầng T2")
+ * leaves the cell unreadable rather than on either day.
  */
 export function parseWeekdayValue(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -108,9 +124,17 @@ export function parseWeekdayValue(value: unknown): number | null {
     // A number typed as text ("3", "03", "3.0") reads as that number would.
     if (/^\+?\d+(\.\d+)?$/.test(str)) return parseWeekdayValue(Number(str));
 
-    const vietnamese = namedDay(str, VIETNAMESE_WEEKDAYS);
-    if (vietnamese !== undefined) return vietnamese;
-    return namedDay(str, ENGLISH_WEEKDAYS) ?? null;
+    const names = namedDays(str, VIETNAMESE_DAY_NAMES);
+    const codes = namedDays(str, VIETNAMESE_DAY_CODES);
+    const english = namedDays(str, ENGLISH_DAY_NAMES);
+    const vietnamese = new Set([...names, ...codes]);
+    if (vietnamese.size === 0) return onlyDay(english);
+
+    const day = onlyDay(vietnamese);
+    if (day === null) return null;
+    // Only a code named the day: an English name for another day means the code is something else.
+    if (names.size === 0 && english.size > 0 && (english.size > 1 || !english.has(day))) return null;
+    return day;
   }
 
   return null;

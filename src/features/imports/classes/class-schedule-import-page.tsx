@@ -145,9 +145,12 @@ type CheckedResult = Omit<DryRunClassScheduleImportResult, "schedule_rows"> & { 
 const UNREADABLE_WEEKDAY_ECHO_MAX = 40;
 
 function unreadableWeekdayMessage(raw: unknown): string {
-  const text = raw === null || raw === undefined ? "" : String(raw).trim();
+  const text = raw === null || raw === undefined ? "" : String(raw).normalize("NFC").trim();
   if (!text) return "Không đọc được thứ trong tuần: ô để trống.";
-  const shown = text.length > UNREADABLE_WEEKDAY_ECHO_MAX ? `${text.slice(0, UNREADABLE_WEEKDAY_ECHO_MAX)}…` : text;
+  // Counted in code points, so a cut never splits an emoji or a letter from its marks.
+  const characters = [...text];
+  const shown =
+    characters.length > UNREADABLE_WEEKDAY_ECHO_MAX ? `${characters.slice(0, UNREADABLE_WEEKDAY_ECHO_MAX).join("")}…` : text;
   return `Không đọc được thứ trong tuần: “${shown}”.`;
 }
 

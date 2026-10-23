@@ -108,9 +108,11 @@ export function getStudentImportCommitGate({
     {
       met: `Kết quả kiểm tra khớp file đang chọn (${formatNumber(validation.row_count)} dòng)`,
       ok: rowsMatch && !needsRecheck,
-      unmet: needsRecheck ? "Máy chủ báo dữ liệu đã thay đổi: cần kiểm tra lại" : "Kết quả kiểm tra không khớp file đang chọn",
+      unmet: needsRecheck
+        ? "Máy chủ báo dữ liệu đã thay đổi hoặc còn dòng lỗi: cần kiểm tra lại"
+        : "Kết quả kiểm tra không khớp file đang chọn",
       why: needsRecheck
-        ? "Dữ liệu đã thay đổi: bấm “Kiểm tra lại” trước khi nhập."
+        ? "Dữ liệu đã thay đổi hoặc còn dòng lỗi: bấm “Kiểm tra lại” trước khi nhập."
         : "Chọn lại file và kiểm tra các dòng trước khi nhập.",
     },
     {

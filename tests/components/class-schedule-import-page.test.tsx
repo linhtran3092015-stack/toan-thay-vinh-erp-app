@@ -315,10 +315,32 @@ describe("ClassScheduleImportPage: mapping", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  // Value: protects=a long unreadable "Thứ" cell (a notes column mapped by mistake) is echoed in the row message cut to 40 characters, so the reason stays readable in the table and the phone card;
-  // fails_when=unreadableWeekdayMessage echoes the whole cell again;
+  // Value: protects=a long unreadable "Thứ" cell (a notes column mapped by mistake) is echoed in the row message cut to 40 characters (code points of the NFC text, so a decomposed letter or an emoji is never split), so the reason stays readable in the table and the phone card;
+  // fails_when=unreadableWeekdayMessage echoes the whole cell again, adds "…" to a cell of exactly 40 characters, or cuts decomposed text by UTF-16 units;
   // why_new=design review (third pass) of the unreadable-weekday message; no test had a long cell;
   // seam=the actions override answers with the clean fixture's rows for the rows sent; no_claim=does not prove the table's wrapping
+  it.each([
+    ["exactly 40 characters", "x".repeat(40), "x".repeat(40)],
+    ["41 characters", "x".repeat(41), `${"x".repeat(40)}…`],
+    ["decomposed Vietnamese", "Học buổi tối học thêm hình học nâng cao lớp chín".normalize("NFD"), "Học buổi tối học thêm hình học nâng cao …"],
+  ])("echoes an unreadable weekday cell of %s whole letters at a time", async (_case, cell, echoed) => {
+    actions.dryRunClassScheduleImport.mockImplementationOnce(async (input) => {
+      const sent = new Set(input.schedules.map((row) => row.source_row_number));
+      const scheduleRows = CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_rows.filter((row) => sent.has(row.source_row_number));
+      return {
+        data: { ...CLASS_IMPORT_PREVIEW_DRY_RUN, schedule_rows: scheduleRows, schedule_summary: { ...CLASS_IMPORT_PREVIEW_DRY_RUN.schedule_summary, new: 7, total: 9 } },
+        ok: true,
+      };
+    });
+    renderPage({ initialWorkbook: withWeekdays(CLASS_IMPORT_PREVIEW_WORKBOOK, { 4: cell }) });
+
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra dòng" }));
+    await waitFor(() => expectStep(2));
+    fireEvent.click(screen.getByRole("tab", { name: /Lịch học/ }));
+    const row = within(screen.getByRole("table", { name: "Kết quả kiểm tra 10 dòng lịch học" })).getAllByRole("row")[1];
+    expect(row.textContent).toContain(`Không đọc được thứ trong tuần: “${echoed}”.`);
+  });
+
   it("cuts a long unreadable weekday cell to 40 characters in the row message", async () => {
     actions.dryRunClassScheduleImport.mockImplementationOnce(async (input) => {
       const sent = new Set(input.schedules.map((row) => row.source_row_number));

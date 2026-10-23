@@ -229,8 +229,9 @@ export function StudentImportPage({
   // Bumped by every input change that invalidates a check (a new or cleared file, a mapping change)
   // and by each check: a dry-run answer is applied only while its run is still the latest.
   const checkRun = useRef(0);
-  // "Kiểm tra lại" unmounts with the confirm step: focus lands on the note that says what happened.
+  // "Kiểm tra lại" unmounts with the confirm step: focus lands once on the note that says what happened.
   const recheckNoticeRef = useRef<HTMLDivElement>(null);
+  const recheckFocusPending = useRef(false);
 
   const mappingValidation = useMemo(
     () => (workbook ? validateStudentImportColumnMapping(workbook.columns, mapping) : null),
@@ -248,7 +249,9 @@ export function StudentImportPage({
   const currentStep: StudentImportStep = commitResult ? "confirm" : resolveStep(step, { validation, workbook });
 
   useEffect(() => {
-    if (isRecheckedResult && currentStep === "review") recheckNoticeRef.current?.focus();
+    if (!recheckFocusPending.current || !isRecheckedResult || currentStep !== "review") return;
+    recheckFocusPending.current = false;
+    recheckNoticeRef.current?.focus();
   }, [currentStep, isRecheckedResult]);
   const currentIndex = STEPS.findIndex((item) => item.key === currentStep);
   const steps: StepperStep[] = STEPS.map((item, index) => ({
@@ -256,10 +259,13 @@ export function StudentImportPage({
     title: item.title,
   }));
 
+  /** Drops the commit step and whatever a re-check left (a new file or a mapping change). */
   function clearCommitState() {
     setReason("");
     setConfirmed(false);
     setCommitError(null);
+    setRecheckError(null);
+    setIsRecheckedResult(false);
   }
 
   /** A new file (or none): every later step is dropped. */
@@ -271,8 +277,6 @@ export function StudentImportPage({
     setCommitResult(null);
     setFileError(null);
     setValidateError(null);
-    setRecheckError(null);
-    setIsRecheckedResult(false);
     clearCommitState();
   }
 
@@ -316,8 +320,6 @@ export function StudentImportPage({
     setMapping((current) => ({ ...current, [fieldKey]: columnKey.length > 0 ? columnKey : null }));
     setValidation(null);
     setValidateError(null);
-    setRecheckError(null);
-    setIsRecheckedResult(false);
     clearCommitState();
   }
 
@@ -343,7 +345,8 @@ export function StudentImportPage({
         }
         setValidation(result.data);
         setIsRecheckedResult(recheck);
-        // The confirmation was for the old result; a reason typed before a re-check from the confirm step is kept.
+        recheckFocusPending.current = recheck;
+        // The confirmation was for the old result. The reason is kept: only a new file or a mapping change clears it.
         setConfirmed(false);
         setCommitError(null);
         setStep("review");
