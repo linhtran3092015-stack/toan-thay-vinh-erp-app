@@ -40,8 +40,10 @@ export function PayslipDocument({ data }: { data: PayslipDocumentData }) {
         <PayslipEmployeeCard employee={data.employee} period={data.period} />
 
         <PayslipLineTables
+          adjustments={data.adjustments}
           deductions={data.deductions}
           earnings={data.earnings}
+          piecework={data.piecework}
           totals={data.totals}
         />
 

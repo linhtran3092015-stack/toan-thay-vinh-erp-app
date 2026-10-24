@@ -1,9 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+import { getPayrollPeriodsWithDetailsResult } from "@/features/payroll/data";
 import {
   normalizePayrollPeriodsWithDetailsRows,
   type PayrollPeriodsWithDetailsRow,
 } from "@/features/payroll/read-models";
+
+const supabase = vi.hoisted(() => ({ from: vi.fn(), range: vi.fn(), rpc: vi.fn() }));
+
+vi.mock("@/lib/supabase/server", () => ({
+  createSupabaseServerClient: vi.fn(async () => ({ from: supabase.from, rpc: supabase.rpc })),
+}));
 
 function row(
   overrides: Partial<PayrollPeriodsWithDetailsRow>,
@@ -208,5 +215,54 @@ describe("normalizePayrollPeriodsWithDetailsRows", () => {
         payableAmountVnd: 84,
       }),
     ]);
+  });
+});
+
+describe("getPayrollPeriodsWithDetailsResult", () => {
+  // Value: protects=the payroll page reads every line of the details RPC past PostgREST's max_rows, so payslip totals summed from lines (display income, Khấu trừ, Lương khoán) are not cut short;
+  // fails_when=the loader goes back to one un-ranged rpc call (the mocked builder is not a result, so the read fails closed) or stops after the first full 500-row page (the statement keeps 500 of 502 lines), or asks overlapping ranges;
+  // why_new=payslip totals are now summed from lines, and no test exercised this loader (payroll-route mocks it whole);
+  // seam=createSupabaseServerClient mocked: the details RPC returns a range builder, the explanations RPC and the payroll_periods payment read return empty results; no_claim=does not prove max_rows on prod or that the RPC's ORDER BY keeps pages from overlapping
+  it("reads every page of the details RPC", async () => {
+    const pages = [
+      Array.from({ length: 500 }, (_, index) => row({ line_amount_vnd: 1_000, payroll_line_item_id: `line-${index}` })),
+      [row({ line_amount_vnd: 2_000, payroll_line_item_id: "line-500" }), row({ line_amount_vnd: 3_000, payroll_line_item_id: "line-501" })],
+    ];
+    supabase.range.mockImplementation(async (from: number) => ({ data: pages[from / 500] ?? [], error: null }));
+    supabase.rpc.mockImplementation((name: string) => name === "get_payroll_periods_with_details"
+      ? { range: supabase.range }
+      : Promise.resolve({ data: { lines: [], periods: [], statements: [] }, error: null }));
+    supabase.from.mockReturnValue({ select: () => Promise.resolve({ data: [], error: null }) });
+
+    const result = await getPayrollPeriodsWithDetailsResult();
+
+    expect(supabase.range.mock.calls).toEqual([[0, 499], [500, 999]]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const lines = result.data[0].statements[0].lines;
+    expect(lines).toHaveLength(502);
+    expect(lines.slice(-2).map((line) => [line.id, line.amountVnd])).toEqual([["line-500", 2_000], ["line-501", 3_000]]);
+  });
+
+  // Value: protects=a line that a write between two page requests pushes onto the next page as well is kept once, so line-derived payslip totals are not doubled;
+  // fails_when=the dedupe by payroll_line_item_id is removed (line-499 is listed twice and the statement has 502 lines);
+  // why_new=paging splits one read into several, each its own snapshot;
+  // seam=@/lib/supabase/server mocked; no_claim=does not recover a line skipped by such a write (a per-period read is the follow-up)
+  it("keeps a line once when a page boundary repeats it", async () => {
+    const first = Array.from({ length: 500 }, (_, index) => row({ line_amount_vnd: 1_000, payroll_line_item_id: `line-${index}` }));
+    const second = [row({ line_amount_vnd: 1_000, payroll_line_item_id: "line-499" }), row({ line_amount_vnd: 2_000, payroll_line_item_id: "line-500" })];
+    supabase.range.mockImplementation(async (from: number) => ({ data: from === 0 ? first : second, error: null }));
+    supabase.rpc.mockImplementation((name: string) => name === "get_payroll_periods_with_details"
+      ? { range: supabase.range }
+      : Promise.resolve({ data: { lines: [], periods: [], statements: [] }, error: null }));
+    supabase.from.mockReturnValue({ select: () => Promise.resolve({ data: [], error: null }) });
+
+    const result = await getPayrollPeriodsWithDetailsResult();
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const ids = result.data[0].statements[0].lines.map((line) => line.id);
+    expect(ids).toHaveLength(501);
+    expect(new Set(ids).size).toBe(501);
   });
 });

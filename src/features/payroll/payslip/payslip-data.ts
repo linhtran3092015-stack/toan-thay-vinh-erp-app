@@ -6,6 +6,7 @@ import {
   formatCurrency,
   formatWorkMinutes,
   getLineFormulaSummary,
+  getLineNote,
   getLineTypeLabel,
 } from "@/features/payroll/payroll-presentation";
 import type {
@@ -18,6 +19,12 @@ import type {
   WorkHoursDetail,
 } from "@/features/payroll/payslip/types";
 import { formatVietnameseCurrencyWords } from "@/features/payroll/payslip/vietnamese-currency-words";
+import {
+  getPayslipDisplayTotals,
+  isNettedIntoIncome,
+  manualAdjustmentLineTypes,
+  summarizePiecework,
+} from "@/features/payroll/payslip-sections";
 import type { PayrollLineRead, PayrollStatementRead } from "@/features/payroll/read-models";
 import {
   payrollPositionLabels,
@@ -253,7 +260,7 @@ function normalizePayslipLine(line: PayrollLineRead): PayslipLineItem {
     id: line.id,
     label: getLineTypeLabel(line.lineType),
     lineType: line.lineType,
-    note: line.note,
+    note: getLineNote(line),
     quantity: line.quantity ?? line.unitCount,
     unitLabel: line.unitLabel,
     unitRateFormatted: line.unitRateVnd ? formatCurrency(line.unitRateVnd) : null,
@@ -409,13 +416,21 @@ export async function getPayslipDocumentData(
     // Graceful fallback to statement snapshot values
   }
 
+  // Manual adjustments and the piecework offset are not deductions to staff;
+  // see payslip-sections.ts.
   const earningLines = currentStatement.lines
-    .filter((l) => l.direction === "earning")
+    .filter((l) => l.direction === "earning" && !manualAdjustmentLineTypes.has(l.lineType))
+    .map(normalizePayslipLine);
+
+  const adjustmentLines = currentStatement.lines
+    .filter((l) => manualAdjustmentLineTypes.has(l.lineType))
     .map(normalizePayslipLine);
 
   const deductionLines = currentStatement.lines
-    .filter((l) => l.direction === "deduction")
+    .filter((l) => l.direction === "deduction" && !isNettedIntoIncome(l))
     .map(normalizePayslipLine);
+
+  const displayTotals = getPayslipDisplayTotals(currentStatement);
 
   const workHoursBreakdown = extractWorkHoursBreakdown(currentStatement.lines);
   const gradingBreakdown = extractGradingBreakdown(currentStatement.lines);
@@ -433,6 +448,7 @@ export async function getPayslipDocumentData(
       grading: gradingBreakdown,
       workHours: workHoursBreakdown,
     },
+    adjustments: adjustmentLines,
     deductions: deductionLines,
     earnings: earningLines,
     employee: {
@@ -461,19 +477,18 @@ export async function getPayslipDocumentData(
       status: period.status,
       statusLabel: getPeriodStatusLabel(period.status),
     },
+    piecework: summarizePiecework(currentStatement.lines),
     statementId: currentStatement.id,
     totals: {
       amountInWords: formatVietnameseCurrencyWords(
         currentStatement.payableAmountVnd,
       ),
-      grossFormatted: formatCurrency(currentStatement.totalEarningsVnd),
-      grossVnd: currentStatement.totalEarningsVnd,
+      grossFormatted: formatCurrency(displayTotals.incomeVnd),
+      grossVnd: displayTotals.incomeVnd,
       netFormatted: formatCurrency(currentStatement.payableAmountVnd),
       netVnd: currentStatement.payableAmountVnd,
-      totalDeductionsFormatted: formatCurrency(
-        currentStatement.totalDeductionsVnd,
-      ),
-      totalDeductionsVnd: currentStatement.totalDeductionsVnd,
+      totalDeductionsFormatted: formatCurrency(displayTotals.deductionsVnd),
+      totalDeductionsVnd: displayTotals.deductionsVnd,
       workHours: currentStatement.workHours,
       workMinutes: currentStatement.workMinutes,
       workUnits: currentStatement.workUnits,

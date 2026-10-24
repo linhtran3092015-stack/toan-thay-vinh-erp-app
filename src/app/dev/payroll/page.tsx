@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const views: PayrollPreviewView[] = ["dashboard", "ledger", "payslip"];
+const views: PayrollPreviewView[] = ["dashboard", "ledger", "payslip", "payslip-piecework"];
 const roles: PayrollPreviewRole[] = ["owner", "accountant", "staff"];
 const states: PayrollPreviewState[] = ["normal", "empty", "errors"];
 
@@ -24,7 +24,8 @@ function first(value: string | string[] | undefined): string | undefined {
 /**
  * Payroll preview mirroring `08-bang-luong.dc.html` (frames 8a, 8b) with
  * fixture data inside the shell.
- * `?view=dashboard|ledger|payslip&role=owner|accountant|staff&state=normal|empty|errors`.
+ * `?view=dashboard|ledger|payslip|payslip-piecework&role=owner|accountant|staff&state=normal|empty|errors`.
+ * `payslip-piecework` is an operations assistant on lương cứng + lương khoán.
  * Inert: the live estimate runs on a fixture transport (no `/api/payroll/*`
  * fetch, no realtime channel) and the payslip PDF action is disabled.
  * Development only: 404 in production.
