@@ -48,25 +48,98 @@ function getExcelColumnKey(columnIndex: number): string {
   return result;
 }
 
+/**
+ * Spellings (regex fragments) standing as whole words on NFC upper-case text: a
+ * letter or digit on either side means part of another word ("THU" in "LÝ THUYẾT",
+ * "SUN" in "BỔ SUNG", "T2" in "T2B"). No lookbehind, so older Safari still parses it.
+ */
+function wholeWord(spellings: readonly string[]): RegExp {
+  return new RegExp(`(?:^|[^\\p{L}\\p{N}])(?:${spellings.join("|")})(?=[^\\p{L}\\p{N}]|$)`, "u");
+}
+
+type WeekdaySpellings = ReadonlyArray<{ iso: number; pattern: RegExp }>;
+
+/** Longest "Thứ" cell read as a weekday ("Thứ 2 (cô Thu, phòng 201)" fits easily). */
+const WEEKDAY_CELL_MAX_LENGTH = 100;
+
+/** Vietnamese day names: when one is in the cell, it decides the day ("Thứ 2 (cô Thu)" is Monday). */
+const VIETNAMESE_DAY_NAMES: WeekdaySpellings = [
+  { iso: 1, pattern: wholeWord(["THỨ ?2", "THỨ HAI"]) },
+  { iso: 2, pattern: wholeWord(["THỨ ?3", "THỨ BA"]) },
+  { iso: 3, pattern: wholeWord(["THỨ ?4", "THỨ TƯ"]) },
+  { iso: 4, pattern: wholeWord(["THỨ ?5", "THỨ NĂM"]) },
+  { iso: 5, pattern: wholeWord(["THỨ ?6", "THỨ SÁU"]) },
+  { iso: 6, pattern: wholeWord(["THỨ ?7", "THỨ BẢY", "THỨ BẨY"]) },
+  { iso: 7, pattern: wholeWord(["CHỦ NHẬT"]) },
+];
+
+/** Short codes: they also name floors, branches or teachers ("tầng T2", "CN Cầu Giấy"). */
+const VIETNAMESE_DAY_CODES: WeekdaySpellings = [
+  { iso: 1, pattern: wholeWord(["T2"]) },
+  { iso: 2, pattern: wholeWord(["T3"]) },
+  { iso: 3, pattern: wholeWord(["T4"]) },
+  { iso: 4, pattern: wholeWord(["T5"]) },
+  { iso: 5, pattern: wholeWord(["T6"]) },
+  { iso: 6, pattern: wholeWord(["T7"]) },
+  { iso: 7, pattern: wholeWord(["CN"]) },
+];
+
+/** English names: "THU" is also a Vietnamese given name, so they never outrank a Vietnamese day name. */
+const ENGLISH_DAY_NAMES: WeekdaySpellings = [
+  { iso: 1, pattern: wholeWord(["MON", "MONDAYS?"]) },
+  { iso: 2, pattern: wholeWord(["TUE", "TUES", "TUESDAYS?"]) },
+  { iso: 3, pattern: wholeWord(["WED", "WEDS", "WEDNESDAYS?"]) },
+  { iso: 4, pattern: wholeWord(["THU", "THUR", "THURS", "THURSDAYS?"]) },
+  { iso: 5, pattern: wholeWord(["FRI", "FRIDAYS?"]) },
+  { iso: 6, pattern: wholeWord(["SAT", "SATURDAYS?"]) },
+  { iso: 7, pattern: wholeWord(["SUN", "SUNDAYS?"]) },
+];
+
+/** The ISO days the spellings name in `text`. */
+function namedDays(text: string, spellings: WeekdaySpellings): Set<number> {
+  return new Set(spellings.filter((day) => day.pattern.test(text)).map((day) => day.iso));
+}
+
+/** The one day in `days`, or null. */
+function onlyDay(days: ReadonlySet<number>): number | null {
+  return days.size === 1 ? [...days][0] : null;
+}
+
+/**
+ * The ISO weekday of a "Thứ" cell, or null when the cell does not name exactly
+ * one day: a fraction, a number outside 1–7, an unknown spelling, or a cell
+ * naming two days ("Thứ 2, Thứ 4") is never rounded or guessed onto a day.
+ * Vietnamese day names and codes decide together; English names count only
+ * without them, and a code that an English name contradicts ("Sat - tầng T2")
+ * leaves the cell unreadable rather than on either day.
+ */
 export function parseWeekdayValue(value: unknown): number | null {
   if (value === null || value === undefined) return null;
 
   if (typeof value === "number") {
-    const intVal = Math.floor(value);
-    return intVal >= 1 && intVal <= 7 ? intVal : null;
+    return Number.isInteger(value) && value >= 1 && value <= 7 ? value : null;
   }
 
   if (typeof value === "string") {
-    const str = value.trim().toUpperCase();
-    if (/^[1-7]$/.test(str)) return parseInt(str, 10);
+    // No weekday cell is this long, even with a note: a notes column mapped as "Thứ" stops here, before any matching.
+    if (value.length > WEEKDAY_CELL_MAX_LENGTH) return null;
+    // NFC first: decomposed Vietnamese ("ư" typed as "u" + combining marks) would otherwise read "THỨ" as English "THU".
+    // Any run of spaces (non-breaking ones pasted from Word, tabs, doubles) counts as one.
+    const str = value.normalize("NFC").replace(/\s+/gu, " ").trim().toUpperCase();
+    // A number typed as text ("3", "03", "3.0") reads as that number would.
+    if (/^\+?\d+(\.\d+)?$/.test(str)) return parseWeekdayValue(Number(str));
 
-    if (str === "T2" || str.includes("THỨ 2") || str.includes("THỨ HAI") || str.includes("MON")) return 1;
-    if (str === "T3" || str.includes("THỨ 3") || str.includes("THỨ BA") || str.includes("TUE")) return 2;
-    if (str === "T4" || str.includes("THỨ 4") || str.includes("THỨ TƯ") || str.includes("WED")) return 3;
-    if (str === "T5" || str.includes("THỨ 5") || str.includes("THỨ NĂM") || str.includes("THU")) return 4;
-    if (str === "T6" || str.includes("THỨ 6") || str.includes("THỨ SÁU") || str.includes("FRI")) return 5;
-    if (str === "T7" || str.includes("THỨ 7") || str.includes("THỨ BẢY") || str.includes("SAT")) return 6;
-    if (str === "CN" || str.includes("CHỦ NHẬT") || str.includes("SUN")) return 7;
+    const names = namedDays(str, VIETNAMESE_DAY_NAMES);
+    const codes = namedDays(str, VIETNAMESE_DAY_CODES);
+    const english = namedDays(str, ENGLISH_DAY_NAMES);
+    const vietnamese = new Set([...names, ...codes]);
+    if (vietnamese.size === 0) return onlyDay(english);
+
+    const day = onlyDay(vietnamese);
+    if (day === null) return null;
+    // Only a code named the day: an English name for another day means the code is something else.
+    if (names.size === 0 && english.size > 0 && (english.size > 1 || !english.has(day))) return null;
+    return day;
   }
 
   return null;
