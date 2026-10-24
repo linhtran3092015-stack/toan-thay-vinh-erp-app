@@ -6,9 +6,12 @@ import Link from "next/link";
 import { Button, getButtonClassName } from "@/components/ui/button";
 
 export function PayslipToolbar({
+  backHref = "/payroll",
   pdfDownloadUrl,
   pdfUnavailableReason,
 }: {
+  /** Where "Quay lại bảng lương" goes; the route keeps the /payroll window and this period in view. */
+  backHref?: string;
   pdfDownloadUrl: string;
   /** When set, the PDF action is disabled and this reason is shown under it. */
   pdfUnavailableReason?: string;
@@ -21,7 +24,7 @@ export function PayslipToolbar({
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border-subtle bg-surface-base px-4 py-3 print:hidden sm:px-6">
       <Link
         className={getButtonClassName({ className: "max-md:h-11", size: "sm", variant: "ghost" })}
-        href="/payroll"
+        href={backHref}
       >
         <ArrowLeft aria-hidden="true" className="h-4 w-4" />
         <span>Quay lại bảng lương</span>

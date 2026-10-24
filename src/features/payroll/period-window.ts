@@ -34,3 +34,26 @@ export function getOlderPayrollPeriodsLink(
   const included = includedPeriodId ? `&period=${encodeURIComponent(includedPeriodId)}` : "";
   return { addedCount, href: `/payroll?periods=${periodCount + addedCount}${included}` };
 }
+
+/** A payslip link that remembers how many periods /payroll was showing. */
+export function getPayslipHref(
+  periodId: string,
+  statementId: string,
+  periodCount: number = RECENT_PAYROLL_PERIOD_COUNT,
+): string {
+  const href = `/payroll/${periodId}/statements/${statementId}/payslip`;
+  return periodCount > RECENT_PAYROLL_PERIOD_COUNT ? `${href}?periods=${periodCount}` : href;
+}
+
+/**
+ * Back from a payslip: the same window, with the payslip's own period loaded
+ * (it may be older than the window, e.g. opened from a Tạm ứng link) and in view.
+ */
+export function getPayrollReturnHref(
+  periodId: string,
+  periodCount: number = RECENT_PAYROLL_PERIOD_COUNT,
+): string {
+  const id = encodeURIComponent(periodId);
+  const periods = periodCount > RECENT_PAYROLL_PERIOD_COUNT ? `periods=${periodCount}&` : "";
+  return `/payroll?${periods}period=${id}#payroll-period-${id}`;
+}
