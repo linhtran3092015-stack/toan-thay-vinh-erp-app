@@ -2,6 +2,7 @@ import { DataTableFrame } from "@/components/patterns/data-table-frame";
 import { PageHeader } from "@/components/patterns/page-header";
 import { ResponsiveRecordList } from "@/components/patterns/responsive-record-list";
 import { Badge } from "@/components/ui/badge";
+import { getButtonClassName } from "@/components/ui/button";
 import { CreatePayrollDraftDialog } from "@/features/payroll/components/create-payroll-draft-dialog";
 import { PayrollCorrectionResolutionDialog } from "@/features/payroll/components/payroll-correction-resolution-dialog";
 import { PayrollImportDecisionDialog } from "@/features/payroll/components/payroll-import-decision-dialog";
@@ -26,6 +27,11 @@ import {
   formatWorkMinutes,
 } from "@/features/payroll/payroll-presentation";
 import { getPayslipDisplayTotals } from "@/features/payroll/payslip-sections";
+import {
+  getOlderPayrollPeriodsLink,
+  MAX_PAYROLL_PERIOD_COUNT,
+  RECENT_PAYROLL_PERIOD_COUNT,
+} from "@/features/payroll/period-window";
 import type {
   PayrollCalculationIssueRead,
   PayrollCorrectionRequestRead,
@@ -52,6 +58,12 @@ interface PayrollPageProps {
   importBatches?: readonly PayrollImportBatchRead[];
   initialEstimate?: StaffPayrollEstimate | null;
   issues?: readonly PayrollCalculationIssueRead[];
+  /** `?period=`: a period shown even outside the recent window; kept when loading older ones. */
+  includedPeriodId?: string | null;
+  /** Visible periods older than `periods`, loaded on request. */
+  olderPeriodCount?: number;
+  /** How many recent periods were asked for (`?periods=`). */
+  periodCount?: number;
   periods: readonly PayrollPeriodRead[];
 }
 
@@ -125,9 +137,13 @@ export function PayrollPage({
   correctionRequests = [],
   importBatches = [],
   initialEstimate,
+  includedPeriodId = null,
   issues = [],
+  olderPeriodCount = 0,
+  periodCount = RECENT_PAYROLL_PERIOD_COUNT,
   periods,
 }: PayrollPageProps) {
+  const olderPeriodsLink = getOlderPayrollPeriodsLink(periodCount, olderPeriodCount, includedPeriodId);
   return (
     <div className="grid min-w-0 gap-6">
       <PageHeader
@@ -243,6 +259,25 @@ export function PayrollPage({
             />
           ))
         )}
+
+        {olderPeriodCount > 0 ? (
+          <div className="mt-4 flex flex-col items-center gap-2 rounded-lg border border-dashed border-border-strong bg-surface-base px-4 py-4 text-center">
+            <p className="text-secondary text-text-muted">
+              {olderPeriodsLink
+                ? `Còn ${olderPeriodCount} kỳ lương cũ hơn chưa hiển thị.`
+                : `Chỉ hiển thị ${MAX_PAYROLL_PERIOD_COUNT} kỳ lương gần nhất; còn ${olderPeriodCount} kỳ cũ hơn.`}
+            </p>
+            {olderPeriodsLink ? (
+              <Link
+                className={getButtonClassName({ className: "max-md:h-11", size: "sm", variant: "secondary" })}
+                href={olderPeriodsLink.href}
+                scroll={false}
+              >
+                Xem thêm {olderPeriodsLink.addedCount} kỳ cũ hơn
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -195,6 +195,47 @@ describe("StaffLiveEstimateCard Component", () => {
     }
   });
 
+  // Value: protects=the home card never shows a negative "Lương khoán" amount: when the offset exceeds the bonuses it read, it warns instead;
+  // fails_when=the card prints piecework.addedVnd for a mismatch (−500.000 VND) or keeps the "Đạt … đã nằm trong lương cứng" sentence;
+  // why_new=summarizePiecework now reports a negative added amount as a mismatch;
+  // seam=fetch stubbed to never resolve so the card keeps the initial estimate; no_claim=does not prove why the estimate lines disagree
+  it("warns instead of showing a negative lương khoán", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
+    try {
+      const monthly = { note: null, policyCode: null, unitLabel: null, unitRateVnd: null, workDate: "2026-09-01", workedMinutes: null };
+      render(
+        <StaffLiveEstimateCard
+          initialEstimate={{
+            ...mockStaffEstimate,
+            lines: [
+              { ...mockStaffEstimate.lines[0], amountVnd: 1_500_000 },
+              { ...monthly, amountVnd: 400_000, direction: "earning", lineType: "operations_grade_renewal_bonus" },
+              { ...monthly, amountVnd: 900_000, direction: "deduction", lineType: "piecework_offset", sourceKind: "piecework_floor" },
+            ],
+            statement: mockStaffEstimate.statement ? {
+              ...mockStaffEstimate.statement,
+              payableVnd: 1_000_000,
+              positionCode: "operations_assistant",
+              totalDeductionsVnd: 900_000,
+              totalEarningsVnd: 1_900_000,
+            } : null,
+          }}
+          month="2026-09-01"
+          today="2026-09-18"
+        />,
+      );
+
+      const table = screen.getByRole("columnheader", { name: "Khoản lương" }).closest("table") as HTMLElement;
+      const row = within(table).getByText("Lương khoán").closest("tr") as HTMLElement;
+      expect(row).toHaveTextContent("Lương khoán tạm tính chưa khớp với phần đã trả trong lương cứng; số liệu sẽ được đối chiếu khi chốt kỳ lương.");
+      expect(row).not.toHaveTextContent("đã nằm trong lương cứng");
+      expect(row.lastElementChild).toHaveTextContent("—");
+    } finally {
+      cleanup();
+      vi.unstubAllGlobals();
+    }
+  });
+
   // Value: protects=on the home card, manual decreases that outweigh increases read as one signed net "Điều chỉnh" row;
   // fails_when=the Điều chỉnh row sums amounts without direction (70.000 VND) or drops the minus sign of a negative net (30.000 VND);
   // why_new=the existing card fixture nets positive (80.000 − 50.000), so the negative branch never renders;
@@ -446,6 +487,46 @@ describe("OwnerLiveEstimateOverview Component", () => {
       for (const key of ["deductions", "income", "payable"] as const) {
         expect(vnd(total[key])).toBe(rows.reduce((sum, row) => sum + vnd(row[key]), 0));
       }
+    } finally {
+      cleanup();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  // Value: protects=the "Chưa phân loại" position row counts the advances of staff without a payroll position, so its Thu nhập and Khấu trừ reconcile to its payable like every other row;
+  // fails_when=advancesByPosition skips statements without positionCode again (the row shows Khấu trừ 0 and Thu nhập equal to the payable);
+  // why_new=the two-position fixture gives every statement a position, so the "__unassigned__" key never received an advance;
+  // seam=fetch stubbed to never resolve so the overview keeps the initial estimate; no_claim=does not prove the RPC groups unassigned staff under "__unassigned__"
+  it("adds advances of staff without a payroll position to the Chưa phân loại row", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
+    try {
+      const unassigned = { advanceDeductionsVnd: 100_000, payableVnd: 400_000, totalDeductionsVnd: 100_000, totalEarningsVnd: 500_000 };
+      render(
+        <OwnerLiveEstimateOverview
+          initialEstimate={{
+            ...mockOwnerEstimate,
+            byPosition: [{ payableVnd: unassigned.payableVnd, positionCode: "__unassigned__", staffCount: 1, totalDeductionsVnd: unassigned.totalDeductionsVnd, totalEarningsVnd: unassigned.totalEarningsVnd }],
+            finance: { status: "restricted" },
+            statements: [{
+              ...unassigned,
+              pendingVerificationCount: 0,
+              positionCode: null,
+              staffDisplayName: "Nhân sự chưa xếp vị trí",
+              staffEmployeeCode: "NV83",
+              staffId: "db57d08d-4cbf-42ba-84e8-20fd52c90583",
+              workHours: 9,
+              workUnits: 1,
+              workedMinutes: 540,
+            }],
+            summary: { ...unassigned, pendingVerificationCount: 0, staffCount: 1 },
+          }}
+          month="2026-08-01"
+        />,
+      );
+
+      const table = screen.getByRole("table", { name: /Tạm tính theo vị trí/ });
+      const row = within(table).getByText("Chưa phân loại").closest("tr") as HTMLElement;
+      expect(row).toHaveTextContent(/500\.000.*−100\.000.*400\.000/);
     } finally {
       cleanup();
       vi.unstubAllGlobals();

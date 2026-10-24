@@ -229,7 +229,7 @@ describe("Advances list redesign", () => {
 
     const links = screen.getAllByRole("link", { name: "Mở kỳ lương 09/2026" });
     expect(links).toHaveLength(2);
-    expect(links[0]).toHaveAttribute("href", "/payroll#payroll-period-period-09");
+    expect(links[0]).toHaveAttribute("href", "/payroll?period=period-09#payroll-period-period-09");
     expect(links[0]).toHaveTextContent("Kỳ lương");
 
     rerender(<AdvanceListPage canApprove={false} canRequest={false} canReview={false} entries={lifecycle()} today={TODAY} />);

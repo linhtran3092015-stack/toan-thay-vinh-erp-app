@@ -82,7 +82,7 @@ describe("/dev/lists advances preview", () => {
     expect(screen.getAllByRole("button", { name: "Phê duyệt" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "Mở kỳ lương 09/2026" })[0]).toHaveAttribute(
       "href",
-      "/payroll#payroll-period-b2000000-0000-4000-8000-000000202609",
+      "/payroll?period=b2000000-0000-4000-8000-000000202609#payroll-period-b2000000-0000-4000-8000-000000202609",
     );
     expect(screen.getAllByText(`1–20 trong ${advancePreviewEntries.length} đơn`)).toHaveLength(2);
     expect(screen.getAllByText("Trạng thái chưa hỗ trợ: cancelled_by_migration")).not.toHaveLength(0);

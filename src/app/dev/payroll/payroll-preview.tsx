@@ -492,7 +492,7 @@ function pieceworkPayslipData(): PayslipDocumentData {
       payslipLine("k5", "payroll_processing_bonus", "Thưởng tính lương nhân sự", 300_000),
     ],
     employee: { ...base.employee, bankAccount: null, displayName: "Phạm Thu Hạnh", employeeCode: "NV03", positionLabel: "Trợ lý vận hành", staffId: staffIds.hanh },
-    piecework: { absorbedVnd: 2_210_000, addedVnd: 490_000, baseSalaryVnd: 2_600_000, earnedVnd: 2_700_000, floorBasisPoints: 8_500, thresholdVnd: 2_210_000 },
+    piecework: { absorbedVnd: 2_210_000, addedVnd: 490_000, baseSalaryVnd: 2_600_000, earnedVnd: 2_700_000, floorBasisPoints: 8_500, kind: "summary", thresholdVnd: 2_210_000 },
     totals: {
       ...base.totals,
       amountInWords: formatVietnameseCurrencyWords(net),

@@ -32,6 +32,7 @@ import {
   getPayslipDisplayTotals,
   getPayslipSection,
   getPieceworkExplanation,
+  PIECEWORK_MISMATCH_MESSAGE,
   PIECEWORK_RULE,
   type PayslipSectionKey,
   signedAmount,
@@ -174,12 +175,13 @@ export function PayrollPayslipDialog({
                 <PayslipGroup
                   canRequestCorrection={canRequestCorrection}
                   description={group.key === "attendance" ? `${formatWorkMinutes(statement.workMinutes)} trong kỳ · Mở từng khoản để xem công theo ngày.` : group.description}
-                  footnote={group.key === "piecework" && piecework ? getPieceworkExplanation(piecework) : null}
+                  footnote={group.key === "piecework" && piecework?.kind === "summary" ? getPieceworkExplanation(piecework) : null}
                   key={group.key}
                   lines={lines}
                   payrollStatementId={statement.id}
                   perLine={group.key === "manual"}
                   title={group.title}
+                  warning={group.key === "piecework" && piecework?.kind === "mismatch" ? PIECEWORK_MISMATCH_MESSAGE : null}
                 />
               );
             })}
@@ -238,6 +240,7 @@ function PayslipGroup({
   payrollStatementId,
   perLine = false,
   title,
+  warning = null,
 }: {
   canRequestCorrection: boolean;
   description: string;
@@ -247,6 +250,8 @@ function PayslipGroup({
   /** One row per line with its note visible (manager corrections each carry their own reason). */
   perLine?: boolean;
   title: string;
+  /** A data problem in this group: shown above the lines, and the group total is withheld. */
+  warning?: string | null;
 }) {
   const groups = perLine
     ? lines.map((line) => ({ amountVnd: line.amountVnd, direction: line.direction, key: line.id, lineType: line.lineType, lines: [line] }))
@@ -256,8 +261,9 @@ function PayslipGroup({
     <section aria-label={title} className="overflow-hidden rounded-2xl border border-border-subtle bg-surface-base">
       <div className="flex items-start justify-between gap-4 border-b border-border-subtle bg-surface-raised px-4 py-4">
         <div><h3 className="font-semibold text-text-strong">{title}</h3><p className="mt-1 text-caption text-text-muted">{description}</p></div>
-        <span aria-label={`Tổng ${title}`} className="shrink-0 text-base font-bold tabular-nums text-text-strong sm:text-lg">{formatSignedCurrency(total)}</span>
+        <span aria-label={`Tổng ${title}`} className="shrink-0 text-base font-bold tabular-nums text-text-strong sm:text-lg">{warning ? "—" : formatSignedCurrency(total)}</span>
       </div>
+      {warning ? <p className="border-b border-warning-border bg-warning-bg px-4 py-2.5 text-secondary text-warning-ink">{warning}</p> : null}
       {groups.length === 0 ? <p className="px-4 py-4 text-secondary text-text-muted">Không phát sinh hạng mục trong nhóm này.</p> : groups.map((group) => (
         <details key={group.key} className="group/line border-b border-border-subtle last:border-b-0">
           <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring [&::-webkit-details-marker]:hidden">

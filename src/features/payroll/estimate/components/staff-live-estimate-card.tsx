@@ -21,6 +21,7 @@ import {
   getPayslipDisplayTotals,
   getPayslipSection,
   manualAdjustmentLineTypes,
+  PIECEWORK_ESTIMATE_MISMATCH_MESSAGE,
   PIECEWORK_RULE,
   signedAmount,
   summarizePiecework,
@@ -262,16 +263,22 @@ export function StaffLiveEstimateCard({
                   <td className="py-2.5 font-medium text-text-strong">Lương khoán</td>
                   <td className="py-2.5 text-text-muted">
                     {pieceworkLabels.join(", ")}
-                    <span className="block">
-                      Đạt {formatCurrency(piecework.earnedVnd)}; {formatCurrency(piecework.absorbedVnd)} đã nằm trong lương cứng
-                    </span>
-                    <span className="block text-caption text-text-muted">
-                      {PIECEWORK_RULE} Không phải khoản bị trừ.
-                    </span>
+                    {piecework.kind === "summary" ? (
+                      <>
+                        <span className="block">
+                          Đạt {formatCurrency(piecework.earnedVnd)}; {formatCurrency(piecework.absorbedVnd)} đã nằm trong lương cứng
+                        </span>
+                        <span className="block text-caption text-text-muted">
+                          {PIECEWORK_RULE} Không phải khoản bị trừ.
+                        </span>
+                      </>
+                    ) : (
+                      <span className="block text-warning">{PIECEWORK_ESTIMATE_MISMATCH_MESSAGE}</span>
+                    )}
                     {gradingCaveat}
                   </td>
                   <td className="py-2.5 text-right font-medium text-text-strong tabular-nums">
-                    {formatCurrency(piecework.addedVnd)}
+                    {piecework.kind === "summary" ? formatCurrency(piecework.addedVnd) : "—"}
                   </td>
                 </tr>
               ) : null}

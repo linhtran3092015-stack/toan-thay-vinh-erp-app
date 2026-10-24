@@ -163,7 +163,7 @@ describe("Payslip card (8b)", () => {
             line("e1", "base_offline", "Lương công offline", 1_500_000),
             line("e2", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 900_000),
           ],
-          piecework: { absorbedVnd: 900_000, addedVnd: 0, baseSalaryVnd: 1_500_000, earnedVnd: 900_000, floorBasisPoints: 8_500, thresholdVnd: 1_275_000 },
+          piecework: { absorbedVnd: 900_000, addedVnd: 0, baseSalaryVnd: 1_500_000, earnedVnd: 900_000, floorBasisPoints: 8_500, kind: "summary", thresholdVnd: 1_275_000 },
           totals: { ...data.totals, grossFormatted: "1.530.000 VND", grossVnd: 1_530_000, netFormatted: "1.530.000 VND", netVnd: 1_530_000, totalDeductionsFormatted: "0 VND", totalDeductionsVnd: 0 },
         }}
       />,
@@ -203,7 +203,7 @@ describe("Payslip card (8b)", () => {
             line("k4", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 1_075_000),
             line("k5", "payroll_processing_bonus", "Thưởng tính lương nhân sự", 525_000),
           ],
-          piecework: { absorbedVnd: 2_040_000, addedVnd: 760_000, baseSalaryVnd: 2_400_000, earnedVnd: 2_800_000, floorBasisPoints: 8_500, thresholdVnd: 2_040_000 },
+          piecework: { absorbedVnd: 2_040_000, addedVnd: 760_000, baseSalaryVnd: 2_400_000, earnedVnd: 2_800_000, floorBasisPoints: 8_500, kind: "summary", thresholdVnd: 2_040_000 },
           totals: { ...data.totals, grossFormatted: "3.160.000 VND", grossVnd: 3_160_000, netFormatted: "3.160.000 VND", netVnd: 3_160_000, totalDeductionsFormatted: "0 VND", totalDeductionsVnd: 0 },
         }}
       />,
@@ -232,7 +232,7 @@ describe("Payslip card (8b)", () => {
             line("g2", "grading_bonus", "Thưởng chấm bài", 244_660),
             line("g3", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 700_000),
           ],
-          piecework: { absorbedVnd: 900_000, addedVnd: 0, baseSalaryVnd: 1_500_000, earnedVnd: 900_000, floorBasisPoints: 8_500, thresholdVnd: 1_275_000 },
+          piecework: { absorbedVnd: 900_000, addedVnd: 0, baseSalaryVnd: 1_500_000, earnedVnd: 900_000, floorBasisPoints: 8_500, kind: "summary", thresholdVnd: 1_275_000 },
         }}
       />,
     );

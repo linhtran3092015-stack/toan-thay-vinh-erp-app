@@ -1,268 +1,221 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getPayrollPeriodsWithDetailsResult } from "@/features/payroll/data";
 import {
-  normalizePayrollPeriodsWithDetailsRows,
-  type PayrollPeriodsWithDetailsRow,
+  getPayrollStatementDetailsResult,
+  getRecentPayrollPeriodsResult,
+} from "@/features/payroll/data";
+import {
+  findUnreconciledStatementIds,
+  parsePayrollPeriodDetails,
 } from "@/features/payroll/read-models";
 
-const supabase = vi.hoisted(() => ({ from: vi.fn(), range: vi.fn(), rpc: vi.fn() }));
+const supabase = vi.hoisted(() => ({ rpc: vi.fn() }));
 
 vi.mock("@/lib/supabase/server", () => ({
-  createSupabaseServerClient: vi.fn(async () => ({ from: supabase.from, rpc: supabase.rpc })),
+  createSupabaseServerClient: vi.fn(async () => ({ rpc: supabase.rpc })),
 }));
 
-function row(
-  overrides: Partial<PayrollPeriodsWithDetailsRow>,
-): PayrollPeriodsWithDetailsRow {
+afterEach(() => {
+  vi.clearAllMocks();
+  vi.restoreAllMocks();
+});
+
+type Payload = ReturnType<typeof payload>;
+
+function line(overrides: Record<string, unknown> = {}) {
   return {
-    line_amount_vnd: 100,
-    line_direction: "earning",
-    line_type: "manual_reward",
+    amountVnd: 1_000_000,
+    direction: "earning",
+    evidenceSnapshot: {},
+    formulaSnapshot: {},
+    id: "line-1",
+    lineType: "manual_reward",
     note: "Stored note",
-    pay_date: "2026-05-28",
-    payable_amount_vnd: 777,
-    payroll_line_item_id: "line-1",
-    payroll_period_id: "period-1",
-    payroll_statement_id: "statement-1",
-    period_month: "2026-04-01",
-    period_status: "review",
-    staff_display_name: "Mina Ordinary",
-    staff_employee_code: "EMP-ORD",
-    staff_id: "staff-1",
-    total_deductions_vnd: 111,
-    total_earnings_vnd: 888,
-    unit_count: null,
-    unit_rate_vnd: null,
-    work_hours: 18,
-    work_units: 2,
+    policyCode: null,
+    quantity: null,
+    sourceKind: null,
+    unitCount: null,
+    unitLabel: null,
+    unitRateVnd: null,
+    workMinutes: null,
     ...overrides,
   };
 }
 
-describe("normalizePayrollPeriodsWithDetailsRows", () => {
-  it("keeps an authoritative zero-statement period without a placeholder statement", () => {
-    expect(
-      normalizePayrollPeriodsWithDetailsRows([
-        row({
-          line_amount_vnd: null,
-          line_direction: null,
-          line_type: null,
-          note: null,
-          payable_amount_vnd: null,
-          payroll_line_item_id: null,
-          payroll_period_id: "empty-period",
-          payroll_statement_id: null,
-          period_month: "2026-05-01",
-          period_status: "draft",
-          staff_display_name: null,
-          staff_employee_code: null,
-          staff_id: null,
-          total_deductions_vnd: null,
-          total_earnings_vnd: null,
-          work_hours: null,
-          work_units: null,
-        }),
-      ]),
-    ).toMatchObject([
-      {
-        id: "empty-period",
-        payDate: "2026-05-28",
-        periodMonth: "2026-05-01",
-        status: "draft",
-        statements: [],
-      },
-    ]);
-  });
-
-  it("groups flattened lines without recalculating stored statement totals", () => {
-    const result = normalizePayrollPeriodsWithDetailsRows([
-      row({
-        line_amount_vnd: null,
-        line_direction: null,
-        line_type: null,
-        note: null,
-        payroll_line_item_id: null,
-      }),
-      row({
-        line_amount_vnd: 100,
-        payroll_line_item_id: "line-1",
-      }),
-      row({
-        line_amount_vnd: 50,
-        line_direction: "deduction",
-        line_type: "manual_deduction",
-        note: "Stored deduction",
-        payroll_line_item_id: "line-2",
-      }),
-    ]);
-
-    expect(result).toMatchObject([
-      {
-        id: "period-1",
-        payDate: "2026-05-28",
-        periodMonth: "2026-04-01",
-        status: "review",
-        statements: [
-          {
-            id: "statement-1",
-            lines: [
-              {
-                amountVnd: 100,
-                direction: "earning",
-                id: "line-1",
-                lineType: "manual_reward",
-                note: "Stored note",
-                payrollStatementId: "statement-1",
-                unitCount: null,
-                unitRateVnd: null,
-              },
-              {
-                amountVnd: 50,
-                direction: "deduction",
-                id: "line-2",
-                lineType: "manual_deduction",
-                note: "Stored deduction",
-                payrollStatementId: "statement-1",
-                unitCount: null,
-                unitRateVnd: null,
-              },
-            ],
-            payableAmountVnd: 777,
-            payrollPeriodId: "period-1",
-            staffDisplayName: "Mina Ordinary",
-            staffEmployeeCode: "EMP-ORD",
-            staffId: "staff-1",
-            totalDeductionsVnd: 111,
-            totalEarningsVnd: 888,
-            workHours: 18,
-            workUnits: 2,
-          },
+/** One period, one statement: 1.000.000 earning − 100.000 deduction = 900.000 (fictional). */
+function payload() {
+  return {
+    olderPeriodCount: 0,
+    periods: [{
+      blockingIssueCount: 0,
+      currentRevision: 2 as number | null,
+      feedbackClosedAt: null,
+      feedbackOpenedAt: "2026-05-28T00:00:00+00:00",
+      id: "period-1",
+      lastCalculatedAt: "2026-05-28T00:00:00+00:00",
+      paidAt: null,
+      paidOn: null,
+      payDate: "2026-05-28",
+      paymentReference: null,
+      pendingCorrectionCount: 0,
+      periodMonth: "2026-04-01",
+      statements: [{
+        id: "statement-1",
+        lines: [
+          line(),
+          line({ amountVnd: 100_000, direction: "deduction", id: "line-2", lineType: "manual_deduction" }),
         ],
-      },
+        payableAmountVnd: 900_000,
+        payrollPeriodId: "period-1",
+        staffDisplayName: "Mina Ordinary",
+        staffEmployeeCode: "EMP-ORD",
+        staffId: "staff-1",
+        totalDeductionsVnd: 100_000,
+        totalEarningsVnd: 1_000_000,
+        workHours: 18,
+        workMinutes: 1_080,
+        workUnits: 2,
+      }],
+      status: "review",
+    }],
+    staleStatement: null as { currentStatementId: string | null } | null,
+  };
+}
+
+/** The same payload with the deduction line missing, as a cut read would return it. */
+function payloadMissingALine(): Payload {
+  const value = payload();
+  value.periods[0].statements[0].lines = value.periods[0].statements[0].lines.slice(0, 1);
+  return value;
+}
+
+describe("parsePayrollPeriodDetails", () => {
+  it("maps the RPC payload to period reads and tags each line with its statement", () => {
+    const details = parsePayrollPeriodDetails(payload());
+
+    expect(details.olderPeriodCount).toBe(0);
+    expect(details.staleStatement).toBeNull();
+    expect(details.periods[0]).toMatchObject({
+      currentRevision: 2,
+      id: "period-1",
+      paidAt: null,
+      periodMonth: "2026-04-01",
+      status: "review",
+    });
+    expect(details.periods[0].statements[0].lines.map((entry) => [entry.id, entry.payrollStatementId])).toEqual([
+      ["line-1", "statement-1"],
+      ["line-2", "statement-1"],
     ]);
   });
 
-  it("preserves server ordering across periods while retaining zero-line statements", () => {
-    const result = normalizePayrollPeriodsWithDetailsRows([
-      row({
-        line_amount_vnd: 600,
-        payroll_line_item_id: "period-a-line-1",
-        payroll_period_id: "period-a",
-        payroll_statement_id: "period-a-statement",
-        period_month: "2026-06-01",
-        period_status: "approved",
-        total_deductions_vnd: 200,
-        total_earnings_vnd: 1_000,
-        payable_amount_vnd: 800,
-      }),
-      row({
-        line_amount_vnd: 400,
-        line_type: "hourly_wage",
-        payroll_line_item_id: "period-a-line-2",
-        payroll_period_id: "period-a",
-        payroll_statement_id: "period-a-statement",
-        period_month: "2026-06-01",
-        period_status: "approved",
-        total_deductions_vnd: 200,
-        total_earnings_vnd: 1_000,
-        payable_amount_vnd: 800,
-      }),
-      row({
-        line_amount_vnd: null,
-        line_direction: null,
-        line_type: null,
-        note: null,
-        payroll_line_item_id: null,
-        payroll_period_id: "period-b",
-        payroll_statement_id: "period-b-statement",
-        period_month: "2026-05-01",
-        period_status: "review",
-        staff_display_name: "Bao Viewer",
-        total_deductions_vnd: 17,
-        total_earnings_vnd: 101,
-        payable_amount_vnd: 84,
-        work_hours: 9,
-        work_units: 1,
-      }),
-    ]);
+  it("shows a period without a calculation run as the first revision", () => {
+    const value = payload();
+    value.periods[0].currentRevision = null;
+    value.periods[0].statements = [];
 
-    expect(result).toHaveLength(2);
-    expect(result.map((period) => [period.id, period.status])).toEqual([
-      ["period-a", "approved"],
-      ["period-b", "review"],
-    ]);
+    expect(parsePayrollPeriodDetails(value).periods[0].currentRevision).toBe(1);
+  });
 
-    const [periodA, periodB] = result;
-    expect(periodA.statements).toHaveLength(1);
-    expect(periodA.statements[0]).toMatchObject({
-      id: "period-a-statement",
-      totalDeductionsVnd: 200,
-      totalEarningsVnd: 1_000,
-      payableAmountVnd: 800,
-    });
-    expect(periodA.statements[0].lines.map((line) => line.id)).toEqual([
-      "period-a-line-1",
-      "period-a-line-2",
-    ]);
-
-    expect(periodB.statements).toEqual([
-      expect.objectContaining({
-        id: "period-b-statement",
-        lines: [],
-        totalDeductionsVnd: 17,
-        totalEarningsVnd: 101,
-        payableAmountVnd: 84,
-      }),
-    ]);
+  it("rejects a payload that breaks the contract", () => {
+    expect(() => parsePayrollPeriodDetails({ periods: [] })).toThrow("PAYROLL_PERIOD_DETAILS_INVALID");
   });
 });
 
-describe("getPayrollPeriodsWithDetailsResult", () => {
-  // Value: protects=the payroll page reads every line of the details RPC past PostgREST's max_rows, so payslip totals summed from lines (display income, Khấu trừ, Lương khoán) are not cut short;
-  // fails_when=the loader goes back to one un-ranged rpc call (the mocked builder is not a result, so the read fails closed) or stops after the first full 500-row page (the statement keeps 500 of 502 lines), or asks overlapping ranges;
-  // why_new=payslip totals are now summed from lines, and no test exercised this loader (payroll-route mocks it whole);
-  // seam=createSupabaseServerClient mocked: the details RPC returns a range builder, the explanations RPC and the payroll_periods payment read return empty results; no_claim=does not prove max_rows on prod or that the RPC's ORDER BY keeps pages from overlapping
-  it("reads every page of the details RPC", async () => {
-    const pages = [
-      Array.from({ length: 500 }, (_, index) => row({ line_amount_vnd: 1_000, payroll_line_item_id: `line-${index}` })),
-      [row({ line_amount_vnd: 2_000, payroll_line_item_id: "line-500" }), row({ line_amount_vnd: 3_000, payroll_line_item_id: "line-501" })],
-    ];
-    supabase.range.mockImplementation(async (from: number) => ({ data: pages[from / 500] ?? [], error: null }));
-    supabase.rpc.mockImplementation((name: string) => name === "get_payroll_periods_with_details"
-      ? { range: supabase.range }
-      : Promise.resolve({ data: { lines: [], periods: [], statements: [] }, error: null }));
-    supabase.from.mockReturnValue({ select: () => Promise.resolve({ data: [], error: null }) });
-
-    const result = await getPayrollPeriodsWithDetailsResult();
-
-    expect(supabase.range.mock.calls).toEqual([[0, 499], [500, 999]]);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    const lines = result.data[0].statements[0].lines;
-    expect(lines).toHaveLength(502);
-    expect(lines.slice(-2).map((line) => [line.id, line.amountVnd])).toEqual([["line-500", 2_000], ["line-501", 3_000]]);
+describe("findUnreconciledStatementIds", () => {
+  it("accepts a statement whose lines add up to its totals", () => {
+    expect(findUnreconciledStatementIds(parsePayrollPeriodDetails(payload()).periods)).toEqual([]);
   });
 
-  // Value: protects=a line that a write between two page requests pushes onto the next page as well is kept once, so line-derived payslip totals are not doubled;
-  // fails_when=the dedupe by payroll_line_item_id is removed (line-499 is listed twice and the statement has 502 lines);
-  // why_new=paging splits one read into several, each its own snapshot;
-  // seam=@/lib/supabase/server mocked; no_claim=does not recover a line skipped by such a write (a per-period read is the follow-up)
-  it("keeps a line once when a page boundary repeats it", async () => {
-    const first = Array.from({ length: 500 }, (_, index) => row({ line_amount_vnd: 1_000, payroll_line_item_id: `line-${index}` }));
-    const second = [row({ line_amount_vnd: 1_000, payroll_line_item_id: "line-499" }), row({ line_amount_vnd: 2_000, payroll_line_item_id: "line-500" })];
-    supabase.range.mockImplementation(async (from: number) => ({ data: from === 0 ? first : second, error: null }));
-    supabase.rpc.mockImplementation((name: string) => name === "get_payroll_periods_with_details"
-      ? { range: supabase.range }
-      : Promise.resolve({ data: { lines: [], periods: [], statements: [] }, error: null }));
-    supabase.from.mockReturnValue({ select: () => Promise.resolve({ data: [], error: null }) });
+  it("flags a missing deduction line, a missing earning line and a payable that does not follow", () => {
+    const missingEarning = payload();
+    missingEarning.periods[0].statements[0].lines = missingEarning.periods[0].statements[0].lines.slice(1);
+    const wrongPayable = payload();
+    wrongPayable.periods[0].statements[0].payableAmountVnd = 1_000_000;
 
-    const result = await getPayrollPeriodsWithDetailsResult();
+    expect(findUnreconciledStatementIds(parsePayrollPeriodDetails(payloadMissingALine()).periods)).toEqual(["statement-1"]);
+    expect(findUnreconciledStatementIds(parsePayrollPeriodDetails(missingEarning).periods)).toEqual(["statement-1"]);
+    expect(findUnreconciledStatementIds(parsePayrollPeriodDetails(wrongPayable).periods)).toEqual(["statement-1"]);
+  });
+});
 
+describe("getPayrollStatementDetailsResult", () => {
+  // Value: protects=the payslip page and PDF read one statement in one call, not every period's lines page by page;
+  // fails_when=the loader drops the period/statement arguments, pages the read, or calls the RPC more than once for a reconciled read;
+  // why_new=v0.39 paged the whole history through get_payroll_periods_with_details;
+  // seam=createSupabaseServerClient mocked; no_claim=does not prove the RPC filters by these arguments (pgTAP payroll-period-details does)
+  it("reads the one statement in a single call", async () => {
+    supabase.rpc.mockResolvedValue({ data: payload(), error: null });
+
+    const result = await getPayrollStatementDetailsResult("period-1", "statement-1");
+
+    expect(supabase.rpc.mock.calls).toEqual([[
+      "get_payroll_period_details",
+      { p_payroll_period_id: "period-1", p_payroll_statement_id: "statement-1" },
+    ]]);
+    expect(result.ok).toBe(true);
+  });
+
+  // Value: protects=a read whose lines do not add up to the statement totals is retried once, and the second, reconciled read is used;
+  // fails_when=the loader returns the first, unreconciled read (a payslip with a missing line) or fails without retrying;
+  // why_new=reconciliation after the read is new in this change;
+  // seam=createSupabaseServerClient mocked; no_claim=does not prove why a real read would disagree (one RPC call is one snapshot)
+  it("reads again once when the lines do not reconcile", async () => {
+    supabase.rpc
+      .mockResolvedValueOnce({ data: payloadMissingALine(), error: null })
+      .mockResolvedValueOnce({ data: payload(), error: null });
+
+    const result = await getPayrollStatementDetailsResult("period-1", "statement-1");
+
+    expect(supabase.rpc).toHaveBeenCalledTimes(2);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const ids = result.data[0].statements[0].lines.map((line) => line.id);
-    expect(ids).toHaveLength(501);
-    expect(new Set(ids).size).toBe(501);
+    expect(result.data.periods[0].statements[0].lines).toHaveLength(2);
+  });
+
+  // Value: protects=a statement that still does not reconcile on the second read fails closed instead of rendering totals its lines do not explain;
+  // fails_when=the loader returns data after two mismatches, retries more than once, or reports the failure as a plain read error;
+  // why_new=reconciliation after the read is new in this change;
+  // seam=createSupabaseServerClient mocked, console.error silenced; no_claim=does not check the server log format beyond the statement id
+  it("fails closed after two reads that do not reconcile", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    supabase.rpc.mockResolvedValue({ data: payloadMissingALine(), error: null });
+
+    const result = await getPayrollStatementDetailsResult("period-1", "statement-1");
+
+    expect(supabase.rpc).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ ok: false, reason: "unreconciled" });
+    expect(log).toHaveBeenCalledWith("PAYROLL_DETAILS_UNRECONCILED", "statement-1");
+  });
+
+  it("reports an RPC error or an invalid payload as unavailable", async () => {
+    supabase.rpc.mockResolvedValueOnce({ data: null, error: { message: "PAYROLL_VIEW_PERMISSION_REQUIRED" } });
+    expect(await getPayrollStatementDetailsResult("period-1", "statement-1")).toEqual({ ok: false, reason: "unavailable" });
+
+    supabase.rpc.mockResolvedValueOnce({ data: { periods: "nope" }, error: null });
+    expect(await getPayrollStatementDetailsResult("period-1", "statement-1")).toEqual({ ok: false, reason: "unavailable" });
+  });
+});
+
+describe("getRecentPayrollPeriodsResult", () => {
+  // Value: protects=/payroll asks for a bounded number of recent periods instead of the whole history;
+  // fails_when=the limit is not passed, or a value outside 1–60 reaches the RPC (which would raise);
+  // why_new=/payroll loaded every period before this change;
+  // seam=createSupabaseServerClient mocked; no_claim=does not prove the RPC returns the newest periods (pgTAP does)
+  it("passes a limit within the RPC's range", async () => {
+    supabase.rpc.mockResolvedValue({ data: { ...payload(), olderPeriodCount: 4 }, error: null });
+
+    const recent = await getRecentPayrollPeriodsResult(3);
+    await getRecentPayrollPeriodsResult(500);
+    await getRecentPayrollPeriodsResult(0);
+
+    await getRecentPayrollPeriodsResult(6, "period-9");
+
+    expect(supabase.rpc.mock.calls.map(([, args]) => args)).toEqual([
+      { p_period_limit: 3 },
+      { p_period_limit: 60 },
+      { p_period_limit: 3 },
+      { p_include_payroll_period_id: "period-9", p_period_limit: 6 },
+    ]);
+    expect(recent.ok && recent.data.olderPeriodCount).toBe(4);
   });
 });
