@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { PARENT_MESSAGE_MAX_CHARS, planMessageParts } from "@/features/parent-messages/comment-template";
+import { MAX_BULK_ZALO_LINKS } from "@/features/parent-messages/zalo-group-matching";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -242,6 +243,69 @@ export async function linkStudentZaloGroupAction(input: {
   return { message: "Đã liên kết nhóm sổ liên lạc.", ok: true };
 }
 
+export type BulkZaloLinkResult =
+  | { ok: true; results: { message: string; ok: boolean; studentId: string }[] }
+  | { message: string; ok: false };
+
+/** Parallel link RPCs per call (each is one round trip to Supabase). */
+const BULK_LINK_CONCURRENCY = 5;
+
+const bulkLinkSchema = z
+  .array(
+    z.object({
+      groupName: z.string().trim().max(200).nullable(),
+      studentId: z.string().uuid(),
+      threadId: z.string().trim().min(1).max(120),
+      zaloAccountId: z.string().trim().min(1).max(120),
+    }),
+  )
+  .min(1)
+  .max(MAX_BULK_ZALO_LINKS);
+
+/**
+ * Bulk link page: saves the groups staff confirmed, one link RPC per student
+ * (each audited on its own). A row that fails (group taken meanwhile) does not
+ * stop the others; the page shows the per-row result.
+ */
+export async function linkStudentZaloGroupsAction(input: {
+  links: { groupName: string | null; studentId: string; threadId: string; zaloAccountId: string }[];
+}): Promise<BulkZaloLinkResult> {
+  const denied = await requirePermission("students.update");
+  if (denied) return { message: denied, ok: false };
+  const parsed = bulkLinkSchema.safeParse(input.links);
+  if (!parsed.success) return { message: "Danh sách liên kết không hợp lệ.", ok: false };
+  const links = parsed.data;
+  if (new Set(links.map((link) => link.threadId)).size !== links.length) {
+    return { message: "Một nhóm Zalo chỉ liên kết được với một học sinh. Bỏ chọn nhóm bị trùng rồi thử lại.", ok: false };
+  }
+  if (new Set(links.map((link) => link.studentId)).size !== links.length) {
+    return { message: "Mỗi học sinh chỉ chọn một nhóm.", ok: false };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const results: { message: string; ok: boolean; studentId: string }[] = [];
+  for (let index = 0; index < links.length; index += BULK_LINK_CONCURRENCY) {
+    const slice = links.slice(index, index + BULK_LINK_CONCURRENCY);
+    results.push(
+      ...(await Promise.all(
+        slice.map(async (link) => {
+          const { error } = await supabase.rpc("link_student_zalo_group", {
+            p_group_name: link.groupName ?? "",
+            p_student_id: link.studentId,
+            p_thread_id: link.threadId,
+            p_zalo_account_id: link.zaloAccountId,
+          });
+          return error
+            ? { message: rpcErrorMessage(error), ok: false, studentId: link.studentId }
+            : { message: "Đã liên kết.", ok: true, studentId: link.studentId };
+        }),
+      )),
+    );
+  }
+  revalidatePath("/parent-messages/groups");
+  return { ok: true, results };
+}
+
 export async function unlinkStudentZaloGroupAction(input: { reason: string; studentId: string }): Promise<ParentMessageActionResult> {
   const denied = await requirePermission("students.update");
   if (denied) return { message: denied, ok: false };
@@ -261,6 +325,8 @@ export type ZaloLinkCheckResult =
 
 /** Re-reads the group by its stable thread id (current name, whether the nick is still a member). */
 export async function checkStudentZaloGroupAction(input: { threadId: string; zaloAccountId: string }): Promise<ZaloLinkCheckResult> {
+  const denied = await requirePermission("students.update");
+  if (denied) return { message: denied, ok: false };
   const result = await getZaloGroupByThread(input.threadId, input.zaloAccountId);
   if (!result.ok) return { message: result.error, ok: false };
   if (!result.data) return { accountStatus: null, groupName: null, membersCount: null, ok: true, present: false };
