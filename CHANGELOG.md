@@ -2,6 +2,27 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.39.1.0] - 2026-10-24
+
+ERP phản hồi nhanh hơn: máy chủ ứng dụng chuyển sang Singapore, ngay cạnh cơ sở dữ liệu, nên mỗi lần đọc hoặc ghi dữ liệu không còn phải đi vòng sang Mỹ. Điểm danh từng học sinh và chuyển giữa các mục đều nhanh hơn.
+
+### Changed
+- Máy chủ ứng dụng chạy ở Singapore thay vì Washington (Mỹ). Trước đây mỗi lượt đọc/ghi dữ liệu mất khoảng 0,2 giây chỉ để đi đường, và một lần điểm danh cần hàng chục lượt như vậy.
+- Điểm danh một chạm, sửa điểm danh, thêm học viên học thêm và nhập kết quả cuối buổi: mỗi lần lưu chỉ tải lại trang buổi học một lần thay vì hai lần.
+- "Có mặt cho tất cả" lưu từng học sinh mà không tải lại trang sau mỗi bạn; xong mới làm mới trang buổi học và danh sách buổi học một lần.
+- Trang buổi học tải thông tin buổi, danh sách lớp, điểm danh, kết quả và các khung bên cạnh cùng lúc thay vì lần lượt; kiểm tra đăng nhập và quyền cũng chạy song song.
+
+### Fixed
+- Thêm học viên học thêm lúc mất kết nối không còn làm cả trang buổi học chuyển sang trang lỗi; lỗi hiện ngay trong ô Học thêm và giữ nguyên lựa chọn.
+- Khi "Có mặt cho tất cả" đã lưu xong nhưng trang không làm mới được (mất mạng), thông báo nói rõ cần tải lại trang để xem điểm danh mới.
+
+### For contributors
+- `vercel.json` mới: `"regions": ["sin1"]`. Sau deploy, header `x-vercel-id` phải có `::sin1::`.
+- `markSessionAttendanceAction` nhận `deferRefresh` (chỉ lưu hàng loạt dùng); server action mới `refreshSessionAttendanceAction(classSessionId)` kiểm tra `attendance.mark` rồi revalidate `/sessions` và `/sessions/{id}`. Lỗi mạng khi gọi nó không kéo theo `router.refresh()`, vì Next biến một lần làm mới không tới được máy chủ thành tải lại toàn trang.
+- Bỏ `router.refresh()` sau các action đã `revalidatePath` trong điểm danh và kết quả buổi học.
+- `getSessionDetail`, trang `/sessions/[sessionId]` và `getDatabasePermissions` (getUser song song với `get_my_permissions`, quyền chỉ được dùng sau khi getUser xác thực) chạy truy vấn bằng `Promise.all`.
+- Test mới `tests/unit/database-permissions.test.ts`, `tests/unit/session-result-actions-refresh.test.ts`; mở rộng test điểm danh, chi tiết buổi học và route buổi học.
+
 ## [0.38.1.0] - 2026-10-24
 
 Chấm bài AI: học sinh ghi chung một giá trị cho nhiều ẩn (ví dụ `a và b=0`) được hiểu là mọi ẩn bằng giá trị đó, và bài vẫn đánh vàng để trợ giảng xem (prompt `grade-v4`).
