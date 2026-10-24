@@ -92,6 +92,7 @@ describe("PayslipPageRoute", () => {
         periodId: "period-uuid-1",
         statementId: "stmt-uuid-1",
       }),
+      searchParams: Promise.resolve({}),
     });
 
     render(page);
@@ -102,6 +103,36 @@ describe("PayslipPageRoute", () => {
     expect(screen.getAllByText("Trần Văn Linh").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("NV17")).toBeInTheDocument();
     expect(screen.getByText("Quay lại bảng lương")).toBeInTheDocument();
+  });
+
+  // Value: protects="Quay lại bảng lương" returns to the /payroll window the payslip was opened from, with the payslip's period loaded and in view;
+  // fails_when=the back link goes to bare /payroll (an older period opened via "Xem thêm" or a Tạm ứng link disappears), drops ?periods=, or the stale redirect loses it;
+  // why_new=/payroll now shows only recent and open periods, so a bare /payroll can hide the period the user came from;
+  // seam=getPayslipDocumentData and redirect mocked; no_claim=does not prove the browser scrolls to the anchor
+  it("returns to the same /payroll window and keeps it across a stale redirect", async () => {
+    mockGetPayslipDocumentData.mockResolvedValueOnce({ data: mockDocData, ok: true });
+
+    render(await PayslipPageRoute({
+      params: Promise.resolve({ periodId: "period-uuid-1", statementId: "stmt-uuid-1" }),
+      searchParams: Promise.resolve({ periods: "9" }),
+    }));
+
+    expect(screen.getByRole("link", { name: "Quay lại bảng lương" })).toHaveAttribute(
+      "href",
+      "/payroll?periods=9&period=period-uuid-1#payroll-period-period-uuid-1",
+    );
+
+    mockGetPayslipDocumentData.mockResolvedValueOnce({
+      error: "STATEMENT_STALE",
+      message: "Phiếu lương thuộc phiên bản tính cũ.",
+      ok: false,
+      suggestedCurrentStatementId: "current-stmt-uuid-2",
+    });
+    await PayslipPageRoute({
+      params: Promise.resolve({ periodId: "period-uuid-1", statementId: "old-stale-stmt" }),
+      searchParams: Promise.resolve({ periods: "9" }),
+    });
+    expect(mockRedirect).toHaveBeenCalledWith("/payroll/period-uuid-1/statements/current-stmt-uuid-2/payslip?periods=9");
   });
 
   it("redirects to CURRENT statement when accessing a stale statement revision", async () => {
@@ -117,6 +148,7 @@ describe("PayslipPageRoute", () => {
         periodId: "period-uuid-1",
         statementId: "old-stale-stmt",
       }),
+      searchParams: Promise.resolve({}),
     });
 
     expect(mockRedirect).toHaveBeenCalledWith(
@@ -136,6 +168,7 @@ describe("PayslipPageRoute", () => {
         periodId: "period-uuid-1",
         statementId: "unauthorized-stmt",
       }),
+      searchParams: Promise.resolve({}),
     });
 
     render(page);
@@ -158,6 +191,7 @@ describe("PayslipPageRoute", () => {
         periodId: "period-uuid-1",
         statementId: "nonexistent-stmt",
       }),
+      searchParams: Promise.resolve({}),
     });
 
     render(page);

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   getOlderPayrollPeriodsLink,
+  getPayrollReturnHref,
+  getPayslipHref,
   MAX_PAYROLL_PERIOD_COUNT,
   parsePayrollPeriodCount,
   parsePayrollPeriodId,
@@ -41,5 +43,16 @@ describe("payroll period window", () => {
     expect(parsePayrollPeriodId(["b2000000-0000-4000-8000-000000202609", "x"])).toBe("b2000000-0000-4000-8000-000000202609");
     expect(parsePayrollPeriodId("period-9")).toBeNull();
     expect(parsePayrollPeriodId(undefined)).toBeNull();
+  });
+
+  // Value: protects=a payslip opened from an expanded /payroll window links back to that window with its own period loaded and anchored;
+  // fails_when=the payslip link drops ?periods=, the back link omits ?period= (an older period disappears) or the anchor, or the default window gains a redundant ?periods=3;
+  // why_new=the payslip back link went to bare /payroll, which shows only recent and open periods;
+  // seam=none (pure function); no_claim=does not prove /payroll reads these params (payroll-route.test does)
+  it("carries the /payroll window to the payslip and back", () => {
+    expect(getPayslipHref("p1", "s1")).toBe("/payroll/p1/statements/s1/payslip");
+    expect(getPayslipHref("p1", "s1", 9)).toBe("/payroll/p1/statements/s1/payslip?periods=9");
+    expect(getPayrollReturnHref("p1")).toBe("/payroll?period=p1#payroll-period-p1");
+    expect(getPayrollReturnHref("p1", 9)).toBe("/payroll?periods=9&period=p1#payroll-period-p1");
   });
 });

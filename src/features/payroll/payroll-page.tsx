@@ -29,6 +29,7 @@ import {
 import { getPayslipDisplayTotals } from "@/features/payroll/payslip-sections";
 import {
   getOlderPayrollPeriodsLink,
+  getPayslipHref,
   MAX_PAYROLL_PERIOD_COUNT,
   RECENT_PAYROLL_PERIOD_COUNT,
 } from "@/features/payroll/period-window";
@@ -256,6 +257,7 @@ export function PayrollPage({
               currentStaffId={currentStaffId}
               key={period.id}
               period={period}
+              periodCount={periodCount}
             />
           ))
         )}
@@ -290,6 +292,7 @@ function PayrollPeriodSection({
   canResolveFeedback,
   currentStaffId,
   period,
+  periodCount,
 }: {
   canApprove: boolean;
   canManage: boolean;
@@ -297,6 +300,7 @@ function PayrollPeriodSection({
   canResolveFeedback: boolean;
   currentStaffId: string;
   period: PayrollPeriodRead;
+  periodCount: number;
 }) {
   const isPaid = Boolean(period.paidAt);
   const status = isPaid ? { label: "Đã trả lương", tone: "success" as const } : getPeriodStatus(period.status);
@@ -389,6 +393,7 @@ function PayrollPeriodSection({
           currentStaffId={currentStaffId}
           feedbackOpen={period.status === "draft" && !period.feedbackClosedAt}
           period={period}
+          periodCount={periodCount}
           periodStatusTone={status.tone}
         />
       )}
@@ -401,12 +406,15 @@ function PayrollStatements({
   currentStaffId,
   feedbackOpen,
   period,
+  periodCount,
   periodStatusTone,
 }: {
   canAddManualLine: boolean;
   currentStaffId: string;
   feedbackOpen: boolean;
   period: PayrollPeriodRead;
+  /** Kept on payslip links so "Quay lại bảng lương" returns to the same window. */
+  periodCount: number;
   periodStatusTone: "info" | "neutral" | "success" | "warning";
 }) {
   const periodStatusLabel = getPeriodStatus(period.status).label;
@@ -419,6 +427,7 @@ function PayrollStatements({
             canAddManualLine={canAddManualLine}
             canRequestCorrection={feedbackOpen && statement.staffId === currentStaffId}
             key={statement.id}
+            payslipHref={getPayslipHref(period.id, statement.id, periodCount)}
             period={period}
             periodStatusLabel={periodStatusLabel}
             periodStatusTone={periodStatusTone}
@@ -450,6 +459,7 @@ function PayrollStatements({
             canAddManualLine={canAddManualLine}
             canRequestCorrection={feedbackOpen && statement.staffId === currentStaffId}
             key={statement.id}
+            payslipHref={getPayslipHref(period.id, statement.id, periodCount)}
             period={period}
             periodStatusLabel={periodStatusLabel}
             periodStatusTone={periodStatusTone}
@@ -464,6 +474,7 @@ function PayrollStatements({
 function PayrollStatementTableRow({
   canAddManualLine,
   canRequestCorrection,
+  payslipHref,
   period,
   periodStatusLabel,
   periodStatusTone,
@@ -471,6 +482,7 @@ function PayrollStatementTableRow({
 }: {
   canAddManualLine: boolean;
   canRequestCorrection: boolean;
+  payslipHref: string;
   period: PayrollPeriodRead;
   periodStatusLabel: string;
   periodStatusTone: "info" | "neutral" | "success" | "warning";
@@ -495,7 +507,7 @@ function PayrollStatementTableRow({
         <div className="flex items-center gap-2">
           <Link
             className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-border-subtle bg-surface-base px-2.5 py-1.5 text-xs font-semibold text-text-strong shadow-xs hover:bg-surface-raised active:bg-interactive-pressed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-            href={`/payroll/${period.id}/statements/${statement.id}/payslip`}
+            href={payslipHref}
           >
             <Receipt aria-hidden="true" size={14} strokeWidth={1.8} />
             <span>Phiếu lương</span>
@@ -508,6 +520,7 @@ function PayrollStatementTableRow({
             payDate={period.payDate}
             periodMonth={period.periodMonth}
             periodStatusLabel={periodStatusLabel}
+            payslipHref={payslipHref}
             periodStatusTone={periodStatusTone}
             statement={statement}
           />
@@ -520,6 +533,7 @@ function PayrollStatementTableRow({
 function PayrollStatementRecord({
   canAddManualLine,
   canRequestCorrection,
+  payslipHref,
   period,
   periodStatusLabel,
   periodStatusTone,
@@ -527,6 +541,7 @@ function PayrollStatementRecord({
 }: {
   canAddManualLine: boolean;
   canRequestCorrection: boolean;
+  payslipHref: string;
   period: PayrollPeriodRead;
   periodStatusLabel: string;
   periodStatusTone: "info" | "neutral" | "success" | "warning";
@@ -556,7 +571,7 @@ function PayrollStatementRecord({
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-3">
         <Link
           className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-border-subtle bg-surface-base px-3 py-1.5 text-xs font-semibold text-text-strong shadow-xs hover:bg-surface-raised active:bg-interactive-pressed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-          href={`/payroll/${period.id}/statements/${statement.id}/payslip`}
+          href={payslipHref}
         >
           <Receipt aria-hidden="true" size={14} strokeWidth={1.8} />
           <span>Phiếu lương</span>
@@ -569,6 +584,7 @@ function PayrollStatementRecord({
           payDate={period.payDate}
           periodMonth={period.periodMonth}
           periodStatusLabel={periodStatusLabel}
+          payslipHref={payslipHref}
           periodStatusTone={periodStatusTone}
           statement={statement}
         />

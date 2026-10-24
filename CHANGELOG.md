@@ -2,7 +2,7 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
-## [0.40.0.1] - 2026-10-24
+## [0.40.0.2] - 2026-10-24
 
 Hai chỗ sửa ở màn nhập dữ liệu sau bước 15b: nhập học sinh có lại nút "Kiểm tra lại" khi máy chủ từ chối vì dữ liệu đã đổi, và nhập lớp không còn âm thầm ghi thứ Hai cho ô "Thứ" không đọc được.
 
@@ -13,6 +13,16 @@ Hai chỗ sửa ở màn nhập dữ liệu sau bước 15b: nhập học sinh c
 
 ### Changed
 - **Nhập lớp:** ô "Thứ" phải nêu đúng một ngày. Tên ngày tiếng Việt được đọc trước, tên tiếng Anh chỉ khi ô không có tên tiếng Việt (giáo viên tên Thu trong "Thứ 2 (cô Thu)" vẫn là thứ Hai); ô có mã T2–T7/CN mà tên tiếng Anh nói ngày khác ("Sat - tầng T2") thì thành dòng lỗi để sửa trong file thay vì bị đoán.
+
+## [0.40.0.1] - 2026-10-24
+
+Nút "Quay lại bảng lương" trên phiếu lương đưa về đúng danh sách kỳ lương vừa xem, kể cả các kỳ cũ đã mở thêm, và cuộn tới kỳ của phiếu đó.
+
+### Fixed
+- **Phiếu lương → Quay lại bảng lương**: trước đây luôn về `/payroll` mặc định (3 kỳ gần nhất), nên kỳ cũ vừa mở bằng "Xem thêm" hoặc từ trang Tạm ứng biến mất. Giờ liên kết phiếu lương (bảng, danh sách trên điện thoại, nút "Mở phiếu lương" trong hộp chi tiết) giữ số kỳ đang hiện, và nút quay lại mở lại đúng số kỳ đó, tải thêm kỳ của phiếu nếu cần và cuộn tới kỳ đó. Phiếu thuộc phiên bản tính cũ chuyển sang phiếu hiện tại mà vẫn giữ số kỳ.
+
+### For contributors
+- Ghi ngoại lệ "đọc bảng lương theo từng kỳ" (v0.40.0.0) vào `docs/redesign/WORKFLOW_CONTRACTS_A_E.md` (List reads outside A–E), `docs/redesign/REDESIGN_PROGRAM.md` và `DESIGN.md`.
 
 ## [0.40.0.0] - 2026-10-24
 
