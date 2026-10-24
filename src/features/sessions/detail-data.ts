@@ -151,43 +151,81 @@ export async function getSessionDetail(
     const supabase =
       await createSupabaseServerClient();
 
-    const {
-      data: sessionData,
-      error: sessionError,
-    } = await supabase
-      .from("class_sessions")
-      .select(`
-        id,
-        class_id,
-        session_date,
-        session_kind,
-        component_code,
-        start_time,
-        end_time,
-        learning_mode,
-        room_name,
-        meeting_url,
-        status,
-        started_at,
-        completed_at,
-        cancelled_at,
-        cancellation_reason,
-        locked_at,
-        lock_reason,
-        previous_session_date,
-        reschedule_count,
-        notes,
-        class:classes!class_sessions_class_id_fkey (
+    // The session row, roster, attendance and results do not depend on each other, so they load
+    // in one round trip; only the student names below wait for their ids.
+    const [
+      { data: sessionData, error: sessionError },
+      enrollmentResponse,
+      attendanceResponse,
+      resultResponse,
+    ] = await Promise.all([
+      supabase
+        .from("class_sessions")
+        .select(`
           id,
-          code,
-          name,
-          grade,
-          level,
-          status
-        )
-      `)
-      .eq("id", sessionId)
-      .maybeSingle();
+          class_id,
+          session_date,
+          session_kind,
+          component_code,
+          start_time,
+          end_time,
+          learning_mode,
+          room_name,
+          meeting_url,
+          status,
+          started_at,
+          completed_at,
+          cancelled_at,
+          cancellation_reason,
+          locked_at,
+          lock_reason,
+          previous_session_date,
+          reschedule_count,
+          notes,
+          class:classes!class_sessions_class_id_fkey (
+            id,
+            code,
+            name,
+            grade,
+            level,
+            status
+          )
+        `)
+        .eq("id", sessionId)
+        .maybeSingle(),
+      options.includeRoster
+        ? supabase.rpc("resolve_class_session_roster", {
+            p_class_session_id: sessionId,
+          })
+        : null,
+      options.includeAttendance
+        ? supabase
+            .from("session_attendance")
+            .select(`
+              id,
+              student_id,
+              student_enrollment_id,
+              attendance_status,
+              actual_learning_mode,
+              is_late_update,
+              notes
+            `)
+            .eq("class_session_id", sessionId)
+        : null,
+      options.includeResults
+        ? supabase
+            .from("session_results")
+            .select(`
+              id,
+              student_id,
+              test_score,
+              notebook_score,
+              notebook_status,
+              comment
+            `)
+            .eq("class_session_id", sessionId)
+        : null,
+    ]);
 
     if (sessionError) {
       return {
@@ -234,102 +272,49 @@ export async function getSessionDetail(
       };
     }
 
-    let enrollmentRows: EnrollmentQueryRow[] =
-      [];
-
-    let attendanceRows: AttendanceQueryRow[] =
-      [];
-
-    let resultRows: ResultQueryRow[] = [];
-
-    if (options.includeRoster) {
-      const {
-        data: enrollmentData,
-        error: enrollmentError,
-      } = await supabase
-        .rpc("resolve_class_session_roster", {
-          p_class_session_id: sessionId,
-        });
-
-      if (enrollmentError) {
-        return {
-          error: {
-            code: "query_failed",
-            message:
-              "Không thể tải danh sách học viên của buổi học.",
-          },
-          ok: false,
-        };
-      }
-
-      enrollmentRows =
-        (enrollmentData ??
-          []) as EnrollmentQueryRow[];
+    if (enrollmentResponse?.error) {
+      return {
+        error: {
+          code: "query_failed",
+          message:
+            "Không thể tải danh sách học viên của buổi học.",
+        },
+        ok: false,
+      };
     }
 
-    if (options.includeAttendance) {
-      const {
-        data: attendanceData,
-        error: attendanceError,
-      } = await supabase
-        .from("session_attendance")
-        .select(`
-          id,
-          student_id,
-          student_enrollment_id,
-          attendance_status,
-          actual_learning_mode,
-          is_late_update,
-          notes
-        `)
-        .eq("class_session_id", sessionId);
-
-      if (attendanceError) {
-        return {
-          error: {
-            code: "query_failed",
-            message:
-              "Không thể tải dữ liệu điểm danh của buổi học.",
-          },
-          ok: false,
-        };
-      }
-
-      attendanceRows =
-        (attendanceData ??
-          []) as AttendanceQueryRow[];
+    if (attendanceResponse?.error) {
+      return {
+        error: {
+          code: "query_failed",
+          message:
+            "Không thể tải dữ liệu điểm danh của buổi học.",
+        },
+        ok: false,
+      };
     }
 
-    if (options.includeResults) {
-      const {
-        data: resultData,
-        error: resultError,
-      } = await supabase
-        .from("session_results")
-        .select(`
-          id,
-          student_id,
-          test_score,
-          notebook_score,
-          notebook_status,
-          comment
-        `)
-        .eq("class_session_id", sessionId);
-
-      if (resultError) {
-        return {
-          error: {
-            code: "query_failed",
-            message:
-              "Không thể tải kết quả cuối buổi.",
-          },
-          ok: false,
-        };
-      }
-
-      resultRows =
-        (resultData ?? []) as ResultQueryRow[];
+    if (resultResponse?.error) {
+      return {
+        error: {
+          code: "query_failed",
+          message:
+            "Không thể tải kết quả cuối buổi.",
+        },
+        ok: false,
+      };
     }
+
+    const enrollmentRows =
+      (enrollmentResponse?.data ??
+        []) as EnrollmentQueryRow[];
+
+    const attendanceRows =
+      (attendanceResponse?.data ??
+        []) as AttendanceQueryRow[];
+
+    const resultRows =
+      (resultResponse?.data ?? []) as ResultQueryRow[];
 
     const studentIds = Array.from(
       new Set([
