@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
 import { GuardedActionPanel, type GuardedCondition } from "@/components/patterns/guarded-action-panel";
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
-import { getButtonClassName } from "@/components/ui/button";
+import { Button, getButtonClassName } from "@/components/ui/button";
 import { Label, Textarea } from "@/components/ui/field";
 import { formatImportTimestamp } from "@/features/imports/components/import-labels";
 import { ImportSummaryStrip } from "@/features/imports/components/import-summary-strip";
@@ -39,6 +39,14 @@ const COMMIT_UNKNOWN_RESULT = "Bấm xác nhận lại: máy chủ không ghi ha
  */
 export const STUDENT_IMPORT_ALREADY_COMMITTED_MESSAGE = "File này đã được import thành công trước đó.";
 
+/**
+ * The commit action's message for STUDENT_IMPORT_VALIDATION_FAILED (code
+ * "invalid_request"): the server re-checked the rows and they no longer pass,
+ * so the panel offers a fresh check right there.
+ */
+export const STUDENT_IMPORT_VALIDATION_FAILED_MESSAGE =
+  "Dữ liệu đã thay đổi hoặc còn dòng lỗi. Hãy kiểm tra lại trước khi xác nhận import.";
+
 export interface StudentImportCommitGateInput {
   canCreateStudents: boolean;
   /** Rows mapped from the file currently chosen (0 when no file is held). */
@@ -50,21 +58,24 @@ export interface StudentImportCommitGateInput {
   isCommitted: boolean;
   /** The commit refused this file as already committed (an earlier press landed): locked, with its reason. */
   isAlreadyCommitted?: boolean;
+  /** The commit was refused because the rows no longer pass: locked until "Kiểm tra lại" answers. */
+  needsRecheck?: boolean;
 }
 
 export interface StudentImportCommitGate {
   canCommit: boolean;
   conditions: GuardedCondition[];
-  /** Why the commit is unavailable, in words (the first unmet condition); null when it can run or is running. */
+  /** Why the commit is unavailable, in words (the first unmet condition); null when it can run or while a commit or a re-check runs. */
   reason: string | null;
 }
 
 /**
  * The commit gate of today's panel, condition by condition and in the same
  * order as its checks: `students.create`, 0 invalid rows, the dry-run still
- * matches the mapped file (same row count, at least one row), a reason of
- * 1–1,500 characters, the confirmation checkbox, not pending, not committed
- * (here or by an earlier press the server reports).
+ * matches the mapped file (same row count, at least one row, and no commit
+ * refused for rows that no longer pass until "Kiểm tra lại" answers), a reason
+ * of 1–1,500 characters, the confirmation checkbox; then not pending and not
+ * committed (here or by an earlier press the server reports).
  */
 export function getStudentImportCommitGate({
   canCreateStudents,
@@ -73,6 +84,7 @@ export function getStudentImportCommitGate({
   isCommitted,
   isPending,
   mappedRowCount,
+  needsRecheck = false,
   reason,
   validation,
 }: StudentImportCommitGateInput): StudentImportCommitGate {
@@ -95,9 +107,13 @@ export function getStudentImportCommitGate({
     },
     {
       met: `Kết quả kiểm tra khớp file đang chọn (${formatNumber(validation.row_count)} dòng)`,
-      ok: rowsMatch,
-      unmet: "Kết quả kiểm tra không khớp file đang chọn",
-      why: "Chọn lại file và kiểm tra các dòng trước khi nhập.",
+      ok: rowsMatch && !needsRecheck,
+      unmet: needsRecheck
+        ? "Máy chủ báo dữ liệu đã thay đổi hoặc còn dòng lỗi: cần kiểm tra lại"
+        : "Kết quả kiểm tra không khớp file đang chọn",
+      why: needsRecheck
+        ? "Dữ liệu đã thay đổi hoặc còn dòng lỗi: bấm “Kiểm tra lại” trước khi nhập."
+        : "Chọn lại file và kiểm tra các dòng trước khi nhập.",
     },
     {
       met: "Đã nhập lý do",
@@ -126,13 +142,19 @@ export type StudentImportCommitError =
   | { kind: "error"; message: string }
   | { kind: "unknown" }
   /** The server's refusal of a file it already committed; `message` is its words. */
-  | { kind: "already_committed"; message: string };
+  | { kind: "already_committed"; message: string }
+  /** The server's re-check of the rows failed (data changed or rows invalid); `message` is its words. */
+  | { kind: "needs_recheck"; message: string };
 
-/** A refused commit in the panel's terms: the already-committed refusal is told apart from the rest. */
+/** A refused commit in the panel's terms: the already-committed and failed re-check refusals are told apart from the rest. */
 export function toStudentImportCommitError(failure: Pick<StudentImportActionFailure, "code" | "message">): StudentImportCommitError {
-  return failure.code === "conflict" && failure.message === STUDENT_IMPORT_ALREADY_COMMITTED_MESSAGE
-    ? { kind: "already_committed", message: failure.message }
-    : { kind: "error", message: failure.message };
+  if (failure.code === "conflict" && failure.message === STUDENT_IMPORT_ALREADY_COMMITTED_MESSAGE) {
+    return { kind: "already_committed", message: failure.message };
+  }
+  if (failure.code === "invalid_request" && failure.message === STUDENT_IMPORT_VALIDATION_FAILED_MESSAGE) {
+    return { kind: "needs_recheck", message: failure.message };
+  }
+  return { kind: "error", message: failure.message };
 }
 
 interface StudentImportCommitPanelProps {
@@ -143,9 +165,14 @@ interface StudentImportCommitPanelProps {
   onReasonChange: (value: string) => void;
   confirmed: boolean;
   onConfirmedChange: (value: boolean) => void;
-  /** Inputs locked (pending, no permission, rows still invalid, file already committed). */
+  /** Inputs locked (a commit or a re-check running, no permission, rows still invalid, file already committed). */
   inputsDisabled: boolean;
   error: StudentImportCommitError | null;
+  /**
+   * "Kiểm tra lại" on a failed re-check refusal: runs the dry-run again with the
+   * file and mapping held; `error` is that check's own failure, if any.
+   */
+  recheck: { onRecheck: () => void; isPending: boolean; error: string | null };
   /** Where the already-committed banner sends people to see the students (the /dev preview keeps it under /dev). */
   studentListHref: string;
 }
@@ -163,11 +190,20 @@ export function StudentImportCommitPanel({
   onConfirmedChange,
   onReasonChange,
   reason,
+  recheck,
   reusedGuardianCount,
   studentListHref,
   validation,
 }: StudentImportCommitPanelProps) {
   const total = formatNumber(validation.row_count);
+  const recheckButtonRef = useRef<HTMLButtonElement>(null);
+  const recheckWasPending = useRef(false);
+
+  // The button is disabled while its check runs, which drops focus; a failed check leaves it in place, so focus returns.
+  useEffect(() => {
+    if (recheckWasPending.current && !recheck.isPending) recheckButtonRef.current?.focus();
+    recheckWasPending.current = recheck.isPending;
+  }, [recheck.isPending]);
 
   return (
     <GuardedActionPanel
@@ -192,6 +228,27 @@ export function StudentImportCommitPanel({
               title="File này đã được nhập."
               tone="info"
             />
+          ) : error.kind === "needs_recheck" ? (
+            <div className="grid gap-3">
+              <ResultBanner
+                action={
+                  <Button
+                    className="max-md:h-11"
+                    isLoading={recheck.isPending}
+                    onClick={recheck.onRecheck}
+                    ref={recheckButtonRef}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    {recheck.isPending ? "Đang kiểm tra…" : "Kiểm tra lại"}
+                  </Button>
+                }
+                description={error.message}
+                title="Chưa nhập."
+                tone="error"
+              />
+              {recheck.error ? <ResultBanner description={recheck.error} title="Chưa kiểm tra được." tone="error" /> : null}
+            </div>
           ) : (
             <ResultBanner description={error.message} title="Chưa nhập." tone="error" />
           )

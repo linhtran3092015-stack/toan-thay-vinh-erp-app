@@ -23,6 +23,18 @@ ERP phản hồi nhanh hơn: máy chủ ứng dụng chuyển sang Singapore, ng
 - `getSessionDetail`, trang `/sessions/[sessionId]` và `getDatabasePermissions` (getUser song song với `get_my_permissions`, quyền chỉ được dùng sau khi getUser xác thực) chạy truy vấn bằng `Promise.all`.
 - Test mới `tests/unit/database-permissions.test.ts`, `tests/unit/session-result-actions-refresh.test.ts`; mở rộng test điểm danh, chi tiết buổi học và route buổi học.
 
+## [0.40.0.2] - 2026-10-24
+
+Hai chỗ sửa ở màn nhập dữ liệu sau bước 15b: nhập học sinh có lại nút "Kiểm tra lại" khi máy chủ từ chối vì dữ liệu đã đổi, và nhập lớp không còn âm thầm ghi thứ Hai cho ô "Thứ" không đọc được.
+
+### Fixed
+- **Nhập học sinh:** khi bấm xác nhận mà máy chủ báo "Dữ liệu đã thay đổi hoặc còn dòng lỗi", ngay dưới lời báo có nút "Kiểm tra lại". Nút chạy lại kiểm tra với file và ánh xạ đang chọn rồi mở bước Kiểm tra dòng với kết quả mới, ghi rõ "Đã kiểm tra lại."; lý do đã gõ được giữ, dấu xác nhận phải đánh lại. Tới lúc đó nút xác nhận khóa và nói lý do; kiểm tra lại lỗi thì báo ngay dưới lời từ chối và bấm lại được.
+- **Nhập lớp:** dòng lịch có ô "Thứ" không đọc được (ô trống, "Thứ Tám", số lẻ như 1,5, ô ghi hai ngày như "Thứ 2, Thứ 4") không còn bị ghi thành thứ Hai. Dòng đó thành dòng "Không hợp lệ" ở bước Kiểm tra dòng ("Không đọc được thứ trong tuần: …", ô trống thì nhắc khả năng ô bị gộp trong Excel) và chặn "Tạo lô" tới khi sửa file. Nếu cả sheet không đọc được thứ thì báo ngay ở bước Ánh xạ cột, thường là do chọn nhầm cột.
+- **Nhập lớp:** đọc thứ trong tuần đúng hơn: chữ tiếng Việt gõ dạng tổ hợp (Unikey "Unicode tổ hợp") không còn bị đọc thành thứ Năm; "Thứ3"…"Thứ7", "Thứ Bẩy", khoảng trắng không ngắt dòng hay hai dấu cách liền đều đọc đúng ngày.
+
+### Changed
+- **Nhập lớp:** ô "Thứ" phải nêu đúng một ngày. Tên ngày tiếng Việt được đọc trước, tên tiếng Anh chỉ khi ô không có tên tiếng Việt (giáo viên tên Thu trong "Thứ 2 (cô Thu)" vẫn là thứ Hai); ô có mã T2–T7/CN mà tên tiếng Anh nói ngày khác ("Sat - tầng T2") thì thành dòng lỗi để sửa trong file thay vì bị đoán.
+
 ## [0.40.0.1] - 2026-10-24
 
 Nút "Quay lại bảng lương" trên phiếu lương đưa về đúng danh sách kỳ lương vừa xem, kể cả các kỳ cũ đã mở thêm, và cuộn tới kỳ của phiếu đó.

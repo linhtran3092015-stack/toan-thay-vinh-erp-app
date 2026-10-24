@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
 import type { StepperStep } from "@/components/patterns/stepper";
@@ -149,6 +149,11 @@ function fieldIssueText(issue: StudentImportMappingIssue): string {
   return issue.message;
 }
 
+/** An edit on the confirm step clears a refusal, except the one only "Kiểm tra lại" resolves. */
+function keepRecheckRefusal(current: StudentImportCommitError | null): StudentImportCommitError | null {
+  return current?.kind === "needs_recheck" ? current : null;
+}
+
 function getRowSeverity(row: StudentImportValidationRow): ImportRowSeverity {
   // An exact duplicate is an error row (the server marks it invalid; commit refuses it).
   if (row.status === "invalid" || row.exact_student_duplicate) return "error";
@@ -209,6 +214,10 @@ export function StudentImportPage({
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [isTemplateDownloading, setIsTemplateDownloading] = useState(false);
   const [validateError, setValidateError] = useState<string | null>(null);
+  // A failed "Kiểm tra lại": shown with the refusal on the confirm step, never as a mapping-step error.
+  const [recheckError, setRecheckError] = useState<string | null>(null);
+  // The review holds a result from "Kiểm tra lại": it says so, since the confirmation must be given again.
+  const [isRecheckedResult, setIsRecheckedResult] = useState(false);
 
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -220,6 +229,9 @@ export function StudentImportPage({
   // Bumped by every input change that invalidates a check (a new or cleared file, a mapping change)
   // and by each check: a dry-run answer is applied only while its run is still the latest.
   const checkRun = useRef(0);
+  // "Kiểm tra lại" unmounts with the confirm step: focus lands once on the note that says what happened.
+  const recheckNoticeRef = useRef<HTMLDivElement>(null);
+  const recheckFocusPending = useRef(false);
 
   const mappingValidation = useMemo(
     () => (workbook ? validateStudentImportColumnMapping(workbook.columns, mapping) : null),
@@ -235,16 +247,25 @@ export function StudentImportPage({
   );
 
   const currentStep: StudentImportStep = commitResult ? "confirm" : resolveStep(step, { validation, workbook });
+
+  useEffect(() => {
+    if (!recheckFocusPending.current || !isRecheckedResult || currentStep !== "review") return;
+    recheckFocusPending.current = false;
+    recheckNoticeRef.current?.focus();
+  }, [currentStep, isRecheckedResult]);
   const currentIndex = STEPS.findIndex((item) => item.key === currentStep);
   const steps: StepperStep[] = STEPS.map((item, index) => ({
     state: commitResult || index < currentIndex ? "done" : index === currentIndex ? "current" : "upcoming",
     title: item.title,
   }));
 
+  /** Drops the commit step and whatever a re-check left (a new file or a mapping change). */
   function clearCommitState() {
     setReason("");
     setConfirmed(false);
     setCommitError(null);
+    setRecheckError(null);
+    setIsRecheckedResult(false);
   }
 
   /** A new file (or none): every later step is dropped. */
@@ -302,26 +323,36 @@ export function StudentImportPage({
     clearCommitState();
   }
 
-  function handleValidate() {
+  /**
+   * The dry-run of the file and mapping held. With `recheck`, it is "Kiểm tra lại" on a commit
+   * refused because the rows no longer pass: its failure stays with that refusal on the confirm step.
+   */
+  function handleValidate({ recheck = false }: { recheck?: boolean } = {}) {
     if (!workbook || !mappingValidation?.isValid) return;
     const rows = mapStudentImportWorkbookRows(workbook, mapping);
     const run = ++checkRun.current;
+    const setError = recheck ? setRecheckError : setValidateError;
     setValidateError(null);
+    setRecheckError(null);
     startValidating(async () => {
       try {
         const result = await validateRows({ rows });
         // The file or the mapping changed while the check ran: this answer is for other rows.
         if (run !== checkRun.current) return;
         if (!result.ok) {
-          setValidateError(result.message);
+          setError(result.message);
           return;
         }
         setValidation(result.data);
-        clearCommitState();
+        setIsRecheckedResult(recheck);
+        recheckFocusPending.current = recheck;
+        // The confirmation was for the old result. The reason is kept: only a new file or a mapping change clears it.
+        setConfirmed(false);
+        setCommitError(null);
         setStep("review");
       } catch {
         if (run !== checkRun.current) return;
-        setValidateError("Không kết nối được tới máy chủ. Kiểm tra kết nối rồi thử lại; bước này không ghi dữ liệu.");
+        setError("Không kết nối được tới máy chủ. Kiểm tra kết nối rồi thử lại; bước này không ghi dữ liệu.");
       }
     });
   }
@@ -334,8 +365,10 @@ export function StudentImportPage({
         confirmed,
         isAlreadyCommitted,
         isCommitted: commitResult !== null,
-        isPending: isCommitting,
+        // A re-check after a refused commit is running: its answer replaces the result being confirmed.
+        isPending: isCommitting || isValidating,
         mappedRowCount: mappedRows.length,
+        needsRecheck: commitError?.kind === "needs_recheck",
         reason,
         validation,
       })
@@ -533,7 +566,7 @@ export function StudentImportPage({
               aria-describedby={mappingValidation.isValid ? undefined : primaryReasonId}
               disabled={!mappingValidation.isValid}
               isLoading={isValidating}
-              onClick={handleValidate}
+              onClick={() => handleValidate()}
             >
               {`Kiểm tra ${formatNumber(workbook.rowCount)} dòng`}
             </Button>
@@ -553,6 +586,21 @@ export function StudentImportPage({
     const hasErrors = validation.invalid_count > 0;
     body = (
       <>
+        {isRecheckedResult ? (
+          <div
+            className="rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+            ref={recheckNoticeRef}
+            tabIndex={-1}
+          >
+            <ResultBanner
+              description={`Kết quả dưới đây là của lần kiểm tra mới với file và ánh xạ cột đang chọn.${
+                hasErrors ? "" : " Ở bước Xác nhận nhập, cần đánh dấu xác nhận lại."
+              }`}
+              title="Đã kiểm tra lại."
+              tone="info"
+            />
+          </div>
+        ) : null}
         <ImportSummaryStrip
           cells={[
             { label: "Tổng dòng", value: validation.row_count },
@@ -569,7 +617,14 @@ export function StudentImportPage({
       <ImportActionBar
         back={{ label: "Ánh xạ cột", onClick: () => setStep("mapping") }}
         primary={
-          <Button aria-describedby={hasErrors ? primaryReasonId : undefined} disabled={hasErrors} onClick={() => setStep("confirm")}>
+          <Button
+            aria-describedby={hasErrors ? primaryReasonId : undefined}
+            disabled={hasErrors}
+            onClick={() => {
+              setIsRecheckedResult(false);
+              setStep("confirm");
+            }}
+          >
             Tiếp: Xác nhận nhập
           </Button>
         }
@@ -590,16 +645,17 @@ export function StudentImportPage({
         confirmed={confirmed}
         error={commitError}
         gate={gate}
-        inputsDisabled={isCommitting || validation.invalid_count > 0 || !canCreateStudents || isAlreadyCommitted}
+        inputsDisabled={isCommitting || isValidating || validation.invalid_count > 0 || !canCreateStudents || isAlreadyCommitted}
         onConfirmedChange={(value) => {
           setConfirmed(value);
-          setCommitError(null);
+          setCommitError(keepRecheckRefusal);
         }}
         onReasonChange={(value) => {
           setReason(value);
-          setCommitError(null);
+          setCommitError(keepRecheckRefusal);
         }}
         reason={reason}
+        recheck={{ error: recheckError, isPending: isValidating, onRecheck: () => handleValidate({ recheck: true }) }}
         reusedGuardianCount={reusedGuardianCount}
         studentListHref={resultLinks.studentList}
         validation={validation}
@@ -607,7 +663,7 @@ export function StudentImportPage({
     );
     actionBar = (
       <ImportActionBar
-        back={{ disabled: isCommitting, label: "Kiểm tra dòng", onClick: () => setStep("review") }}
+        back={{ disabled: isCommitting || isValidating, label: "Kiểm tra dòng", onClick: () => setStep("review") }}
         primary={
           <Button
             aria-describedby={gate.reason ? primaryReasonId : undefined}
