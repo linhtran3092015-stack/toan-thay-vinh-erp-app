@@ -40,6 +40,8 @@ function rpcErrorMessage(error: { details?: string | null; message: string }): s
   const message = error.message;
   // The lock reason comes from parent_message_send_block_reason ("Chưa chấm vở; Chưa điền trợ giảng giám thị").
   if (message.includes("PARENT_MESSAGE_SEND_BLOCKED")) return `Chưa gửi được: ${error.details?.trim() || "tin chưa đủ điều kiện gửi"}.`;
+  // Two saves at once can pass the RPC's own check; the unique index then refuses the second.
+  if (message.includes("students_zalo_group_thread_key")) return "Nhóm Zalo này đã được liên kết với một học sinh khác.";
   const known: Record<string, string> = {
     ATTENDANCE_MARK_PERMISSION_DENIED: "Tài khoản hiện tại không có quyền gửi tin nhắn phụ huynh.",
     PARENT_MESSAGE_CONTENT_CHANGED: "Nội dung tin vừa được cập nhật (điểm, nhận xét hoặc mẫu tin). Kiểm tra lại rồi bấm Gửi.",
