@@ -94,6 +94,7 @@ export function PayrollPayslipDialog({
   lastCalculatedAt,
   payDate,
   periodMonth,
+  payslipHref,
   periodStatusLabel,
   periodStatusTone,
   statement,
@@ -104,6 +105,8 @@ export function PayrollPayslipDialog({
   lastCalculatedAt: string | null;
   payDate: string;
   periodMonth: string;
+  /** The printable payslip; carries the /payroll window so its back link returns to it. */
+  payslipHref: string;
   periodStatusLabel: string;
   periodStatusTone: BadgeTone;
   statement: PayrollStatementRead;
@@ -209,7 +212,7 @@ export function PayrollPayslipDialog({
             </div>
           </section>
 
-          <div className="flex justify-end"><a className="inline-flex items-center gap-2 rounded-lg bg-action-primary px-4 py-2 text-sm font-semibold text-white hover:bg-action-primary-hover" href={`/payroll/${statement.payrollPeriodId}/statements/${statement.id}/payslip`}><ExternalLink size={16} aria-hidden="true" />Mở phiếu lương</a></div>
+          <div className="flex justify-end"><a className="inline-flex items-center gap-2 rounded-lg bg-action-primary px-4 py-2 text-sm font-semibold text-white hover:bg-action-primary-hover" href={payslipHref}><ExternalLink size={16} aria-hidden="true" />Mở phiếu lương</a></div>
 
           {canAddManualLine || canRequestCorrection ? (
             <div className="flex flex-col gap-2 border-t border-border-subtle pt-4 sm:flex-row sm:justify-end">

@@ -414,6 +414,23 @@ describe("Payroll 1 presentation", () => {
     expect(within(piecework).getByLabelText("Tổng Lương khoán")).toHaveTextContent("—");
   });
 
+  // Value: protects=payslip links from an expanded /payroll window (table row, narrow-screen record and the dialog's "Mở phiếu lương") carry ?periods= so the payslip's back link can return to it;
+  // fails_when=any of the three payslip links drops the window (the period the user expanded to disappears on the way back), or the default window adds a redundant ?periods=;
+  // why_new=the payslip back link went to bare /payroll;
+  // seam=PayrollPage → PayrollPayslipDialog with fixture lines; no_claim=does not cover the payslip page's own back link (payroll-payslip-routes does)
+  it("keeps the /payroll window on every payslip link", () => {
+    const base = `/payroll/${period().id}/statements/${statementId}/payslip`;
+    const { unmount } = render(<PayrollPage canApprove={false} canManage={false} canReconcile={false} periods={[period()]} />);
+    expect(screen.getAllByRole("link", { name: "Phiếu lương" })[0]).toHaveAttribute("href", base);
+
+    unmount();
+    render(<PayrollPage canApprove={false} canManage={false} canReconcile={false} periodCount={9} periods={[period()]} />);
+    for (const link of screen.getAllByRole("link", { name: "Phiếu lương" })) {
+      expect(link).toHaveAttribute("href", `${base}?periods=9`);
+    }
+    expect(within(openPayslip()).getByRole("link", { name: "Mở phiếu lương" })).toHaveAttribute("href", `${base}?periods=9`);
+  });
+
   it("keeps a real zero-statement period distinct and fails closed for unknown status", () => {
     render(<PayrollPage canApprove={false} canManage canReconcile={false} periods={[
       period({ id: "empty-period", periodMonth: "2026-05-01", statements: [], status: "review" }),
