@@ -16,7 +16,8 @@ import {
 } from "@/features/payroll/estimate/daily-breakdown";
 import type { StaffPayrollEstimate } from "@/features/payroll/estimate/types";
 import { formatDashboardMonth } from "@/features/payroll/dashboard/format";
-import { formatCurrency, formatWorkMinutes, getLineTypeLabel } from "@/features/payroll/payroll-presentation";
+import { formatCurrency, formatWorkMinutes, getLineNote, getLineTypeLabel } from "@/features/payroll/payroll-presentation";
+import { getAmountClassName } from "@/features/payroll/payslip-sections";
 import { cn } from "@/lib/utils";
 
 interface PayrollDailyBreakdownTableProps {
@@ -114,7 +115,7 @@ export function PayrollDailyBreakdownTable({
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h4 className="text-secondary font-semibold text-text-strong">Khoản tính theo tháng</h4>
           <span className="text-caption text-text-muted">
-            Không gắn với ngày cụ thể: thưởng theo kết quả tháng, bù trừ lương khoán, tạm ứng, điều chỉnh thủ công.
+            Không gắn với ngày cụ thể: thưởng theo kết quả tháng, phần lương khoán đã tính trong lương cứng, tạm ứng, điều chỉnh.
           </span>
         </div>
 
@@ -131,9 +132,10 @@ export function PayrollDailyBreakdownTable({
                 >
                   <div className="min-w-0">
                     <p className="font-medium text-text-default">{getLineTypeLabel(line.lineType)}</p>
-                    {line.note ? <p className="text-caption text-text-muted">{line.note}</p> : null}
+                    {getLineNote(line) ? <p className="text-caption text-text-muted [overflow-wrap:anywhere]">{getLineNote(line)}</p> : null}
                   </div>
-                  <span className={cn("shrink-0 font-medium tabular-nums", signedAmount < 0 ? "text-danger" : "text-text-strong")}>
+                  {/* Only real deductions (advances) read as money taken away. */}
+                  <span className={cn("shrink-0 font-medium tabular-nums", getAmountClassName(line))}>
                     {formatSignedAmount(signedAmount)}
                   </span>
                 </li>

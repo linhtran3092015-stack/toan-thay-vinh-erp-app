@@ -3,13 +3,17 @@ import "server-only";
 import type {
   PayrollDashboardEntry,
   PayrollManagementOverviewRead,
-  PayrollPeriodRead,
+  PayrollPeriodDetailsRead,
   PayrollReadResult,
 } from "@/features/payroll/read-models";
 import {
-  enrichPayrollPeriodsWithExplanations,
-  normalizePayrollPeriodsWithDetailsRows,
+  findUnreconciledStatementIds,
+  parsePayrollPeriodDetails,
 } from "@/features/payroll/read-models";
+import {
+  MAX_PAYROLL_PERIOD_COUNT,
+  RECENT_PAYROLL_PERIOD_COUNT,
+} from "@/features/payroll/period-window";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
@@ -93,48 +97,72 @@ export async function getPayrollDashboardResult(): Promise<
   }
 }
 
-export async function getPayrollPeriodsWithDetailsResult(): Promise<
-  PayrollReadResult<readonly PayrollPeriodRead[]>
-> {
+export type PayrollDetailsReadResult =
+  | { data: PayrollPeriodDetailsRead; ok: true }
+  // "unreconciled": a statement's lines did not add up to its totals on two reads.
+  | { ok: false; reason: "unavailable" | "unreconciled" };
+
+/**
+ * One get_payroll_period_details() call is a single jsonb value built in one
+ * snapshot, so its totals and lines agree unless the read was cut, filtered or
+ * mangled on the way (the paged read this replaced could drop a line). Payslip
+ * totals are summed from the lines, so on a mismatch read once more, then fail
+ * closed rather than show totals the lines do not explain.
+ */
+async function readReconciledPayrollDetails(args: {
+  p_payroll_period_id?: string;
+  p_payroll_statement_id?: string;
+  p_period_limit?: number;
+  p_include_payroll_period_id?: string;
+}): Promise<PayrollDetailsReadResult> {
   try {
     const supabase = await createSupabaseServerClient();
-    const untypedRpcClient = supabase as unknown as {
-      rpc: (name: string) => Promise<{
-        data: unknown;
-        error: { message: string } | null;
-      }>;
-    };
-    const [detailsResult, explanationsResult, paymentResult] = await Promise.all([
-      supabase.rpc("get_payroll_periods_with_details"),
-      untypedRpcClient.rpc("get_payroll_explanations"),
-      // Payment facts live on the period row; the details RPC predates them.
-      supabase.from("payroll_periods").select("id, paid_at, paid_on, payment_reference"),
-    ]);
-
-    if (detailsResult.error || explanationsResult.error || paymentResult.error) {
-      return { ok: false };
+    let unreconciledIds: string[] = [];
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const { data, error } = await supabase.rpc("get_payroll_period_details", args);
+      if (error) {
+        console.error("PAYROLL_DETAILS_UNAVAILABLE", error.code, error.message);
+        return { ok: false, reason: "unavailable" };
+      }
+      const details = parsePayrollPeriodDetails(data);
+      unreconciledIds = findUnreconciledStatementIds(details.periods);
+      if (unreconciledIds.length === 0) {
+        return { data: details, ok: true };
+      }
     }
-
-    const paymentById = new Map(
-      (paymentResult.data ?? []).map((row) => [row.id, row]),
-    );
-    const periods = enrichPayrollPeriodsWithExplanations(
-      normalizePayrollPeriodsWithDetailsRows(detailsResult.data),
-      explanationsResult.data,
-    ).map((period) => {
-      const payment = paymentById.get(period.id);
-      return {
-        ...period,
-        paidAt: payment?.paid_at ?? null,
-        paidOn: payment?.paid_on ?? null,
-        paymentReference: payment?.payment_reference ?? null,
-      };
-    });
-
-    return { data: periods, ok: true };
-  } catch {
-    return { ok: false };
+    console.error("PAYROLL_DETAILS_UNRECONCILED", unreconciledIds.join(","));
+    return { ok: false, reason: "unreconciled" };
+  } catch (error) {
+    console.error("PAYROLL_DETAILS_UNAVAILABLE", error instanceof Error ? error.message : "unknown");
+    return { ok: false, reason: "unavailable" };
   }
+}
+
+/**
+ * The latest `periodCount` periods visible to the viewer, every period still in
+ * draft or review, and `includedPeriodId` when given; newest first.
+ */
+export async function getRecentPayrollPeriodsResult(
+  periodCount: number = RECENT_PAYROLL_PERIOD_COUNT,
+  includedPeriodId: string | null = null,
+): Promise<PayrollDetailsReadResult> {
+  const limit = Math.min(Math.max(Math.trunc(periodCount) || RECENT_PAYROLL_PERIOD_COUNT, 1), MAX_PAYROLL_PERIOD_COUNT);
+  return readReconciledPayrollDetails(
+    includedPeriodId
+      ? { p_include_payroll_period_id: includedPeriodId, p_period_limit: limit }
+      : { p_period_limit: limit },
+  );
+}
+
+/** One statement of one period's current calculation run (payslip page and PDF). */
+export async function getPayrollStatementDetailsResult(
+  payrollPeriodId: string,
+  payrollStatementId: string,
+): Promise<PayrollDetailsReadResult> {
+  return readReconciledPayrollDetails({
+    p_payroll_period_id: payrollPeriodId,
+    p_payroll_statement_id: payrollStatementId,
+  });
 }
 
 export async function getPayrollManagementOverviewResult(): Promise<

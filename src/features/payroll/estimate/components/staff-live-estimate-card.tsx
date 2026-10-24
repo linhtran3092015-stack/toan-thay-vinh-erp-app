@@ -13,9 +13,19 @@ import {
   formatDate,
   formatDateTime,
   formatMonth,
+  formatSignedCurrency,
   formatWorkMinutes,
   getLineTypeLabel,
 } from "@/features/payroll/payroll-presentation";
+import {
+  getPayslipDisplayTotals,
+  getPayslipSection,
+  manualAdjustmentLineTypes,
+  PIECEWORK_ESTIMATE_MISMATCH_MESSAGE,
+  PIECEWORK_RULE,
+  signedAmount,
+  summarizePiecework,
+} from "@/features/payroll/payslip-sections";
 import { getPayrollPositionLabel } from "@/features/staff/payroll-profile-types";
 
 interface StaffLiveEstimateCardProps {
@@ -97,13 +107,31 @@ export function StaffLiveEstimateCard({
     l.direction === "earning" &&
     l.lineType !== "base_offline" &&
     l.lineType !== "base_online" &&
-    l.lineType !== "teaching_allowance",
+    l.lineType !== "teaching_allowance" &&
+    !manualAdjustmentLineTypes.has(l.lineType),
   );
   const bonusTotal = bonusLines.reduce((acc, l) => acc + l.amountVnd, 0);
 
   const hasGradingBonus = bonusLines.some((l) => l.lineType === "grading_bonus");
+  const gradingCaveat = hasGradingBonus ? (
+    <span className="block text-caption text-text-muted">
+      *Thưởng quỹ chấm bài tạm tính theo tỷ trọng hiện tại, có thể tăng hoặc giảm.
+    </span>
+  ) : null;
 
-  const deductionTotal = statement?.totalDeductionsVnd ?? 0;
+  // The piecework offset and manual adjustments are not deductions (see payslip-sections.ts).
+  const piecework = summarizePiecework(lines);
+  // The same lines the payslip lists under Lương khoán: bonuses plus any teaching allowance.
+  const pieceworkLabels = [...new Set(
+    lines.filter((l) => l.direction === "earning" && getPayslipSection(l, true) === "piecework").map((l) => getLineTypeLabel(l.lineType)),
+  )];
+  const adjustmentLines = lines.filter((l) => manualAdjustmentLineTypes.has(l.lineType));
+  const adjustmentTotal = adjustmentLines.reduce((acc, l) => acc + signedAmount(l), 0);
+  const displayTotals = getPayslipDisplayTotals({
+    lines,
+    totalDeductionsVnd: statement?.totalDeductionsVnd ?? 0,
+    totalEarningsVnd: statement?.totalEarningsVnd ?? 0,
+  });
 
   return (
     <section aria-labelledby="live-estimate-heading" className="overflow-hidden rounded-xl border border-border-subtle bg-surface-base shadow-sm">
@@ -218,8 +246,8 @@ export function StaffLiveEstimateCard({
                 </td>
               </tr>
 
-              {/* Phụ cấp */}
-              {allowanceTotal > 0 ? (
+              {/* Phụ cấp (counted inside Lương khoán when there is one, as on the payslip) */}
+              {!piecework && allowanceTotal > 0 ? (
                 <tr>
                   <td className="py-2.5 font-medium text-text-strong">Phụ cấp trợ giảng</td>
                   <td className="py-2.5 text-text-muted">{allowanceLines.length} lượt phát sinh</td>
@@ -229,20 +257,53 @@ export function StaffLiveEstimateCard({
                 </tr>
               ) : null}
 
+              {/* Lương khoán: bonuses above the part already paid inside lương cứng */}
+              {piecework ? (
+                <tr>
+                  <td className="py-2.5 font-medium text-text-strong">Lương khoán</td>
+                  <td className="py-2.5 text-text-muted">
+                    {pieceworkLabels.join(", ")}
+                    {piecework.kind === "summary" ? (
+                      <>
+                        <span className="block">
+                          Đạt {formatCurrency(piecework.earnedVnd)}; {formatCurrency(piecework.absorbedVnd)} đã nằm trong lương cứng
+                        </span>
+                        <span className="block text-caption text-text-muted">
+                          {PIECEWORK_RULE} Không phải khoản bị trừ.
+                        </span>
+                      </>
+                    ) : (
+                      <span className="block text-warning">{PIECEWORK_ESTIMATE_MISMATCH_MESSAGE}</span>
+                    )}
+                    {gradingCaveat}
+                  </td>
+                  <td className="py-2.5 text-right font-medium text-text-strong tabular-nums">
+                    {piecework.kind === "summary" ? formatCurrency(piecework.addedVnd) : "—"}
+                  </td>
+                </tr>
+              ) : null}
+
               {/* Thưởng & Hoa hồng */}
-              {bonusTotal > 0 ? (
+              {!piecework && bonusTotal > 0 ? (
                 <tr>
                   <td className="py-2.5 font-medium text-text-strong">Thưởng & Hoa hồng</td>
                   <td className="py-2.5 text-text-muted">
                     {bonusLines.map((b) => getLineTypeLabel(b.lineType)).join(", ")}
-                    {hasGradingBonus ? (
-                      <span className="block text-caption text-text-subtle">
-                        *Thưởng quỹ chấm bài tạm tính theo tỷ trọng hiện tại, có thể tăng hoặc giảm.
-                      </span>
-                    ) : null}
+                    {gradingCaveat}
                   </td>
                   <td className="py-2.5 text-right font-medium text-text-strong tabular-nums">
                     {formatCurrency(bonusTotal)}
+                  </td>
+                </tr>
+              ) : null}
+
+              {/* Điều chỉnh thủ công */}
+              {adjustmentLines.length > 0 ? (
+                <tr>
+                  <td className="py-2.5 font-medium text-text-strong">Điều chỉnh</td>
+                  <td className="py-2.5 text-text-muted">{adjustmentLines.length} khoản điều chỉnh tăng hoặc giảm</td>
+                  <td className="py-2.5 text-right font-medium text-text-strong tabular-nums">
+                    {formatSignedCurrency(adjustmentTotal)}
                   </td>
                 </tr>
               ) : null}
@@ -252,28 +313,17 @@ export function StaffLiveEstimateCard({
                 <td className="py-2 font-semibold text-text-strong">Tổng thu nhập</td>
                 <td className="py-2 text-caption text-text-muted">Trước các khoản khấu trừ</td>
                 <td className="py-2 text-right font-semibold text-text-strong tabular-nums">
-                  {formatCurrency(statement?.totalEarningsVnd ?? 0)}
+                  {formatCurrency(displayTotals.incomeVnd)}
                 </td>
               </tr>
 
               {/* Khấu trừ tạm ứng */}
               {statement?.advanceDeductionsVnd && statement.advanceDeductionsVnd > 0 ? (
                 <tr>
-                  <td className="py-2.5 font-medium text-warning">Khấu trừ tạm ứng</td>
+                  <td className="py-2.5 font-medium text-danger">Khấu trừ tạm ứng</td>
                   <td className="py-2.5 text-text-muted">Khoản tạm ứng thuộc kỳ {formatMonth(month).toLowerCase()}</td>
-                  <td className="py-2.5 text-right font-medium text-warning tabular-nums">
+                  <td className="py-2.5 text-right font-medium text-danger tabular-nums">
                     −{formatCurrency(statement.advanceDeductionsVnd)}
-                  </td>
-                </tr>
-              ) : null}
-
-              {/* Khấu trừ khác nếu có */}
-              {deductionTotal > (statement?.advanceDeductionsVnd ?? 0) ? (
-                <tr>
-                  <td className="py-2.5 font-medium text-warning">Khấu trừ khác</td>
-                  <td className="py-2.5 text-text-muted">Bù trừ lương khoán / giảm trừ</td>
-                  <td className="py-2.5 text-right font-medium text-warning tabular-nums">
-                    −{formatCurrency(deductionTotal - (statement?.advanceDeductionsVnd ?? 0))}
                   </td>
                 </tr>
               ) : null}

@@ -22,7 +22,7 @@ import type { PayslipDocumentData } from "@/features/payroll/payslip/types";
 import { formatVietnameseCurrencyWords } from "@/features/payroll/payslip/vietnamese-currency-words";
 import { DATABASE_PERMISSION_CODES, type PermissionCode } from "@/lib/permissions/types";
 
-export type PayrollPreviewView = "dashboard" | "ledger" | "payslip";
+export type PayrollPreviewView = "dashboard" | "ledger" | "payslip" | "payslip-piecework";
 export type PayrollPreviewRole = "owner" | "accountant" | "staff";
 export type PayrollPreviewState = "normal" | "empty" | "errors";
 
@@ -363,7 +363,7 @@ export const previewPayrollTransports: Record<PayrollPreviewState, PayrollEstima
 
 /* --------------------------------------------------------------- payslip (8b) */
 
-function payslipLine(id: string, lineType: string, label: string, amountVnd: number, direction: "earning" | "deduction" = "earning") {
+function payslipLine(id: string, lineType: string, label: string, amountVnd: number, direction: "earning" | "deduction" = "earning", note: string | null = null) {
   return {
     amountFormatted: formatCurrency(amountVnd),
     amountVnd,
@@ -372,7 +372,7 @@ function payslipLine(id: string, lineType: string, label: string, amountVnd: num
     id,
     label,
     lineType,
-    note: null,
+    note,
     quantity: null,
     unitLabel: null,
     unitRateFormatted: null,
@@ -391,8 +391,14 @@ function payslipData(state: PayrollPreviewState): PayslipDocumentData {
         payslipLine("p4", "grading_bonus", "Thưởng chấm bài", 300_000),
         payslipLine("p5", "new_student_fixed_bonus", "Thưởng tuyển sinh theo nguồn", 300_000),
       ];
+  const adjustments = empty
+    ? []
+    : [
+        payslipLine("p7", "manual_reward", "Điều chỉnh tăng", 120_000, "earning", "Phụ cấp ăn tối 3 ngày làm thông ca × 40.000"),
+        payslipLine("p8", "manual_deduction", "Điều chỉnh giảm", 50_000, "deduction", "Trừ phần thưởng chấm bài tính trùng ngày 20/09"),
+      ];
   const deductions = empty ? [] : [payslipLine("p6", "advance_deduction", "Khấu trừ tạm ứng", 2_000_000, "deduction")];
-  const gross = empty ? 0 : 5_550_000;
+  const gross = empty ? 0 : 5_620_000;
   const totalDeductions = empty ? 0 : 2_000_000;
   const net = gross - totalDeductions;
 
@@ -407,6 +413,7 @@ function payslipData(state: PayrollPreviewState): PayslipDocumentData {
             { dailyRateFormatted: "720.000 VND", dailyRateVnd: 720_000, factorText: "50%", mode: "online", modeLabel: "Lương công online", subtotalFormatted: "440.000 VND", subtotalVnd: 440_000, workHoursFormatted: "5 giờ 30 phút", workMinutes: 330 },
           ],
         },
+    adjustments,
     deductions,
     earnings,
     employee: {
@@ -435,6 +442,7 @@ function payslipData(state: PayrollPreviewState): PayslipDocumentData {
       status: empty ? "draft" : "approved",
       statusLabel: empty ? "Bản nháp" : "Đã duyệt & khóa",
     },
+    piecework: null,
     statementId: "f5000000-0000-4000-8000-000000000007",
     totals: {
       amountInWords: formatVietnameseCurrencyWords(net),
@@ -447,6 +455,56 @@ function payslipData(state: PayrollPreviewState): PayslipDocumentData {
       workHours: empty ? 0 : 57,
       workMinutes: empty ? 0 : 3_450,
       workUnits: empty ? 0 : 26,
+    },
+  };
+}
+
+/**
+ * An operations assistant on lương cứng + lương khoán (fictional figures):
+ * lương cứng 2.600.000, lương khoán 2.700.000 above the 85% floor (2.210.000),
+ * so 490.000 is added; two manager corrections with their notes; one advance.
+ */
+function pieceworkPayslipData(): PayslipDocumentData {
+  const base = payslipData("normal");
+  const income = 3_200_000;
+  const totalDeductions = 500_000;
+  const net = income - totalDeductions;
+  return {
+    ...base,
+    adjustments: [
+      payslipLine("k6", "manual_reward", "Điều chỉnh tăng", 150_000, "earning", "Phụ cấp điện thoại 10 ca × 15.000"),
+      payslipLine("k7", "manual_deduction", "Điều chỉnh giảm", 40_000, "deduction", "Trả lại phần công online tính nhầm thành offline"),
+    ],
+    breakdowns: {
+      commissions: [],
+      grading: null,
+      workHours: [
+        { dailyRateFormatted: "720.000 VND", dailyRateVnd: 720_000, factorText: null, mode: "offline", modeLabel: "Lương công offline", subtotalFormatted: "2.400.000 VND", subtotalVnd: 2_400_000, workHoursFormatted: "30 giờ", workMinutes: 1_800 },
+        { dailyRateFormatted: "720.000 VND", dailyRateVnd: 720_000, factorText: "50%", mode: "online", modeLabel: "Lương công online", subtotalFormatted: "200.000 VND", subtotalVnd: 200_000, workHoursFormatted: "5 giờ", workMinutes: 300 },
+      ],
+    },
+    deductions: [payslipLine("k8", "advance_deduction", "Khấu trừ tạm ứng", 500_000, "deduction")],
+    earnings: [
+      payslipLine("k1", "base_offline", "Lương công offline", 2_400_000),
+      payslipLine("k2", "base_online", "Lương công online", 200_000),
+      payslipLine("k3", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 1_500_000),
+      payslipLine("k4", "center_renewal_duty_bonus", "Thưởng quản lý và trực tin nhắn", 900_000),
+      payslipLine("k5", "payroll_processing_bonus", "Thưởng tính lương nhân sự", 300_000),
+    ],
+    employee: { ...base.employee, bankAccount: null, displayName: "Phạm Thu Hạnh", employeeCode: "NV03", positionLabel: "Trợ lý vận hành", staffId: staffIds.hanh },
+    piecework: { absorbedVnd: 2_210_000, addedVnd: 490_000, baseSalaryVnd: 2_600_000, earnedVnd: 2_700_000, floorBasisPoints: 8_500, kind: "summary", thresholdVnd: 2_210_000 },
+    totals: {
+      ...base.totals,
+      amountInWords: formatVietnameseCurrencyWords(net),
+      grossFormatted: formatCurrency(income),
+      grossVnd: income,
+      netFormatted: formatCurrency(net),
+      netVnd: net,
+      totalDeductionsFormatted: formatCurrency(totalDeductions),
+      totalDeductionsVnd: totalDeductions,
+      workHours: 35,
+      workMinutes: 2_100,
+      workUnits: 3,
     },
   };
 }
@@ -477,6 +535,7 @@ export function PayrollPreview({
       {view === "dashboard" ? <DashboardView permissions={permissions} state={state} /> : null}
       {view === "ledger" ? <LedgerView role={role} state={state} /> : null}
       {view === "payslip" ? <PayslipView state={state} /> : null}
+      {view === "payslip-piecework" ? <PayslipView piecework state={state} /> : null}
     </AppShell>
   );
 }
@@ -521,7 +580,7 @@ function LedgerView({ role, state }: { role: PayrollPreviewRole; state: PayrollP
   );
 }
 
-function PayslipView({ state }: { state: PayrollPreviewState }) {
+function PayslipView({ piecework = false, state }: { piecework?: boolean; state: PayrollPreviewState }) {
   if (state === "errors") {
     return <ErrorState description="Không tìm thấy phiếu lương của nhân sự." title="Không tải được phiếu lương" />;
   }
@@ -533,7 +592,7 @@ function PayslipView({ state }: { state: PayrollPreviewState }) {
         pdfUnavailableReason="Bản xem trước không tạo PDF."
       />
       <div className="p-4 sm:p-6">
-        <PayslipDocument data={payslipData(state)} />
+        <PayslipDocument data={piecework && state === "normal" ? pieceworkPayslipData() : payslipData(state)} />
       </div>
     </div>
   );

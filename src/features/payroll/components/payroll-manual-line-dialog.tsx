@@ -102,7 +102,7 @@ export function PayrollManualLineDialog({
             Điều chỉnh bảng lương
           </h2>
           <p className="mt-1 text-secondary text-text-muted" id={descriptionId}>
-            Thêm thưởng hoặc khấu trừ thủ công cho {staffDisplayName}. Hệ thống xác minh kỳ lương còn có thể cập nhật trước khi lưu.
+            Thêm điều chỉnh tăng hoặc giảm cho {staffDisplayName}. Điều chỉnh tăng cộng vào, điều chỉnh giảm trừ vào Thực nhận. Hệ thống xác minh kỳ lương còn có thể cập nhật trước khi lưu.
           </p>
 
           <form className="mt-5 grid gap-4" onSubmit={handleSubmit}>
@@ -115,8 +115,8 @@ export function PayrollManualLineDialog({
                 ref={lineTypeRef}
                 value={lineType}
               >
-                <option value="manual_reward">Thưởng thủ công</option>
-                <option value="manual_deduction">Khấu trừ thủ công</option>
+                <option value="manual_reward">Điều chỉnh tăng</option>
+                <option value="manual_deduction">Điều chỉnh giảm</option>
               </select>
             </SelectField>
 
@@ -141,6 +141,7 @@ export function PayrollManualLineDialog({
 
             <TextAreaField
               error={fieldErrors.note?.[0]}
+              hint="Nhân sự thấy nội dung này trên phiếu lương, ở mục Điều chỉnh."
               id={noteId}
               label="Nội dung"
             >
@@ -181,6 +182,7 @@ export function PayrollManualLineDialog({
 function SelectField({
   children,
   error,
+  hint,
   id,
   label,
 }: {
@@ -189,18 +191,20 @@ function SelectField({
     "aria-invalid"?: boolean;
   }>;
   error?: string;
+  hint?: string;
   id: string;
   label: string;
 }) {
   const errorId = `${id}-error`;
+  const hintId = `${id}-hint`;
   return (
     <div className="grid gap-1.5">
       <label className="text-label text-text-default" htmlFor={id}>{label}</label>
       {cloneElement(children, {
-        "aria-describedby": error ? errorId : undefined,
+        "aria-describedby": error ? errorId : hint ? hintId : undefined,
         "aria-invalid": Boolean(error),
       })}
-      {error ? <p className="text-caption font-medium text-danger" id={errorId}>{error}</p> : null}
+      {error ? <p className="text-caption font-medium text-danger" id={errorId}>{error}</p> : hint ? <p className="text-caption text-text-muted" id={hintId}>{hint}</p> : null}
     </div>
   );
 }
@@ -225,6 +229,7 @@ function InputField({
 function TextAreaField({
   children,
   error,
+  hint,
   id,
   label,
 }: {
@@ -233,8 +238,9 @@ function TextAreaField({
     "aria-invalid"?: boolean;
   }>;
   error?: string;
+  hint?: string;
   id: string;
   label: string;
 }) {
-  return <SelectField error={error} id={id} label={label}>{children}</SelectField>;
+  return <SelectField error={error} hint={hint} id={id} label={label}>{children}</SelectField>;
 }

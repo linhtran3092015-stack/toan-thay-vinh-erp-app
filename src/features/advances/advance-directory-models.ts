@@ -140,9 +140,13 @@ export function describeOwnPendingCaption(stage: AdvanceDecisionStage): string {
     : "Đơn của bạn · cần người khác phê duyệt";
 }
 
-/** `/payroll` anchors each period by id; there is no per-period route. */
+/**
+ * `/payroll` anchors each period by id; there is no per-period route. It shows
+ * only recent and open periods, so `?period=` asks it to load this one too.
+ */
 export function getPayrollPeriodHref(payrollPeriodId: string): string {
-  return `/payroll#payroll-period-${encodeURIComponent(payrollPeriodId)}`;
+  const id = encodeURIComponent(payrollPeriodId);
+  return `/payroll?period=${id}#payroll-period-${id}`;
 }
 
 // ---------------------------------------------------------------------------

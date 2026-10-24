@@ -40,6 +40,7 @@ const makeDocumentData = (
       },
     ],
   },
+  adjustments: [],
   deductions: [
     {
       amountFormatted: "2.350.000 VND",
@@ -130,6 +131,7 @@ const makeDocumentData = (
     status: "draft",
     statusLabel: "Bản nháp",
   },
+  piecework: null,
   statementId: "statement-uuid-1",
   totals: {
     amountInWords: "Chín triệu bốn trăm bảy mươi sáu nghìn đồng chẵn./.",
@@ -191,7 +193,7 @@ describe("Payslip UI Presentation & Document Structure", () => {
     // Income Overview Card
     expect(screen.getByText("Tổng thu nhập")).toBeInTheDocument();
     expect(screen.getAllByText("11.826.000 VND").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Tổng bù trừ & khấu trừ")).toBeInTheDocument();
+    expect(screen.getByText("Tổng khấu trừ")).toBeInTheDocument();
     expect(screen.getAllByText(/2\.350\.000 VND/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("9.476.000 VND").length).toBeGreaterThanOrEqual(1);
     expect(
@@ -200,7 +202,7 @@ describe("Payslip UI Presentation & Document Structure", () => {
 
     // Line tables
     expect(screen.getByRole("heading", { name: "Thu nhập" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Bù trừ & khấu trừ" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Khấu trừ" })).toBeInTheDocument();
     expect(screen.getAllByText("Lương công offline")[0]).toBeInTheDocument();
     expect(screen.getByText("Thưởng chấm bài")).toBeInTheDocument();
     expect(screen.getByText("Thưởng doanh thu")).toBeInTheDocument();

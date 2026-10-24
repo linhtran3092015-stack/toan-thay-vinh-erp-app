@@ -1,3 +1,5 @@
+import type { PieceworkSummary } from "@/features/payroll/payslip-sections";
+
 export type PayslipPeriodStatus = "draft" | "review" | "approved";
 
 export interface PayslipBankAccountInfo {
@@ -80,10 +82,12 @@ export interface CommissionDetail {
 export interface PayslipTotals {
   amountInWords: string;
   grossFormatted: string;
+  /** "Tổng thu nhập" as staff read it: net of the piecework offset and manual deductions. */
   grossVnd: number;
   netFormatted: string;
   netVnd: number;
   totalDeductionsFormatted: string;
+  /** Real deductions only (advances). */
   totalDeductionsVnd: number;
   workHours: number;
   workMinutes: number;
@@ -96,11 +100,17 @@ export interface PayslipDocumentData {
     grading: GradingDetail | null;
     workHours: readonly WorkHoursDetail[];
   };
+  /** Manual adjustments (tăng and giảm); not counted as deductions. */
+  adjustments: readonly PayslipLineItem[];
+  /** Real deductions only (advances); the piecework offset lives in `piecework`. */
   deductions: readonly PayslipLineItem[];
+  /** Earnings without manual adjustments. */
   earnings: readonly PayslipLineItem[];
   employee: PayslipEmployeeInfo;
   isStale: boolean;
   period: PayslipPeriodInfo;
+  /** Present when the staff member is paid lương cứng + lương khoán above a floor. */
+  piecework: PieceworkSummary | null;
   statementId: string;
   totals: PayslipTotals;
 }
