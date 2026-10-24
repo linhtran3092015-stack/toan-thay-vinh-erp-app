@@ -2,6 +2,26 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.41.0.0] - 2026-10-24
+
+Kết nối ZaloCRM dùng được thật: trang mới **Liên kết nhóm Zalo** (`/parent-messages/groups`) cho biết kết nối đang thiếu bước nào và gợi ý nhóm sổ liên lạc cho mọi học sinh đang học chưa liên kết, để liên kết hàng loạt thay vì từng em. Chưa liên kết thì không có tin vắng mặt hay nhận xét cuối buổi.
+
+### Added
+- **Trang Liên kết nhóm Zalo** (nút trên trang Tin nhắn phụ huynh và trong Cài đặt → Chung; cần quyền xem và sửa học sinh). Bảng "Kết nối ZaloCRM" 5 bước: khóa ZaloCRM trên máy chủ, kết nối tới ZaloCRM, nick trung tâm đang kết nối, danh sách nhóm, số học sinh đã liên kết; bước nào thiếu thì nói cách làm. Khi 4 bước đầu xong, bảng thu thành một dòng "Đã kết nối".
+- **Gợi ý nhóm** từ tên nhóm hiện tại trên ZaloCRM theo mã học sinh, họ tên, SĐT và tên phụ huynh. Dòng "Chắc chắn" được chọn sẵn chỉ khi tên nhóm có mã học sinh, đúng họ tên có dấu, hoặc tên không dấu kèm SĐT phụ huynh; nhóm đông hơn 15 người, anh em chung SĐT, trùng tên (kể cả với học sinh đã nghỉ, bảo lưu hay đã liên kết) thì vào "Cần chọn". Bấm "Liên kết N học sinh" để lưu, 25 em mỗi lần; dòng lỗi giữ lại kèm lý do. Nút "Tìm nhóm" ở từng dòng mở hộp tìm nhóm như trên hồ sơ học sinh.
+- Tên và SĐT phụ huynh trên trang chỉ hiện với quyền xem phụ huynh.
+
+### Changed
+- Liên kết và tìm nhóm luôn dùng nick trung tâm trong Cài đặt, đọc ở máy chủ; hộp "Tìm nhóm" chỉ tìm trong nhóm của nick này. "Kiểm tra liên kết" trên hồ sơ học sinh đọc nhóm theo dữ liệu đã lưu của học sinh và cần quyền sửa học sinh.
+- Hộp tìm nhóm ghi rõ "Liên kết nhóm này" (bấm là lưu ngay).
+
+### Fixed
+- Một nhóm Zalo không thể gắn cho hai học sinh, kể cả khi hai người lưu cùng lúc (khóa ở cơ sở dữ liệu), để tin của em này không tới phụ huynh em khác.
+
+### For contributors
+- Migration `20261024200000_students_zalo_group_thread_unique.sql`: unique index `students_zalo_group_thread_key` và RPC `get_zalo_center_account_id` (cho quyền sửa học sinh, điểm danh hoặc xem cài đặt). Đẩy lên production trước khi merge.
+- `src/lib/phone.ts` (`normalizeVietnamPhoneNumber`) dùng chung cho form học sinh và bộ ghép nhóm. Bản xem trước `/dev/zalo-groups`.
+
 ## [0.40.1.0] - 2026-10-24
 
 ERP phản hồi nhanh hơn: máy chủ ứng dụng chuyển sang Singapore, ngay cạnh cơ sở dữ liệu, nên mỗi lần đọc hoặc ghi dữ liệu không còn phải đi vòng sang Mỹ. Điểm danh từng học sinh và chuyển giữa các mục đều nhanh hơn.

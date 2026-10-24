@@ -2715,6 +2715,42 @@
 
 ## Tin nhắn phụ huynh (Zalo)
 
+### Bảng liên kết nhóm Zalo trên điện thoại
+
+**What:** Dưới chiều rộng an toàn của bảng, hiện dạng danh sách thẻ (tên, lớp, phụ huynh, ô chọn nhóm và "Tìm nhóm" rộng 44px), như `tuition-readiness-table.tsx`.
+
+**Why:** Bảng rộng khoảng 930px nên trên điện thoại phải cuộn ngang. Chủ trung tâm để sau (24/10/2026) vì liên kết hàng loạt thường làm trên máy tính.
+
+**Context:** `src/features/parent-messages/components/zalo-group-bulk-linker.tsx`; DESIGN.md (ResponsiveRecordList).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Không
+
+### Liên kết hàng loạt: chỉ ghi khi học sinh còn chưa có nhóm, ngay trong RPC
+
+**What:** RPC `link_student_zalo_group` ghi đè nhóm cũ không điều kiện. Thao tác hàng loạt kiểm tra "chưa có nhóm" trước rồi mới gọi RPC, nên một liên kết lưu từ hồ sơ học sinh trong cùng khoảng một giây có thể bị thay. Thêm chế độ `where zalo_group_thread_id is null` (hoặc RPC riêng) báo `ZALO_STUDENT_ALREADY_LINKED`; cân nhắc kiểm tra nhóm trên ZaloCRM và lấy tên nhóm từ CRM thay vì từ trình duyệt.
+
+**Why:** Review bảo mật vòng 2; khả năng xảy ra rất thấp, và unique index đã chặn trường hợp hai học sinh chung một nhóm.
+
+**Context:** `linkStudentZaloGroupsAction` trong `src/features/parent-messages/actions.ts`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Không
+
+### Nick lưu theo từng học sinh có thể cũ khi đổi nick trung tâm
+
+**What:** Liên kết lưu `students.zalo_account_id`, và hàng đợi ưu tiên giá trị này hơn nick trung tâm. Nếu nick trung tâm được thêm lại với mã mới trên ZaloCRM, tin của học sinh đã liên kết vẫn đi nick cũ. Cho hàng đợi ưu tiên nick trong Cài đặt, hoặc báo trên bảng kiểm tra số học sinh lưu nick khác.
+
+**Why:** Red team review 24/10/2026.
+
+**Context:** `enqueue_parent_message` (migration `20261017090000_zalo_comment_message_v2.sql`).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Không
+
 ### Gỡ RPC `record_parent_message_result` cũ sau khi bản 0.21 chạy ổn
 
 **What:** Ứng dụng từ 0.21.0.0 gửi qua `begin_parent_message_send` + `record_parent_message_part`. RPC cũ `record_parent_message_result` chỉ còn để bản ứng dụng cũ chạy được trong lúc deploy; gỡ bằng một migration sau.
