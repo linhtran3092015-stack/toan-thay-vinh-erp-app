@@ -2879,7 +2879,7 @@
 
 **Why:** Người Việt đọc "3" là Thứ 3 (thứ Ba); lịch lớp có thể được tạo lệch một ngày cho cả file. Cùng nhóm, vẫn đọc sai mà không báo: "Thu 2" hay "Thu Ba" gõ không dấu bị đọc thành thứ Năm (khớp chữ "THU" của tiếng Anh), và "Thứ 2, 4, 6" chỉ được đọc là thứ Hai. Ngược lại, ô ghi thêm mã khác trùng mã thứ ("Thứ 2 - CN Cầu Giấy", "Thứ 3 - tầng T2") bị coi là ghi hai ngày, và ô chỉ có mã mà tên tiếng Anh nói ngày khác ("Sat - tầng T2", "T2 (cô Thu)") đều thành dòng lỗi. Thêm nữa, lời nhắn của máy chủ trong bảng kiểm tra in số ISO sau chữ "Thứ" ("Thứ 3" cho thứ Tư, "Thứ: 7" cho Chủ nhật), ngược với cột Thứ ngay cạnh; khi chọn quy ước nên đổi luôn cách hiện lời nhắn này (dịch ở `getRowIssue` hay sửa hàm máy chủ). Nên quyết cùng một lần với quy ước số.
 
-**Context:** `parseWeekdayValue` trong `src/features/imports/classes/workbook.ts` (nhánh số: `typeof value === "number"` và chữ số `/^\+?\d+(\.\d+)?$/`; bảng `VIETNAMESE_DAY_NAMES` / `VIETNAMESE_DAY_CODES` / `ENGLISH_DAY_NAMES`), tiêu đề `Thứ *` ở `src/features/imports/classes/fields.ts`, file mẫu `src/features/imports/classes/template-browser.ts`; test `tests/unit/class-schedule-import-weekday.test.ts`. Review /ship v0.38.0.1 (red team), anh chọn ghi TODO.
+**Context:** `parseWeekdayValue` trong `src/features/imports/classes/workbook.ts` (nhánh số: `typeof value === "number"` và chữ số `/^\+?\d+(\.\d+)?$/`; bảng `VIETNAMESE_DAY_NAMES` / `VIETNAMESE_DAY_CODES` / `ENGLISH_DAY_NAMES`), tiêu đề `Thứ *` ở `src/features/imports/classes/fields.ts`, file mẫu `src/features/imports/classes/template-browser.ts`; test `tests/unit/class-schedule-import-weekday.test.ts`. Review /ship v0.38.1.1 (red team), anh chọn ghi TODO.
 
 **Effort:** S
 **Priority:** P2
@@ -2891,7 +2891,7 @@
 
 **Why:** (1) chặn mọi file lịch thật; (2) tạo lịch sai ngày bắt đầu mà không ai thấy; (3) người nhập không biết dòng nào sai.
 
-**Context:** `normalizeCellValue`, `parseTimeValue`, `parseDateValue` trong `src/features/imports/classes/workbook.ts`; `prepareScheduleInputs` và `withUnreadableWeekdayRows` trong `src/features/imports/classes/class-schedule-import-page.tsx`; `scheduleImportRowInputSchema` trong `src/features/imports/classes/schemas.ts`; ép kiểu `::time`/`::date` trong `dry_run_class_schedule_import`; read-excel-file trả ô trống cho phần còn lại của ô gộp. Có từ trước (giống trên main). Review /ship v0.38.0.1 (red team), anh chọn ghi TODO; mức ưu tiên nâng lên P1 sau khi red team tìm ra (1) và (2), anh có thể hạ.
+**Context:** `normalizeCellValue`, `parseTimeValue`, `parseDateValue` trong `src/features/imports/classes/workbook.ts`; `prepareScheduleInputs` và `withUnreadableWeekdayRows` trong `src/features/imports/classes/class-schedule-import-page.tsx`; `scheduleImportRowInputSchema` trong `src/features/imports/classes/schemas.ts`; ép kiểu `::time`/`::date` trong `dry_run_class_schedule_import`; read-excel-file trả ô trống cho phần còn lại của ô gộp. Có từ trước (giống trên main). Review /ship v0.38.1.1 (red team), anh chọn ghi TODO; mức ưu tiên nâng lên P1 sau khi red team tìm ra (1) và (2), anh có thể hạ.
 
 **Effort:** M
 **Priority:** P1
@@ -2927,19 +2927,19 @@
 
 **Why:** Câu chữ đúng sự thật khi mất phản hồi, và bớt phụ thuộc vào câu chữ máy chủ.
 
-**Context:** banner kết quả ở bốn wizard trong `src/features/imports/`, `session-balance-batch-detail-page.tsx`, `enrollments/enrollment-import-page.tsx` (`computeSha256`, `BATCH_ALREADY_COMMITTED_CODE`), `students/student-import-commit-panel.tsx` (`toStudentImportCommitError`, `STUDENT_IMPORT_VALIDATION_FAILED_MESSAGE`). Review /ship bước 15b (v0.38.0.0), red team; review /ship v0.38.0.1 (maintainability).
+**Context:** banner kết quả ở bốn wizard trong `src/features/imports/`, `session-balance-batch-detail-page.tsx`, `enrollments/enrollment-import-page.tsx` (`computeSha256`, `BATCH_ALREADY_COMMITTED_CODE`), `students/student-import-commit-panel.tsx` (`toStudentImportCommitError`, `STUDENT_IMPORT_VALIDATION_FAILED_MESSAGE`). Review /ship bước 15b (v0.38.0.0), red team; review /ship v0.38.1.1 (maintainability).
 
 **Effort:** S
 **Priority:** P3
 **Depends on:** Không
 
-### Nhập học sinh và nhập lớp: các điểm nhỏ còn lại sau review v0.38.0.1
+### Nhập học sinh và nhập lớp: các điểm nhỏ còn lại sau review v0.38.1.1
 
 **What:** (1) Khi xác nhận nhập học sinh bị từ chối "Dữ liệu đã thay đổi hoặc còn dòng lỗi", đưa focus bàn phím tới nút "Kiểm tra lại" ngay lúc lời từ chối hiện (hiện chỉ trả focus sau một lần kiểm tra lại lỗi). (2) Sau lời từ chối đó, bấm Quay lại về "Kiểm tra dòng" vẫn hiện kết quả cũ "Không còn dòng lỗi." mà không ghi là đã cũ; thêm ghi chú kèm nút "Kiểm tra lại" ở bước đó. (3) Giới hạn 100 ký tự của ô "Thứ" đang đếm trước khi chuẩn hóa NFC, nên ô dạng tổ hợp dài gần 100 ký tự bị chặn còn cùng chữ dạng dựng sẵn thì đọc được; đếm sau khi chuẩn hóa (giữ một ngưỡng thô rộng hơn trước đó). (4) Lời nhắn "Không đọc được thứ trong tuần: …" vẫn chuẩn hóa cả ô trước khi cắt 40 ký tự, và chú thích trong mã nói quá; cắt phần đầu trước khi chuẩn hóa hoặc sửa chú thích. (5) Bảng xem trước ở bước Ánh xạ cột hiện "Không rõ thứ (…)" với cả ô, không cắt như lời nhắn ở bước Kiểm tra dòng. (6) Chốt chặn `hasUnreadableWeekday` trong `handleCreateBatch` trả về im lặng; nếu một thay đổi sau làm nó chạy tới, nút "Tạo lô" bấm được mà không có gì xảy ra; đưa điều kiện vào lý do khóa nút. (7) Dòng lịch bị giữ lại vì thứ không đọc được hiện giá trị thô (mã lớp chưa viết hoa, giờ như gõ) cạnh các dòng máy chủ đã chuẩn hóa. (8) Ba ca test còn thiếu: ô 41 emoji (nhánh cắt theo độ dài UTF-16), sheet Schedules không có dòng nào, lần kiểm tra đầu bị mất kết nối. (9) Gợi ý gọn lại phần cắt ô (bỏ phần đầu giới hạn nếu đã cắt trước khi chuẩn hóa).
 
 **Why:** Không điểm nào ghi sai dữ liệu (review đối kháng cuối khuyên ship nguyên trạng); đây là trợ năng bàn phím, câu chữ nhất quán và test cho các nhánh mới.
 
-**Context:** `src/features/imports/students/student-import-commit-panel.tsx` (`recheckButtonRef`), `src/features/imports/students/student-import-page.tsx` (bước Kiểm tra dòng), `src/features/imports/classes/workbook.ts` (`WEEKDAY_CELL_MAX_LENGTH`), `src/features/imports/classes/class-schedule-import-page.tsx` (`unreadableWeekdayMessage`, `formatPreviewCell`, `handleCreateBatch`); tests `tests/components/class-schedule-import-page.test.tsx`, `tests/components/student-import-page.test.tsx`. Review /ship v0.38.0.1 (vòng 3 và review đối kháng); anh chọn ship và ghi chung một mục P3.
+**Context:** `src/features/imports/students/student-import-commit-panel.tsx` (`recheckButtonRef`), `src/features/imports/students/student-import-page.tsx` (bước Kiểm tra dòng), `src/features/imports/classes/workbook.ts` (`WEEKDAY_CELL_MAX_LENGTH`), `src/features/imports/classes/class-schedule-import-page.tsx` (`unreadableWeekdayMessage`, `formatPreviewCell`, `handleCreateBatch`); tests `tests/components/class-schedule-import-page.test.tsx`, `tests/components/student-import-page.test.tsx`. Review /ship v0.38.1.1 (vòng 3 và review đối kháng); anh chọn ship và ghi chung một mục P3.
 
 **Effort:** S
 **Priority:** P3
@@ -2971,7 +2971,7 @@
 **Priority:** P2
 **Depends on:** Không
 
-**Completed:** v0.38.0.1 (2026-10-24): lời từ chối đó có nút "Kiểm tra lại" ngay trong bước Xác nhận nhập, và nút xác nhận khóa ("Dữ liệu đã thay đổi hoặc còn dòng lỗi: bấm “Kiểm tra lại” trước khi nhập.") tới khi kiểm tra lại xong; nút chạy lại kiểm tra với file và ánh xạ đang giữ rồi mở bước Kiểm tra dòng với kết quả mới và câu "Đã kiểm tra lại." (giữ lý do đã gõ, bỏ dấu xác nhận). Kiểm tra lại lỗi thì báo ngay dưới lời từ chối, không hiện ở bước Ánh xạ cột.
+**Completed:** v0.38.1.1 (2026-10-24): lời từ chối đó có nút "Kiểm tra lại" ngay trong bước Xác nhận nhập, và nút xác nhận khóa ("Dữ liệu đã thay đổi hoặc còn dòng lỗi: bấm “Kiểm tra lại” trước khi nhập.") tới khi kiểm tra lại xong; nút chạy lại kiểm tra với file và ánh xạ đang giữ rồi mở bước Kiểm tra dòng với kết quả mới và câu "Đã kiểm tra lại." (giữ lý do đã gõ, bỏ dấu xác nhận). Kiểm tra lại lỗi thì báo ngay dưới lời từ chối, không hiện ở bước Ánh xạ cột.
 
 ### Nhập lớp: thứ trong tuần không đọc được bị ghi thành thứ Hai
 
@@ -2985,7 +2985,7 @@
 **Priority:** P2
 **Depends on:** Không
 
-**Completed:** v0.38.0.1 (2026-10-24): dòng lịch có thứ không đọc được (kể cả ô trống) không còn gửi đi như thứ Hai mà thành dòng "Không hợp lệ" ở bước Kiểm tra dòng ("Không đọc được thứ trong tuần: …"), được đếm vào số dòng chặn "Tạo lô"; nếu cả sheet không đọc được thứ thì báo ngay ở bước Ánh xạ cột. Hàm đọc thứ cũng không còn đoán: số lẻ (1,5), ô ghi hai ngày ("Thứ 2, Thứ 4") là không đọc được, và chữ tiếng Việt dạng tổ hợp (Unicode tổ hợp) không còn bị đọc thành thứ Năm.
+**Completed:** v0.38.1.1 (2026-10-24): dòng lịch có thứ không đọc được (kể cả ô trống) không còn gửi đi như thứ Hai mà thành dòng "Không hợp lệ" ở bước Kiểm tra dòng ("Không đọc được thứ trong tuần: …"), được đếm vào số dòng chặn "Tạo lô"; nếu cả sheet không đọc được thứ thì báo ngay ở bước Ánh xạ cột. Hàm đọc thứ cũng không còn đoán: số lẻ (1,5), ô ghi hai ngày ("Thứ 2, Thứ 4") là không đọc được, và chữ tiếng Việt dạng tổ hợp (Unicode tổ hợp) không còn bị đọc thành thứ Năm.
 
 ### Mở thông báo ngay khi bấm, đánh dấu đã đọc ở nền
 
