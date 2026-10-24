@@ -2,6 +2,27 @@
 
 All notable changes to Toan Thay Vinh ERP will be documented in this file.
 
+## [0.40.0.0] - 2026-10-24
+
+Phiếu lương và trang Bảng lương chỉ đọc đúng phần cần hiển thị, trong một lần đọc: phiếu lương (trang in và PDF) đọc đúng phiếu đó, trang `/payroll` đọc 3 kỳ gần nhất cùng mọi kỳ còn nháp hoặc chờ đối soát, và tải kỳ cũ hơn khi bấm. Phiếu có dòng lương không cộng ra đúng tổng thì không hiện số sai nữa.
+
+### Changed
+- **Trang Bảng lương** (`/payroll`): hiện 3 kỳ lương gần nhất và mọi kỳ còn nháp hoặc chờ đối soát (để luôn bấm được Tính lại, chuyển đối soát, duyệt). Cuối danh sách có dòng "Còn N kỳ lương cũ hơn chưa hiển thị" và nút "Xem thêm 3 kỳ cũ hơn"; tối đa 60 kỳ. Trang không còn tải toàn bộ lịch sử lương xuống trình duyệt.
+- **Liên kết từ Tạm ứng** tới kỳ lương đã khấu trừ mở đúng kỳ đó, kể cả kỳ cũ hơn 3 kỳ gần nhất.
+- **Phiếu lương và PDF**: chỉ đọc phiếu đang mở. Phiếu thuộc phiên bản tính cũ vẫn chuyển sang phiếu hiện tại của cùng nhân sự; đường dẫn sai định dạng báo "không tìm thấy".
+- **Lương khoán đạt** trên phiếu lương lấy đúng con số hệ thống đã dùng khi tính phần bù trừ.
+- **Nhân sự** chỉ thấy số lỗi dữ liệu và yêu cầu điều chỉnh của chính mình ở đầu mỗi kỳ, không còn thấy số của đồng nghiệp.
+- **Bảng "Tạm tính theo vị trí"** của chủ trung tâm: dòng "Chưa phân loại" cộng cả tạm ứng của nhân sự chưa có vị trí, nên Thu nhập − Khấu trừ khớp số phải trả.
+
+### Fixed
+- Phiếu lương có dòng lương không khớp tổng, hoặc lương khoán không khớp các khoản liệt kê, không còn được hiển thị hay in: trang báo lỗi rõ ràng, PDF trả lỗi thay vì tệp. Nhân sự được nhắc báo quản lý lương; người quản lý lương được nhắc Tính lại.
+- Lương khoán không bao giờ hiện số âm ở phần "cộng thêm": hộp "Xem chi tiết" hiện cảnh báo màu vàng và ẩn tổng nhóm, thẻ lương tạm tính hiện "Lương khoán tạm tính chưa khớp…".
+
+### For contributors
+- Migration `20261024150000_payroll_period_details_scoped_read.sql` thêm RPC `get_payroll_period_details(p_payroll_period_id, p_payroll_statement_id, p_period_limit, p_include_payroll_period_id)`: một giá trị jsonb (kỳ → phiếu → dòng, tổng, `olderPeriodCount`, `staleStatement`) trong một snapshot, không bị giới hạn 1.000 dòng của PostgREST. `get_payroll_periods_with_details` và `get_payroll_explanations` vẫn giữ trong lúc triển khai; bỏ ở bản sau.
+- Cần `supabase db push` migration này **trước khi** merge vào main, vì code mới chỉ gọi RPC mới.
+- Test: pgTAP `payroll-period-details.test.sql` (41 kiểm tra), unit cho đọc, đối chiếu và đọc lại, `?periods=`/`?period=`, quy tắc lương khoán, dòng "Chưa phân loại".
+
 ## [0.39.0.0] - 2026-10-24
 
 Phiếu lương không còn ghi phần lương khoán đã tính trong lương cứng và các khoản điều chỉnh thủ công là "khấu trừ". Nhân sự thấy lương khoán và điều chỉnh nằm trong thu nhập, còn "Khấu trừ" chỉ là tạm ứng lương. Số thực nhận không đổi.
