@@ -10,6 +10,7 @@ import {
   enrichPayrollPeriodsWithExplanations,
   normalizePayrollPeriodsWithDetailsRows,
 } from "@/features/payroll/read-models";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
@@ -105,21 +106,32 @@ export async function getPayrollPeriodsWithDetailsResult(): Promise<
       }>;
     };
     const [detailsResult, explanationsResult, paymentResult] = await Promise.all([
-      supabase.rpc("get_payroll_periods_with_details"),
+      // Every line of every period, paged under PostgREST's max_rows: payslip
+      // totals are now summed from these lines, so a cut list would misstate them.
+      fetchAllPages((from, to) => supabase.rpc("get_payroll_periods_with_details").range(from, to)),
       untypedRpcClient.rpc("get_payroll_explanations"),
       // Payment facts live on the period row; the details RPC predates them.
       supabase.from("payroll_periods").select("id, paid_at, paid_on, payment_reference"),
     ]);
 
-    if (detailsResult.error || explanationsResult.error || paymentResult.error) {
+    if (detailsResult.error || !detailsResult.data || explanationsResult.error || paymentResult.error) {
       return { ok: false };
     }
 
     const paymentById = new Map(
       (paymentResult.data ?? []).map((row) => [row.id, row]),
     );
+    // Pages are separate reads: a write between two requests can shift a row
+    // onto the next page too, so keep each line once.
+    const seenLineIds = new Set<string>();
+    const detailRows = detailsResult.data.filter((row) => {
+      if (row.payroll_line_item_id === null) return true;
+      if (seenLineIds.has(row.payroll_line_item_id)) return false;
+      seenLineIds.add(row.payroll_line_item_id);
+      return true;
+    });
     const periods = enrichPayrollPeriodsWithExplanations(
-      normalizePayrollPeriodsWithDetailsRows(detailsResult.data),
+      normalizePayrollPeriodsWithDetailsRows(detailRows),
       explanationsResult.data,
     ).map((period) => {
       const payment = paymentById.get(period.id);
