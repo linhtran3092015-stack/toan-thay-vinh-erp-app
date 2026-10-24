@@ -74,6 +74,31 @@ export async function searchZaloGroups(input: {
   return result.ok ? { data: { groups: result.data.conversations ?? [], total: result.data.total ?? 0 }, ok: true } : result;
 }
 
+/** ZaloCRM caps a page at 100 conversations. */
+const GROUP_PAGE_SIZE = 100;
+
+/**
+ * Every group conversation of one nick, page by page (bulk linking matches
+ * against all of them). Stops after `maxPages` and says so with `truncated`.
+ */
+export async function listAllZaloGroups(
+  zaloAccountId: string,
+  maxPages = 30,
+): Promise<ZaloCrmResult<{ groups: ZaloCrmGroup[]; total: number; truncated: boolean }>> {
+  const groups: ZaloCrmGroup[] = [];
+  let total = 0;
+  for (let page = 1; page <= maxPages; page += 1) {
+    const result = await searchZaloGroups({ limit: GROUP_PAGE_SIZE, page, zaloAccountId });
+    if (!result.ok) return result;
+    total = result.data.total;
+    groups.push(...result.data.groups);
+    if (result.data.groups.length < GROUP_PAGE_SIZE || groups.length >= total) {
+      return { data: { groups, total, truncated: false }, ok: true };
+    }
+  }
+  return { data: { groups, total, truncated: groups.length < total }, ok: true };
+}
+
 export async function getZaloGroupByThread(
   externalThreadId: string,
   zaloAccountId?: string,
