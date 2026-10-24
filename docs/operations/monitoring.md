@@ -42,6 +42,8 @@ Workflow `.github/workflows/deploy.yml` deploy production **sau khi Quality thà
 
 Khi chưa cấu hình secrets, job Deploy tự bỏ qua (không đỏ) và Git integration vẫn deploy như cũ.
 
+**Vùng chạy function:** `vercel.json` ghim `"regions": ["sin1"]` (Singapore), cùng vùng với Supabase (`ap-southeast-1`); trước đây function chạy ở `iad1` (Mỹ) và mỗi lượt truy vấn tới Supabase mất thêm khoảng 0,2 giây. Cả workflow này lẫn Git integration đều đọc `vercel.json` khi build. Sau mỗi deploy, đăng nhập, mở một trang như `/sessions`, DevTools → Network → request của trang → header `x-vercel-id` phải có `::sin1::`.
+
 ## 5. Migration và ứng dụng không lệch nhau
 
 - Áp migration **trước** khi push code dùng RPC mới (`npx supabase db push --linked`, kiểm tra `npx supabase migration list --linked`).
