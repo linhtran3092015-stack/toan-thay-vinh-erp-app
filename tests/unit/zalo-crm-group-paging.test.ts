@@ -75,4 +75,16 @@ describe("listAllZaloGroups", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ error: "CRM tam thoi loi.", ok: false });
   });
+
+  // Value: protects=groups are never listed without a center nick, since ZaloCRM then returns every nick's groups and staff could link one the center nick is not in;
+  // fails_when=the blank-nick guard in listAllZaloGroups is removed or stops trimming, so a blank id reaches ZaloCRM with no zaloAccountId filter;
+  // why_new=the guard was added after the paging test, and the loader's own guard does not protect other callers;
+  // seam=none; no_claim=does not prove the loader passes the trimmed center nick id
+  it("refuses a blank nick without asking ZaloCRM", async () => {
+    const fetchMock = stubCrm(250, [100, 100, 50]);
+    for (const blank of ["", "   "]) {
+      expect(await listAllZaloGroups(blank)).toEqual({ error: "Chưa chọn nick trung tâm.", ok: false });
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
