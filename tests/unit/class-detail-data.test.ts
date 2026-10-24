@@ -121,7 +121,8 @@ describe("getClassDetailWorkspace", () => {
         error: null,
       },
       student_payment_requests: {
-        data: [{ created_at: "2026-10-10T00:00:00Z", expected_amount_vnd: "1200000", paid_amount_vnd: "200000", status: "pending", student_id: "a" }],
+        // Three days old, so never past the 14-day overdue rule whatever today's date is.
+        data: [{ created_at: new Date(Date.now() - 3 * 86_400_000).toISOString(), expected_amount_vnd: "1200000", paid_amount_vnd: "200000", status: "pending", student_id: "a" }],
         error: null,
       },
     });
