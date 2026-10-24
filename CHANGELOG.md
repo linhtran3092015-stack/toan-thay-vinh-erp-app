@@ -20,6 +20,21 @@ Phiếu lương không còn ghi phần lương khoán đã tính trong lương c
 ### Added
 - Trang xem trước `/dev/payroll?view=payslip-piecework`: phiếu lương mẫu của một trợ lý vận hành có lương khoán (dữ liệu mẫu, không ghi dữ liệu).
 
+## [0.38.1.0] - 2026-10-24
+
+Chấm bài AI: học sinh ghi chung một giá trị cho nhiều ẩn (ví dụ `a và b=0`) được hiểu là mọi ẩn bằng giá trị đó, và bài vẫn đánh vàng để trợ giảng xem (prompt `grade-v4`).
+
+### Fixed
+- **Đáp số ghi chung cho nhiều ẩn** (prompt `grade-v4`): trước khi kết luận "thiếu đáp số", AI xem học sinh có ghi chung một giá trị cho nhiều ẩn không (`a và b=0`, `a, b = 0`, `x;y=2`). Nếu có, AI hiểu là a = b = 0, chấm đúng khi khớp đáp án và gắn cờ ghi chép chưa rõ, nên bài thành vàng.
+  - Trước đây AI coi là thiếu a, chấm sai câu đó với độ tin cao và để bài xanh. Bài Lớp 8A ngày 22/10 câu 8 bị chấm 5 điểm và trợ giảng phải sửa thành 10. Đây là bài xanh đầu tiên trợ giảng phải sửa điểm trên production.
+  - Câu hỏi nhiều đáp số mà học sinh thật sự chỉ ghi một phần vẫn là sai (quy tắc 23/10).
+- Lượt chấm mới ghi `prompt_version = grade-v4`.
+
+### For contributors
+- Bộ đề hồi quy ngày 24/10: 175 bài thuộc 8 đề (thêm 28 bài Lớp 8 ngày 22/10, có bài 8A câu 8), chi phí 0,27 USD.
+  - `grade-v4`: khớp từng câu 98,3%; lệch ≤ 1 điểm 98,3%, lần đầu đạt mốc 98%; không bài xanh nào lệch trợ giảng. Còn 3 bài lệch, cả 3 đều vàng.
+  - Trên 147 bài của lần chạy trước: `grade-v3` khớp 98,0%, `grade-v4` khớp 98,6%; tỉ lệ bài xanh từ 58% lên 61%.
+- Migration `20261024090000_ai_grading_prompt_grade_v4.sql` chỉ đổi nhãn `prompt_version` trong `enqueue_submission_grading`.
 ## [0.38.0.0] - 2026-10-23
 
 Bốn màn nhập dữ liệu từ Excel (học sinh, ghi danh, lớp & lịch, số dư buổi đầu kỳ) dựng lại theo phong cách Stumana (bước 15b): mỗi màn là các bước rõ ràng, mỗi lần một bước, bảng kiểm tra dòng nêu lỗi bằng chữ, và nút xác nhận ghi rõ điều kiện còn thiếu.
