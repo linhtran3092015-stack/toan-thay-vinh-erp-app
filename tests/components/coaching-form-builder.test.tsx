@@ -561,6 +561,8 @@ describe("CoachingFormBuilder publishing", () => {
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Xuất bản v2" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(new RegExp(`^${escapeRegExp(refused)}$`));
     expect(stubs.saveCoachingFormDraft).not.toHaveBeenCalled();
+    // The message shows before the publish's transition settles; Xuất bản takes a click again only after it.
+    await waitFor(() => expect(headerPublish()).toBeEnabled());
 
     await user.type(screen.getByRole("textbox", { name: "Tên biểu mẫu" }), " (sửa)");
     await user.click(headerPublish());
@@ -568,6 +570,8 @@ describe("CoachingFormBuilder publishing", () => {
     await waitFor(() => expect(stubs.publishCoachingForm).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole("alert")).toHaveTextContent(`Đã lưu bản nháp nhưng chưa xuất bản: ${refused}`);
     expect(stubs.saveCoachingFormDraft).toHaveBeenCalledTimes(1);
+    // Settled first: while the publish is pending, the save-in-flight guard still asks before leaving.
+    await waitFor(() => expect(headerPublish()).toBeEnabled());
     // The save counted: nothing is unsaved any more.
     expect(beforeUnloadIsPrevented()).toBe(false);
   });
@@ -917,11 +921,14 @@ describe("CoachingFormBuilder rejected actions", () => {
     await user.click(saveButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(COACHING_CONNECTION_ERROR_MESSAGE);
+    // The message is set after the action's await, outside the transition, so it shows before pending clears;
+    // the buttons re-enable when the transition settles, and the checks below then see the settled builder.
+    await waitFor(() => expect(saveButton()).toBeEnabled());
     expect(screen.getByRole("textbox", { name: "Tên biểu mẫu" })).toHaveValue("Phiếu tháng 11");
     expect(screen.getByRole("textbox", { name: "Tiêu đề hiển thị cho phụ huynh" })).toHaveValue("Phản hồi tháng 11");
-    expect(saveButton()).toBeEnabled();
     expect(router.replace).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
+    // Settled, so this is the unsaved-edits guard asking, not the save-in-flight one.
     expect(beforeUnloadIsPrevented()).toBe(true);
 
     stubs.saveCoachingFormDraft.mockResolvedValueOnce({ formId: "form-new", message: "Đã lưu bản nháp biểu mẫu.", status: "success" });
@@ -940,6 +947,7 @@ describe("CoachingFormBuilder rejected actions", () => {
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Xuất bản v2" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(`Chưa xuất bản: ${COACHING_CONNECTION_ERROR_MESSAGE}`);
+    await waitFor(() => expect(headerPublish()).toBeEnabled());
     expect(stubs.publishCoachingForm).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Tên biểu mẫu" })).toHaveValue("Phiếu cuối kỳ (sửa)");
@@ -957,9 +965,9 @@ describe("CoachingFormBuilder rejected actions", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       new RegExp(`^${escapeRegExp(COACHING_CONNECTION_ERROR_MESSAGE)}$`),
     );
+    await waitFor(() => expect(headerPublish()).toBeEnabled());
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(titleInput(1)).toHaveValue("Con tên gì?");
-    expect(headerPublish()).toBeEnabled();
     expect(router.replace).not.toHaveBeenCalled();
   });
 
@@ -971,9 +979,9 @@ describe("CoachingFormBuilder rejected actions", () => {
     await user.click(screen.getByRole("button", { name: "Tạo bản nháp phiên bản mới" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(COACHING_CONNECTION_ERROR_MESSAGE);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Tạo bản nháp phiên bản mới" })).toBeEnabled());
     expect(screen.getByText("v2 · Đang xuất bản")).toBeInTheDocument();
     expect(titleInput(1)).toHaveValue("Con tên gì?");
-    expect(screen.getByRole("button", { name: "Tạo bản nháp phiên bản mới" })).toBeEnabled();
   });
 });
 
