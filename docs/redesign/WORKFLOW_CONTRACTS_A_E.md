@@ -4,7 +4,7 @@
 
 These workflow descriptions capture currently observed behavior. Presentation may change in later waves, but no workflow may gain, lose, or reinterpret a transition, permission check, RPC, validation rule, audit path, or error mapping.
 
-Owner-approved exceptions are recorded next to the workflow they change, each marked with its release: the client lock-readiness mirror (v0.7.0.0, Sessions), and class-page bulk cancel, class-page enrolment and server-side enrolment search (v0.8.0.0, Sessions and Students), class-page transfer and reserve with the expected-enrolment check (v0.9.0.0, Students), the sessions directory's server-side date window with its until-today redirect and the larger list reads (v0.20.0.0, Sessions), the sales-commission list's larger read (v0.22.0.0, List reads outside A–E), the import wizards' client-side gates (v0.38.0.0, Imports outside A–E), and the payroll page's per-period read with its recent-period window (v0.40.0.0, List reads outside A–E).
+Owner-approved exceptions are recorded next to the workflow they change, each marked with its release: the client lock-readiness mirror (v0.7.0.0, Sessions), and class-page bulk cancel, class-page enrolment and server-side enrolment search (v0.8.0.0, Sessions and Students), class-page transfer and reserve with the expected-enrolment check (v0.9.0.0, Students), the sessions directory's server-side date window with its until-today redirect and the larger list reads (v0.20.0.0, Sessions), the sales-commission list's larger read (v0.22.0.0, List reads outside A–E), the import wizards' client-side gates (v0.38.0.0, Imports outside A–E), the payroll page's per-period read with its recent-period window (v0.40.0.0, List reads outside A–E), and the bulk attendance mark's single deferred refresh through `refreshSessionAttendanceAction` (v0.40.1.0, Attendance).
 
 ## Students
 
@@ -93,6 +93,7 @@ stateDiagram-v2
 
 - Read access is route/data dependent on `attendance.view`; mutation requires `attendance.mark`.
 - `markSessionAttendanceAction` and `updateSessionAttendanceAction` call `mark_session_attendance` and `update_session_attendance`.
+- A bulk "Có mặt cho tất cả" calls `markSessionAttendanceAction` with `deferRefresh: true` for each student, then `refreshSessionAttendanceAction` once (it checks `attendance.mark` and revalidates `/sessions` and `/sessions/{id}`). The RPC, permission, error mapping and audit of each save are unchanged; one-tap, editor and additional-study saves still revalidate on their own (owner-approved, v0.40.1.0).
 - Existing action errors cover at least session-not-started, locked session, cancelled session, roster/enrollment mismatch, and validation failures. These errors remain feature-owned.
 - Attendance belongs within the existing session workflow. No standalone attendance route is created.
 

@@ -42,7 +42,7 @@ Rà soát mã nguồn và migration, chưa truy cập database production để 
 | Thành phần | Bằng chứng trong repository | Cách tận dụng / khoảng trống |
 |---|---|---|
 | Điểm danh | `supabase/migrations/20260725050000_session_attendance_schema_foundation.sql`, `20260817090000_class_component_roster_foundation.sql` | Đã có buổi học, roster, vắng CP/KP; cần xác định chính xác các buổi học viên phải tham gia |
-| Điểm cuối buổi | `src/features/sessions/detail-data.ts:313` | Có `session_results.test_score`, điểm 0–10, cho phép null; dùng làm nguồn thật |
+| Điểm cuối buổi | `src/features/sessions/detail-data.ts:221` | Có `session_results.test_score`, điểm 0–10, cho phép null; dùng làm nguồn thật |
 | Cảnh báo mẫu | `src/features/students/detail/mock-student-detail.ts:35` (đã xóa ở v0.6.18.0) | Chỉ demo, không dùng làm bộ phát hiện |
 | Hồ sơ học viên thật | `src/app/(app)/students/[studentId]/page.tsx` | Dùng `StudentProfilePage` (từ 2026-10-12; trước đó `DatabaseStudentDetailPage`); lịch sử chăm sóc nằm ở tab Chăm sóc |
 | Coaching | `supabase/migrations/20260729123000_coaching_foundation.sql`, `20260802193000_coaching_management_workflows.sql` | Đã có tạo phiếu, owner, review_at, ghi chú, kết quả, đóng phiếu |
