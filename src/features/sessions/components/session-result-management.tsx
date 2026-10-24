@@ -15,7 +15,6 @@ import {
   useState,
   useTransition,
 } from "react";
-import { useRouter } from "next/navigation";
 
 import { Dialog } from "@/components/ui/dialog";
 import { RosterSearch, matchesRosterSearch } from "@/features/sessions/components/roster-search";
@@ -72,8 +71,6 @@ export function SessionResultManagement({
   sessionId,
   sessionStatus,
 }: SessionResultManagementProps) {
-  const router = useRouter();
-
   const [editor, setEditor] =
     useState<ResultEditorState | null>(
       null,
@@ -275,7 +272,7 @@ export function SessionResultManagement({
         } else {
           setEditor(null);
         }
-        router.refresh();
+        // No router.refresh(): the action's revalidatePath already re-rendered this page.
       }
       } catch {
         setActionState({ status: "error", message: "Chưa lưu được kết quả. Dữ liệu đang nhập được giữ lại, vui lòng thử lại." });

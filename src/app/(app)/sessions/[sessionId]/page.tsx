@@ -154,13 +154,38 @@ export default async function SessionDetailRoute({
         "completed"
     );
 
-  const candidateResult =
+  const canViewGrading =
+    permissionResult.permissions.includes("ai_grading.view") && detailResult.detail.status !== "cancelled";
+  const canManageTests = permissionResult.permissions.includes("ai_grading.manage_tests");
+  const canReview = permissionResult.permissions.includes("ai_grading.review");
+
+  // Everything below depends only on the session detail, so it loads in one round trip instead
+  // of one after another; this page re-renders after every attendance or result save (once per bulk mark).
+  const [candidateResult, messageContact, gradingSubmissions, sessionTest, reviewSettings] = await Promise.all([
     canAddAdditionalStudy
-      ? await getAdditionalStudyCandidates()
+      ? getAdditionalStudyCandidates()
       : {
           ok: true as const,
           students: [],
-        };
+        },
+    canMarkAttendance || canViewAttendance
+      ? getSessionMessageContact(sessionId)
+      : null,
+    canViewGrading
+      ? getSessionGradingSubmissions(sessionId)
+      : null,
+    (permissionResult.permissions.includes("ai_grading.view") || canManageTests) && detailResult.detail.status !== "cancelled"
+      ? getSessionTestState({
+          canConfirm: permissionResult.permissions.includes("ai_grading.confirm_key"),
+          canManage: canManageTests,
+          editable: detailResult.detail.lockedAt === null,
+          sessionId,
+        })
+      : null,
+    canReview && canViewGrading
+      ? Promise.all([getGradingRankBands(), getGradingCommentPhrases()])
+      : null,
+  ]);
 
   if (!candidateResult.ok) {
     return (
@@ -173,27 +198,6 @@ export default async function SessionDetailRoute({
     );
   }
 
-  const messageContact =
-    canMarkAttendance || canViewAttendance
-      ? await getSessionMessageContact(sessionId)
-      : null;
-
-  const gradingSubmissions =
-    permissionResult.permissions.includes("ai_grading.view") && detailResult.detail.status !== "cancelled"
-      ? await getSessionGradingSubmissions(sessionId)
-      : null;
-
-  const canManageTests = permissionResult.permissions.includes("ai_grading.manage_tests");
-  const sessionTest =
-    (permissionResult.permissions.includes("ai_grading.view") || canManageTests) && detailResult.detail.status !== "cancelled"
-      ? await getSessionTestState({
-          canConfirm: permissionResult.permissions.includes("ai_grading.confirm_key"),
-          canManage: canManageTests,
-          editable: detailResult.detail.lockedAt === null,
-          sessionId,
-        })
-      : null;
-
   // Wake the AI grading worker when this session still has AI work waiting (safety net for a
   // batch that stopped early); the worker claims nothing when another one already runs it.
   const extractionActive =
@@ -203,11 +207,10 @@ export default async function SessionDetailRoute({
 
   // Phase 3b: approving AI-graded papers writes the session result, so it follows the result rules
   // (started, not locked) and needs results.manage on top of ai_grading.review.
-  const canReview = permissionResult.permissions.includes("ai_grading.review");
   let submissionReview: ReviewContext | undefined;
-  if (canReview && gradingSubmissions?.ok) {
+  if (canReview && gradingSubmissions?.ok && reviewSettings) {
     const confirmedTest = sessionTest?.ok && sessionTest.data.test?.status === "key_confirmed" ? sessionTest.data.test : null;
-    const [bands, phrases] = await Promise.all([getGradingRankBands(), getGradingCommentPhrases()]);
+    const [bands, phrases] = reviewSettings;
     submissionReview = {
       bands,
       canReview,

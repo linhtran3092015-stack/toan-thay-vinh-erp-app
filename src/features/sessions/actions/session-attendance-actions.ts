@@ -12,6 +12,7 @@ import type {
 } from "@/features/sessions/forms/attendance-action-types";
 import {
   markSessionAttendanceSchema,
+  refreshSessionAttendanceSchema,
   updateSessionAttendanceSchema,
 } from "@/features/sessions/forms/attendance-form-schema";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
@@ -228,9 +229,13 @@ export async function markSessionAttendanceAction(
       );
     }
 
-    revalidateAttendanceRoutes(
-      data.class_session_id,
-    );
+    // Revalidating re-renders the whole session page into this response, which a bulk mark would
+    // pay once per student; it calls refreshSessionAttendanceAction once at its end instead.
+    if (parsed.data.deferRefresh !== true) {
+      revalidateAttendanceRoutes(
+        data.class_session_id,
+      );
+    }
 
     return {
       attendanceId: data.id,
@@ -329,4 +334,31 @@ export async function updateSessionAttendanceAction(
       "Không thể kết nối tới hệ thống điểm danh. Vui lòng thử lại.",
     );
   }
+}
+
+/**
+ * Re-renders the session page and the sessions list once, after a bulk mark saved its rows with
+ * deferRefresh (at its end, or when it stops early). Answers
+ * `ok: false` without revalidating when the session id is invalid or attendance.mark is gone;
+ * the caller then falls back to a plain page refresh.
+ */
+export async function refreshSessionAttendanceAction(
+  classSessionId: string,
+): Promise<{ ok: boolean }> {
+  const parsed =
+    refreshSessionAttendanceSchema.safeParse(
+      classSessionId,
+    );
+
+  if (!parsed.success) {
+    return { ok: false };
+  }
+
+  if (await getAttendancePermissionError()) {
+    return { ok: false };
+  }
+
+  revalidateAttendanceRoutes(parsed.data);
+
+  return { ok: true };
 }

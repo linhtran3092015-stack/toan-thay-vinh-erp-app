@@ -58,6 +58,8 @@ export const markSessionAttendanceSchema =
         "Mã buổi học không hợp lệ.",
       ),
 
+    deferRefresh: z.boolean().optional(),
+
     notes: notesSchema,
 
     studentId: z
@@ -66,6 +68,10 @@ export const markSessionAttendanceSchema =
         "Mã học viên không hợp lệ.",
       ),
   });
+
+export const refreshSessionAttendanceSchema = z
+  .string()
+  .uuid("Mã buổi học không hợp lệ.");
 
 export const updateSessionAttendanceSchema =
   z.object({

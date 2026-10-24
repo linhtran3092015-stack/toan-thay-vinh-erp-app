@@ -49,7 +49,12 @@ export async function getDatabasePermissions(): Promise<DatabasePermissionsResul
 
   try {
     const supabase = await createSupabaseServerClient();
-    const { data: userData, error: userError } = await supabase.auth.getUser();
+    // Both calls carry the same session, so they go out together: one round trip instead of two.
+    // The permission rows are only used once getUser() has verified that session.
+    const [{ data: userData, error: userError }, { data, error }] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.rpc("get_my_permissions"),
+    ]);
 
     if (userError || !userData.user) {
       // not_authenticated is normal for unauthenticated visitors — log only real errors.
@@ -61,8 +66,6 @@ export async function getDatabasePermissions(): Promise<DatabasePermissionsResul
         error: createPermissionError("not_authenticated"),
       };
     }
-
-    const { data, error } = await supabase.rpc("get_my_permissions");
 
     if (error) {
       console.error("[permissions] query_failed — get_my_permissions RPC error:", error.message, error.code, error.details);
