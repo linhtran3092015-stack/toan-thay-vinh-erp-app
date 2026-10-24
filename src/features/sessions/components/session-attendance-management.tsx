@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/card";
 import {
   markSessionAttendanceAction,
+  refreshSessionAttendanceAction,
   updateSessionAttendanceAction,
 } from "@/features/sessions/actions/session-attendance-actions";
 import type {
@@ -224,8 +225,8 @@ export function SessionAttendanceManagement({
           actualLearningMode: getInitialLearningMode(participant, defaultLearningMode),
           notes: null,
         });
+        // A success needs no router.refresh(): the action's revalidatePath already re-rendered this page.
         setActionState(result);
-        if (result.status === "success") router.refresh();
       } catch {
         setActionState({ status: "error", message: "Chưa lưu được điểm danh. Vui lòng thử lại." });
       }
@@ -243,6 +244,7 @@ export function SessionAttendanceManagement({
    * Marks every unmarked student present, one existing action per student. A per-student failure does
    * not stop the rest; failures are collected and reported together at the end. A session-wide failure
    * (locked, cancelled, signed out, no permission…) would fail every remaining student, so it stops the batch.
+   * Each save skips the page re-render (deferRefresh); this page and the sessions list refresh once when it ends.
    */
   const markAllPresent = () => {
     if (!canEdit || isPending || unmarkedParticipants.length === 0) return;
@@ -259,6 +261,7 @@ export function SessionAttendanceManagement({
             studentId: participant.studentId,
             attendanceStatus: "present",
             actualLearningMode: getInitialLearningMode(participant, defaultLearningMode),
+            deferRefresh: true,
             notes: null,
           });
           if (result.status === "success") {
@@ -275,7 +278,7 @@ export function SessionAttendanceManagement({
                   ? `Đã ghi có mặt cho ${saved} học sinh; ${failedNames.length} học sinh chưa ghi được: ${failedNames.join(", ")}. ${firstFailureMessage} Dừng, ${stopNotice}`
                   : `Đã ghi có mặt cho ${saved} học sinh; dừng, ${stopNotice}`,
             });
-            router.refresh();
+            await refreshSessionPages();
             return;
           } else {
             failureMessage = result.message;
@@ -296,9 +299,27 @@ export function SessionAttendanceManagement({
             }
           : { status: "success", message: `Đã ghi có mặt cho ${saved} học sinh chưa chọn.`, attendanceId: "", classSessionId: sessionId },
       );
-      router.refresh();
+      await refreshSessionPages();
     });
   };
+
+  /**
+   * One refresh after a bulk mark saved its rows with deferRefresh: revalidates this page and the
+   * sessions list. When the action refuses (signed out, permission gone) a plain refresh shows why.
+   * When it throws (offline), nothing more is tried: Next turns a refresh that cannot reach the
+   * server into a full page load, which offline replaces the app with the browser's error page.
+   */
+  async function refreshSessionPages() {
+    try {
+      const result = await refreshSessionAttendanceAction(sessionId);
+      if (!result.ok) router.refresh();
+    } catch {
+      // The saves are in; only this page is behind. Say so on the bulk banner rather than refreshing.
+      setActionState((current) =>
+        current ? { ...current, message: `${current.message} Trang chưa cập nhật — tải lại trang để xem điểm danh mới.` } : current,
+      );
+    }
+  }
 
   const submitAttendance = () => {
     if (!editor || !canEdit || isPending) {
@@ -334,9 +355,9 @@ export function SessionAttendanceManagement({
 
       setActionState(result);
 
+      // The action revalidates this page, so the saved row is already in its response.
       if (result.status === "success") {
         setEditor(null);
-        router.refresh();
       }
       } catch {
         setActionState({ status: "error", message: "Chưa lưu được điểm danh. Dữ liệu đang nhập được giữ lại, vui lòng thử lại." });
@@ -621,8 +642,6 @@ function AdditionalStudyPanel({
   existingStudentIds: string[];
   sessionId: string;
 }) {
-  const router = useRouter();
-
   const [isOpen, setIsOpen] =
     useState(false);
 
@@ -748,21 +767,26 @@ function AdditionalStudyPanel({
     setActionState(null);
 
     startTransition(async () => {
-      const result =
-        await markSessionAttendanceAction({
-          actualLearningMode,
-          attendanceStatus:
-            "additional_study",
-          classSessionId: sessionId,
-          notes: optionalValue(notes),
-          studentId,
-        });
+      try {
+        const result =
+          await markSessionAttendanceAction({
+            actualLearningMode,
+            attendanceStatus:
+              "additional_study",
+            classSessionId: sessionId,
+            notes: optionalValue(notes),
+            studentId,
+          });
 
-      setActionState(result);
+        setActionState(result);
 
-      if (result.status === "success") {
-        reset();
-        router.refresh();
+        // The action revalidates this page, so the new row is already in its response.
+        if (result.status === "success") {
+          reset();
+        }
+      } catch {
+        // A lost connection stays in this panel instead of replacing the session page with the error page.
+        setActionState({ status: "error", message: "Chưa lưu được học viên học thêm. Kiểm tra kết nối rồi thử lại." });
       }
     });
   };

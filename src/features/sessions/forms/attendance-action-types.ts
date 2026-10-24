@@ -10,6 +10,8 @@ export interface MarkSessionAttendanceActionInput {
   actualLearningMode: AttendanceLearningMode;
   attendanceStatus: SessionAttendanceStatus;
   classSessionId: string;
+  /** Skip revalidating the session pages; a bulk mark saves many rows and calls refreshSessionAttendanceAction once. */
+  deferRefresh?: boolean;
   notes?: string | null;
   studentId: string;
 }

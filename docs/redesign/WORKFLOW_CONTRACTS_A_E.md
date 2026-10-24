@@ -93,6 +93,7 @@ stateDiagram-v2
 
 - Read access is route/data dependent on `attendance.view`; mutation requires `attendance.mark`.
 - `markSessionAttendanceAction` and `updateSessionAttendanceAction` call `mark_session_attendance` and `update_session_attendance`.
+- A bulk "Có mặt cho tất cả" calls `markSessionAttendanceAction` with `deferRefresh: true` for each student, then `refreshSessionAttendanceAction` once (it checks `attendance.mark` and revalidates `/sessions` and `/sessions/{id}`). The RPC, permission, error mapping and audit of each save are unchanged; one-tap, editor and additional-study saves still revalidate on their own (owner-approved, v0.39.1.0).
 - Existing action errors cover at least session-not-started, locked session, cancelled session, roster/enrollment mismatch, and validation failures. These errors remain feature-owned.
 - Attendance belongs within the existing session workflow. No standalone attendance route is created.
 
