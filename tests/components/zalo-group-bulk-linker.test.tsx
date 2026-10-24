@@ -103,6 +103,32 @@ describe("ZaloGroupBulkLinker", () => {
     expect(screen.getByText("Nhóm Zalo này đã được liên kết với một học sinh khác.")).toBeInTheDocument();
   });
 
+  // Value: protects=a chunk the server never saved (network drop, refused action) marks each of its rows failed with the reason and keeps them ticked to retry;
+  // fails_when=the .catch around the action is removed (rejection escapes the transition), ok:false is treated as success, or failed rows get unticked;
+  // why_new=the existing save test only covers ok:true with per-row results, never a whole-chunk failure;
+  // seam=none; no_claim=does not prove the server action or that the retry then succeeds
+  it("keeps every row of a chunk the server did not save ticked, with the reason, for a retry", async () => {
+    actions.linkStudentZaloGroupsAction.mockRejectedValueOnce(new Error("fetch failed")).mockResolvedValueOnce({
+      message: "Tài khoản hiện tại không có quyền cập nhật hồ sơ học sinh.",
+      ok: false,
+    });
+    renderLinker();
+
+    fireEvent.click(screen.getByRole("button", { name: "Liên kết 1 học sinh" }));
+    await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
+    expect(screen.getByText("Đã liên kết 0 học sinh; 1 học sinh chưa liên kết được (xem lý do ở từng dòng).")).toBeInTheDocument();
+    expect(screen.getByText("Mất kết nối tới máy chủ. Kiểm tra mạng rồi bấm Liên kết lại.")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Chọn Nguyễn Văn An" })).toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: "Liên kết 1 học sinh" }));
+    await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("Tài khoản hiện tại không có quyền cập nhật hồ sơ học sinh.")).toBeInTheDocument();
+    expect(screen.queryByText("Mất kết nối tới máy chủ. Kiểm tra mạng rồi bấm Liên kết lại.")).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Chọn Nguyễn Văn An" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Liên kết 1 học sinh" })).toBeEnabled();
+    expect(actions.linkStudentZaloGroupsAction).toHaveBeenCalledTimes(2);
+  });
+
   it("offers the search dialog for students without a matching group", () => {
     renderLinker();
     fireEvent.click(screen.getByRole("button", { name: /Không tìm thấy/ }));
