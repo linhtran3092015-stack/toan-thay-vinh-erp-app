@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/patterns/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, getButtonClassName } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import {
   sendParentMessageAction,
@@ -42,11 +42,14 @@ const filters: { label: string; value: ParentMessageStatus | "all" }[] = [
 ];
 
 export function ParentMessageQueue({
+  canLinkGroups = false,
   canSend,
   configured,
   items,
   status,
 }: {
+  /** students.view + students.update: show the way to the bulk group link page. */
+  canLinkGroups?: boolean;
   canSend: boolean;
   configured: boolean;
   items: ParentMessageQueueItem[];
@@ -55,7 +58,16 @@ export function ParentMessageQueue({
   const queuedCount = items.filter((item) => item.status === "queued").length;
   return (
     <div className="grid min-w-0 gap-5">
-      <PageHeader title="Tin nhắn phụ huynh">
+      <PageHeader
+        actions={
+          canLinkGroups ? (
+            <Link className={getButtonClassName({ size: "md", variant: "outline" })} href="/parent-messages/groups">
+              Liên kết nhóm Zalo
+            </Link>
+          ) : null
+        }
+        title="Tin nhắn phụ huynh"
+      >
         <p className="mt-1 text-secondary text-text-muted">
           Tin được tạo tự động từ điểm danh vắng không phép và nhận xét cuối buổi, gửi vào nhóm Zalo sổ liên lạc của học sinh
           qua nick trung tâm. Trợ giảng kiểm tra nội dung rồi bấm Gửi.
@@ -64,7 +76,18 @@ export function ParentMessageQueue({
 
       {!configured ? (
         <ResultBanner
-          description="Đặt ZALOCRM_BASE_URL và ZALOCRM_API_KEY trên máy chủ, rồi chọn nick trung tâm trong Cài đặt → Chung. Tin vẫn được xếp hàng nhưng chưa gửi được."
+          description={
+            canLinkGroups
+              ? "Làm theo các bước ở trang Liên kết nhóm Zalo (khóa ZaloCRM trên máy chủ, nick trung tâm, nhóm cho từng học sinh). Tin vẫn được xếp hàng nhưng chưa gửi được."
+              : "Đặt ZALOCRM_BASE_URL và ZALOCRM_API_KEY trên máy chủ, rồi chọn nick trung tâm trong Cài đặt → Chung. Tin vẫn được xếp hàng nhưng chưa gửi được."
+          }
+          action={
+            canLinkGroups ? (
+              <Link className="font-semibold text-action-link! hover:underline" href="/parent-messages/groups">
+                Mở trang Liên kết nhóm Zalo
+              </Link>
+            ) : undefined
+          }
           title="Chưa kết nối ZaloCRM"
           tone="warning"
         />

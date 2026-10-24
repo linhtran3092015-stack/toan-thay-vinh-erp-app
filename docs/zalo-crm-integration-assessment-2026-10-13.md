@@ -28,7 +28,7 @@ trigger nghiệp vụ ─► parent_messages ─► /api/cron/parent-messages �
 - **ERP giữ hàng đợi và nhật ký** (bảng `parent_messages`, trang Tin nhắn phụ huynh, cài đặt bật/tắt từng loại tin, giờ không gửi 21:00–07:00) — đúng phần đã thiết kế ở Đợt 3a, chỉ đổi "bộ gửi" từ ZNS sang ZaloCRM.
 - **Ánh xạ phụ huynh ↔ Zalo**: lần gửi đầu tra `GET /api/public/contacts?search=<sđt>` lấy `zaloUid`, lưu vào `guardians.zalo_uid` (+ `zalo_crm_contact_id`); không tìm thấy → tin ở trạng thái `skipped` kèm lý do "phụ huynh chưa kết bạn Zalo với nick trung tâm", lễ tân thấy để xử lý tay.
 - **Nick gửi**: cài đặt `zalo.default_account_id` (nick trung tâm) và tùy chọn nick theo lớp/trợ giảng (bảng `class_zalo_accounts`) để tin vắng mặt đi từ trợ giảng quen thuộc.
-- **Secrets**: `ZALOCRM_BASE_URL`, `ZALOCRM_API_KEY` đặt trên Vercel (API key tạo trong ZaloCRM → Settings → API).
+- **Secrets**: `ZALOCRM_BASE_URL`, `ZALOCRM_API_KEY` đặt trên Vercel (API key lấy trong ZaloCRM → Cài đặt → API & Webhook, `/settings/dev/api`).
 
 ## 2b. Gửi vào nhóm sổ liên lạc theo UID nhóm (quyết định chủ trung tâm 13/10/2026)
 
@@ -73,10 +73,10 @@ So với kế hoạch 3a (Zalo OA/ZNS): bỏ được đăng ký OA, duyệt m�
 
 Quyết định: gửi từ nick trung tâm; hai loại tin đầu là vắng không phép và nhận xét cuối buổi; trợ giảng bấm Gửi trong hàng đợi.
 
-1. **ZaloCRM**: fork đã có commit `dc1f3829` (API public: lọc nhóm, tra nhóm theo UID, thành viên nhóm, danh sách nick, gửi tin trả messageId). Deploy lại CRM (`scripts/zalocrm-deploy.sh` trên máy chủ CRM). Lấy API key tại ZaloCRM → Settings → API.
+1. **ZaloCRM**: fork đã có commit `dc1f3829` (API public: lọc nhóm, tra nhóm theo UID, thành viên nhóm, danh sách nick, gửi tin trả messageId). Đã deploy trên CRM (kiểm tra 24/10/2026: `/api/public/groups/:id/members` trả 401 thay vì 404). Lấy API key tại ZaloCRM → Cài đặt → API & Webhook (`/settings/dev/api`); chỉ bấm "Tạo key mới" khi ô trống vì key mới thay key cũ.
 2. **Vercel** → Environment Variables: `ZALOCRM_BASE_URL=https://crm.vanlinhtran.id.vn`, `ZALOCRM_API_KEY=<key>` → redeploy.
 3. **ERP** → Cài đặt → Chung → mục "Tin nhắn phụ huynh (Zalo)": bấm "Tải danh sách nick", chọn nick trung tâm, lưu. Kiểm tra mẫu tin.
-4. **Hồ sơ học sinh** → thẻ "Nhóm Zalo sổ liên lạc" → Liên kết nhóm (tìm theo tên nhóm / tên phụ huynh, đối chiếu thành viên) — làm cho từng học sinh; chưa liên kết thì không tạo tin.
+4. **Liên kết nhóm Zalo** (`/parent-messages/groups`, từ v0.41: nút trên trang Tin nhắn phụ huynh, cần quyền xem + sửa học sinh): bảng "Kết nối ZaloCRM" 5 bước cho biết bước nào còn thiếu; bảng gợi ý ghép nhóm cho mọi học sinh đang học chưa liên kết, dựa trên tên nhóm hiện tại (mã học sinh, họ tên đầy đủ, SĐT/tên phụ huynh). Dòng "Chắc chắn" được chọn sẵn, dòng "Cần chọn" (anh em, trùng tên) chọn trong danh sách hoặc bấm Tìm nhóm để xem thành viên, rồi bấm "Liên kết N học sinh". Từng học sinh vẫn sửa được trên hồ sơ → thẻ "Nhóm Zalo sổ liên lạc". Chưa liên kết thì không tạo tin.
 5. **Trợ giảng**: menu Vận hành → Chăm sóc & Tuyển sinh → "Tin nhắn phụ huynh" (trước v0.7.0.0 nằm trong Học vụ) → xem tin chờ, sửa nếu cần, bấm "Gửi vào nhóm Zalo".
 
 ## 7. Quyết định cần chủ trung tâm (các bước sau)

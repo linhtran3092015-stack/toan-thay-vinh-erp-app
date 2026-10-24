@@ -35,6 +35,7 @@ export default async function ParentMessagesPage({
 
   return (
     <ParentMessageQueue
+      canLinkGroups={permissionResult.permissions.includes("students.view") && permissionResult.permissions.includes("students.update")}
       canSend={permissionResult.permissions.includes("attendance.mark")}
       configured={isZaloCrmConfigured()}
       items={queue.data}

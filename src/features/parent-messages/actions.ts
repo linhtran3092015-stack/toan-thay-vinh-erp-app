@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { PARENT_MESSAGE_MAX_CHARS, planMessageParts } from "@/features/parent-messages/comment-template";
+import { MAX_BULK_ZALO_LINKS } from "@/features/parent-messages/zalo-group-matching";
+import { getZaloCenterAccountId } from "@/features/settings/system-settings-data";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -39,6 +41,8 @@ function rpcErrorMessage(error: { details?: string | null; message: string }): s
   const message = error.message;
   // The lock reason comes from parent_message_send_block_reason ("Chưa chấm vở; Chưa điền trợ giảng giám thị").
   if (message.includes("PARENT_MESSAGE_SEND_BLOCKED")) return `Chưa gửi được: ${error.details?.trim() || "tin chưa đủ điều kiện gửi"}.`;
+  // Two saves at once can pass the RPC's own check; the unique index then refuses the second.
+  if (message.includes("students_zalo_group_thread_key")) return "Nhóm Zalo này đã được liên kết với một học sinh khác.";
   const known: Record<string, string> = {
     ATTENDANCE_MARK_PERMISSION_DENIED: "Tài khoản hiện tại không có quyền gửi tin nhắn phụ huynh.",
     PARENT_MESSAGE_CONTENT_CHANGED: "Nội dung tin vừa được cập nhật (điểm, nhận xét hoặc mẫu tin). Kiểm tra lại rồi bấm Gửi.",
@@ -197,11 +201,16 @@ export type ZaloGroupSearchResult =
   | { groups: (ZaloCrmGroup & { members?: ZaloCrmGroupMember[] })[]; ok: true; total: number }
   | { message: string; ok: false };
 
+/** Links and searches always use the center nick from settings, never a value from the browser. */
+const NO_CENTER_NICK = "Chưa chọn nick trung tâm. Chọn nick trong Cài đặt → Chung trước khi liên kết nhóm.";
+
 export async function searchZaloGroupsAction(input: { search: string; withMembers?: boolean }): Promise<ZaloGroupSearchResult> {
   const denied = await requirePermission("students.update");
   if (denied) return { message: denied, ok: false };
+  const zaloAccountId = await getZaloCenterAccountId();
+  if (!zaloAccountId) return { message: NO_CENTER_NICK, ok: false };
   const search = input.search.trim().slice(0, 100);
-  const result = await searchZaloGroups({ limit: 20, search });
+  const result = await searchZaloGroups({ limit: 20, search, zaloAccountId });
   if (!result.ok) return { message: result.error, ok: false };
   const groups = await Promise.all(
     result.data.groups.map(async (group) => {
@@ -217,7 +226,6 @@ export async function linkStudentZaloGroupAction(input: {
   groupName: string | null;
   studentId: string;
   threadId: string;
-  zaloAccountId: string;
 }): Promise<ParentMessageActionResult> {
   const denied = await requirePermission("students.update");
   if (denied) return { message: denied, ok: false };
@@ -226,20 +234,101 @@ export async function linkStudentZaloGroupAction(input: {
       groupName: z.string().trim().max(200).nullable(),
       studentId: z.string().uuid(),
       threadId: z.string().trim().min(1).max(120),
-      zaloAccountId: z.string().trim().min(1).max(120),
     })
     .safeParse(input);
   if (!parsed.success) return { message: "Thông tin nhóm không hợp lệ.", ok: false };
+  const zaloAccountId = await getZaloCenterAccountId();
+  if (!zaloAccountId) return { message: NO_CENTER_NICK, ok: false };
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("link_student_zalo_group", {
     p_group_name: parsed.data.groupName ?? "",
     p_student_id: parsed.data.studentId,
     p_thread_id: parsed.data.threadId,
-    p_zalo_account_id: parsed.data.zaloAccountId,
+    p_zalo_account_id: zaloAccountId,
   });
   if (error) return { message: rpcErrorMessage(error), ok: false };
   revalidatePath(`/students/${parsed.data.studentId}`);
   return { message: "Đã liên kết nhóm sổ liên lạc.", ok: true };
+}
+
+export type BulkZaloLinkResult =
+  | { ok: true; results: { message: string; ok: boolean; studentId: string }[] }
+  | { message: string; ok: false };
+
+/** Parallel link RPCs per call (each is one round trip to Supabase). */
+const BULK_LINK_CONCURRENCY = 5;
+
+const bulkLinkSchema = z
+  .array(
+    z.object({
+      groupName: z.string().trim().max(200).nullable(),
+      studentId: z.string().uuid(),
+      threadId: z.string().trim().min(1).max(120),
+    }),
+  )
+  .min(1)
+  .max(MAX_BULK_ZALO_LINKS);
+
+/**
+ * Bulk link page: saves the groups staff confirmed, one link RPC per student
+ * (each audited on its own). Only students still without a group are linked,
+ * so a stale page never replaces a group someone linked meanwhile. A row that
+ * fails does not stop the others; the page shows the per-row result. No
+ * revalidatePath: the page refreshes once after its last chunk instead of
+ * re-reading every ZaloCRM group per chunk.
+ */
+export async function linkStudentZaloGroupsAction(input: {
+  links: { groupName: string | null; studentId: string; threadId: string }[];
+}): Promise<BulkZaloLinkResult> {
+  const denied = await requirePermission("students.update");
+  if (denied) return { message: denied, ok: false };
+  const parsed = bulkLinkSchema.safeParse(input.links);
+  if (!parsed.success) return { message: "Danh sách liên kết không hợp lệ.", ok: false };
+  const links = parsed.data;
+  if (new Set(links.map((link) => link.threadId)).size !== links.length) {
+    return { message: "Một nhóm Zalo chỉ liên kết được với một học sinh. Bỏ chọn nhóm bị trùng rồi thử lại.", ok: false };
+  }
+  if (new Set(links.map((link) => link.studentId)).size !== links.length) {
+    return { message: "Mỗi học sinh chỉ chọn một nhóm.", ok: false };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const [zaloAccountId, { data: current, error: currentError }] = await Promise.all([
+    getZaloCenterAccountId(),
+    supabase.from("students").select("id, zalo_group_thread_id").in("id", links.map((link) => link.studentId)),
+  ]);
+  if (!zaloAccountId) return { message: NO_CENTER_NICK, ok: false };
+  if (currentError) return { message: "Không kiểm tra được học sinh. Vui lòng thử lại.", ok: false };
+  // Student id → current thread ("" = unlinked). A row the caller cannot read is refused, not treated as unlinked.
+  const currentThread = new Map((current ?? []).map((row) => [row.id, row.zalo_group_thread_id ?? ""]));
+
+  const results: { message: string; ok: boolean; studentId: string }[] = [];
+  for (let index = 0; index < links.length; index += BULK_LINK_CONCURRENCY) {
+    const slice = links.slice(index, index + BULK_LINK_CONCURRENCY);
+    results.push(
+      ...(await Promise.all(
+        slice.map(async (link) => {
+          const thread = currentThread.get(link.studentId);
+          if (thread === undefined) return { message: "Không đọc được học sinh này. Tải lại trang.", ok: false, studentId: link.studentId };
+          // A retry after a lost response finds its own link already saved.
+          if (thread === link.threadId) return { message: "Đã liên kết.", ok: true, studentId: link.studentId };
+          if (thread) {
+            return { message: "Học sinh này vừa được liên kết nhóm khác. Tải lại trang để xem.", ok: false, studentId: link.studentId };
+          }
+          const { error } = await supabase.rpc("link_student_zalo_group", {
+            p_group_name: link.groupName ?? "",
+            p_student_id: link.studentId,
+            p_thread_id: link.threadId,
+            p_zalo_account_id: zaloAccountId,
+          });
+          return error
+            ? { message: rpcErrorMessage(error), ok: false, studentId: link.studentId }
+            : { message: "Đã liên kết.", ok: true, studentId: link.studentId };
+        }),
+      )),
+    );
+  }
+  return { ok: true, results };
 }
 
 export async function unlinkStudentZaloGroupAction(input: { reason: string; studentId: string }): Promise<ParentMessageActionResult> {
@@ -259,9 +348,26 @@ export type ZaloLinkCheckResult =
   | { accountStatus: string | null; groupName: string | null; membersCount: number | null; ok: true; present: boolean }
   | { message: string; ok: false };
 
-/** Re-reads the group by its stable thread id (current name, whether the nick is still a member). */
-export async function checkStudentZaloGroupAction(input: { threadId: string; zaloAccountId: string }): Promise<ZaloLinkCheckResult> {
-  const result = await getZaloGroupByThread(input.threadId, input.zaloAccountId);
+/**
+ * Re-reads a student's linked group by its stable thread id (current name,
+ * whether the nick is still a member). Thread and nick come from the student
+ * row, never from the browser.
+ */
+export async function checkStudentZaloGroupAction(input: { studentId: string }): Promise<ZaloLinkCheckResult> {
+  const denied = await requirePermission("students.update");
+  if (denied) return { message: denied, ok: false };
+  const parsed = z.object({ studentId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { message: "Không tìm thấy học sinh.", ok: false };
+  const supabase = await createSupabaseServerClient();
+  const [{ data: student }, centerAccountId] = await Promise.all([
+    supabase.from("students").select("zalo_group_thread_id, zalo_account_id").eq("id", parsed.data.studentId).maybeSingle(),
+    getZaloCenterAccountId(),
+  ]);
+  const threadId = student?.zalo_group_thread_id;
+  const zaloAccountId = student?.zalo_account_id || centerAccountId;
+  if (!threadId) return { message: "Học sinh chưa liên kết nhóm.", ok: false };
+  if (!zaloAccountId) return { message: NO_CENTER_NICK, ok: false };
+  const result = await getZaloGroupByThread(threadId, zaloAccountId);
   if (!result.ok) return { message: result.error, ok: false };
   if (!result.data) return { accountStatus: null, groupName: null, membersCount: null, ok: true, present: false };
   return {

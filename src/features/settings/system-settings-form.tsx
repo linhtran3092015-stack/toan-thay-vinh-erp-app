@@ -222,7 +222,8 @@ export function SystemSettingsForm({
           description={
             <>
               Gửi qua ZaloCRM từ nick trung tâm vào nhóm sổ liên lạc của từng học sinh. Chọn nick trong danh sách (cần đã cấu hình ZALOCRM_BASE_URL / ZALOCRM_API_KEY). Mẫu tin vắng dùng các biến {"{center} {student} {class} {date} {time}"}. Mẫu tin nhận xét cuối buổi sửa ở{" "}
-              <Link className="font-semibold text-action-link hover:underline" href="/settings/zalo">Cài đặt → Tin Zalo</Link>.
+              <Link className="font-semibold text-action-link hover:underline" href="/settings/zalo">Cài đặt → Tin Zalo</Link>. Kiểm tra kết nối và liên kết nhóm cho học sinh ở{" "}
+              <Link className="font-semibold text-action-link hover:underline" href="/parent-messages/groups">Liên kết nhóm Zalo</Link>.
             </>
           }
           title="Tin nhắn phụ huynh (Zalo)"

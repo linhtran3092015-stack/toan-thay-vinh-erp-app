@@ -5,7 +5,7 @@ import { useId, useRef, useState, useTransition, type FormEvent } from "react";
 
 import { ResultBanner } from "@/components/shared/result-banner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonVariant } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label } from "@/components/ui/field";
 import {
@@ -19,19 +19,23 @@ import {
 type GroupHit = Extract<ZaloGroupSearchResult, { ok: true }>["groups"][number];
 
 export function StudentZaloGroupLinkDialog({
-  centerAccountId,
   configured,
   currentThreadId,
-  currentZaloAccountId,
   studentId,
+  onLinked,
   studentName,
+  triggerLabel,
+  triggerVariant,
 }: {
-  centerAccountId: string;
   configured: boolean;
   currentThreadId: string | null;
-  currentZaloAccountId: string | null;
+  /** Bulk page: the row disappears on refresh, so the table shows the result instead. */
+  onLinked?: (message: string) => void;
   studentId: string;
   studentName: string;
+  /** The bulk link table uses a short ghost "Tìm nhóm" per row instead of the profile's primary button. */
+  triggerLabel?: string;
+  triggerVariant?: ButtonVariant;
 }) {
   const router = useRouter();
   const titleId = useId();
@@ -83,11 +87,11 @@ export function StudentZaloGroupLinkDialog({
         groupName: group.groupName,
         studentId,
         threadId: group.externalThreadId,
-        zaloAccountId: group.zaloAccountId || centerAccountId,
-      });
+      }).catch(() => ({ message: "Mất kết nối tới máy chủ. Tải lại trang để xem nhóm đã được liên kết chưa.", ok: false as const }));
       setFeedback(result);
       if (result.ok) {
         setIsOpen(false);
+        onLinked?.(`${studentName}: ${result.message}`);
         router.refresh();
       }
     });
@@ -97,7 +101,7 @@ export function StudentZaloGroupLinkDialog({
     if (!currentThreadId || isPending) return;
     setCheckText(null);
     startTransition(async () => {
-      const result = await checkStudentZaloGroupAction({ threadId: currentThreadId, zaloAccountId: currentZaloAccountId ?? centerAccountId });
+      const result = await checkStudentZaloGroupAction({ studentId });
       if (!result.ok) {
         setCheckText(`Không kiểm tra được: ${result.message}`);
         return;
@@ -125,8 +129,16 @@ export function StudentZaloGroupLinkDialog({
   return (
     <div className="grid gap-2">
       <div className="flex flex-wrap gap-2">
-        <Button disabled={!configured} onClick={open} ref={triggerRef} size="sm" type="button" variant={currentThreadId ? "outline" : "primary"}>
-          {currentThreadId ? "Đổi nhóm" : "Liên kết nhóm sổ liên lạc"}
+        <Button
+          aria-label={triggerLabel ? `${triggerLabel} cho ${studentName}` : undefined}
+          disabled={!configured}
+          onClick={open}
+          ref={triggerRef}
+          size="sm"
+          type="button"
+          variant={triggerVariant ?? (currentThreadId ? "outline" : "primary")}
+        >
+          {triggerLabel ?? (currentThreadId ? "Đổi nhóm" : "Liên kết nhóm sổ liên lạc")}
         </Button>
         {currentThreadId ? (
           <Button disabled={!configured || isPending} onClick={check} size="sm" type="button" variant="ghost">
@@ -181,7 +193,8 @@ export function StudentZaloGroupLinkDialog({
                     ) : null}
                   </div>
                   <Button disabled={isPending || group.externalThreadId === currentThreadId} onClick={() => link(group)} size="sm" type="button">
-                    Chọn nhóm này
+                    {/* Saves at once (unlike the bulk table's picker, which only stages a choice). */}
+                    Liên kết nhóm này
                   </Button>
                 </li>
               ))}

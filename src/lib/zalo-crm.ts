@@ -74,6 +74,77 @@ export async function searchZaloGroups(input: {
   return result.ok ? { data: { groups: result.data.conversations ?? [], total: result.data.total ?? 0 }, ok: true } : result;
 }
 
+/** ZaloCRM caps a page at 100 conversations. */
+const GROUP_PAGE_SIZE = 100;
+/** Pages read at once after the first one. */
+const GROUP_PAGE_CONCURRENCY = 5;
+/** One CRM call may run this long (see `call`). */
+const CALL_TIMEOUT_MS = 15_000;
+/**
+ * Paging stops starting new calls once a call could end after this budget,
+ * so 25 s + one 15 s call still leaves room inside the page's 60 s limit for
+ * the database reads, the nick check and matching.
+ */
+export const GROUP_READ_BUDGET_MS = 25_000;
+
+type GroupListResult = ZaloCrmResult<{ groups: ZaloCrmGroup[]; total: number; truncated: boolean }>;
+
+/**
+ * Every group conversation of one nick: page 1 gives the total, the rest are
+ * read 5 at a time. Stops at `maxPages` or when the time budget runs out and
+ * says so with `truncated`. The CRM orders by last message, so a group that
+ * moves between pages can come back twice: duplicates are dropped by thread id.
+ */
+export async function listAllZaloGroups(zaloAccountId: string, maxPages = 30, budgetMs = GROUP_READ_BUDGET_MS): Promise<GroupListResult> {
+  // Without a nick the CRM would return every nick's groups, and staff could link a group the center nick is not in.
+  if (!zaloAccountId.trim()) return { error: "Chưa chọn nick trung tâm.", ok: false };
+  const deadline = Date.now() + budgetMs;
+  const first = await searchZaloGroups({ limit: GROUP_PAGE_SIZE, page: 1, zaloAccountId });
+  if (!first.ok) return first;
+  const total = first.data.total;
+  const byThread = new Map<string, ZaloCrmGroup>();
+  const keep = (groups: ZaloCrmGroup[]) => {
+    for (const group of groups) {
+      // Do not rely on the CRM honouring the filter: a group of another nick is never offered.
+      if (group.zaloAccountId && group.zaloAccountId !== zaloAccountId) continue;
+      if (!byThread.has(group.externalThreadId)) byThread.set(group.externalThreadId, group);
+    }
+  };
+  keep(first.data.groups);
+  const lastPage = Math.min(maxPages, Math.ceil(total / GROUP_PAGE_SIZE));
+  let truncated = Math.ceil(total / GROUP_PAGE_SIZE) > maxPages;
+  // Offset paging over a list ordered by last message: a group that moves to page 1 mid-read is
+  // missed (its duplicate later is dropped), so fewer distinct groups than `total` is a short read.
+  const done = () => ({ data: { groups: [...byThread.values()], total, truncated: truncated || byThread.size < total }, ok: true as const });
+  if (first.data.groups.length < GROUP_PAGE_SIZE) return done();
+  for (let page = 2; page <= lastPage; page += GROUP_PAGE_CONCURRENCY) {
+    if (Date.now() + CALL_TIMEOUT_MS > deadline) {
+      truncated = true;
+      break;
+    }
+    const pages = Array.from({ length: Math.min(GROUP_PAGE_CONCURRENCY, lastPage - page + 1) }, (_, index) => page + index);
+    const results = await Promise.all(pages.map((number) => searchZaloGroups({ limit: GROUP_PAGE_SIZE, page: number, zaloAccountId })));
+    for (const result of results) {
+      if (!result.ok) return result;
+      keep(result.data.groups);
+    }
+  }
+  return done();
+}
+
+/** Group lists for matching, kept 60 s per nick so a refresh after each link does not re-read every page. */
+const GROUP_CACHE_TTL_MS = 60_000;
+const groupCache = new Map<string, { at: number; result: GroupListResult }>();
+
+export async function listAllZaloGroupsCached(zaloAccountId: string): Promise<GroupListResult> {
+  const cached = groupCache.get(zaloAccountId);
+  if (cached && Date.now() - cached.at < GROUP_CACHE_TTL_MS) return cached.result;
+  const result = await listAllZaloGroups(zaloAccountId);
+  // Only complete reads are kept; an error or a truncated read is retried next time.
+  if (result.ok && !result.data.truncated) groupCache.set(zaloAccountId, { at: Date.now(), result });
+  return result;
+}
+
 export async function getZaloGroupByThread(
   externalThreadId: string,
   zaloAccountId?: string,

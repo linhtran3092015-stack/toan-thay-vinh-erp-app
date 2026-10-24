@@ -1,4 +1,5 @@
 import type { StudentDetail } from "@/features/students/detail/types";
+import { normalizeVietnamPhoneNumber } from "@/lib/phone";
 import type { PermissionCode, StudentLifecycleStatus } from "@/types/domain";
 import {
   enrollmentChecklistItems,
@@ -18,13 +19,7 @@ import {
 } from "./student-form-types";
 
 export function normalizeVietnamPhone(value: string): PhoneNormalizationResult {
-  const compact = value.trim().replace(/[\s.-]/g, "");
-  const normalized = compact.startsWith("+84")
-    ? `0${compact.slice(3)}`
-    : compact.startsWith("84")
-      ? `0${compact.slice(2)}`
-      : compact;
-  const isValid = /^0(3|5|7|8|9)\d{8}$/.test(normalized);
+  const { compact, isValid, normalized } = normalizeVietnamPhoneNumber(value);
 
   if (!value.trim()) {
     return {
