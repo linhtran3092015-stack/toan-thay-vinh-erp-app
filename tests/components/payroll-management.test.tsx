@@ -96,16 +96,16 @@ function openPayslip() {
   return screen.getByRole("dialog", { name: /Phiếu lương/ });
 }
 
-/** Operations assistant below the 85% floor (944.660 VND of bonuses, all inside lương cứng), plus an optional advance. */
+/** Operations assistant below the 85% floor (900.000 VND of bonuses, all inside lương cứng), plus an optional advance. */
 function pieceworkStatement(advanceVnd: number) {
   const lines = [
-    line({ amountVnd: 1_433_333, id: "w-base", lineType: "base_offline" }),
+    line({ amountVnd: 1_500_000, id: "w-base", lineType: "base_offline" }),
     line({ amountVnd: 700_000, id: "w-renewal", lineType: "operations_grade_renewal_bonus" }),
     line({ amountVnd: 244_660, id: "w-grading", lineType: "grading_bonus" }),
     line({
-      amountVnd: 944_660,
+      amountVnd: 900_000,
       direction: "deduction",
-      formulaSnapshot: { base_salary_vnd: 1_433_333, basis_points: 8_500, piecework_vnd: 944_660 },
+      formulaSnapshot: { base_salary_vnd: 1_500_000, basis_points: 8_500, piecework_vnd: 900_000 },
       id: "w-offset",
       lineType: "piecework_offset",
       note: "Bù trừ lương khoán đến ngưỡng 85% lương cứng.",
@@ -114,7 +114,7 @@ function pieceworkStatement(advanceVnd: number) {
   ];
   return {
     lines,
-    totals: { payableAmountVnd: 1_433_333 - advanceVnd, totalDeductionsVnd: 944_660 + advanceVnd, totalEarningsVnd: 2_377_993 },
+    totals: { payableAmountVnd: 1_500_000 - advanceVnd, totalDeductionsVnd: 900_000 + advanceVnd, totalEarningsVnd: 2_400_000 },
   };
 }
 
@@ -182,16 +182,16 @@ describe("Payroll 1 presentation", () => {
 
   // Value: protects=an operations payslip shows the 85% floor inside "Lương khoán" with its explanation, corrections under "Điều chỉnh", and "Khấu trừ" at 0 when there is no advance;
   // fails_when=the offset or a manual deduction is listed or totalled under "Tạm ứng & khấu trừ", or the summary card still shows the offset as Khấu trừ;
-  // why_new=staff read "Bù trừ & khấu trừ −944.660 VND" as a cut in pay (owner report, 23/10/2026);
+  // why_new=staff read "Bù trừ & khấu trừ −900.000 VND" as a cut in pay;
   // seam=PayrollPage → PayrollPayslipDialog with fixture lines; no_claim=does not prove the engine's offset amount
   it("shows the piecework floor as lương khoán, not as a deduction", () => {
     const pieceworkLines = [
-      line({ amountVnd: 1_433_333, id: "p-base", lineType: "base_offline" }),
-      line({ amountVnd: 944_660, id: "p-renewal", lineType: "operations_grade_renewal_bonus" }),
+      line({ amountVnd: 1_500_000, id: "p-base", lineType: "base_offline" }),
+      line({ amountVnd: 900_000, id: "p-renewal", lineType: "operations_grade_renewal_bonus" }),
       line({
-        amountVnd: 944_660,
+        amountVnd: 900_000,
         direction: "deduction",
-        formulaSnapshot: { base_salary_vnd: 1_433_333, basis_points: 8_500, piecework_vnd: 944_660 },
+        formulaSnapshot: { base_salary_vnd: 1_500_000, basis_points: 8_500, piecework_vnd: 900_000 },
         id: "p-offset",
         lineType: "piecework_offset",
         note: "Bù trừ lương khoán đến ngưỡng 85% lương cứng.",
@@ -201,21 +201,21 @@ describe("Payroll 1 presentation", () => {
     render(<PayrollPage canApprove={false} canManage={false} canReconcile={false} periods={[period({ statements: [{
       ...period().statements[0],
       lines: pieceworkLines,
-      payableAmountVnd: 1_513_333,
-      totalDeductionsVnd: 944_660,
-      totalEarningsVnd: 2_457_993,
+      payableAmountVnd: 1_580_000,
+      totalDeductionsVnd: 900_000,
+      totalEarningsVnd: 2_480_000,
     }] })]} />);
 
     fireEvent.click(screen.getAllByRole("button", { name: "Xem chi tiết" })[0]);
     const dialog = screen.getByRole("dialog", { name: /Phiếu lương/ });
 
     const summary = within(dialog).getByRole("region", { name: "Tóm tắt thu nhập" });
-    expect(summary).toHaveTextContent("Tổng thu nhập1.513.333 VND");
+    expect(summary).toHaveTextContent("Tổng thu nhập1.580.000 VND");
     expect(summary).toHaveTextContent("Khấu trừ0 VND");
     const piecework = within(dialog).getByRole("region", { name: "Lương khoán" });
     expect(piecework).toHaveTextContent("Phần lương khoán đã tính trong lương cứng");
     expect(piecework).toHaveTextContent("Không phải khoản bị trừ");
-    expect(piecework).toHaveTextContent("chưa vượt 85% lương cứng (1.433.333 VND × 85% = 1.218.333 VND)");
+    expect(piecework).toHaveTextContent("chưa vượt 85% lương cứng (1.500.000 VND × 85% = 1.275.000 VND)");
     expect(piecework).not.toHaveTextContent("Bù trừ");
     expect(within(dialog).getByRole("region", { name: "Điều chỉnh" })).toHaveTextContent("Điều chỉnh tăng");
     expect(within(dialog).getByRole("region", { name: "Tạm ứng & khấu trừ" })).toHaveTextContent("Không phát sinh hạng mục trong nhóm này.");
@@ -286,7 +286,7 @@ describe("Payroll 1 presentation", () => {
     renderStatement(withAdvance.lines, withAdvance.totals);
     let dialog = openPayslip();
 
-    const offsetAmounts = within(within(dialog).getByRole("region", { name: "Lương khoán" })).getAllByText("−944.660 VND");
+    const offsetAmounts = within(within(dialog).getByRole("region", { name: "Lương khoán" })).getAllByText("−900.000 VND");
     expect(offsetAmounts.length).toBeGreaterThan(0);
     for (const amount of offsetAmounts) expect(amount).not.toHaveClass("text-danger");
     // The group row and the line row (the section header total is styled as a heading, not as a line amount).

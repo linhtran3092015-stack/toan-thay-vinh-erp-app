@@ -374,13 +374,13 @@ describe("getPayslipDocumentData", () => {
         statements: [{
           ...samplePeriod.statements[0],
           lines: [
-            { ...base, amountVnd: 1_433_333, id: "p-base" },
-            { ...base, amountVnd: 944_660, formulaSnapshot: {}, id: "p-renewal", lineType: "operations_grade_renewal_bonus", note: null, quantity: null, unitCount: null, unitLabel: null, unitRateVnd: null, workMinutes: null },
+            { ...base, amountVnd: 1_500_000, id: "p-base" },
+            { ...base, amountVnd: 900_000, formulaSnapshot: {}, id: "p-renewal", lineType: "operations_grade_renewal_bonus", note: null, quantity: null, unitCount: null, unitLabel: null, unitRateVnd: null, workMinutes: null },
             {
               ...base,
-              amountVnd: 944_660,
+              amountVnd: 900_000,
               direction: "deduction",
-              formulaSnapshot: { base_floor_basis_points: 8_500, base_salary_vnd: 1_433_333, offset_vnd: 944_660, piecework_vnd: 944_660, position_code: "operations_assistant" },
+              formulaSnapshot: { base_floor_basis_points: 8_500, base_salary_vnd: 1_500_000, offset_vnd: 900_000, piecework_vnd: 900_000, position_code: "operations_assistant" },
               id: "p-offset",
               lineType: "piecework_offset",
               note: "Bù trừ lương khoán đến ngưỡng 85% lương cứng.",
@@ -392,9 +392,9 @@ describe("getPayslipDocumentData", () => {
             },
             { ...base, amountVnd: 200_000, direction: "deduction", formulaSnapshot: {}, id: "p-advance", lineType: "advance_deduction", note: null, quantity: null, unitCount: null, unitLabel: null, unitRateVnd: null, workMinutes: null },
           ],
-          payableAmountVnd: 1_233_333,
-          totalDeductionsVnd: 1_144_660,
-          totalEarningsVnd: 2_377_993,
+          payableAmountVnd: 1_300_000,
+          totalDeductionsVnd: 1_100_000,
+          totalEarningsVnd: 2_400_000,
         }],
       }],
       ok: true,
@@ -420,14 +420,14 @@ describe("getPayslipDocumentData", () => {
     expect(result.data.earnings.map((line) => line.lineType)).toEqual(["base_offline", "operations_grade_renewal_bonus"]);
     expect(result.data.adjustments).toEqual([]);
     expect(result.data.piecework).toEqual({
-      absorbedVnd: 944_660,
+      absorbedVnd: 900_000,
       addedVnd: 0,
-      baseSalaryVnd: 1_433_333,
-      earnedVnd: 944_660,
+      baseSalaryVnd: 1_500_000,
+      earnedVnd: 900_000,
       floorBasisPoints: 8_500,
-      thresholdVnd: 1_218_333,
+      thresholdVnd: 1_275_000,
     });
-    expect(result.data.totals.grossVnd).toBe(1_433_333);
+    expect(result.data.totals.grossVnd).toBe(1_500_000);
     expect(result.data.totals.totalDeductionsVnd).toBe(200_000);
     expect(result.data.totals.grossVnd - result.data.totals.totalDeductionsVnd).toBe(result.data.totals.netVnd);
   });
@@ -459,15 +459,15 @@ describe("getPayslipDocumentData", () => {
       breakdowns: { commissions: [], grading: null, workHours: [] },
       deductions: [item("d1", "advance_deduction", "Khấu trừ tạm ứng", 200_000, "deduction")],
       earnings: [
-        item("e1", "base_offline", "Lương công offline", 1_433_333),
-        item("e2", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 944_660),
+        item("e1", "base_offline", "Lương công offline", 1_500_000),
+        item("e2", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 900_000),
       ],
       employee: { avatarUrl: null, bankAccount: null, department: null, displayName: "Trần Văn Linh", employeeCode: "NV17", joinedAt: null, positionLabel: "Trợ lý vận hành", staffId: "staff-1" },
       isStale: false,
       period: { currentRevision: 1, feedbackClosedAt: null, feedbackOpenedAt: null, id: "period-1", lastCalculatedAt: null, payDate: "2026-10-05", payDateFormatted: "05/10/2026", periodEndDate: "30/09/2026", periodMonth: "2026-09-01", periodMonthFormatted: "THÁNG 09/2026", periodStartDate: "01/09/2026", status: "draft", statusLabel: "Bản nháp" },
-      piecework: { absorbedVnd: 944_660, addedVnd: 0, baseSalaryVnd: 1_433_333, earnedVnd: 944_660, floorBasisPoints: 8_500, thresholdVnd: 1_218_333 },
+      piecework: { absorbedVnd: 900_000, addedVnd: 0, baseSalaryVnd: 1_500_000, earnedVnd: 900_000, floorBasisPoints: 8_500, thresholdVnd: 1_275_000 },
       statementId: "statement-1",
-      totals: { amountInWords: "-", grossFormatted: "1.463.333 VND", grossVnd: 1_463_333, netFormatted: "1.263.333 VND", netVnd: 1_263_333, totalDeductionsFormatted: "200.000 VND", totalDeductionsVnd: 200_000, workHours: 0, workMinutes: 0, workUnits: 0 },
+      totals: { amountInWords: "-", grossFormatted: "1.530.000 VND", grossVnd: 1_530_000, netFormatted: "1.330.000 VND", netVnd: 1_330_000, totalDeductionsFormatted: "200.000 VND", totalDeductionsVnd: 200_000, workHours: 0, workMinutes: 0, workUnits: 0 },
     }));
 
     const income = pdf.slice(pdf.indexOf("(LUONG THEO CONG)"), pdf.indexOf("(TONG THU NHAP)"));
@@ -476,7 +476,7 @@ describe("getPayslipDocumentData", () => {
     expect(income).toContain("(LUONG KHOAN)");
     expect(income).toContain("(Thuong tai phi khoi phu trach)");
     expect(income).toContain("(Phan luong khoan da tinh trong luong cung)");
-    expect(income).toContain("(-944.660 VND)");
+    expect(income).toContain("(-900.000 VND)");
     expect(income).toContain("(DIEU CHINH)");
     expect(income).toContain("(Dieu chinh tang)");
     expect(income).toContain("(Dieu chinh giam)");
@@ -510,7 +510,7 @@ function pdfData(overrides: Partial<PayslipPdfData>): PayslipPdfData {
     adjustments: [],
     breakdowns: { commissions: [], grading: null, workHours: [] },
     deductions: [],
-    earnings: [pdfItem("e1", "base_offline", "Lương công offline", 2_519_999)],
+    earnings: [pdfItem("e1", "base_offline", "Lương công offline", 2_400_000)],
     employee: { avatarUrl: null, bankAccount: null, department: null, displayName: "Nhân sự mẫu", employeeCode: "NV90", joinedAt: null, positionLabel: "Trợ lý vận hành", staffId: "staff-90" },
     isStale: false,
     period: { currentRevision: 1, feedbackClosedAt: null, feedbackOpenedAt: null, id: "period-1", lastCalculatedAt: null, payDate: "2026-10-05", payDateFormatted: "05/10/2026", periodEndDate: "30/09/2026", periodMonth: "2026-09-01", periodMonthFormatted: "THÁNG 09/2026", periodStartDate: "01/09/2026", status: "draft", statusLabel: "Bản nháp" },
@@ -534,27 +534,27 @@ function pdfSectionTexts(data: PayslipPdfData, title: string, end: string): stri
 
 describe("generatePayslipPdf sections", () => {
   // Value: protects=above the floor, the PDF "LUONG KHOAN" subtotal is the part added on top of lương cứng (addedVnd), followed by the offset row and the explanation of what was added;
-  // fails_when=renderSection ignores `subtotal` and prints the bonus sum (3.035.735 VND), the offset extra row is dropped, or the footnote is not drawn after it;
+  // fails_when=renderSection ignores `subtotal` and prints the bonus sum (2.800.000 VND), the offset extra row is dropped, or the footnote is not drawn after it;
   // why_new=TEST 12 is below the floor (addedVnd 0) and never reads the subtotal, so a subtotal of 0 or of the bonus sum passes it;
   // seam=none (pure generator; the content stream is uncompressed text); no_claim=does not check wrapping width or page breaks
   it("subtotals LUONG KHOAN above the floor with the amount added and explains it after the offset row", () => {
     const texts = pdfSectionTexts(pdfData({
       earnings: [
-        pdfItem("k1", "base_offline", "Lương công offline", 2_234_814),
-        pdfItem("k2", "base_online", "Lương công online", 285_185),
-        pdfItem("k3", "center_renewal_duty_bonus", "Thưởng quản lý và trực tin nhắn", 1_154_455),
-        pdfItem("k4", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 1_356_280),
+        pdfItem("k1", "base_offline", "Lương công offline", 2_100_000),
+        pdfItem("k2", "base_online", "Lương công online", 300_000),
+        pdfItem("k3", "center_renewal_duty_bonus", "Thưởng quản lý và trực tin nhắn", 1_200_000),
+        pdfItem("k4", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 1_075_000),
         pdfItem("k5", "payroll_processing_bonus", "Thưởng tính lương nhân sự", 525_000),
       ],
-      piecework: { absorbedVnd: 2_141_999, addedVnd: 893_736, baseSalaryVnd: 2_519_999, earnedVnd: 3_035_735, floorBasisPoints: 8_500, thresholdVnd: 2_141_999 },
+      piecework: { absorbedVnd: 2_040_000, addedVnd: 760_000, baseSalaryVnd: 2_400_000, earnedVnd: 2_800_000, floorBasisPoints: 8_500, thresholdVnd: 2_040_000 },
     }), "LUONG KHOAN", "TONG THU NHAP");
 
-    expect(texts.slice(0, 2)).toEqual(["LUONG KHOAN", "893.736 VND"]);
+    expect(texts.slice(0, 2)).toEqual(["LUONG KHOAN", "760.000 VND"]);
     const offset = texts.indexOf("Phan luong khoan da tinh trong luong cung");
     expect(offset).toBeGreaterThan(1);
-    expect(texts[offset + 1]).toBe("-2.141.999 VND");
+    expect(texts[offset + 1]).toBe("-2.040.000 VND");
     expect(texts.slice(offset + 2).join(" ")).toBe(
-      "Luong khoan dat 3.035.735 VND. Phan den 85% luong cung (2.519.999 VND x 85% = 2.141.999 VND) da duoc tra trong luong cung; phan vuot 893.736 VND duoc cong them.",
+      "Luong khoan dat 2.800.000 VND. Phan den 85% luong cung (2.400.000 VND x 85% = 2.040.000 VND) da duoc tra trong luong cung; phan vuot 760.000 VND duoc cong them.",
     );
   });
 
@@ -599,11 +599,11 @@ describe("generatePayslipPdf sections", () => {
   it("draws grading and other bonuses only inside LUONG KHOAN", () => {
     const pdf = new TextDecoder().decode(generatePayslipPdf(pdfData({
       earnings: [
-        pdfItem("g1", "base_offline", "Lương công offline", 1_433_333),
+        pdfItem("g1", "base_offline", "Lương công offline", 1_500_000),
         pdfItem("g2", "grading_bonus", "Thưởng chấm bài", 244_660),
         pdfItem("g3", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 700_000),
       ],
-      piecework: { absorbedVnd: 944_660, addedVnd: 0, baseSalaryVnd: 1_433_333, earnedVnd: 944_660, floorBasisPoints: 8_500, thresholdVnd: 1_218_333 },
+      piecework: { absorbedVnd: 900_000, addedVnd: 0, baseSalaryVnd: 1_500_000, earnedVnd: 900_000, floorBasisPoints: 8_500, thresholdVnd: 1_275_000 },
     })));
 
     expect(pdf).not.toContain("(CHAM BAI) Tj");
@@ -635,7 +635,7 @@ describe("generatePayslipPdf sections", () => {
   it("draws only printable ASCII bytes, mapping ×, dashes and quotes", () => {
     const bytes = generatePayslipPdf(pdfData({
       adjustments: [pdfItem("a1", "manual_reward", "Điều chỉnh tăng", 150_000, "earning", "Phụ cấp “điện thoại” 10 ca × 15.000 – tháng 9…")],
-      piecework: { absorbedVnd: 2_141_999, addedVnd: 893_736, baseSalaryVnd: 2_519_999, earnedVnd: 3_035_735, floorBasisPoints: 8_500, thresholdVnd: 2_141_999 },
+      piecework: { absorbedVnd: 2_040_000, addedVnd: 760_000, baseSalaryVnd: 2_400_000, earnedVnd: 2_800_000, floorBasisPoints: 8_500, thresholdVnd: 2_040_000 },
     }));
 
     expect([...bytes].filter((byte) => byte > 0x7e)).toEqual([]);

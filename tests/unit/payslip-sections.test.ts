@@ -9,22 +9,22 @@ import {
   summarizePiecework,
 } from "@/features/payroll/payslip-sections";
 
-// An operations assistant above the 85% floor: lương cứng 2.519.999, lương
-// khoán 3.035.735, plus two manual corrections.
+// An operations assistant above the 85% floor: lương cứng 2.400.000, lương
+// khoán 2.800.000, plus two manual corrections.
 const aboveFloorLines = [
-  { amountVnd: 2_234_814, direction: "earning", lineType: "base_offline" },
-  { amountVnd: 285_185, direction: "earning", lineType: "base_online" },
-  { amountVnd: 1_154_455, direction: "earning", lineType: "center_renewal_duty_bonus" },
-  { amountVnd: 1_356_280, direction: "earning", lineType: "operations_grade_renewal_bonus" },
+  { amountVnd: 2_100_000, direction: "earning", lineType: "base_offline" },
+  { amountVnd: 300_000, direction: "earning", lineType: "base_online" },
+  { amountVnd: 1_200_000, direction: "earning", lineType: "center_renewal_duty_bonus" },
+  { amountVnd: 1_075_000, direction: "earning", lineType: "operations_grade_renewal_bonus" },
   { amountVnd: 525_000, direction: "earning", lineType: "payroll_processing_bonus" },
   {
-    amountVnd: 2_141_999,
+    amountVnd: 2_040_000,
     direction: "deduction",
-    formulaSnapshot: { base_salary_vnd: 2_519_999, basis_points: 8_500, piecework_vnd: 3_035_735 },
+    formulaSnapshot: { base_salary_vnd: 2_400_000, basis_points: 8_500, piecework_vnd: 2_800_000 },
     lineType: "piecework_offset",
   },
   { amountVnd: 240_000, direction: "earning", lineType: "manual_reward" },
-  { amountVnd: 2_529_228, direction: "earning", lineType: "manual_reward" },
+  { amountVnd: 1_500_000, direction: "earning", lineType: "manual_reward" },
 ];
 
 describe("payslip sections", () => {
@@ -34,12 +34,12 @@ describe("payslip sections", () => {
   // seam=none (pure function); no_claim=does not recompute or validate the engine's offset
   it("summarizes lương khoán from the stored offset", () => {
     expect(summarizePiecework(aboveFloorLines)).toEqual({
-      absorbedVnd: 2_141_999,
-      addedVnd: 893_736,
-      baseSalaryVnd: 2_519_999,
-      earnedVnd: 3_035_735,
+      absorbedVnd: 2_040_000,
+      addedVnd: 760_000,
+      baseSalaryVnd: 2_400_000,
+      earnedVnd: 2_800_000,
       floorBasisPoints: 8_500,
-      thresholdVnd: 2_141_999,
+      thresholdVnd: 2_040_000,
     });
     expect(summarizePiecework([{ amountVnd: 1_000, direction: "earning", lineType: "grading_bonus" }])).toBeNull();
   });
@@ -80,14 +80,14 @@ describe("payslip sections", () => {
   it("explains the floor without calling it a deduction", () => {
     const above = summarizePiecework(aboveFloorLines);
     expect(above && getPieceworkExplanation(above)).toBe(
-      "Lương khoán đạt 3.035.735 VND. Phần đến 85% lương cứng (2.519.999 VND × 85% = 2.141.999 VND) đã được trả trong lương cứng; phần vượt 893.736 VND được cộng thêm.",
+      "Lương khoán đạt 2.800.000 VND. Phần đến 85% lương cứng (2.400.000 VND × 85% = 2.040.000 VND) đã được trả trong lương cứng; phần vượt 760.000 VND được cộng thêm.",
     );
     const below = summarizePiecework([
-      { amountVnd: 944_660, direction: "earning", lineType: "operations_grade_renewal_bonus" },
-      { amountVnd: 944_660, direction: "deduction", formulaSnapshot: { base_salary_vnd: 1_433_333, basis_points: 8_500 }, lineType: "piecework_offset" },
+      { amountVnd: 900_000, direction: "earning", lineType: "operations_grade_renewal_bonus" },
+      { amountVnd: 900_000, direction: "deduction", formulaSnapshot: { base_salary_vnd: 1_500_000, basis_points: 8_500 }, lineType: "piecework_offset" },
     ]);
     expect(below && getPieceworkExplanation(below)).toBe(
-      "Lương khoán đạt 944.660 VND, chưa vượt 85% lương cứng (1.433.333 VND × 85% = 1.218.333 VND), nên đã được trả trọn trong lương cứng. Không có khoản nào bị trừ.",
+      "Lương khoán đạt 900.000 VND, chưa vượt 85% lương cứng (1.500.000 VND × 85% = 1.275.000 VND), nên đã được trả trọn trong lương cứng. Không có khoản nào bị trừ.",
     );
   });
 

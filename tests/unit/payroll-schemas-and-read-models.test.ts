@@ -307,20 +307,20 @@ describe("Payroll payslip presentation", () => {
   // seam=none (pure functions); no_claim=does not cover an offset whose snapshot lacks these keys (the formula then falls back to the raw note)
   it("explains the piecework offset from either snapshot shape without the engine's offset note", () => {
     const offset = (formulaSnapshot: Record<string, unknown>) => line({
-      amountVnd: 944_660,
+      amountVnd: 900_000,
       direction: "deduction",
       formulaSnapshot,
       lineType: "piecework_offset",
       note: "Bù trừ lương khoán đến ngưỡng 85% lương cứng.",
     });
-    const live = offset({ base_salary_vnd: 1_433_333, basis_points: 8_500, piecework_vnd: 944_660 });
-    const run = offset({ base_floor_basis_points: 8_500, base_salary_vnd: 1_433_333, offset_vnd: 944_660, piecework_vnd: 944_660 });
+    const live = offset({ base_salary_vnd: 1_500_000, basis_points: 8_500, piecework_vnd: 900_000 });
+    const run = offset({ base_floor_basis_points: 8_500, base_salary_vnd: 1_500_000, offset_vnd: 900_000, piecework_vnd: 900_000 });
 
     for (const snapshotLine of [live, run]) {
       expect(getLineFormulaSummary(snapshotLine)).toBe(
-        "Mức thấp hơn giữa lương khoán 944.660 VND và 1.433.333 VND × 85% = 944.660 VND",
+        "Mức thấp hơn giữa lương khoán 900.000 VND và 1.500.000 VND × 85% = 900.000 VND",
       );
-      expect(getLineInputSummary(snapshotLine)).toBe("Lương khoán 944.660 VND, lương cứng 1.433.333 VND");
+      expect(getLineInputSummary(snapshotLine)).toBe("Lương khoán 900.000 VND, lương cứng 1.500.000 VND");
     }
     // Without the figures the input cell explains the offset instead of echoing the engine's note.
     expect(getLineInputSummary(offset({}))).toBe("Không phải khoản bị trừ: phần lương khoán này đã được trả trong lương cứng.");

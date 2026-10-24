@@ -155,9 +155,9 @@ describe("StaffLiveEstimateCard Component", () => {
           initialEstimate={{
             ...mockStaffEstimate,
             lines: [
-              { ...mockStaffEstimate.lines[0], amountVnd: 1_433_333 },
-              { ...monthly, amountVnd: 944_660, direction: "earning", lineType: "operations_grade_renewal_bonus" },
-              { ...monthly, amountVnd: 944_660, direction: "deduction", lineType: "piecework_offset", note: "Bù trừ lương khoán đến ngưỡng 85% lương cứng.", sourceKind: "piecework_floor" },
+              { ...mockStaffEstimate.lines[0], amountVnd: 1_500_000 },
+              { ...monthly, amountVnd: 900_000, direction: "earning", lineType: "operations_grade_renewal_bonus" },
+              { ...monthly, amountVnd: 900_000, direction: "deduction", lineType: "piecework_offset", note: "Bù trừ lương khoán đến ngưỡng 85% lương cứng.", sourceKind: "piecework_floor" },
               { ...monthly, amountVnd: 80_000, direction: "earning", lineType: "manual_reward", note: "Phụ cấp ăn tối" },
               { ...monthly, amountVnd: 50_000, direction: "deduction", lineType: "manual_deduction", note: "Trả lại phần tính dư" },
               { ...monthly, amountVnd: 200_000, direction: "deduction", lineType: "advance_deduction", sourceKind: "salary_advance" },
@@ -165,10 +165,10 @@ describe("StaffLiveEstimateCard Component", () => {
             statement: mockStaffEstimate.statement ? {
               ...mockStaffEstimate.statement,
               advanceDeductionsVnd: 200_000,
-              payableVnd: 1_263_333,
+              payableVnd: 1_330_000,
               positionCode: "operations_assistant",
-              totalDeductionsVnd: 1_194_660,
-              totalEarningsVnd: 2_457_993,
+              totalDeductionsVnd: 1_150_000,
+              totalEarningsVnd: 2_480_000,
             } : null,
           }}
           month="2026-09-01"
@@ -179,14 +179,14 @@ describe("StaffLiveEstimateCard Component", () => {
       const table = screen.getByRole("columnheader", { name: "Khoản lương" }).closest("table") as HTMLElement;
       const row = (label: string) => within(table).getByText(label).closest("tr") as HTMLElement;
 
-      expect(row("Lương khoán")).toHaveTextContent("Đạt 944.660 VND; 944.660 VND đã nằm trong lương cứng");
+      expect(row("Lương khoán")).toHaveTextContent("Đạt 900.000 VND; 900.000 VND đã nằm trong lương cứng");
       expect(row("Lương khoán")).toHaveTextContent("Không phải khoản bị trừ.");
       expect(row("Lương khoán").lastElementChild).toHaveTextContent("0 VND");
       expect(row("Điều chỉnh")).toHaveTextContent("2 khoản điều chỉnh tăng hoặc giảm");
       expect(row("Điều chỉnh").lastElementChild).toHaveTextContent("30.000 VND");
-      expect(row("Tổng thu nhập").lastElementChild).toHaveTextContent("1.463.333 VND");
+      expect(row("Tổng thu nhập").lastElementChild).toHaveTextContent("1.530.000 VND");
       expect(row("Khấu trừ tạm ứng").lastElementChild).toHaveTextContent("−200.000 VND");
-      expect(row("Lương tạm tính").lastElementChild).toHaveTextContent("1.263.333 VND");
+      expect(row("Lương tạm tính").lastElementChild).toHaveTextContent("1.330.000 VND");
       expect(within(table).queryByText("Khấu trừ khác")).not.toBeInTheDocument();
       expect(within(table).queryByText("Thưởng & Hoa hồng")).not.toBeInTheDocument();
     } finally {
@@ -342,7 +342,7 @@ describe("OwnerLiveEstimateOverview Component", () => {
   it("nets the piecework offset and manual deductions into income on every owner surface", () => {
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
     try {
-      const totals = { advanceDeductionsVnd: 200_000, payableVnd: 1_263_333, totalDeductionsVnd: 1_194_660, totalEarningsVnd: 2_457_993 };
+      const totals = { advanceDeductionsVnd: 200_000, payableVnd: 1_330_000, totalDeductionsVnd: 1_150_000, totalEarningsVnd: 2_480_000 };
       render(
         <OwnerLiveEstimateOverview
           initialEstimate={{
@@ -367,21 +367,21 @@ describe("OwnerLiveEstimateOverview Component", () => {
       );
 
       const figures = screen.getByLabelText("Số liệu lương tạm tính");
-      expect(figures).toHaveTextContent(/Tổng thu nhập\s*1\.463\.333/);
+      expect(figures).toHaveTextContent(/Tổng thu nhập\s*1\.530\.000/);
       expect(figures).toHaveTextContent(/Khấu trừ\s*−200\.000/);
 
       const staffRow = within(screen.getByRole("table", { name: /theo nhân sự/ })).getByText("Trần Văn Linh").closest("tr") as HTMLElement;
-      expect(staffRow).toHaveTextContent(/Thu nhập\s*1\.463\.333/);
+      expect(staffRow).toHaveTextContent(/Thu nhập\s*1\.530\.000/);
       expect(staffRow).toHaveTextContent(/Khấu trừ\s*−200\.000.*tạm ứng/);
 
       const positionRows = within(screen.getByRole("table", { name: /Tạm tính theo vị trí/ })).getAllByRole("row").slice(1);
       // The operations row and the "Tổng cộng" row.
       expect(positionRows).toHaveLength(2);
       for (const positionRow of positionRows) {
-        expect(positionRow).toHaveTextContent(/1\.463\.333.*−200\.000.*1\.263\.333/);
+        expect(positionRow).toHaveTextContent(/1\.530\.000.*−200\.000.*1\.330\.000/);
       }
 
-      expect(document.body).not.toHaveTextContent(/2\.457\.993|1\.194\.660/);
+      expect(document.body).not.toHaveTextContent(/2\.480\.000|1\.150\.000/);
     } finally {
       cleanup();
       vi.unstubAllGlobals();
@@ -395,7 +395,7 @@ describe("OwnerLiveEstimateOverview Component", () => {
   it("reads each position row's income and deductions from its own statements", () => {
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
     try {
-      const operations = { advanceDeductionsVnd: 200_000, payableVnd: 1_263_333, totalDeductionsVnd: 1_194_660, totalEarningsVnd: 2_457_993 };
+      const operations = { advanceDeductionsVnd: 200_000, payableVnd: 1_330_000, totalDeductionsVnd: 1_150_000, totalEarningsVnd: 2_480_000 };
       const teaching = { advanceDeductionsVnd: 0, payableVnd: 500_000, totalDeductionsVnd: 0, totalEarningsVnd: 500_000 };
       const statement = { pendingVerificationCount: 0, workHours: 40, workUnits: 5, workedMinutes: 2_400 };
       render(
@@ -413,11 +413,11 @@ describe("OwnerLiveEstimateOverview Component", () => {
             ],
             summary: {
               advanceDeductionsVnd: 200_000,
-              payableVnd: 1_763_333,
+              payableVnd: 1_830_000,
               pendingVerificationCount: 0,
               staffCount: 2,
-              totalDeductionsVnd: 1_194_660,
-              totalEarningsVnd: 2_957_993,
+              totalDeductionsVnd: 1_150_000,
+              totalEarningsVnd: 2_980_000,
             },
           }}
           month="2026-08-01"
@@ -438,11 +438,11 @@ describe("OwnerLiveEstimateOverview Component", () => {
 
       const rows = [cells("Trợ lý vận hành"), cells("Trợ giảng")];
       expect(rows).toEqual([
-        { deductions: "−200.000 ₫", income: "1.463.333 ₫", payable: "1.263.333 ₫" },
+        { deductions: "−200.000 ₫", income: "1.530.000 ₫", payable: "1.330.000 ₫" },
         { deductions: "0 ₫", income: "500.000 ₫", payable: "500.000 ₫" },
       ]);
       const total = cells("Tổng cộng");
-      expect(total).toEqual({ deductions: "−200.000 ₫", income: "1.963.333 ₫", payable: "1.763.333 ₫" });
+      expect(total).toEqual({ deductions: "−200.000 ₫", income: "2.030.000 ₫", payable: "1.830.000 ₫" });
       for (const key of ["deductions", "income", "payable"] as const) {
         expect(vnd(total[key])).toBe(rows.reduce((sum, row) => sum + vnd(row[key]), 0));
       }

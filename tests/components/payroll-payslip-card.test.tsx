@@ -147,7 +147,7 @@ describe("Payslip card (8b)", () => {
 
   // Value: protects=staff on lương cứng + lương khoán read the floor as part of lương khoán and manual corrections as "Điều chỉnh", never as money deducted;
   // fails_when=the piecework offset or a manual deduction is listed under "Khấu trừ", the offset turns red, or the explanation drops the threshold;
-  // why_new=staff read the old "Bù trừ & khấu trừ −944.660 VND" as a cut in pay (owner report, 23/10/2026);
+  // why_new=staff read the old "Bù trừ & khấu trừ −900.000 VND" as a cut in pay;
   // seam=none (PayslipDocument renders fixture data); no_claim=does not prove the loader builds these arrays (payslip-data tests cover that)
   it("shows lương khoán and corrections under income, not as deductions", () => {
     render(
@@ -160,21 +160,21 @@ describe("Payslip card (8b)", () => {
           ],
           deductions: [],
           earnings: [
-            line("e1", "base_offline", "Lương công offline", 1_433_333),
-            line("e2", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 944_660),
+            line("e1", "base_offline", "Lương công offline", 1_500_000),
+            line("e2", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 900_000),
           ],
-          piecework: { absorbedVnd: 944_660, addedVnd: 0, baseSalaryVnd: 1_433_333, earnedVnd: 944_660, floorBasisPoints: 8_500, thresholdVnd: 1_218_333 },
-          totals: { ...data.totals, grossFormatted: "1.463.333 VND", grossVnd: 1_463_333, netFormatted: "1.463.333 VND", netVnd: 1_463_333, totalDeductionsFormatted: "0 VND", totalDeductionsVnd: 0 },
+          piecework: { absorbedVnd: 900_000, addedVnd: 0, baseSalaryVnd: 1_500_000, earnedVnd: 900_000, floorBasisPoints: 8_500, thresholdVnd: 1_275_000 },
+          totals: { ...data.totals, grossFormatted: "1.530.000 VND", grossVnd: 1_530_000, netFormatted: "1.530.000 VND", netVnd: 1_530_000, totalDeductionsFormatted: "0 VND", totalDeductionsVnd: 0 },
         }}
       />,
     );
 
     const piecework = screen.getByRole("region", { name: "Lương khoán" });
-    expect(within(piecework).getByText("Thưởng tái phí khối phụ trách").nextElementSibling).toHaveTextContent("944.660 VND");
+    expect(within(piecework).getByText("Thưởng tái phí khối phụ trách").nextElementSibling).toHaveTextContent("900.000 VND");
     const absorbed = within(piecework).getByText("Phần lương khoán đã tính trong lương cứng").nextElementSibling as HTMLElement;
-    expect(absorbed).toHaveTextContent("−944.660 VND");
+    expect(absorbed).toHaveTextContent("−900.000 VND");
     expect(absorbed).not.toHaveClass("text-danger");
-    expect(piecework).toHaveTextContent("chưa vượt 85% lương cứng (1.433.333 VND × 85% = 1.218.333 VND)");
+    expect(piecework).toHaveTextContent("chưa vượt 85% lương cứng (1.500.000 VND × 85% = 1.275.000 VND)");
     expect(piecework).toHaveTextContent("Không có khoản nào bị trừ.");
 
     const adjustments = screen.getByRole("region", { name: "Điều chỉnh" });
@@ -187,7 +187,7 @@ describe("Payslip card (8b)", () => {
   });
 
   // Value: protects=above the floor, the printable "Lương khoán" block totals the part added on top of lương cứng (earned − already paid), lists the offset row, and explains the amount added;
-  // fails_when=the Lương khoán SummarySection ignores `subtotal` and shows earnedVnd (3.035.735) or the bonus sum instead of addedVnd, the offset row disappears, or the above-floor explanation is not rendered;
+  // fails_when=the Lương khoán SummarySection ignores `subtotal` and shows earnedVnd (2.800.000) or the bonus sum instead of addedVnd, the offset row disappears, or the above-floor explanation is not rendered;
   // why_new=the only PayslipDocument piecework fixture is below the floor (addedVnd 0), so a header showing earnedVnd or 0 is never told apart;
   // seam=none (PayslipDocument renders fixture data); no_claim=does not prove the loader computes addedVnd (payslip-sections and payslip-data tests cover that)
   it("totals lương khoán above the floor as the part added on top of lương cứng", () => {
@@ -197,23 +197,23 @@ describe("Payslip card (8b)", () => {
           ...data,
           deductions: [],
           earnings: [
-            line("k1", "base_offline", "Lương công offline", 2_234_814),
-            line("k2", "base_online", "Lương công online", 285_185),
-            line("k3", "center_renewal_duty_bonus", "Thưởng quản lý và trực tin nhắn", 1_154_455),
-            line("k4", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 1_356_280),
+            line("k1", "base_offline", "Lương công offline", 2_100_000),
+            line("k2", "base_online", "Lương công online", 300_000),
+            line("k3", "center_renewal_duty_bonus", "Thưởng quản lý và trực tin nhắn", 1_200_000),
+            line("k4", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 1_075_000),
             line("k5", "payroll_processing_bonus", "Thưởng tính lương nhân sự", 525_000),
           ],
-          piecework: { absorbedVnd: 2_141_999, addedVnd: 893_736, baseSalaryVnd: 2_519_999, earnedVnd: 3_035_735, floorBasisPoints: 8_500, thresholdVnd: 2_141_999 },
-          totals: { ...data.totals, grossFormatted: "3.413.735 VND", grossVnd: 3_413_735, netFormatted: "3.413.735 VND", netVnd: 3_413_735, totalDeductionsFormatted: "0 VND", totalDeductionsVnd: 0 },
+          piecework: { absorbedVnd: 2_040_000, addedVnd: 760_000, baseSalaryVnd: 2_400_000, earnedVnd: 2_800_000, floorBasisPoints: 8_500, thresholdVnd: 2_040_000 },
+          totals: { ...data.totals, grossFormatted: "3.160.000 VND", grossVnd: 3_160_000, netFormatted: "3.160.000 VND", netVnd: 3_160_000, totalDeductionsFormatted: "0 VND", totalDeductionsVnd: 0 },
         }}
       />,
     );
 
     const piecework = screen.getByRole("region", { name: "Lương khoán" });
-    expect(within(piecework).getByRole("heading", { name: "Lương khoán" }).nextElementSibling?.textContent).toBe("893.736 VND");
-    expect(within(piecework).getByText("Phần lương khoán đã tính trong lương cứng").nextElementSibling?.textContent).toBe("−2.141.999 VND");
+    expect(within(piecework).getByRole("heading", { name: "Lương khoán" }).nextElementSibling?.textContent).toBe("760.000 VND");
+    expect(within(piecework).getByText("Phần lương khoán đã tính trong lương cứng").nextElementSibling?.textContent).toBe("−2.040.000 VND");
     expect(piecework).toHaveTextContent(
-      "Lương khoán đạt 3.035.735 VND. Phần đến 85% lương cứng (2.519.999 VND × 85% = 2.141.999 VND) đã được trả trong lương cứng; phần vượt 893.736 VND được cộng thêm.",
+      "Lương khoán đạt 2.800.000 VND. Phần đến 85% lương cứng (2.400.000 VND × 85% = 2.040.000 VND) đã được trả trong lương cứng; phần vượt 760.000 VND được cộng thêm.",
     );
   });
 
@@ -228,11 +228,11 @@ describe("Payslip card (8b)", () => {
           ...data,
           deductions: [],
           earnings: [
-            line("g1", "base_offline", "Lương công offline", 1_433_333),
+            line("g1", "base_offline", "Lương công offline", 1_500_000),
             line("g2", "grading_bonus", "Thưởng chấm bài", 244_660),
             line("g3", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 700_000),
           ],
-          piecework: { absorbedVnd: 944_660, addedVnd: 0, baseSalaryVnd: 1_433_333, earnedVnd: 944_660, floorBasisPoints: 8_500, thresholdVnd: 1_218_333 },
+          piecework: { absorbedVnd: 900_000, addedVnd: 0, baseSalaryVnd: 1_500_000, earnedVnd: 900_000, floorBasisPoints: 8_500, thresholdVnd: 1_275_000 },
         }}
       />,
     );
