@@ -3,6 +3,11 @@ import { PermissionDeniedState } from "@/components/shared/permission-denied-sta
 import { PayslipDocument } from "@/features/payroll/payslip/components/payslip-document";
 import { PayslipToolbar } from "@/features/payroll/payslip/components/payslip-toolbar";
 import { getPayslipDocumentData } from "@/features/payroll/payslip/payslip-data";
+import {
+  getPayrollReturnHref,
+  getPayslipHref,
+  parsePayrollPeriodCount,
+} from "@/features/payroll/period-window";
 import { redirect } from "next/navigation";
 
 interface PayslipPageProps {
@@ -10,18 +15,19 @@ interface PayslipPageProps {
     periodId: string;
     statementId: string;
   }>;
+  /** `?periods=`: how many periods /payroll was showing when the payslip was opened. */
+  searchParams: Promise<{ periods?: string | string[] }>;
 }
 
-export default async function PayslipPageRoute({ params }: PayslipPageProps) {
+export default async function PayslipPageRoute({ params, searchParams }: PayslipPageProps) {
   const { periodId, statementId } = await params;
+  const periodCount = parsePayrollPeriodCount((await searchParams).periods);
 
   const result = await getPayslipDocumentData(periodId, statementId);
 
   if (!result.ok) {
     if (result.error === "STATEMENT_STALE" && result.suggestedCurrentStatementId) {
-      redirect(
-        `/payroll/${periodId}/statements/${result.suggestedCurrentStatementId}/payslip`,
-      );
+      redirect(getPayslipHref(periodId, result.suggestedCurrentStatementId, periodCount));
     }
 
     if (result.error === "PERMISSION_DENIED") {
@@ -49,7 +55,7 @@ export default async function PayslipPageRoute({ params }: PayslipPageProps) {
 
   return (
     <div className="min-h-screen bg-surface-canvas print:bg-white">
-      <PayslipToolbar pdfDownloadUrl={pdfDownloadUrl} />
+      <PayslipToolbar backHref={getPayrollReturnHref(periodId, periodCount)} pdfDownloadUrl={pdfDownloadUrl} />
       <main className="p-4 print:p-0 sm:p-6">
         <PayslipDocument data={result.data} />
       </main>

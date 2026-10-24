@@ -23,6 +23,16 @@ ERP phản hồi nhanh hơn: máy chủ ứng dụng chuyển sang Singapore, ng
 - `getSessionDetail`, trang `/sessions/[sessionId]` và `getDatabasePermissions` (getUser song song với `get_my_permissions`, quyền chỉ được dùng sau khi getUser xác thực) chạy truy vấn bằng `Promise.all`.
 - Test mới `tests/unit/database-permissions.test.ts`, `tests/unit/session-result-actions-refresh.test.ts`; mở rộng test điểm danh, chi tiết buổi học và route buổi học.
 
+## [0.40.0.1] - 2026-10-24
+
+Nút "Quay lại bảng lương" trên phiếu lương đưa về đúng danh sách kỳ lương vừa xem, kể cả các kỳ cũ đã mở thêm, và cuộn tới kỳ của phiếu đó.
+
+### Fixed
+- **Phiếu lương → Quay lại bảng lương**: trước đây luôn về `/payroll` mặc định (3 kỳ gần nhất), nên kỳ cũ vừa mở bằng "Xem thêm" hoặc từ trang Tạm ứng biến mất. Giờ liên kết phiếu lương (bảng, danh sách trên điện thoại, nút "Mở phiếu lương" trong hộp chi tiết) giữ số kỳ đang hiện, và nút quay lại mở lại đúng số kỳ đó, tải thêm kỳ của phiếu nếu cần và cuộn tới kỳ đó. Phiếu thuộc phiên bản tính cũ chuyển sang phiếu hiện tại mà vẫn giữ số kỳ.
+
+### For contributors
+- Ghi ngoại lệ "đọc bảng lương theo từng kỳ" (v0.40.0.0) vào `docs/redesign/WORKFLOW_CONTRACTS_A_E.md` (List reads outside A–E), `docs/redesign/REDESIGN_PROGRAM.md` và `DESIGN.md`.
+
 ## [0.40.0.0] - 2026-10-24
 
 Phiếu lương và trang Bảng lương chỉ đọc đúng phần cần hiển thị, trong một lần đọc: phiếu lương (trang in và PDF) đọc đúng phiếu đó, trang `/payroll` đọc 3 kỳ gần nhất cùng mọi kỳ còn nháp hoặc chờ đối soát, và tải kỳ cũ hơn khi bấm. Phiếu có dòng lương không cộng ra đúng tổng thì không hiện số sai nữa.
