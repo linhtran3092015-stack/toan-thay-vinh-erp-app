@@ -16,21 +16,38 @@ import {
   formatDate,
   formatDateTime,
   formatMonth,
+  formatSignedCurrency,
   formatWorkMinutes,
   getEvidenceDetails,
   getEvidenceUrl,
   getLineFormulaSummary,
   getLineInputSummary,
+  getLineNote,
   getLineRateSummary,
   getLineTypeLabel,
   getSourceKindLabel,
 } from "@/features/payroll/payroll-presentation";
+import {
+  getAmountClassName,
+  getPayslipDisplayTotals,
+  getPayslipSection,
+  getPieceworkExplanation,
+  PIECEWORK_RULE,
+  type PayslipSectionKey,
+  signedAmount,
+  summarizePiecework,
+} from "@/features/payroll/payslip-sections";
 import type { PayrollLineRead, PayrollStatementRead } from "@/features/payroll/read-models";
 
 import { attendanceLineTypes, groupPayrollLines } from "@/features/payroll/payroll-line-groups";
 
 type BadgeTone = "info" | "neutral" | "success" | "warning";
-type LineGroupKey = "attendance" | "grading" | "earnings" | "deductions";
+type LineGroupKey = PayslipSectionKey;
+
+/** Sections that only appear when they have lines (most staff have neither). */
+const optionalSections = new Set<LineGroupKey>(["piecework", "manual"]);
+/** With lương khoán every bonus sits in that section, so these would only ever be empty. */
+const sectionsInsidePiecework = new Set<LineGroupKey>(["grading", "earnings"]);
 
 const groupMetadata: readonly {
   description: string;
@@ -48,24 +65,26 @@ const groupMetadata: readonly {
     title: "Chấm bài",
   },
   {
+    description: `Thưởng và hoa hồng theo kết quả công việc. ${PIECEWORK_RULE}`,
+    key: "piecework",
+    title: "Lương khoán",
+  },
+  {
     description: "Phụ cấp, thưởng, hoa hồng và các khoản cộng khác.",
     key: "earnings",
     title: "Phụ cấp, thưởng & hoa hồng",
   },
   {
-    description: "Tạm ứng, bù trừ và các khoản khấu trừ trong kỳ.",
+    description: "Khoản quản lý điều chỉnh tăng hoặc giảm; nội dung ghi ở từng dòng.",
+    key: "manual",
+    title: "Điều chỉnh",
+  },
+  {
+    description: "Tạm ứng lương và các khoản khấu trừ trong kỳ.",
     key: "deductions",
     title: "Tạm ứng & khấu trừ",
   },
 ];
-
-
-function getLineGroup(line: PayrollLineRead): LineGroupKey {
-  if (line.direction === "deduction") return "deductions";
-  if (line.lineType === "grading_bonus") return "grading";
-  if (attendanceLineTypes.has(line.lineType)) return "attendance";
-  return "earnings";
-}
 
 export function PayrollPayslipDialog({
   canAddManualLine,
@@ -93,6 +112,9 @@ export function PayrollPayslipDialog({
   const closeRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+  const piecework = summarizePiecework(statement.lines);
+  const withPiecework = piecework !== null;
+  const totals = getPayslipDisplayTotals(statement);
 
   return (
     <>
@@ -139,21 +161,24 @@ export function PayrollPayslipDialog({
           </section>
 
           <section aria-label="Tóm tắt thu nhập" className="grid overflow-hidden rounded-lg border border-border-subtle bg-surface-base sm:grid-cols-3">
-            <SummaryAmount label="Tổng thu nhập" value={statement.totalEarningsVnd} />
-            <SummaryAmount deduction label="Bù trừ & khấu trừ" value={statement.totalDeductionsVnd} />
+            <SummaryAmount label="Tổng thu nhập" value={totals.incomeVnd} />
+            <SummaryAmount deduction label="Khấu trừ" value={totals.deductionsVnd} />
             <SummaryAmount emphasized label="Thực nhận" value={statement.payableAmountVnd} />
           </section>
 
           <div className="grid gap-5">
             {groupMetadata.map((group) => {
-              const lines = statement.lines.filter((line) => getLineGroup(line) === group.key);
+              const lines = statement.lines.filter((line) => getPayslipSection(line, withPiecework) === group.key);
+              if (lines.length === 0 && (optionalSections.has(group.key) || (withPiecework && sectionsInsidePiecework.has(group.key)))) return null;
               return (
                 <PayslipGroup
                   canRequestCorrection={canRequestCorrection}
                   description={group.key === "attendance" ? `${formatWorkMinutes(statement.workMinutes)} trong kỳ · Mở từng khoản để xem công theo ngày.` : group.description}
+                  footnote={group.key === "piecework" && piecework ? getPieceworkExplanation(piecework) : null}
                   key={group.key}
                   lines={lines}
                   payrollStatementId={statement.id}
+                  perLine={group.key === "manual"}
                   title={group.title}
                 />
               );
@@ -167,9 +192,9 @@ export function PayrollPayslipDialog({
             <div className="grid gap-4 p-4 lg:grid-cols-[1fr_auto] lg:items-center">
               <div>
                 <p className="text-label font-semibold text-text-default">Cách tính tổng thực nhận</p>
-                <p className="mt-1 text-secondary text-text-muted">Tổng thu nhập − Bù trừ & khấu trừ = Thực nhận</p>
+                <p className="mt-1 text-secondary text-text-muted">Tổng thu nhập − Khấu trừ = Thực nhận</p>
                 <p className="mt-2 tabular-nums text-body font-semibold text-text-strong">
-                  {formatCurrency(statement.totalEarningsVnd)} − {formatCurrency(statement.totalDeductionsVnd)} = {formatCurrency(statement.payableAmountVnd)}
+                  {formatCurrency(totals.incomeVnd)} − {formatCurrency(totals.deductionsVnd)} = {formatCurrency(statement.payableAmountVnd)}
                 </p>
                 <p className="mt-2 text-caption text-text-muted">
                   Tổng thời gian ghi nhận: {formatWorkMinutes(statement.workMinutes)} · {statement.workUnits} công
@@ -208,34 +233,43 @@ export function PayrollPayslipDialog({
 function PayslipGroup({
   canRequestCorrection,
   description,
+  footnote,
   lines,
   payrollStatementId,
+  perLine = false,
   title,
 }: {
   canRequestCorrection: boolean;
   description: string;
+  footnote: string | null;
   lines: readonly PayrollLineRead[];
   payrollStatementId: string;
+  /** One row per line with its note visible (manager corrections each carry their own reason). */
+  perLine?: boolean;
   title: string;
 }) {
-  const groups = groupPayrollLines(lines);
-  const total = lines.reduce((sum, line) => sum + line.amountVnd, 0);
+  const groups = perLine
+    ? lines.map((line) => ({ amountVnd: line.amountVnd, direction: line.direction, key: line.id, lineType: line.lineType, lines: [line] }))
+    : groupPayrollLines(lines);
+  const total = lines.reduce((sum, line) => sum + signedAmount(line), 0);
   return (
     <section aria-label={title} className="overflow-hidden rounded-2xl border border-border-subtle bg-surface-base">
       <div className="flex items-start justify-between gap-4 border-b border-border-subtle bg-surface-raised px-4 py-4">
         <div><h3 className="font-semibold text-text-strong">{title}</h3><p className="mt-1 text-caption text-text-muted">{description}</p></div>
-        <span aria-label={`Tổng ${title}`} className="shrink-0 text-base font-bold tabular-nums text-text-strong sm:text-lg">{formatCurrency(total)}</span>
+        <span aria-label={`Tổng ${title}`} className="shrink-0 text-base font-bold tabular-nums text-text-strong sm:text-lg">{formatSignedCurrency(total)}</span>
       </div>
       {groups.length === 0 ? <p className="px-4 py-4 text-secondary text-text-muted">Không phát sinh hạng mục trong nhóm này.</p> : groups.map((group) => (
         <details key={group.key} className="group/line border-b border-border-subtle last:border-b-0">
           <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring [&::-webkit-details-marker]:hidden">
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-text-strong">{getLineTypeLabel(group.lineType)}</p>
-              <p className="mt-1 text-caption text-text-muted">{attendanceLineTypes.has(group.lineType)
-                ? `${formatWorkMinutes(group.lines.reduce((sum, line) => sum + (line.workMinutes ?? 0), 0))} trong kỳ · ${group.lines.length} phát sinh`
-                : `${group.lines.length} phát sinh · Xem căn cứ tính`}</p>
+              <p className={`mt-1 text-caption text-text-muted [overflow-wrap:anywhere] ${perLine ? "line-clamp-2" : ""}`}>{perLine
+                ? getLineNote(group.lines[0]) ?? "Xem căn cứ tính"
+                : attendanceLineTypes.has(group.lineType)
+                  ? `${formatWorkMinutes(group.lines.reduce((sum, line) => sum + (line.workMinutes ?? 0), 0))} trong kỳ · ${group.lines.length} phát sinh`
+                  : `${group.lines.length} phát sinh · Xem căn cứ tính`}</p>
             </div>
-            <span className={`shrink-0 font-semibold tabular-nums ${group.direction === "deduction" ? "text-danger" : "text-text-strong"}`}>{group.direction === "deduction" ? "−" : ""}{formatCurrency(group.amountVnd)}</span>
+            <span className={`shrink-0 font-semibold tabular-nums ${getAmountClassName(group)}`}>{group.direction === "deduction" ? "−" : ""}{formatCurrency(group.amountVnd)}</span>
             <ChevronRight aria-hidden="true" className="shrink-0 text-text-muted transition-transform group-open/line:rotate-90" size={18} />
           </summary>
           <ul aria-label={`Chi tiết ${getLineTypeLabel(group.lineType)}`} className="border-t border-border-subtle bg-surface-raised">
@@ -243,7 +277,7 @@ function PayslipGroup({
           </ul>
         </details>
       ))}
-      {lines.some((line) => line.lineType === "piecework_offset") ? <p className="border-t border-border-subtle px-4 py-3 text-caption text-text-muted">Bù trừ lương khoán theo chính sách của kỳ. Khoản thưởng chỉ làm tăng thực nhận khi vượt ngưỡng bù trừ.</p> : null}
+      {footnote ? <p className="border-t border-border-subtle px-4 py-3 text-caption text-text-muted">{footnote}</p> : null}
     </section>
   );
 }
@@ -265,7 +299,7 @@ function PayslipLine({
     <li className="grid gap-3 border-b border-border-subtle px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(160px,1.1fr)_minmax(150px,1fr)_minmax(240px,1.7fr)_minmax(120px,.8fr)_minmax(128px,.8fr)_minmax(170px,1fr)]">
       <LineCell label="Hạng mục">
         <p className="font-semibold text-text-strong">{label}</p>
-        {line.note ? <p className="mt-1 text-caption text-text-muted">{line.note}</p> : null}
+        {getLineNote(line) ? <p className="mt-1 text-caption text-text-muted [overflow-wrap:anywhere]">{getLineNote(line)}</p> : null}
         
       </LineCell>
       <LineCell label="Dữ liệu đầu vào">
@@ -278,7 +312,7 @@ function PayslipLine({
         <p className="tabular-nums text-text-default">{getLineRateSummary(line)}</p>
       </LineCell>
       <LineCell className="lg:text-right" label="Thành tiền">
-        <p className={`tabular-nums font-semibold ${line.direction === "deduction" ? "text-danger" : "text-text-strong"}`}>
+        <p className={`tabular-nums font-semibold ${getAmountClassName(line)}`}>
           {line.direction === "deduction" ? "−" : "+"}{formatCurrency(line.amountVnd)}
         </p>
       </LineCell>
@@ -332,7 +366,7 @@ function SummaryAmount({ deduction = false, emphasized = false, label, value }: 
   return (
     <div className={`border-b border-border-subtle p-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 ${emphasized ? "bg-success-bg" : ""}`}>
       <p className={`text-label font-semibold ${emphasized ? "text-success" : "text-text-muted"}`}>{label}</p>
-      <p className={`mt-1 tabular-nums text-section-title font-bold ${deduction ? "text-danger" : emphasized ? "text-success" : "text-text-strong"}`}>
+      <p className={`mt-1 tabular-nums text-section-title font-bold ${deduction ? (value > 0 ? "text-danger" : "text-text-muted") : emphasized ? "text-success" : "text-text-strong"}`}>
         {deduction && value > 0 ? "−" : ""}{formatCurrency(value)}
       </p>
     </div>

@@ -51,7 +51,7 @@ describe("Payroll Manual Line Action Error Mappings", () => {
     const result = await addPayrollManualLineAction(payload);
     expect(result.status).toBe("error");
     expect(result.message).toBe(
-      "Không thể tự thêm thưởng hoặc khấu trừ cho bảng lương của chính mình.",
+      "Không thể tự thêm điều chỉnh cho bảng lương của chính mình.",
     );
   });
 
@@ -62,7 +62,7 @@ describe("Payroll Manual Line Action Error Mappings", () => {
     });
     const resAmount = await addPayrollManualLineAction(payload);
     expect(resAmount.status).toBe("error");
-    expect(resAmount.message).toBe("Số tiền thưởng hoặc khấu trừ không hợp lệ.");
+    expect(resAmount.message).toBe("Số tiền điều chỉnh không hợp lệ.");
 
     rpcMock.mockResolvedValueOnce({
       data: null,
@@ -70,7 +70,7 @@ describe("Payroll Manual Line Action Error Mappings", () => {
     });
     const resNote = await addPayrollManualLineAction(payload);
     expect(resNote.status).toBe("error");
-    expect(resNote.message).toBe("Nội dung thưởng hoặc khấu trừ không hợp lệ.");
+    expect(resNote.message).toBe("Nội dung điều chỉnh không hợp lệ.");
 
     rpcMock.mockResolvedValueOnce({
       data: null,

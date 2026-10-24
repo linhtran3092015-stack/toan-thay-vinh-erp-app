@@ -26,6 +26,7 @@ const mockDocData = {
     grading: null,
     workHours: [],
   },
+  adjustments: [],
   deductions: [],
   earnings: [],
   employee: {
@@ -58,6 +59,7 @@ const mockDocData = {
     status: "draft",
     statusLabel: "Bản nháp",
   },
+  piecework: null,
   statementId: "stmt-uuid-1",
   totals: {
     amountInWords: "Mười triệu đồng chẵn./.",

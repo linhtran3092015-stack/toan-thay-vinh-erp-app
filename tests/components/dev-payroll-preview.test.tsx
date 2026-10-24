@@ -112,4 +112,24 @@ describe("/dev/payroll preview", () => {
     expect(screen.queryByRole("link", { name: /Xuất PDF/ })).not.toBeInTheDocument();
     expectNothingReal();
   });
+
+  // Value: protects=the `payslip-piecework` preview shows an operations payslip with the "Lương khoán" block (amount added and its explanation) and each "Điều chỉnh" with its note, and stays as inert as the other views;
+  // fails_when=PayrollPreview drops the `payslip-piecework` branch (nothing renders), PayslipView ignores the `piecework` flag (the ordinary payslip renders with no Lương khoán), the fixture loses its correction notes, or the view's PDF action becomes a live link or anything fetches / calls a payroll action;
+  // why_new=the view is new in this change and no test rendered it;
+  // seam=same mocks as the file header (fetch, Supabase browser client, payroll actions, AppShell); no_claim=does not prove page.tsx accepts `?view=payslip-piecework` (only the client preview is rendered)
+  it("renders the piecework payslip view with lương khoán, notes and no live PDF link", () => {
+    render(<PayrollPreview role="owner" state="normal" view="payslip-piecework" />);
+
+    const piecework = screen.getByRole("region", { name: "Lương khoán" });
+    expect(within(piecework).getByRole("heading", { name: "Lương khoán" }).nextElementSibling?.textContent).toBe("490.000 VND");
+    expect(piecework).toHaveTextContent(
+      "Lương khoán đạt 2.700.000 VND. Phần đến 85% lương cứng (2.600.000 VND × 85% = 2.210.000 VND) đã được trả trong lương cứng; phần vượt 490.000 VND được cộng thêm.",
+    );
+    const adjustments = screen.getByRole("region", { name: "Điều chỉnh" });
+    expect(within(adjustments).getByText("Phụ cấp điện thoại 10 ca × 15.000")).toBeInTheDocument();
+    expect(within(adjustments).getByText("Trả lại phần công online tính nhầm thành offline")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Xuất PDF/ })).toBeDisabled();
+    expect(screen.queryByRole("link", { name: /Xuất PDF/ })).not.toBeInTheDocument();
+    expectNothingReal();
+  });
 });

@@ -25,6 +25,7 @@ import {
   formatMonth,
   formatWorkMinutes,
 } from "@/features/payroll/payroll-presentation";
+import { getPayslipDisplayTotals } from "@/features/payroll/payslip-sections";
 import type {
   PayrollCalculationIssueRead,
   PayrollCorrectionRequestRead,
@@ -396,7 +397,7 @@ function PayrollStatements({
             <TableHeader>Nhân sự</TableHeader>
             <TableHeader className="text-right">Công</TableHeader>
             <TableHeader className="text-right">Giờ công</TableHeader>
-            <TableHeader className="text-right">Gross</TableHeader>
+            <TableHeader className="text-right">Thu nhập</TableHeader>
             <TableHeader className="text-right">Khấu trừ</TableHeader>
             <TableHeader className="text-right">Thực nhận</TableHeader>
             <TableHeader className="w-[280px]">Thao tác</TableHeader>
@@ -440,6 +441,7 @@ function PayrollStatementTableRow({
   periodStatusTone: "info" | "neutral" | "success" | "warning";
   statement: PayrollStatementRead;
 }) {
+  const totals = getPayslipDisplayTotals(statement);
   return (
     <tr className="align-top hover:bg-[var(--table-row-hover)]">
       <TableCell className="w-[180px]">
@@ -451,8 +453,8 @@ function PayrollStatementTableRow({
       <TableCell className="w-[92px] text-right tabular-nums">
         {formatWorkMinutes(statement.workMinutes)}
       </TableCell>
-      <MoneyCell value={statement.totalEarningsVnd} />
-      <MoneyCell value={statement.totalDeductionsVnd} />
+      <MoneyCell value={totals.incomeVnd} />
+      <MoneyCell value={totals.deductionsVnd} />
       <MoneyCell emphasized value={statement.payableAmountVnd} />
       <TableCell className="w-[280px]">
         <div className="flex items-center gap-2">
@@ -495,6 +497,7 @@ function PayrollStatementRecord({
   periodStatusTone: "info" | "neutral" | "success" | "warning";
   statement: PayrollStatementRead;
 }) {
+  const totals = getPayslipDisplayTotals(statement);
   return (
     <article
       className="rounded-lg border border-border-subtle bg-surface-base px-4 py-3"
@@ -509,8 +512,8 @@ function PayrollStatementRecord({
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-secondary text-text-muted">
-        <RecordAmount label="Gross" value={statement.totalEarningsVnd} />
-        <RecordAmount label="Khấu trừ" value={statement.totalDeductionsVnd} />
+        <RecordAmount label="Thu nhập" value={totals.incomeVnd} />
+        <RecordAmount label="Khấu trừ" value={totals.deductionsVnd} />
         <RecordText label="Công" value={`${statement.workUnits} công`} />
         <RecordText label="Thời gian công" value={formatWorkMinutes(statement.workMinutes)} />
       </dl>

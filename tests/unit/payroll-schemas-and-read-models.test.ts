@@ -300,6 +300,31 @@ describe("Payroll payslip presentation", () => {
       "(120.000.000 VND − 100.000.000 VND) × 10% = 2.000.000 VND",
     );
   });
+
+  // Value: protects=the payslip dialog's "Dữ liệu đầu vào" and "Công thức tính" cells for the piecework offset read from both snapshot shapes (live estimate / current runs: `basis_points`; runs from migration 20260915170000: `base_floor_basis_points`) and never show the engine's "Bù trừ…" note;
+  // fails_when=the `basis_points` key is dropped (the formula falls back to "Bù trừ lương khoán đến ngưỡng 85% lương cứng. = …", the penalty wording this change removes), the old key stops working, or the offset's input summary loses the lương khoán / lương cứng figures;
+  // why_new=no presentation test covers a piecework_offset line;
+  // seam=none (pure functions); no_claim=does not cover an offset whose snapshot lacks these keys (the formula then falls back to the raw note)
+  it("explains the piecework offset from either snapshot shape without the engine's offset note", () => {
+    const offset = (formulaSnapshot: Record<string, unknown>) => line({
+      amountVnd: 944_660,
+      direction: "deduction",
+      formulaSnapshot,
+      lineType: "piecework_offset",
+      note: "Bù trừ lương khoán đến ngưỡng 85% lương cứng.",
+    });
+    const live = offset({ base_salary_vnd: 1_433_333, basis_points: 8_500, piecework_vnd: 944_660 });
+    const run = offset({ base_floor_basis_points: 8_500, base_salary_vnd: 1_433_333, offset_vnd: 944_660, piecework_vnd: 944_660 });
+
+    for (const snapshotLine of [live, run]) {
+      expect(getLineFormulaSummary(snapshotLine)).toBe(
+        "Mức thấp hơn giữa lương khoán 944.660 VND và 1.433.333 VND × 85% = 944.660 VND",
+      );
+      expect(getLineInputSummary(snapshotLine)).toBe("Lương khoán 944.660 VND, lương cứng 1.433.333 VND");
+    }
+    // Without the figures the input cell explains the offset instead of echoing the engine's note.
+    expect(getLineInputSummary(offset({}))).toBe("Không phải khoản bị trừ: phần lương khoán này đã được trả trong lương cứng.");
+  });
 });
 
 describe("Payroll Read Model Normalization & Enrichment", () => {

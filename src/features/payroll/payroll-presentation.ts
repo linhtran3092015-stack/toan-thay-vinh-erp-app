@@ -1,3 +1,4 @@
+import { PIECEWORK_OFFSET } from "@/features/payroll/payroll-line-groups";
 import type { PayrollLineRead } from "@/features/payroll/read-models";
 
 const lineTypeLabels: Record<string, string> = {
@@ -12,13 +13,13 @@ const lineTypeLabels: Record<string, string> = {
   grading_bonus: "Thưởng chấm bài",
   hourly_wage: "Lương theo giờ",
   kpi_bonus: "Thưởng KPI",
-  manual_deduction: "Khấu trừ thủ công",
-  manual_reward: "Thưởng thủ công",
+  manual_deduction: "Điều chỉnh giảm",
+  manual_reward: "Điều chỉnh tăng",
   new_student_fixed_bonus: "Thưởng tuyển sinh theo nguồn",
   new_student_revenue_bonus: "Thưởng doanh thu tuyển mới",
   operations_grade_renewal_bonus: "Thưởng tái phí khối phụ trách",
   payroll_processing_bonus: "Thưởng tính lương nhân sự",
-  piecework_offset: "Bù trừ lương khoán",
+  piecework_offset: "Phần lương khoán đã tính trong lương cứng",
   record_excess_bonus: "Thưởng doanh thu vượt kỷ lục",
   revenue_bonus: "Thưởng doanh thu",
   staff_recruitment_care_bonus: "Thưởng tuyển dụng và chăm sóc nhân sự",
@@ -53,11 +54,11 @@ const metadataLabels: Record<string, string> = {
   grade: "Khối lớp",
   mode: "Hình thức làm việc",
   monthly_pool_vnd: "Quỹ chấm bài tháng",
-  offset_vnd: "Số tiền bù trừ",
+  offset_vnd: "Phần đã tính trong lương cứng",
   order_value_vnd: "Giá trị đơn hàng",
   payroll_statement_count: "Số bảng lương",
   period_month: "Kỳ dữ liệu",
-  piecework_vnd: "Tổng lương khoán",
+  piecework_vnd: "Lương khoán đạt được",
   rate_basis_points: "Tỷ lệ áp dụng",
   record_revenue_vnd: "Mốc doanh thu kỷ lục",
   request_note: "Nội dung tạm ứng",
@@ -73,6 +74,11 @@ const metadataLabels: Record<string, string> = {
 
 export function formatCurrency(value: number): string {
   return `${new Intl.NumberFormat("vi-VN").format(value)} VND`;
+}
+
+/** A signed amount with a typographic minus ("−30.000 VND"); positive amounts carry no sign. */
+export function formatSignedCurrency(value: number): string {
+  return `${value < 0 ? "−" : ""}${formatCurrency(Math.abs(value))}`;
 }
 
 export function formatMonth(value: string): string {
@@ -115,6 +121,12 @@ export function getLineTypeLabel(lineType: string): string {
     : `Loại khoản chưa hỗ trợ: ${lineType}`;
 }
 
+/** The engine's note on the offset reads like a penalty; staff see what it actually is. */
+export function getLineNote(line: { lineType: string; note: string | null }): string | null {
+  if (line.lineType === PIECEWORK_OFFSET) return "Không phải khoản bị trừ: phần lương khoán này đã được trả trong lương cứng.";
+  return line.note;
+}
+
 export function getSourceKindLabel(sourceKind: string | null): string {
   if (!sourceKind) return "Không có nguồn dữ liệu riêng";
   return Object.hasOwn(sourceKindLabels, sourceKind)
@@ -122,13 +134,22 @@ export function getSourceKindLabel(sourceKind: string | null): string {
     : `Nguồn dữ liệu: ${sourceKind}`;
 }
 
-function getNumber(source: Record<string, unknown>, key: string): number | null {
-  const value = source[key];
+export function getNumber(source: Record<string, unknown> | undefined, key: string): number | null {
+  const value = source?.[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function formatPercentage(basisPoints: number): string {
+export function formatPercentage(basisPoints: number): string {
   return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(basisPoints / 100)}%`;
+}
+
+/**
+ * The lương cứng floor of a piecework offset. Live estimates and period runs
+ * since 20260918160000 (compute_payroll_projection) store basis_points; runs
+ * made by the engine up to 20260915170000 stored base_floor_basis_points.
+ */
+export function getFloorBasisPoints(snapshot: Record<string, unknown> | undefined): number | null {
+  return getNumber(snapshot, "basis_points") ?? getNumber(snapshot, "base_floor_basis_points");
 }
 
 function getRateBasisPoints(line: PayrollLineRead): number | null {
@@ -166,6 +187,12 @@ export function getLineInputSummary(line: PayrollLineRead): string {
     return `${new Intl.NumberFormat("vi-VN").format(staffCredits)} phiếu trên tổng ${new Intl.NumberFormat("vi-VN").format(totalCredits)} phiếu`;
   }
 
+  const piecework = getNumber(line.formulaSnapshot, "piecework_vnd");
+  const baseSalary = getNumber(line.formulaSnapshot, "base_salary_vnd");
+  if (line.lineType === PIECEWORK_OFFSET && piecework !== null && baseSalary !== null) {
+    return `Lương khoán ${formatCurrency(piecework)}, lương cứng ${formatCurrency(baseSalary)}`;
+  }
+
   if (line.lineType === "new_student_fixed_bonus" && typeof line.evidenceSnapshot.source_code === "string") {
     return `${new Intl.NumberFormat("vi-VN").format(line.quantity ?? 1)} đơn từ nguồn ${line.evidenceSnapshot.source_code}`;
   }
@@ -177,7 +204,7 @@ export function getLineInputSummary(line: PayrollLineRead): string {
     return `${new Intl.NumberFormat("vi-VN").format(line.quantity)}${line.unitLabel ? ` ${line.unitLabel}` : " đơn vị"}`;
   }
 
-  return line.note ?? "Số tiền được ghi nhận trực tiếp";
+  return getLineNote(line) ?? "Số tiền được ghi nhận trực tiếp";
 }
 
 export function getLineRateSummary(line: PayrollLineRead): string {
@@ -230,9 +257,9 @@ export function getLineFormulaSummary(line: PayrollLineRead): string {
 
   const piecework = getNumber(line.formulaSnapshot, "piecework_vnd");
   const baseSalary = getNumber(line.formulaSnapshot, "base_salary_vnd");
-  const floorRate = getNumber(line.formulaSnapshot, "base_floor_basis_points");
+  const floorRate = getFloorBasisPoints(line.formulaSnapshot);
   if (piecework !== null && baseSalary !== null && floorRate !== null) {
-    return `Mức thấp hơn giữa ${formatCurrency(piecework)} và ${formatCurrency(baseSalary)} × ${formatPercentage(floorRate)} = ${formatCurrency(line.amountVnd)}`;
+    return `Mức thấp hơn giữa lương khoán ${formatCurrency(piecework)} và ${formatCurrency(baseSalary)} × ${formatPercentage(floorRate)} = ${formatCurrency(line.amountVnd)}`;
   }
 
   const centerRevenue = getNumber(line.evidenceSnapshot, "center_renewal_revenue_vnd");
@@ -264,7 +291,7 @@ export function getLineFormulaSummary(line: PayrollLineRead): string {
     return `${new Intl.NumberFormat("vi-VN").format(line.quantity)}${line.unitLabel ? ` ${line.unitLabel}` : ""} × ${formatCurrency(line.unitRateVnd)} = ${formatCurrency(line.amountVnd)}`;
   }
 
-  return `${line.note ?? "Số tiền được ghi nhận"} = ${formatCurrency(line.amountVnd)}`;
+  return `${getLineNote(line) ?? "Số tiền được ghi nhận"} = ${formatCurrency(line.amountVnd)}`;
 }
 
 export interface EvidenceDetail {

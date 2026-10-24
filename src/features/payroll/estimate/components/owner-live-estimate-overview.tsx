@@ -50,6 +50,18 @@ interface OwnerLiveEstimateOverviewProps {
 const stackedRowClassName =
   "max-md:grid max-md:h-auto max-md:grid-cols-2 max-md:gap-x-3 max-md:gap-y-1.5 max-md:border-t max-md:border-border-row max-md:px-4 max-md:py-3 max-md:first:border-t-0 max-md:[&>td]:border-t-0! max-md:[&>td]:px-0!";
 
+/**
+ * Salary advances are the only real deduction; the piecework offset and manual
+ * decreases are netted into income (see the advance-only note in overview-model.ts).
+ */
+function AdvanceCell({ value }: { value: number }) {
+  return (
+    <TableCell className={value > 0 ? "text-danger" : "text-text-muted"} numeric>
+      {value > 0 ? `−${formatVnd(value)}` : formatVnd(0)}
+    </TableCell>
+  );
+}
+
 function MobileLabel({ children }: { children: string }) {
   return <span className="block text-caption text-text-muted md:hidden">{children}</span>;
 }
@@ -109,6 +121,11 @@ export function OwnerLiveEstimateOverview({
   const staffWithoutPositionCount = countStaffWithoutPayrollPosition(estimate, { positionCode });
   // byPosition is not position-filtered: keep only the selected position so rows add up to the filtered total.
   const positionRows = positionCode ? byPosition.filter((row) => row.positionCode === positionCode) : byPosition;
+  const advancesByPosition = new Map<string, number>();
+  for (const statement of estimate.statements) {
+    if (!statement.positionCode) continue;
+    advancesByPosition.set(statement.positionCode, (advancesByPosition.get(statement.positionCode) ?? 0) + statement.advanceDeductionsVnd);
+  }
   const hasRatioFigure = figures.some((figure) => figure.key === "ratio");
   const currentMonth = getCurrentPayrollMonth();
 
@@ -208,8 +225,8 @@ export function OwnerLiveEstimateOverview({
                     {/* Counts the visible rows: staff with activity or a blocking issue. */}
                     <span className="font-semibold text-text-strong">Tổng {staffRows.length} nhân sự</span>
                     <span className="flex flex-wrap gap-x-4 gap-y-1 tabular-nums">
-                      <span>Thu nhập {formatVnd(summary.totalEarningsVnd)}</span>
-                      <span>Khấu trừ {summary.totalDeductionsVnd > 0 ? `−${formatVnd(summary.totalDeductionsVnd)}` : formatVnd(0)}</span>
+                      <span>Thu nhập {formatVnd(summary.payableVnd + summary.advanceDeductionsVnd)}</span>
+                      <span>Khấu trừ {summary.advanceDeductionsVnd > 0 ? `−${formatVnd(summary.advanceDeductionsVnd)}` : formatVnd(0)}</span>
                       <span className="font-semibold text-text-strong">{isApproved ? "Phải trả" : "Tạm tính"} {formatVnd(summary.payableVnd)}</span>
                     </span>
                   </div>
@@ -256,20 +273,16 @@ export function OwnerLiveEstimateOverview({
                   <TableRow key={row.positionCode}>
                     <TableCell className="font-medium text-text-strong">{getPayrollPositionName(row.positionCode)}</TableCell>
                     <TableCell numeric>{row.staffCount}</TableCell>
-                    <TableCell numeric>{formatVnd(row.totalEarningsVnd)}</TableCell>
-                    <TableCell className={row.totalDeductionsVnd > 0 ? "text-danger" : "text-text-subtle"} numeric>
-                      {row.totalDeductionsVnd > 0 ? `−${formatVnd(row.totalDeductionsVnd)}` : formatVnd(0)}
-                    </TableCell>
+                    <TableCell numeric>{formatVnd(row.payableVnd + (advancesByPosition.get(row.positionCode) ?? 0))}</TableCell>
+                    <AdvanceCell value={advancesByPosition.get(row.positionCode) ?? 0} />
                     <TableCell className="font-semibold text-text-strong" numeric>{formatVnd(row.payableVnd)}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-surface-sunken font-semibold text-text-strong">
                   <TableCell>Tổng cộng</TableCell>
                   <TableCell numeric>{summary.staffCount}</TableCell>
-                  <TableCell numeric>{formatVnd(summary.totalEarningsVnd)}</TableCell>
-                  <TableCell className={summary.totalDeductionsVnd > 0 ? "text-danger" : "text-text-subtle"} numeric>
-                    {summary.totalDeductionsVnd > 0 ? `−${formatVnd(summary.totalDeductionsVnd)}` : formatVnd(0)}
-                  </TableCell>
+                  <TableCell numeric>{formatVnd(summary.payableVnd + summary.advanceDeductionsVnd)}</TableCell>
+                  <AdvanceCell value={summary.advanceDeductionsVnd} />
                   <TableCell numeric>{formatVnd(summary.payableVnd)}</TableCell>
                 </TableRow>
               </>
@@ -339,16 +352,14 @@ function StaffRow({ isApproved, onOpen, row }: { isApproved: boolean; onOpen: ()
       </TableCell>
       <TableCell numeric className="max-md:text-left!">
         <MobileLabel>Thu nhập</MobileLabel>
-        {uncalculated ? muted : formatVnd(row.totalEarningsVnd)}
+        {uncalculated ? muted : formatVnd(row.payableVnd + row.advanceDeductionsVnd)}
       </TableCell>
       <TableCell numeric className="max-md:text-left!">
         <MobileLabel>Khấu trừ</MobileLabel>
-        {uncalculated ? muted : row.totalDeductionsVnd > 0 ? (
+        {uncalculated ? muted : row.advanceDeductionsVnd > 0 ? (
           <>
-            <span className="text-danger">−{formatVnd(row.totalDeductionsVnd)}</span>
-            {row.advanceDeductionsVnd > 0 ? (
-              <span className="block text-caption text-text-muted">gồm tạm ứng {formatVnd(row.advanceDeductionsVnd)}</span>
-            ) : null}
+            <span className="text-danger">−{formatVnd(row.advanceDeductionsVnd)}</span>
+            <span className="block text-caption text-text-muted">tạm ứng</span>
           </>
         ) : muted}
       </TableCell>
