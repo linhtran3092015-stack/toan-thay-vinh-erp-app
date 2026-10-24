@@ -85,6 +85,8 @@ export async function listAllZaloGroups(
   zaloAccountId: string,
   maxPages = 30,
 ): Promise<ZaloCrmResult<{ groups: ZaloCrmGroup[]; total: number; truncated: boolean }>> {
+  // Without a nick the CRM would return every nick's groups, and staff could link a group the center nick is not in.
+  if (!zaloAccountId.trim()) return { error: "Chưa chọn nick trung tâm.", ok: false };
   const groups: ZaloCrmGroup[] = [];
   let total = 0;
   for (let page = 1; page <= maxPages; page += 1) {
