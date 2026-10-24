@@ -87,7 +87,7 @@ export function StudentZaloGroupLinkDialog({
         groupName: group.groupName,
         studentId,
         threadId: group.externalThreadId,
-      });
+      }).catch(() => ({ message: "Mất kết nối tới máy chủ. Tải lại trang để xem nhóm đã được liên kết chưa.", ok: false as const }));
       setFeedback(result);
       if (result.ok) {
         setIsOpen(false);

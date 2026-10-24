@@ -104,12 +104,19 @@ export async function listAllZaloGroups(zaloAccountId: string, maxPages = 30, bu
   const total = first.data.total;
   const byThread = new Map<string, ZaloCrmGroup>();
   const keep = (groups: ZaloCrmGroup[]) => {
-    for (const group of groups) if (!byThread.has(group.externalThreadId)) byThread.set(group.externalThreadId, group);
+    for (const group of groups) {
+      // Do not rely on the CRM honouring the filter: a group of another nick is never offered.
+      if (group.zaloAccountId && group.zaloAccountId !== zaloAccountId) continue;
+      if (!byThread.has(group.externalThreadId)) byThread.set(group.externalThreadId, group);
+    }
   };
   keep(first.data.groups);
   const lastPage = Math.min(maxPages, Math.ceil(total / GROUP_PAGE_SIZE));
   let truncated = Math.ceil(total / GROUP_PAGE_SIZE) > maxPages;
-  if (first.data.groups.length < GROUP_PAGE_SIZE) return { data: { groups: [...byThread.values()], total, truncated: false }, ok: true };
+  // Offset paging over a list ordered by last message: a group that moves to page 1 mid-read is
+  // missed (its duplicate later is dropped), so fewer distinct groups than `total` is a short read.
+  const done = () => ({ data: { groups: [...byThread.values()], total, truncated: truncated || byThread.size < total }, ok: true as const });
+  if (first.data.groups.length < GROUP_PAGE_SIZE) return done();
   for (let page = 2; page <= lastPage; page += GROUP_PAGE_CONCURRENCY) {
     if (Date.now() + CALL_TIMEOUT_MS > deadline) {
       truncated = true;
@@ -122,7 +129,7 @@ export async function listAllZaloGroups(zaloAccountId: string, maxPages = 30, bu
       keep(result.data.groups);
     }
   }
-  return { data: { groups: [...byThread.values()], total, truncated }, ok: true };
+  return done();
 }
 
 /** Group lists for matching, kept 60 s per nick so a refresh after each link does not re-read every page. */

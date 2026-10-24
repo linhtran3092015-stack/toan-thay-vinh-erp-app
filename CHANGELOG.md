@@ -17,9 +17,10 @@ Kết nối ZaloCRM dùng được thật: trang mới **Liên kết nhóm Zalo*
 
 ### Fixed
 - Một nhóm Zalo không thể gắn cho hai học sinh, kể cả khi hai người lưu cùng lúc (khóa ở cơ sở dữ liệu), để tin của em này không tới phụ huynh em khác.
+- Khi đổi hoặc gỡ nhóm của học sinh, các tin đang chờ gửi hay gửi lỗi vào nhóm cũ được bỏ qua (ghi rõ lý do), không còn gửi nhầm sang nhóm cũ.
 
 ### For contributors
-- Migration `20261024200000_students_zalo_group_thread_unique.sql`: unique index `students_zalo_group_thread_key` và RPC `get_zalo_center_account_id` (cho quyền sửa học sinh, điểm danh hoặc xem cài đặt). Đẩy lên production trước khi merge.
+- Migration `20261024200000_students_zalo_group_thread_unique.sql`: unique index `students_zalo_group_thread_key` và RPC `get_zalo_center_account_id` (cho quyền sửa học sinh, điểm danh hoặc xem cài đặt). Migration `20261024210000_parent_messages_follow_group_change.sql`: trigger bỏ qua tin chờ/lỗi của nhóm cũ khi nhóm học sinh đổi. Đẩy cả hai lên production trước khi merge.
 - `src/lib/phone.ts` (`normalizeVietnamPhoneNumber`) dùng chung cho form học sinh và bộ ghép nhóm. Bản xem trước `/dev/zalo-groups`.
 
 ## [0.40.1.0] - 2026-10-24

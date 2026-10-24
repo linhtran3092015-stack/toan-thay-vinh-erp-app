@@ -104,7 +104,8 @@ describe("listAllZaloGroups", () => {
     const result = await listAllZaloGroups("acc-test");
     expect(result.ok && result.data.groups).toHaveLength(249);
     expect(result.ok && new Set(result.data.groups.map((group) => group.externalThreadId)).size).toBe(249);
-    expect(result.ok && result.data.truncated).toBe(false);
+    // One group (thread-1-0's slot) was never seen: fewer distinct groups than total is a short read.
+    expect(result.ok && result.data.truncated).toBe(true);
 
     fetchMock.mockClear();
     const slow = await listAllZaloGroups("acc-test", 30, -1);

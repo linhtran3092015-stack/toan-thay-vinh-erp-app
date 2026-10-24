@@ -109,9 +109,9 @@ describe("matchStudentsToGroups", () => {
     const result = byStudent(
       matchStudentsToGroups([student("1", "Đỗ Minh Khoa")], [group("g1", "Sổ liên lạc TV-2026-00009 Đỗ Minh Khoa")], [student("9", "Đỗ Minh Khôi")]),
     );
-    // The rival's code wins the group, so it is not offered to the current student at all.
-    expect(result["1"].confidence).toBe("none");
-    expect(result["1"].candidates).toEqual([]);
+    // The group carries the rival's code and the current student's exact name: staff pick.
+    expect(result["1"].confidence).toBe("ambiguous");
+    expect(result["1"].candidates.map((candidate) => candidate.group.externalThreadId)).toEqual(["g1"]);
   });
 
   it("offers at most five candidates", () => {
@@ -250,5 +250,15 @@ describe("matchStudentsToGroups", () => {
     ["SLL An 0912-345-678", ["0912345678"]],
   ])("extracts phones from %j", (name, expected) => {
     expect(extractPhones(name)).toEqual(expected);
+  });
+
+  it("does not pre-select a group another family's guardian evidence points at", () => {
+    const result = byStudent(
+      matchStudentsToGroups(
+        [student("1", "Nguyễn Văn Hùng"), student("2", "Lê Minh Khoa", { guardians: [{ fullName: "Nguyễn Văn Hùng", phones: [] }] })],
+        [group("g1", "SLL Nguyễn Văn Hùng")],
+      ),
+    );
+    expect(result["1"].confidence).toBe("ambiguous");
   });
 });

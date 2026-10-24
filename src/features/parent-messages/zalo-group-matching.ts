@@ -60,7 +60,7 @@ export const MAX_BULK_ZALO_LINKS = 25;
 
 /** A "sổ liên lạc" group is the family plus a few staff; a bigger group is a class or broadcast group and is never pre-ticked. */
 export const MAX_SURE_GROUP_MEMBERS = 15;
-/** Pairs below this are never assigned and never block another student's group. */
+/** Pairs below this are never assigned; they block a group only when they are that student's best match. */
 const STRONG_SCORE = REASON_SCORE.student_name;
 const MAX_CANDIDATES = 5;
 
@@ -245,7 +245,17 @@ export function matchStudentsToGroups(students: MatchStudent[], groups: MatchGro
         !assigned.has(other.studentId) &&
         !takenGroups.has(other.group.externalThreadId),
     );
-    if (tied.length > 0 || !canBeSure(pair)) {
+    // Another unassigned student whose best match is this group, on evidence this pair does not
+    // also have (a guardian named like this student, another family's phone), makes it that
+    // family's group too, however weak. A namesake with less of the same evidence does not.
+    const claimedElsewhere = (pairsByGroup.get(threadId) ?? []).some(
+      (other) =>
+        other.studentId !== pair.studentId &&
+        !assigned.has(other.studentId) &&
+        pairsByStudent.get(other.studentId)?.[0] === other &&
+        other.reasons.some((reason) => !pair.reasons.includes(reason)),
+    );
+    if (tied.length > 0 || claimedElsewhere || !canBeSure(pair)) {
       block(pair);
       tied.forEach(block);
       continue;
