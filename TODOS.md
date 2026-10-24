@@ -1088,6 +1088,18 @@
 
 ## Bảng lương
 
+### Bỏ hai RPC đọc bảng lương cũ
+
+**What:** Sau khi v0.40.0.0 chạy ổn trên production một thời gian, viết migration bỏ `get_payroll_periods_with_details()`, `get_payroll_explanations()` và kiểu `payroll_periods_with_details_row`; sửa các file pgTAP còn gọi chúng và sinh lại `database.generated.ts`.
+
+**Why:** Từ v0.40.0.0 app chỉ đọc qua `get_payroll_period_details`; hai RPC cũ được giữ để bản đang chạy không lỗi trong lúc triển khai và để quay lại nếu cần.
+
+**Context:** `supabase/tests/payroll-periods-with-details.test.sql`, `supabase/tests/payroll-business-contracts.test.sql` (gọi `get_payroll_explanations`).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** v0.40.0.0 ổn định trên production
+
 ### Số liệu đầu trang Dashboard lương lệch với số tạm tính trực tiếp
 
 **What:** Lấy tiêu đề, nhãn trạng thái và dải số liệu từ cùng một nguồn với khối tạm tính trực tiếp (hoặc ghi rõ thời điểm chụp số liệu).
@@ -2994,6 +3006,20 @@
 **Depends on:** Không
 
 ## Completed
+
+### Đọc dữ liệu bảng lương theo từng kỳ thay vì cả lịch sử
+
+**What:** Cho `get_payroll_periods_with_details` (hoặc một RPC mới) nhận kỳ hoặc phiếu lương cần đọc; trang phiếu lương và route PDF chỉ đọc đúng phiếu đó, trang `/payroll` chỉ đọc vài kỳ gần nhất và tải kỳ cũ khi mở. Sau khi đọc, kiểm tra tổng các dòng khớp tổng của phiếu; lệch thì đọc lại một lần rồi báo lỗi.
+
+**Why:** Từ v0.39.0.0, Tổng thu nhập và Khấu trừ trên phiếu tính từ các dòng lương, nên `src/features/payroll/data.ts` đọc RPC theo trang 500 dòng để không bị cắt ở 1.000 dòng. Mỗi trang chạy lại toàn bộ RPC, số trang tăng theo lịch sử, và các trang không cùng một lần đọc: nếu có người tính lại hoặc thêm điều chỉnh giữa hai trang, một dòng có thể bị sót (dòng trùng đã được loại). Trang `/payroll` cũng gửi toàn bộ lịch sử xuống trình duyệt.
+
+**Context:** Review /ship v0.39.0.0 (red team, adversarial, performance). Cùng lúc nên: lấy "Lương khoán đạt" từ `formula_snapshot.piecework_vnd` của dòng `piecework_offset` thay vì cộng lại từ các dòng (`payslip-sections.ts` `summarizePiecework`); cộng tạm ứng của nhân sự chưa có vị trí vào dòng `__unassigned__` trong `owner-live-estimate-overview.tsx` (`advancesByPosition`). Màn chủ trung tâm đang giả định chỉ có 3 loại dòng khấu trừ (ghi chú trong `overview-model.ts`).
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** None
+
+**Completed:** v0.40.0.0 (2026-10-24): RPC `get_payroll_period_details`; phiếu lương đọc một phiếu, `/payroll` đọc 3 kỳ gần nhất + kỳ còn mở, đối chiếu dòng với tổng rồi đọc lại một lần; lương khoán lấy từ snapshot, không khớp thì báo lỗi; tạm ứng của nhân sự chưa có vị trí vào dòng "Chưa phân loại".
 
 ### Mở thông báo ngay khi bấm, đánh dấu đã đọc ở nền
 

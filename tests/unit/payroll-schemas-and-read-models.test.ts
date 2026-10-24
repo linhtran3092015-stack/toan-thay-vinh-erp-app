@@ -9,12 +9,7 @@ import {
   resolvePayrollCorrectionSchema,
   submitPayrollCorrectionSchema,
 } from "@/features/payroll/forms/payroll-schemas";
-import {
-  enrichPayrollPeriodsWithExplanations,
-  normalizePayrollPeriodsWithDetailsRows,
-  type PayrollLineRead,
-  type PayrollPeriodsWithDetailsRow,
-} from "@/features/payroll/read-models";
+import type { PayrollLineRead } from "@/features/payroll/read-models";
 import {
   getEvidenceDetails,
   getLineFormulaSummary,
@@ -300,148 +295,29 @@ describe("Payroll payslip presentation", () => {
       "(120.000.000 VND − 100.000.000 VND) × 10% = 2.000.000 VND",
     );
   });
-});
 
-describe("Payroll Read Model Normalization & Enrichment", () => {
-  it("normalizes flat RPC rows into nested Period -> Statement -> Line tree", () => {
-    const rows: PayrollPeriodsWithDetailsRow[] = [
-      {
-        payroll_period_id: "p1",
-        period_month: "2026-07-01",
-        pay_date: "2026-08-05",
-        period_status: "draft",
-        payroll_statement_id: "s1",
-        staff_id: "u1",
-        staff_display_name: "Staff 1",
-        staff_employee_code: "EMP-01",
-        work_units: 1,
-        work_hours: 9,
-        total_earnings_vnd: 500000,
-        total_deductions_vnd: 0,
-        payable_amount_vnd: 500000,
-        payroll_line_item_id: "l1",
-        line_type: "base_offline",
-        line_direction: "earning",
-        line_amount_vnd: 500000,
-        unit_count: 1,
-        unit_rate_vnd: 500000,
-        note: "Base salary",
-      },
-    ];
+  // Value: protects=the payslip dialog's "Dữ liệu đầu vào" and "Công thức tính" cells for the piecework offset read from both snapshot shapes (live estimate / current runs: `basis_points`; runs from migration 20260915170000: `base_floor_basis_points`) and never show the engine's "Bù trừ…" note;
+  // fails_when=the `basis_points` key is dropped (the formula falls back to "Bù trừ lương khoán đến ngưỡng 85% lương cứng. = …", the penalty wording this change removes), the old key stops working, or the offset's input summary loses the lương khoán / lương cứng figures;
+  // why_new=no presentation test covers a piecework_offset line;
+  // seam=none (pure functions); no_claim=does not cover an offset whose snapshot lacks these keys (the formula then falls back to the raw note)
+  it("explains the piecework offset from either snapshot shape without the engine's offset note", () => {
+    const offset = (formulaSnapshot: Record<string, unknown>) => line({
+      amountVnd: 900_000,
+      direction: "deduction",
+      formulaSnapshot,
+      lineType: "piecework_offset",
+      note: "Bù trừ lương khoán đến ngưỡng 85% lương cứng.",
+    });
+    const live = offset({ base_salary_vnd: 1_500_000, basis_points: 8_500, piecework_vnd: 900_000 });
+    const run = offset({ base_floor_basis_points: 8_500, base_salary_vnd: 1_500_000, offset_vnd: 900_000, piecework_vnd: 900_000 });
 
-    const normalized = normalizePayrollPeriodsWithDetailsRows(rows);
-    expect(normalized).toHaveLength(1);
-    expect(normalized[0].id).toBe("p1");
-    expect(normalized[0].statements).toHaveLength(1);
-    expect(normalized[0].statements[0].id).toBe("s1");
-    expect(normalized[0].statements[0].lines).toHaveLength(1);
-    expect(normalized[0].statements[0].lines[0].id).toBe("l1");
-  });
-
-  it("handles period with null statement row (zero statements)", () => {
-    const rows: PayrollPeriodsWithDetailsRow[] = [
-      {
-        payroll_period_id: "p2",
-        period_month: "2026-08-01",
-        pay_date: "2026-09-05",
-        period_status: "draft",
-        payroll_statement_id: null,
-        staff_id: null,
-        staff_display_name: null,
-        staff_employee_code: null,
-        work_units: null,
-        work_hours: null,
-        total_earnings_vnd: null,
-        total_deductions_vnd: null,
-        payable_amount_vnd: null,
-        payroll_line_item_id: null,
-        line_type: null,
-        line_direction: null,
-        line_amount_vnd: null,
-        unit_count: null,
-        unit_rate_vnd: null,
-        note: null,
-      },
-    ];
-
-    const normalized = normalizePayrollPeriodsWithDetailsRows(rows);
-    expect(normalized).toHaveLength(1);
-    expect(normalized[0].id).toBe("p2");
-    expect(normalized[0].statements).toHaveLength(0);
-  });
-
-  it("enriches periods with explanations payload", () => {
-    const rows: PayrollPeriodsWithDetailsRow[] = [
-      {
-        payroll_period_id: "p1",
-        period_month: "2026-07-01",
-        pay_date: "2026-08-05",
-        period_status: "draft",
-        payroll_statement_id: "s1",
-        staff_id: "u1",
-        staff_display_name: "Staff 1",
-        staff_employee_code: "EMP-01",
-        work_units: 1,
-        work_hours: 9,
-        total_earnings_vnd: 500000,
-        total_deductions_vnd: 0,
-        payable_amount_vnd: 500000,
-        payroll_line_item_id: "l1",
-        line_type: "base_offline",
-        line_direction: "earning",
-        line_amount_vnd: 500000,
-        unit_count: 1,
-        unit_rate_vnd: 500000,
-        note: "Base salary",
-      },
-    ];
-
-    const periods = normalizePayrollPeriodsWithDetailsRows(rows);
-
-    const payload = {
-      lines: [
-        {
-          evidenceSnapshot: { test: true },
-          formulaSnapshot: { rate: 300000 },
-          id: "l1",
-          policyCode: "base_offline",
-          quantity: 1,
-          sourceKind: "timekeeping",
-          unitLabel: "ngày",
-          workMinutes: 540,
-        },
-      ],
-      periods: [
-        {
-          blockingIssueCount: 0,
-          currentRevision: 2,
-          feedbackClosedAt: null,
-          feedbackOpenedAt: "2026-07-01T00:00:00Z",
-          id: "p1",
-          lastCalculatedAt: "2026-07-01T08:15:00Z",
-          pendingCorrectionCount: 1,
-        },
-      ],
-      statements: [
-        {
-          id: "s1",
-          workMinutes: 540,
-        },
-      ],
-    };
-
-    const enriched = enrichPayrollPeriodsWithExplanations(periods, payload);
-    expect(enriched[0].currentRevision).toBe(2);
-    expect(enriched[0].lastCalculatedAt).toBe("2026-07-01T08:15:00Z");
-    expect(enriched[0].pendingCorrectionCount).toBe(1);
-    expect(enriched[0].statements[0].workMinutes).toBe(540);
-    expect(enriched[0].statements[0].lines[0].unitLabel).toBe("ngày");
-    expect(enriched[0].statements[0].lines[0].formulaSnapshot).toEqual({ rate: 300000 });
-  });
-
-  it("throws when explanations payload is invalid", () => {
-    expect(() => enrichPayrollPeriodsWithExplanations([], { invalid: true })).toThrow(
-      "PAYROLL_EXPLANATIONS_INVALID",
-    );
+    for (const snapshotLine of [live, run]) {
+      expect(getLineFormulaSummary(snapshotLine)).toBe(
+        "Mức thấp hơn giữa lương khoán 900.000 VND và 1.500.000 VND × 85% = 900.000 VND",
+      );
+      expect(getLineInputSummary(snapshotLine)).toBe("Lương khoán 900.000 VND, lương cứng 1.500.000 VND");
+    }
+    // Without the figures the input cell explains the offset instead of echoing the engine's note.
+    expect(getLineInputSummary(offset({}))).toBe("Không phải khoản bị trừ: phần lương khoán này đã được trả trong lương cứng.");
   });
 });

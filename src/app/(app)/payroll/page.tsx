@@ -1,13 +1,19 @@
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getCurrentAuthUser } from "@/features/auth/current-user";
-import { getPayrollManagementOverviewResult, getPayrollPeriodsWithDetailsResult } from "@/features/payroll/data";
+import { getPayrollManagementOverviewResult, getRecentPayrollPeriodsResult } from "@/features/payroll/data";
+import { getUnreconciledReadMessage } from "@/features/payroll/read-models";
 import { getMyPayrollEstimateResult } from "@/features/payroll/estimate/data";
 import { PayrollPage } from "@/features/payroll/payroll-page";
+import { parsePayrollPeriodCount, parsePayrollPeriodId } from "@/features/payroll/period-window";
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 
 import { permissionDeniedDescription } from "@/lib/permissions/labels";
-export default async function PayrollRoute() {
+export default async function PayrollRoute({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string | string[]; periods?: string | string[] }>;
+}) {
   const permissionResult = await getCachedDatabasePermissions();
 
   if (!permissionResult.ok) {
@@ -47,8 +53,14 @@ export default async function PayrollRoute() {
     year: "numeric",
   }).format(now).slice(0, 7)}-01`;
 
+  // The latest few periods (plus open ones); "?periods=" grows the window and
+  // "?period=" names one more to show, e.g. from a Tạm ứng link.
+  const search = await searchParams;
+  const periodCount = parsePayrollPeriodCount(search.periods);
+  const includedPeriodId = parsePayrollPeriodId(search.period);
+
   const [payrollResult, authUserResult, correctionsResult, estimateResult] = await Promise.all([
-    getPayrollPeriodsWithDetailsResult(),
+    getRecentPayrollPeriodsResult(periodCount, includedPeriodId),
     getCurrentAuthUser(),
     canViewManagement ? getPayrollManagementOverviewResult() : Promise.resolve({ data: { correctionRequests: [], importBatches: [], issues: [] }, ok: true } as const),
     getMyPayrollEstimateResult(currentMonth),
@@ -57,7 +69,9 @@ export default async function PayrollRoute() {
   if (!payrollResult.ok || !authUserResult.ok || !correctionsResult.ok) {
     return (
       <ErrorState
-        description="Không tải được dữ liệu bảng lương từ hệ thống."
+        description={!payrollResult.ok && payrollResult.reason === "unreconciled"
+          ? getUnreconciledReadMessage(canManage)
+          : "Không tải được dữ liệu bảng lương từ hệ thống."}
         title="Không tải được bảng lương"
       />
     );
@@ -76,7 +90,10 @@ export default async function PayrollRoute() {
       importBatches={correctionsResult.data.importBatches}
       initialEstimate={estimateResult.ok ? estimateResult.data : null}
       issues={correctionsResult.data.issues}
-      periods={payrollResult.data}
+      includedPeriodId={includedPeriodId}
+      olderPeriodCount={payrollResult.data.olderPeriodCount}
+      periodCount={periodCount}
+      periods={payrollResult.data.periods}
     />
   );
 }

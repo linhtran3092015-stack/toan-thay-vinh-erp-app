@@ -15,7 +15,7 @@ export const addPayrollManualLineSchema = z.object({
   note: z
     .string()
     .trim()
-    .min(1, "Cần nêu nội dung thưởng hoặc khấu trừ.")
+    .min(1, "Cần nêu nội dung điều chỉnh.")
     .max(2000, "Nội dung tối đa 2.000 ký tự."),
   payrollStatementId: z.string().uuid("Bảng lương nhân sự không hợp lệ."),
 });

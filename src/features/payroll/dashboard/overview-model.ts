@@ -105,13 +105,18 @@ export function buildLiveEstimateFigures(
 ): PayrollFigure[] {
   const { finance, summary } = estimate;
   const figures: PayrollFigure[] = [
-    { helper: "Trước khấu trừ", key: "earnings", label: "Tổng thu nhập", value: formatVnd(summary.totalEarningsVnd) },
+    // Same split as the payslip (payslip-sections.ts): the piecework offset and
+    // manual decreases are netted into income, so "Khấu trừ" is the advances.
+    // payable + advances equals that income only because the line-item check
+    // constraint allows exactly three deduction types (advance_deduction,
+    // piecework_offset, manual_deduction; 20260825120000_payroll_calculation_engine.sql).
+    { helper: "Trước khấu trừ", key: "earnings", label: "Tổng thu nhập", value: formatVnd(summary.payableVnd + summary.advanceDeductionsVnd) },
     {
-      helper: `Gồm tạm ứng ${formatVnd(summary.advanceDeductionsVnd)}`,
+      helper: "Tạm ứng lương trừ trong kỳ",
       key: "deductions",
       label: "Khấu trừ",
-      tone: summary.totalDeductionsVnd > 0 ? "danger" : undefined,
-      value: summary.totalDeductionsVnd > 0 ? `−${formatVnd(summary.totalDeductionsVnd)}` : formatVnd(0),
+      tone: summary.advanceDeductionsVnd > 0 ? "danger" : undefined,
+      value: summary.advanceDeductionsVnd > 0 ? `−${formatVnd(summary.advanceDeductionsVnd)}` : formatVnd(0),
     },
     {
       helper: "Sau khấu trừ",

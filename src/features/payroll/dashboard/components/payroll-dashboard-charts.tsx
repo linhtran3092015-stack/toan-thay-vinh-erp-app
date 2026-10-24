@@ -1,4 +1,5 @@
 import { formatCompactVnd, formatPercent, formatShortMonth, formatVnd } from "@/features/payroll/dashboard/format";
+import { isNettedIntoIncome } from "@/features/payroll/payslip-sections";
 import type {
   PayrollDashboardCompositionItem,
   PayrollDashboardPositionSummary,
@@ -197,19 +198,26 @@ export function PayrollCompositionChart({
   netPayroll: number;
 }) {
   const earnings = items.filter((item) => item.direction === "earning");
-  const deductions = items.filter((item) => item.direction === "deduction");
+  // As on the payslip: the piecework offset and manual decreases are netted into
+  // income, so "Tổng khấu trừ" keeps real deductions (advances) only.
+  const netted = items.filter(isNettedIntoIncome);
+  const deductions = items.filter((item) => item.direction === "deduction" && !isNettedIntoIncome(item));
   const earningColors = new Map(
     earnings.map((item, index) => [item.lineType, chartColors[index % chartColors.length]]),
   );
-  const gross = earnings.reduce((sum, item) => sum + item.amountVnd, 0);
+  const income = earnings.reduce((sum, item) => sum + item.amountVnd, 0) - netted.reduce((sum, item) => sum + item.amountVnd, 0);
   const deductionTotal = deductions.reduce((sum, item) => sum + item.amountVnd, 0);
+  const swatchColor = (item: PayrollDashboardCompositionItem) => {
+    if (item.direction === "earning") return earningColors.get(item.lineType);
+    return isNettedIntoIncome(item) ? "var(--text-muted)" : "var(--status-danger)";
+  };
   return (
     <section className="rounded-lg border border-border-subtle bg-surface-base p-5 shadow-[var(--panel-shadow)]" aria-labelledby="payroll-composition-title">
       <div id="payroll-composition-title">
         <SectionHeading description="Các dòng lương đã được Payroll Engine ghi nhận trong kỳ." title="Cơ cấu các khoản chi" />
       </div>
       <dl className="mt-5 grid gap-px overflow-hidden rounded-md border border-border-subtle bg-border-subtle sm:grid-cols-3">
-        <CompositionTotal label="Tổng khoản cộng" value={gross} />
+        <CompositionTotal label="Tổng thu nhập" value={income} />
         <CompositionTotal label="Tổng khấu trừ" value={deductionTotal} />
         <CompositionTotal label="Thực trả" value={netPayroll} strong />
       </dl>
@@ -219,7 +227,7 @@ export function PayrollCompositionChart({
             <div
               key={`${item.direction}-${item.lineType}`}
               style={{ backgroundColor: earningColors.get(item.lineType), width: `${item.sharePercent}%` }}
-              title={`${item.label}: ${formatVnd(item.amountVnd)} · ${formatPercent(item.sharePercent)} tổng khoản cộng`}
+              title={`${item.label}: ${formatVnd(item.amountVnd)} · ${formatPercent(item.sharePercent)} các khoản cộng (trước khi trừ phần đã tính trong lương cứng)`}
             />
           ))}
         </div>
@@ -229,7 +237,7 @@ export function PayrollCompositionChart({
           <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3" key={`${item.direction}-${item.lineType}`}>
             <span
               className="h-2.5 w-2.5 rounded-sm"
-              style={{ backgroundColor: item.direction === "deduction" ? "var(--status-danger)" : earningColors.get(item.lineType) }}
+              style={{ backgroundColor: swatchColor(item) }}
             />
             <span className="min-w-0 truncate text-secondary text-text-default" title={item.label}>{item.label}</span>
             <span className="tabular-nums text-secondary font-semibold text-text-strong">{item.direction === "deduction" ? "−" : ""}{formatCompactVnd(item.amountVnd)}</span>

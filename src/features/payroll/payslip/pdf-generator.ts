@@ -1,5 +1,6 @@
-import { attendanceLineTypes, groupPayrollLines } from "@/features/payroll/payroll-line-groups";
-import { formatCurrency } from "@/features/payroll/payroll-presentation";
+import { attendanceLineTypes, groupPayrollLines, PIECEWORK_OFFSET } from "@/features/payroll/payroll-line-groups";
+import { formatCurrency, formatSignedCurrency, getLineTypeLabel } from "@/features/payroll/payroll-presentation";
+import { getPayslipSection, getPieceworkExplanation, signedAmount } from "@/features/payroll/payslip-sections";
 import type { PayslipDocumentData } from "@/features/payroll/payslip/types";
 
 /**
@@ -11,14 +12,23 @@ function escapePdfText(text: string): string {
 
 /**
  * Normalizes Vietnamese text to ASCII transliteration for standard Type 1 PDF font embedding fallback,
- * while preserving clear readability and structure.
+ * while preserving clear readability and structure. The content stream is written as UTF-8 under
+ * /WinAnsiEncoding, so anything left outside printable ASCII would print as garbage ("×" as "Ã—").
  */
 function toAsciiReadable(text: string): string {
   return text
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/đ/g, "d")
-    .replace(/Đ/g, "D");
+    .replace(/Đ/g, "D")
+    .replace(/[×✕]/g, "x")
+    .replace(/[−–—]/g, "-")
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/…/g, "...")
+    .replace(/•/g, "*")
+    .replace(/\s/g, " ")
+    .replace(/[^\x20-\x7e]/g, "?");
 }
 
 /**
@@ -97,10 +107,11 @@ export function generatePayslipPdf(data: PayslipDocumentData): Uint8Array {
   // Income Overview Box
   addHeader("TONG QUAN THU NHAP", 50, currentY, 11, true);
   currentY -= 18;
-  addText(`Tong thu nhap (Gross): ${data.totals.grossFormatted}`, 50, currentY, 10, false);
-  addText(`Tong khau tru: ${data.totals.totalDeductionsFormatted}`, 300, currentY, 10, false);
+  addText(`Tong thu nhap: ${data.totals.grossFormatted}`, 50, currentY, 10, false);
+  const deductionsSigned = `${data.totals.totalDeductionsVnd > 0 ? "-" : ""}${data.totals.totalDeductionsFormatted}`;
+  addText(`Khau tru: ${deductionsSigned}`, 300, currentY, 10, false);
   currentY -= 18;
-  addText(`THUC NHAN (Net Pay): ${data.totals.netFormatted}`, 50, currentY, 13, true);
+  addText(`THUC NHAN: ${data.totals.netFormatted}`, 50, currentY, 13, true);
   currentY -= 15;
   addText(`Bang chu: ${data.totals.amountInWords}`, 50, currentY, 9, false);
 
@@ -117,31 +128,88 @@ export function generatePayslipPdf(data: PayslipDocumentData): Uint8Array {
       currentY -= 28;
     }
   };
-  const renderSection = (title: string, lines: typeof data.earnings) => {
-    if (!lines.length) return;
+  // Helvetica 8pt: 90 characters stay inside the right margin from x = 70 even
+  // for capital-heavy text (about 5.3pt a capital).
+  const WRAP_CHARS = 90;
+  const addWrapped = (text: string, x: number) => {
+    let line = "";
+    // A word longer than a line (a pasted link) is cut into line-sized pieces.
+    const words = toAsciiReadable(text).split(/\s+/).flatMap((word) => word.match(new RegExp(`.{1,${WRAP_CHARS}}`, "g")) ?? []);
+    for (const word of words) {
+      if (line && line.length + word.length + 1 > WRAP_CHARS) {
+        ensureSpace(14);
+        addText(line, x, currentY, 8);
+        currentY -= 12;
+        line = word;
+      } else {
+        line = line ? `${line} ${word}` : word;
+      }
+    }
+    if (line) {
+      ensureSpace(14);
+      addText(line, x, currentY, 8);
+      currentY -= 12;
+    }
+  };
+  const renderSection = (title: string, lines: typeof data.earnings, options: {
+    extraRows?: readonly { label: string; value: string }[];
+    footnote?: string;
+    perLine?: boolean;
+    subtotal?: number;
+  } = {}) => {
+    const extraRows = options.extraRows ?? [];
+    if (!lines.length && !extraRows.length) return;
     ensureSpace(45);
     addHeader(title, 50, currentY, 10);
-    addText(formatCurrency(lines.reduce((sum, line) => sum + line.amountVnd, 0)), 435, currentY, 9, true);
+    addText(formatSignedCurrency(options.subtotal ?? lines.reduce((sum, line) => sum + signedAmount(line), 0)), 435, currentY, 9, true);
     currentY -= 20;
-    for (const group of groupPayrollLines(lines)) {
+    if (options.perLine) {
+      // One row per line with the manager's note, so each correction carries its reason.
+      for (const line of lines) {
+        ensureSpace();
+        addText(line.label, 60, currentY, 9);
+        addText(formatSignedCurrency(signedAmount(line)), 435, currentY, 9);
+        currentY -= 14;
+        if (line.note) addWrapped(line.note, 70);
+        currentY -= 4;
+      }
+    } else {
+      for (const group of groupPayrollLines(lines)) {
+        ensureSpace();
+        addText(group.lines[0].label, 60, currentY, 9);
+        addText(formatSignedCurrency(group.direction === "deduction" ? -group.amountVnd : group.amountVnd), 435, currentY, 9);
+        currentY -= 18;
+      }
+    }
+    for (const row of extraRows) {
       ensureSpace();
-      addText(group.lines[0].label, 60, currentY, 9);
-      addText(formatCurrency(group.amountVnd), 435, currentY, 9);
+      addText(row.label, 60, currentY, 9);
+      addText(row.value, 435, currentY, 9);
       currentY -= 18;
     }
+    if (options.footnote) addWrapped(options.footnote, 60);
     currentY -= 10;
   };
+  const sectionOf = (line: (typeof data.earnings)[number]) => getPayslipSection(line, data.piecework !== null);
   renderSection("LUONG THEO CONG", data.earnings.filter(line => attendanceLineTypes.has(line.lineType)));
-  renderSection("CHAM BAI", data.earnings.filter(line => line.lineType === "grading_bonus"));
-  renderSection("THUONG & PHU CAP", data.earnings.filter(line => !attendanceLineTypes.has(line.lineType) && line.lineType !== "grading_bonus"));
+  renderSection("CHAM BAI", data.earnings.filter(line => sectionOf(line) === "grading"));
+  if (data.piecework) {
+    renderSection("LUONG KHOAN", data.earnings.filter(line => sectionOf(line) === "piecework"), {
+      extraRows: [{ label: getLineTypeLabel(PIECEWORK_OFFSET), value: `-${formatCurrency(data.piecework.absorbedVnd)}` }],
+      footnote: getPieceworkExplanation(data.piecework),
+      subtotal: data.piecework.addedVnd,
+    });
+  }
+  renderSection("THUONG & PHU CAP", data.earnings.filter(line => sectionOf(line) === "earnings"));
+  renderSection("DIEU CHINH", data.adjustments, { perLine: true });
   ensureSpace(30);
   addText("TONG THU NHAP", 50, currentY, 10, true);
   addText(data.totals.grossFormatted, 435, currentY, 10, true);
   currentY -= 28;
-  renderSection("BU TRU & KHAU TRU", data.deductions);
+  renderSection("KHAU TRU", data.deductions);
   ensureSpace(60);
-  addText("TONG BU TRU & KHAU TRU", 50, currentY, 10, true);
-  addText(data.totals.totalDeductionsFormatted, 435, currentY, 10, true);
+  addText("TONG KHAU TRU", 50, currentY, 10, true);
+  addText(deductionsSigned, 435, currentY, 10, true);
   currentY -= 25;
   addText("THUC NHAN", 50, currentY, 12, true);
   addText(data.totals.netFormatted, 435, currentY, 11, true);

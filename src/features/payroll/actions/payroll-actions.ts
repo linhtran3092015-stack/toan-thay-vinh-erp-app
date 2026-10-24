@@ -107,12 +107,12 @@ function getPayrollRpcErrorMessage(message: string): string {
       "Tệp chấm công có số lượng hoặc hình thức làm việc không hợp lệ.",
     PAYROLL_IMPORT_UNRESOLVED_ROWS:
       "Tệp còn dòng lỗi hoặc xung đột chưa được xử lý.",
-    PAYROLL_MANUAL_LINE_AMOUNT_INVALID: "Số tiền thưởng hoặc khấu trừ không hợp lệ.",
-    PAYROLL_MANUAL_LINE_NOTE_INVALID: "Nội dung thưởng hoặc khấu trừ không hợp lệ.",
+    PAYROLL_MANUAL_LINE_AMOUNT_INVALID: "Số tiền điều chỉnh không hợp lệ.",
+    PAYROLL_MANUAL_LINE_NOTE_INVALID: "Nội dung điều chỉnh không hợp lệ.",
     PAYROLL_MANUAL_LINE_REQUIRES_CURRENT_OPEN_DRAFT:
       "Chỉ có thể điều chỉnh trên bản tính lương nháp hiện tại. Hãy tải lại trang và kiểm tra trước khi thực hiện.",
     PAYROLL_MANUAL_LINE_SELF_CHANGE_FORBIDDEN:
-      "Không thể tự thêm thưởng hoặc khấu trừ cho bảng lương của chính mình.",
+      "Không thể tự thêm điều chỉnh cho bảng lương của chính mình.",
     PAYROLL_MANUAL_LINE_TYPE_INVALID: "Loại điều chỉnh lương không hợp lệ.",
     PAYROLL_OWNER_APPROVE_PERMISSION_REQUIRED:
       "Tài khoản hiện tại không có quyền duyệt bảng lương.",
@@ -219,7 +219,7 @@ export async function addPayrollManualLineAction(
   const parsed = addPayrollManualLineSchema.safeParse(input);
   if (!parsed.success) {
     return createErrorState(
-      "Vui lòng kiểm tra lại khoản thưởng hoặc khấu trừ.",
+      "Vui lòng kiểm tra lại khoản điều chỉnh.",
       parsed.error.flatten().fieldErrors,
     );
   }

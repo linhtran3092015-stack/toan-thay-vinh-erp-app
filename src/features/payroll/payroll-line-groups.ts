@@ -12,3 +12,6 @@ export function groupPayrollLines<T extends { lineType: string; direction: strin
 }
 
 export const attendanceLineTypes = new Set(["base_offline", "base_online", "hourly_wage"]);
+
+/** The part of lương khoán already paid inside lương cứng (stored as a deduction line). */
+export const PIECEWORK_OFFSET = "piecework_offset";

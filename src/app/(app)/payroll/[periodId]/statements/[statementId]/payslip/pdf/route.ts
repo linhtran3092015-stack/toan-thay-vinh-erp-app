@@ -24,7 +24,9 @@ export async function GET(
         ? 403
         : result.error === "NOT_AUTHENTICATED"
           ? 401
-          : 404;
+          : result.error === "STATEMENT_CALCULATION_MISMATCH"
+            ? 409
+            : 404;
 
     return new NextResponse(result.message, { status });
   }

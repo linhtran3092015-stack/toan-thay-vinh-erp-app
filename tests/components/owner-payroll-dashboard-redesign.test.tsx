@@ -382,7 +382,8 @@ describe("Live estimate figures and staff table (8a)", () => {
     expect(zeroDeductions.length).toBeGreaterThan(0);
     for (const cell of zeroDeductions) {
       expect(cell.className).not.toContain("text-danger");
-      expect(cell.className).toContain("text-text-subtle");
+      // Muted, not subtle: "0 ₫" is data (no advance taken), so it keeps readable contrast.
+      expect(cell.className).toContain("text-text-muted");
     }
 
     const fixLink = within(screen.getByTestId("staff-without-position")).getByRole("link", { name: "Cập nhật vị trí" });
