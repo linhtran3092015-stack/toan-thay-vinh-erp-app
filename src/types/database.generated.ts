@@ -10390,6 +10390,15 @@ export type Database = {
       }
       get_payroll_explanations: { Args: never; Returns: Json }
       get_payroll_management_overview: { Args: never; Returns: Json }
+      get_payroll_period_details: {
+        Args: {
+          p_include_payroll_period_id?: string
+          p_payroll_period_id?: string
+          p_payroll_statement_id?: string
+          p_period_limit?: number
+        }
+        Returns: Json
+      }
       get_payroll_periods_with_details: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["payroll_periods_with_details_row"][]
