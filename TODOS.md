@@ -138,15 +138,15 @@
 
 ### Đo tốc độ điểm danh sau khi chuyển sang Singapore, rồi quyết định tick không khoá bảng
 
-**What:** Sau v0.39.1.0, đo thời gian một lượt tick trên production (DevTools hoặc log Vercel). Nếu trợ giảng vẫn thấy chậm, làm PR riêng cho tick một chạm không khoá bảng, thử trên buổi học test trước khi lên production.
+**What:** Sau v0.40.1.0, đo thời gian một lượt tick trên production (DevTools hoặc log Vercel). Nếu trợ giảng vẫn thấy chậm, làm PR riêng cho tick một chạm không khoá bảng, thử trên buổi học test trước khi lên production.
 
-**Why:** Bản 0.39.1.0 giữ cách tick cũ (cả bảng khoá trong lúc lưu) vì phiên bản không khoá bảng còn lỗi qua 3 vòng review (quyết định D4 của chủ dự án).
+**Why:** Bản 0.40.1.0 giữ cách tick cũ (cả bảng khoá trong lúc lưu) vì phiên bản không khoá bảng còn lỗi qua 3 vòng review (quyết định D4 của chủ dự án).
 
 **Context:** Thiết kế đã thử: mỗi học sinh có trạng thái riêng (đang lưu / đã lưu với `attendanceId` trả về / lỗi), gọi action trực tiếp thay vì trong transition bất đồng bộ (transition bất đồng bộ làm kẹt cả chuyển trang). Bẫy đã gặp: `router.refresh()` lúc offline bị Next biến thành tải lại toàn trang (PWA hiện trang lỗi offline); hoãn revalidate thì phải tự làm vô hiệu bộ đệm Back/Forward; bộ lọc "Chưa điểm danh" làm hàng trượt dưới ngón tay; chữ "Đang lưu…" làm cột rộng ra; banner lỗi chèn vào làm bảng xô dọc; `SESSION_ATTENDANCE_ALREADY_EXISTS` từ máy khác cần báo xung đột thay vì im lặng; `ATTENDANCE_PERMISSION_CHECK_FAILED` là lỗi tạm thời.
 
 **Effort:** L
 **Priority:** P2
-**Depends on:** Số đo thật sau deploy v0.39.1.0
+**Depends on:** Số đo thật sau deploy v0.40.1.0
 
 ### Chỉ tải danh sách học viên học thêm khi mở ô Học thêm
 
@@ -154,7 +154,7 @@
 
 **Why:** Giảm dữ liệu gửi xuống điện thoại sau mỗi lượt tick và bớt một truy vấn lớn trên mỗi lần render.
 
-**Context:** `getAdditionalStudyCandidates` trong `src/app/(app)/sessions/[sessionId]/page.tsx`. Review hiệu năng /ship v0.39.1.0, hoãn theo quyết định D3.
+**Context:** `getAdditionalStudyCandidates` trong `src/app/(app)/sessions/[sessionId]/page.tsx`. Review hiệu năng /ship v0.40.1.0, hoãn theo quyết định D3.
 
 **Effort:** M
 **Priority:** P2
@@ -166,7 +166,7 @@
 
 **Why:** Mỗi lần lưu điểm danh hay kết quả đều render lại trang này; ở Singapore mỗi lượt chỉ vài ms nhưng vẫn cộng dồn.
 
-**Context:** Review hiệu năng /ship v0.39.1.0, hoãn theo quyết định D3. Nên đo trước khi làm.
+**Context:** Review hiệu năng /ship v0.40.1.0, hoãn theo quyết định D3. Nên đo trước khi làm.
 
 **Effort:** M
 **Priority:** P3
@@ -176,9 +176,9 @@
 
 **What:** `session-lifecycle-actions.tsx`, `session-lock-actions.tsx`, `session-reschedule-dialog.tsx` gọi `router.refresh()` sau action đã `revalidatePath`, nên trang render hai lần.
 
-**Why:** Cùng lỗi render trùng đã sửa cho điểm danh ở v0.39.1.0.
+**Why:** Cùng lỗi render trùng đã sửa cho điểm danh ở v0.40.1.0.
 
-**Context:** Review hiệu năng vòng 3 /ship v0.39.1.0. Có thể cân nhắc thêm `refresh()` từ `next/cache` trong action để không phụ thuộc việc `revalidatePath` khớp đúng đường dẫn.
+**Context:** Review hiệu năng vòng 3 /ship v0.40.1.0. Có thể cân nhắc thêm `refresh()` từ `next/cache` trong action để không phụ thuộc việc `revalidatePath` khớp đúng đường dẫn.
 
 **Effort:** S
 **Priority:** P3
