@@ -385,8 +385,18 @@ describe("Payroll 1 presentation", () => {
     expect(screen.queryByRole("link", { name: /kỳ cũ hơn/ })).not.toBeInTheDocument();
 
     unmountCap();
-    render(<PayrollPage canApprove={false} canManage={false} canReconcile={false} periods={[period()]} />);
+    const { unmount: unmountNone } = render(<PayrollPage canApprove={false} canManage={false} canReconcile={false} periods={[period()]} />);
     expect(screen.queryByRole("link", { name: /kỳ cũ hơn/ })).not.toBeInTheDocument();
+
+    // Extended by /ship test coverage audit (pass 2).
+    // Value: protects=on /payroll opened from a Tạm ứng link (?period=), "Xem thêm … kỳ cũ hơn" keeps that period in the next URL so it stays on screen;
+    // fails_when=PayrollPage stops passing includedPeriodId to getOlderPayrollPeriodsLink (an optional argument, so it still compiles) and the link drops &period=;
+    // why_new=every PayrollPage render here omits includedPeriodId; period-window.test covers the helper alone, not the page's call;
+    // seam=none; no_claim=does not prove the route hands ?period= to PayrollPage (payroll-route.test mocks PayrollPage and drops the prop)
+    unmountNone();
+    const linkedPeriodId = "b2000000-0000-4000-8000-000000202609";
+    render(<PayrollPage canApprove={false} canManage={false} canReconcile={false} includedPeriodId={linkedPeriodId} olderPeriodCount={5} periodCount={3} periods={[period()]} />);
+    expect(screen.getByRole("link", { name: "Xem thêm 3 kỳ cũ hơn" })).toHaveAttribute("href", `/payroll?periods=6&period=${linkedPeriodId}`);
   });
 
   // Value: protects=the payslip dialog explains a lương khoán that contradicts its offset instead of claiming it was all paid inside lương cứng;
