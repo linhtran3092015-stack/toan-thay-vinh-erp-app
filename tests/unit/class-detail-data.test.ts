@@ -2,7 +2,7 @@
 // fails_when=payments are queried without payments.view, a composite class misses its component sessions, a roster RPC failure is shown as 0/0 attendance, a paged attendance error yields partial tallies, or the candidate query stops filtering on missing enrolments;
 // why_new=class-detail-data is new and server-only; Supabase is mockable at its client boundary;
 // seam=none; no_claim=does not prove PostgREST accepts the embedded anti-join or that RLS returns these rows
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const supabase = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
 
@@ -72,6 +72,10 @@ beforeEach(() => {
   supabase.rpc.mockReset();
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("getClassDetailWorkspace", () => {
   it("reads nothing beyond enrolments for a viewer without feed permissions", async () => {
     const calls = tables({ student_enrollments: { data: [{ student_id: "a" }], error: null } });
@@ -91,6 +95,8 @@ describe("getClassDetailWorkspace", () => {
   });
 
   it("includes component-class sessions and tallies attendance against the roster", async () => {
+    // Pinned so s3 stays upcoming and the 2026-10-10 request stays inside PAYMENT_REQUEST_OVERDUE_DAYS.
+    vi.useFakeTimers({ now: new Date("2026-10-14T03:00:00Z"), toFake: ["Date"] });
     const calls = tables({
       class_component_links: { data: [{ component_class_id: "class-1-t", effective_from: "2026-09-01", effective_to: null }], error: null },
       class_sessions: {
