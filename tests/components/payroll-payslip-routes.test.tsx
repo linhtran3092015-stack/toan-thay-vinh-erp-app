@@ -215,4 +215,28 @@ describe("Payslip PDF Route Handler", () => {
 
     expect(response.status).toBe(403);
   });
+
+  // Value: protects=a payslip whose lines do not reconcile is refused as a conflict (409), not served as a PDF or reported as missing;
+  // fails_when=the route maps STATEMENT_CALCULATION_MISMATCH to 404 or renders the PDF;
+  // why_new=the loader now fails closed on unreconciled lines;
+  // seam=getPayslipDocumentData mocked; no_claim=does not cover when the loader returns this error (payslip-data.test does)
+  it("returns 409 when the statement lines do not reconcile", async () => {
+    mockGetPayslipDocumentData.mockResolvedValueOnce({
+      error: "STATEMENT_CALCULATION_MISMATCH",
+      message: "Các dòng lương chưa khớp với tổng của phiếu lương.",
+      ok: false,
+    });
+
+    const response = await payslipPdfRouteHandler(
+      {} as NextRequest,
+      {
+        params: Promise.resolve({
+          periodId: "period-uuid-1",
+          statementId: "stmt-uuid-1",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(409);
+  });
 });

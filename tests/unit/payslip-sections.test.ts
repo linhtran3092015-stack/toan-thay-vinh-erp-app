@@ -39,9 +39,49 @@ describe("payslip sections", () => {
       baseSalaryVnd: 2_400_000,
       earnedVnd: 2_800_000,
       floorBasisPoints: 8_500,
+      kind: "summary",
       thresholdVnd: 2_040_000,
     });
     expect(summarizePiecework([{ amountVnd: 1_000, direction: "earning", lineType: "grading_bonus" }])).toBeNull();
+  });
+
+  // Value: protects="Lương khoán đạt" is the engine's piecework_vnd and must equal the lines listed under Lương khoán, so the printed section adds up;
+  // fails_when=summarizePiecework prints a snapshot that disagrees with the listed lines (e.g. the engine also counted hourly pay shown under Lương theo công), or applies one snapshot to several offset lines;
+  // why_new=the engine and this file group lines differently for hourly_wage, and a cut read would also leave the rows short of the snapshot;
+  // seam=none (pure function); no_claim=does not prove the engine's piecework_vnd
+  it("uses the offset snapshot only when it matches the listed lương khoán lines", () => {
+    const lines = [
+      { amountVnd: 1_800_000, direction: "earning", lineType: "operations_grade_renewal_bonus" },
+      { amountVnd: 1_500_000, direction: "deduction", formulaSnapshot: { base_salary_vnd: 2_000_000, basis_points: 7_500, piecework_vnd: 1_800_000 }, lineType: "piecework_offset" },
+    ];
+    expect(summarizePiecework(lines)).toMatchObject({ absorbedVnd: 1_500_000, addedVnd: 300_000, earnedVnd: 1_800_000, kind: "summary" });
+
+    // The engine counted 100.000 of hourly pay that the payslip lists under Lương theo công.
+    expect(summarizePiecework([
+      { amountVnd: 100_000, direction: "earning", lineType: "hourly_wage" },
+      { amountVnd: 1_800_000, direction: "earning", lineType: "operations_grade_renewal_bonus" },
+      { ...lines[1], formulaSnapshot: { piecework_vnd: 1_900_000 } },
+    ])).toEqual({ absorbedVnd: 1_500_000, earnedVnd: 1_900_000, kind: "mismatch" });
+
+    // Two offset lines (never written by the engine): no single snapshot speaks for both.
+    expect(summarizePiecework([...lines, { ...lines[1], amountVnd: 100_000 }])).toMatchObject({ absorbedVnd: 1_600_000, earnedVnd: 1_800_000, kind: "summary" });
+  });
+
+  // Value: protects=a lương khoán below the part already paid in lương cứng is an error state, never a negative "cộng thêm" amount;
+  // fails_when=summarizePiecework returns a summary with a negative addedVnd (the payslip would print it), from the snapshot or from the line-sum fallback;
+  // why_new=v0.39 printed earned − absorbed even when negative;
+  // seam=none (pure function); no_claim=does not decide how each surface shows the error (payslip-data and component tests do)
+  it("reports a mismatch instead of a negative added amount", () => {
+    expect(summarizePiecework([
+      { amountVnd: 900_000, direction: "earning", lineType: "operations_grade_renewal_bonus" },
+      { amountVnd: 900_000, direction: "deduction", formulaSnapshot: { piecework_vnd: 600_000 }, lineType: "piecework_offset" },
+    ])).toEqual({ absorbedVnd: 900_000, earnedVnd: 600_000, kind: "mismatch" });
+
+    // Live estimates carry no snapshot: a bonus line missing from the read shows up the same way.
+    expect(summarizePiecework([
+      { amountVnd: 400_000, direction: "earning", lineType: "operations_grade_renewal_bonus" },
+      { amountVnd: 900_000, direction: "deduction", lineType: "piecework_offset" },
+    ])).toEqual({ absorbedVnd: 900_000, earnedVnd: 400_000, kind: "mismatch" });
   });
 
   // Value: protects=income and deductions shown to staff still reconcile to the stored payable;
@@ -79,14 +119,14 @@ describe("payslip sections", () => {
 
   it("explains the floor without calling it a deduction", () => {
     const above = summarizePiecework(aboveFloorLines);
-    expect(above && getPieceworkExplanation(above)).toBe(
+    expect(above?.kind === "summary" && getPieceworkExplanation(above)).toBe(
       "Lương khoán đạt 2.800.000 VND. Phần đến 85% lương cứng (2.400.000 VND × 85% = 2.040.000 VND) đã được trả trong lương cứng; phần vượt 760.000 VND được cộng thêm.",
     );
     const below = summarizePiecework([
       { amountVnd: 900_000, direction: "earning", lineType: "operations_grade_renewal_bonus" },
       { amountVnd: 900_000, direction: "deduction", formulaSnapshot: { base_salary_vnd: 1_500_000, basis_points: 8_500 }, lineType: "piecework_offset" },
     ]);
-    expect(below && getPieceworkExplanation(below)).toBe(
+    expect(below?.kind === "summary" && getPieceworkExplanation(below)).toBe(
       "Lương khoán đạt 900.000 VND, chưa vượt 85% lương cứng (1.500.000 VND × 85% = 1.275.000 VND), nên đã được trả trọn trong lương cứng. Không có khoản nào bị trừ.",
     );
   });
@@ -100,8 +140,8 @@ describe("payslip sections", () => {
       { amountVnd: 1_500_000, direction: "earning", lineType: "operations_grade_renewal_bonus" },
       { amountVnd: 1_200_000, direction: "deduction", formulaSnapshot: {}, lineType: "piecework_offset" },
     ]);
-    expect(above).toEqual({ absorbedVnd: 1_200_000, addedVnd: 300_000, baseSalaryVnd: null, earnedVnd: 1_500_000, floorBasisPoints: null, thresholdVnd: null });
-    expect(above && getPieceworkExplanation(above)).toBe(
+    expect(above).toEqual({ absorbedVnd: 1_200_000, addedVnd: 300_000, baseSalaryVnd: null, earnedVnd: 1_500_000, floorBasisPoints: null, kind: "summary", thresholdVnd: null });
+    expect(above?.kind === "summary" && getPieceworkExplanation(above)).toBe(
       "Lương khoán đạt 1.500.000 VND. Phần đến ngưỡng lương cứng của chính sách đã được trả trong lương cứng; phần vượt 300.000 VND được cộng thêm.",
     );
 
@@ -109,7 +149,7 @@ describe("payslip sections", () => {
       { amountVnd: 400_000, direction: "earning", lineType: "operations_grade_renewal_bonus" },
       { amountVnd: 400_000, direction: "deduction", formulaSnapshot: {}, lineType: "piecework_offset" },
     ]);
-    expect(below && getPieceworkExplanation(below)).toBe(
+    expect(below?.kind === "summary" && getPieceworkExplanation(below)).toBe(
       "Lương khoán đạt 400.000 VND, chưa vượt ngưỡng lương cứng của chính sách, nên đã được trả trọn trong lương cứng. Không có khoản nào bị trừ.",
     );
   });

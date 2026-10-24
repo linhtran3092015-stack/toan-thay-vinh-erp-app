@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getCurrentAuthUser } from "@/features/auth/current-user";
-import { getPayrollPeriodsWithDetailsResult } from "@/features/payroll/data";
+import { getPayrollStatementDetailsResult } from "@/features/payroll/data";
 import {
   formatCurrency,
   formatWorkMinutes,
@@ -23,9 +23,14 @@ import {
   getPayslipDisplayTotals,
   isNettedIntoIncome,
   manualAdjustmentLineTypes,
+  PIECEWORK_MISMATCH_MESSAGE,
   summarizePiecework,
 } from "@/features/payroll/payslip-sections";
-import type { PayrollLineRead, PayrollStatementRead } from "@/features/payroll/read-models";
+import {
+  getUnreconciledReadMessage,
+  type PayrollLineRead,
+  type PayrollStatementRead,
+} from "@/features/payroll/read-models";
 import {
   payrollPositionLabels,
   type PayrollPositionCode,
@@ -268,13 +273,20 @@ function normalizePayslipLine(line: PayrollLineRead): PayslipLineItem {
   };
 }
 
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export async function getPayslipDocumentData(
   payrollPeriodId: string,
   payrollStatementId: string,
 ): Promise<PayslipResult> {
-  const [permissionsResult, authUserResult] = await Promise.all([
+  const idsAreUuids = uuidPattern.test(payrollPeriodId) && uuidPattern.test(payrollStatementId);
+  // The read enforces payroll.view and own-statement visibility itself, so it
+  // starts with the session checks instead of after them (one round trip).
+  const [permissionsResult, authUserResult, detailsResult] = await Promise.all([
     getCachedDatabasePermissions(),
     getCurrentAuthUser(),
+    idsAreUuids ? getPayrollStatementDetailsResult(payrollPeriodId, payrollStatementId) : null,
   ]);
 
   if (!permissionsResult.ok || !authUserResult.ok) {
@@ -298,16 +310,38 @@ export async function getPayslipDocumentData(
     permissionsResult.permissions.includes("payroll.accountant_reconcile") ||
     permissionsResult.permissions.includes("payroll.owner_approve");
 
-  const periodsResult = await getPayrollPeriodsWithDetailsResult();
-  if (!periodsResult.ok) {
-    return {
-      error: "PERIOD_NOT_FOUND",
-      message: "Không tải được danh sách kỳ lương từ hệ thống.",
-      ok: false,
-    };
+  // A link that is not a uuid cannot name a period or statement; the uuid-typed
+  // read would fail as if the system were down.
+  if (!detailsResult) {
+    return uuidPattern.test(payrollPeriodId)
+      ? {
+          error: "STATEMENT_NOT_FOUND",
+          message: "Không tìm thấy phiếu lương của nhân sự trong kỳ này.",
+          ok: false,
+        }
+      : {
+          error: "PERIOD_NOT_FOUND",
+          message: "Không tìm thấy kỳ lương yêu cầu.",
+          ok: false,
+        };
   }
 
-  const period = periodsResult.data.find((p) => p.id === payrollPeriodId);
+  // Only this statement's lines, read in one snapshot and checked against its totals.
+  if (!detailsResult.ok) {
+    return detailsResult.reason === "unreconciled"
+      ? {
+          error: "STATEMENT_CALCULATION_MISMATCH",
+          message: getUnreconciledReadMessage(permissionsResult.permissions.includes("payroll.manage")),
+          ok: false,
+        }
+      : {
+          error: "PERIOD_NOT_FOUND",
+          message: "Không tải được phiếu lương từ hệ thống.",
+          ok: false,
+        };
+  }
+
+  const period = detailsResult.data.periods.find((p) => p.id === payrollPeriodId);
   if (!period) {
     return {
       error: "PERIOD_NOT_FOUND",
@@ -320,34 +354,18 @@ export async function getPayslipDocumentData(
   const currentStatement: PayrollStatementRead | undefined =
     period.statements.find((s) => s.id === payrollStatementId);
 
-  let suggestedCurrentStatementId: string | undefined;
-
   if (!currentStatement) {
-    // Check if the statementId exists in the database as an older revision
-    try {
-      const supabase = await createSupabaseServerClient();
-      const { data: dbStatement } = await supabase
-        .from("payroll_statements")
-        .select("id, staff_id, payroll_period_id, calculation_run_id")
-        .eq("id", payrollStatementId)
-        .maybeSingle();
-
-      if (dbStatement) {
-        const matchingCurrent = period.statements.find(
-          (s) => s.staffId === dbStatement.staff_id,
-        );
-        suggestedCurrentStatementId = matchingCurrent?.id;
-
-        return {
-          error: "STATEMENT_STALE",
-          message:
-            "Phiếu lương này thuộc phiên bản tính cũ và không còn là phiên bản hiện tại.",
-          ok: false,
-          suggestedCurrentStatementId,
-        };
-      }
-    } catch {
-      // Ignore fallback lookup errors
+    // The reader reports a statement from an older calculation run, with the
+    // same staff member's current statement in this period when there is one.
+    const staleStatement = detailsResult.data.staleStatement;
+    if (staleStatement) {
+      return {
+        error: "STATEMENT_STALE",
+        message:
+          "Phiếu lương này thuộc phiên bản tính cũ và không còn là phiên bản hiện tại.",
+        ok: false,
+        suggestedCurrentStatementId: staleStatement.currentStatementId ?? undefined,
+      };
     }
 
     return {
@@ -431,6 +449,11 @@ export async function getPayslipDocumentData(
     .map(normalizePayslipLine);
 
   const displayTotals = getPayslipDisplayTotals(currentStatement);
+  // A printed payslip never shows lương khoán below the part already paid in lương cứng.
+  const piecework = summarizePiecework(currentStatement.lines);
+  if (piecework?.kind === "mismatch") {
+    return { error: "STATEMENT_CALCULATION_MISMATCH", message: PIECEWORK_MISMATCH_MESSAGE, ok: false };
+  }
 
   const workHoursBreakdown = extractWorkHoursBreakdown(currentStatement.lines);
   const gradingBreakdown = extractGradingBreakdown(currentStatement.lines);
@@ -477,7 +500,7 @@ export async function getPayslipDocumentData(
       status: period.status,
       statusLabel: getPeriodStatusLabel(period.status),
     },
-    piecework: summarizePiecework(currentStatement.lines),
+    piecework,
     statementId: currentStatement.id,
     totals: {
       amountInWords: formatVietnameseCurrencyWords(

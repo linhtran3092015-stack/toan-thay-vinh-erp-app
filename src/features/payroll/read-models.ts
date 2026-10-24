@@ -1,4 +1,3 @@
-import type { Database } from "@/types/database.generated";
 import { z } from "zod";
 
 export type PayrollPeriodStatus = "draft" | "review" | "approved";
@@ -126,183 +125,124 @@ export interface PayrollManagementOverviewRead {
   issues: readonly PayrollCalculationIssueRead[];
 }
 
-type GeneratedPayrollPeriodsWithDetailsRow = Database["public"]["Functions"]["get_payroll_periods_with_details"]["Returns"][number];
+const payrollDetailsLineSchema = z.object({
+  amountVnd: z.number().int(),
+  direction: z.string(),
+  evidenceSnapshot: z.record(z.string(), z.unknown()),
+  formulaSnapshot: z.record(z.string(), z.unknown()),
+  id: z.string(),
+  lineType: z.string(),
+  note: z.string().nullable(),
+  policyCode: z.string().nullable(),
+  quantity: z.number().nullable(),
+  sourceKind: z.string().nullable(),
+  unitCount: z.number().int().nullable(),
+  unitLabel: z.string().nullable(),
+  unitRateVnd: z.number().int().nullable(),
+  workMinutes: z.number().int().nonnegative().nullable(),
+});
 
-export type PayrollPeriodsWithDetailsRow =
-  GeneratedPayrollPeriodsWithDetailsRow;
+const payrollDetailsStatementSchema = z.object({
+  id: z.string(),
+  lines: z.array(payrollDetailsLineSchema),
+  payableAmountVnd: z.number().int(),
+  payrollPeriodId: z.string(),
+  staffDisplayName: z.string(),
+  staffEmployeeCode: z.string().nullable(),
+  staffId: z.string(),
+  totalDeductionsVnd: z.number().int(),
+  totalEarningsVnd: z.number().int(),
+  workHours: z.number().int(),
+  workMinutes: z.number().int().nonnegative(),
+  workUnits: z.number().int(),
+});
 
-type MutablePayrollStatement = Omit<PayrollStatementRead, "lines"> & {
-  lines: PayrollLineRead[];
-};
-
-type MutablePayrollPeriod = Omit<PayrollPeriodRead, "statements"> & {
-  statements: MutablePayrollStatement[];
-};
-
-/**
- * Preserves the server-owned flat ordering while grouping the read-only
- * Payroll 0 snapshot by its stable period, statement, and line identifiers.
- */
-export function normalizePayrollPeriodsWithDetailsRows(
-  rows: readonly PayrollPeriodsWithDetailsRow[],
-): readonly PayrollPeriodRead[] {
-  const periods = new Map<string, MutablePayrollPeriod>();
-  const statements = new Map<string, MutablePayrollStatement>();
-
-  for (const row of rows) {
-    if (
-      row.payroll_period_id === null ||
-      row.period_month === null ||
-      row.pay_date === null ||
-      row.period_status === null
-    ) {
-      throw new Error("PAYROLL_DETAILS_PERIOD_ROW_INCOMPLETE");
-    }
-
-    let period = periods.get(row.payroll_period_id);
-
-    if (!period) {
-      period = {
-        blockingIssueCount: 0,
-        currentRevision: 1,
-        feedbackClosedAt: null,
-        feedbackOpenedAt: null,
-        id: row.payroll_period_id,
-        lastCalculatedAt: null,
-        payDate: row.pay_date,
-        periodMonth: row.period_month,
-        status: row.period_status,
-        pendingCorrectionCount: 0,
-        statements: [],
-      };
-      periods.set(period.id, period);
-    }
-
-    if (row.payroll_statement_id === null) {
-      continue;
-    }
-
-    let statement = statements.get(row.payroll_statement_id);
-
-    if (!statement) {
-      if (
-        row.staff_id === null ||
-        row.staff_display_name === null ||
-        row.work_units === null ||
-        row.work_hours === null ||
-        row.total_earnings_vnd === null ||
-        row.total_deductions_vnd === null ||
-        row.payable_amount_vnd === null
-      ) {
-        throw new Error("PAYROLL_DETAILS_STATEMENT_ROW_INCOMPLETE");
-      }
-
-      statement = {
-        id: row.payroll_statement_id,
-        lines: [],
-        payableAmountVnd: row.payable_amount_vnd,
-        payrollPeriodId: row.payroll_period_id,
-        staffDisplayName: row.staff_display_name,
-        staffEmployeeCode: row.staff_employee_code,
-        staffId: row.staff_id,
-        totalDeductionsVnd: row.total_deductions_vnd,
-        totalEarningsVnd: row.total_earnings_vnd,
-        workHours: row.work_hours,
-        workMinutes: row.work_hours * 60,
-        workUnits: row.work_units,
-      };
-      statements.set(statement.id, statement);
-      period.statements.push(statement);
-    }
-
-    if (row.payroll_line_item_id === null) {
-      continue;
-    }
-
-    if (
-      row.line_type === null ||
-      row.line_direction === null ||
-      row.line_amount_vnd === null
-    ) {
-      throw new Error("PAYROLL_DETAILS_LINE_ROW_INCOMPLETE");
-    }
-
-    statement.lines.push({
-      amountVnd: row.line_amount_vnd,
-      direction: row.line_direction,
-      evidenceSnapshot: {},
-      formulaSnapshot: {},
-      id: row.payroll_line_item_id,
-      lineType: row.line_type,
-      note: row.note,
-      payrollStatementId: statement.id,
-      policyCode: null,
-      quantity: row.unit_count,
-      sourceKind: null,
-      unitCount: row.unit_count,
-      unitLabel: null,
-      unitRateVnd: row.unit_rate_vnd,
-      workMinutes: null,
-    });
-  }
-
-  return [...periods.values()];
-}
-
-const payrollExplanationsSchema = z.object({
-  lines: z.array(z.object({
-    evidenceSnapshot: z.record(z.string(), z.unknown()),
-    formulaSnapshot: z.record(z.string(), z.unknown()),
-    id: z.string(),
-    policyCode: z.string().nullable(),
-    quantity: z.number().nullable(),
-    sourceKind: z.string().nullable(),
-    unitLabel: z.string().nullable(),
-    workMinutes: z.number().int().nonnegative().nullable(),
-  })),
+const payrollPeriodDetailsSchema = z.object({
+  olderPeriodCount: z.number().int().nonnegative(),
   periods: z.array(z.object({
     blockingIssueCount: z.number().int().nonnegative(),
-    currentRevision: z.number().int().positive(),
+    currentRevision: z.number().int().positive().nullable(),
     feedbackClosedAt: z.string().nullable(),
     feedbackOpenedAt: z.string().nullable(),
     id: z.string(),
-    lastCalculatedAt: z.string().nullable().optional().default(null),
+    lastCalculatedAt: z.string().nullable(),
+    paidAt: z.string().nullable(),
+    paidOn: z.string().nullable(),
+    payDate: z.string(),
+    paymentReference: z.string().nullable(),
     pendingCorrectionCount: z.number().int().nonnegative(),
+    periodMonth: z.string(),
+    statements: z.array(payrollDetailsStatementSchema),
+    status: z.string(),
   })),
-  statements: z.array(z.object({
-    id: z.string(),
-    workMinutes: z.number().int().nonnegative(),
-  })),
+  staleStatement: z.object({ currentStatementId: z.string().nullable() }).nullable(),
 });
 
-export function enrichPayrollPeriodsWithExplanations(
-  periods: readonly PayrollPeriodRead[],
-  payload: unknown,
-): readonly PayrollPeriodRead[] {
-  const parsed = payrollExplanationsSchema.safeParse(payload);
+export interface PayrollPeriodDetailsRead {
+  /** Visible periods older than the ones returned (list reads only). */
+  olderPeriodCount: number;
+  periods: readonly PayrollPeriodRead[];
+  /** Set when the requested statement belongs to an earlier calculation run. */
+  staleStatement: { currentStatementId: string | null } | null;
+}
+
+/** Parses get_payroll_period_details(); throws on a payload that breaks the contract. */
+export function parsePayrollPeriodDetails(payload: unknown): PayrollPeriodDetailsRead {
+  const parsed = payrollPeriodDetailsSchema.safeParse(payload);
   if (!parsed.success) {
-    throw new Error("PAYROLL_EXPLANATIONS_INVALID");
+    throw new Error("PAYROLL_PERIOD_DETAILS_INVALID");
   }
 
-  const periodById = new Map(parsed.data.periods.map((period) => [period.id, period]));
-  const statementById = new Map(parsed.data.statements.map((statement) => [statement.id, statement]));
-  const lineById = new Map(parsed.data.lines.map((line) => [line.id, line]));
-
-  return periods.map((period) => {
-    const explanation = periodById.get(period.id);
-    return {
+  return {
+    olderPeriodCount: parsed.data.olderPeriodCount,
+    periods: parsed.data.periods.map((period) => ({
       ...period,
-      ...(explanation ?? {}),
+      // A period without a calculation run has no statements; show it as the
+      // first revision, as the earlier reader did.
+      currentRevision: period.currentRevision ?? 1,
       statements: period.statements.map((statement) => ({
         ...statement,
-        workMinutes: statementById.get(statement.id)?.workMinutes ?? statement.workMinutes,
-        lines: statement.lines.map((line) => ({
-          ...line,
-          ...(lineById.get(line.id) ?? {}),
-        })),
+        lines: statement.lines.map((line) => ({ ...line, payrollStatementId: statement.id })),
       })),
-    };
-  });
+    })),
+    staleStatement: parsed.data.staleStatement,
+  };
+}
+
+/**
+ * Payslip totals are summed from the statement's lines, so the lines must add
+ * up to the totals the reader returned with them. The RPC builds both from the
+ * same rows in one snapshot, so this is a check on the read itself (a cut,
+ * filtered or mangled payload), not on stored data: returns the ids of
+ * statements whose earning lines, deduction lines or payable disagree.
+ */
+export function findUnreconciledStatementIds(periods: readonly PayrollPeriodRead[]): string[] {
+  const unreconciled: string[] = [];
+  for (const period of periods) {
+    for (const statement of period.statements) {
+      let earningsVnd = 0;
+      let deductionsVnd = 0;
+      for (const line of statement.lines) {
+        if (line.direction === "earning") earningsVnd += line.amountVnd;
+        else if (line.direction === "deduction") deductionsVnd += line.amountVnd;
+      }
+      if (
+        earningsVnd !== statement.totalEarningsVnd
+        || deductionsVnd !== statement.totalDeductionsVnd
+        || statement.totalEarningsVnd - statement.totalDeductionsVnd !== statement.payableAmountVnd
+      ) {
+        unreconciled.push(statement.id);
+      }
+    }
+  }
+  return unreconciled;
+}
+
+/** What to tell a viewer when a read did not reconcile: recalculating is a payroll.manage action. */
+export function getUnreconciledReadMessage(canRecalculate: boolean): string {
+  return canRecalculate
+    ? "Các dòng lương chưa khớp với tổng của phiếu lương. Vui lòng tải lại sau ít phút; nếu vẫn lỗi, mở kỳ lương và bấm Tính lại."
+    : "Các dòng lương chưa khớp với tổng của phiếu lương. Vui lòng tải lại sau ít phút; nếu vẫn lỗi, báo quản lý lương.";
 }
 
 export type PayrollReadResult<T> =

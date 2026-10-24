@@ -100,7 +100,7 @@ function openPayslip() {
 function pieceworkStatement(advanceVnd: number) {
   const lines = [
     line({ amountVnd: 1_500_000, id: "w-base", lineType: "base_offline" }),
-    line({ amountVnd: 700_000, id: "w-renewal", lineType: "operations_grade_renewal_bonus" }),
+    line({ amountVnd: 655_340, id: "w-renewal", lineType: "operations_grade_renewal_bonus" }),
     line({ amountVnd: 244_660, id: "w-grading", lineType: "grading_bonus" }),
     line({
       amountVnd: 900_000,
@@ -366,6 +366,52 @@ describe("Payroll 1 presentation", () => {
     fireEvent.click(within(screen.getByRole("dialog", { name: "Điều chỉnh bảng lương" })).getByRole("button", { name: "Ghi điều chỉnh" }));
 
     await waitFor(() => expect(screen.getByLabelText("Nội dung")).toHaveAccessibleDescription("Cần nêu nội dung điều chỉnh."));
+  });
+
+  // Value: protects=/payroll offers the next batch of older periods (it now reads only the latest few) and says how many remain;
+  // fails_when=the control is missing when older periods exist, links to the wrong ?periods= value, or shows when nothing older exists;
+  // why_new=before this change every period was rendered, so there was nothing to load;
+  // seam=PayrollPage with fixture periods; no_claim=does not prove the route reads ?periods= (payroll-route.test covers it)
+  it("offers older periods on request", () => {
+    const { unmount } = render(<PayrollPage canApprove={false} canManage={false} canReconcile={false} olderPeriodCount={5} periodCount={3} periods={[period()]} />);
+
+    expect(screen.getByText("Còn 5 kỳ lương cũ hơn chưa hiển thị.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Xem thêm 3 kỳ cũ hơn" })).toHaveAttribute("href", "/payroll?periods=6");
+
+    unmount();
+    const { unmount: unmountCap } = render(<PayrollPage canApprove={false} canManage={false} canReconcile={false} olderPeriodCount={4} periodCount={60} periods={[period()]} />);
+    // At the 60-period cap the note says so instead of offering a link past the RPC's limit.
+    expect(screen.getByText("Chỉ hiển thị 60 kỳ lương gần nhất; còn 4 kỳ cũ hơn.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /kỳ cũ hơn/ })).not.toBeInTheDocument();
+
+    unmountCap();
+    const { unmount: unmountNone } = render(<PayrollPage canApprove={false} canManage={false} canReconcile={false} periods={[period()]} />);
+    expect(screen.queryByRole("link", { name: /kỳ cũ hơn/ })).not.toBeInTheDocument();
+
+    // Extended by /ship test coverage audit (pass 2).
+    // Value: protects=on /payroll opened from a Tạm ứng link (?period=), "Xem thêm … kỳ cũ hơn" keeps that period in the next URL so it stays on screen;
+    // fails_when=PayrollPage stops passing includedPeriodId to getOlderPayrollPeriodsLink (an optional argument, so it still compiles) and the link drops &period=;
+    // why_new=every PayrollPage render here omits includedPeriodId; period-window.test covers the helper alone, not the page's call;
+    // seam=none; no_claim=does not prove the route hands ?period= to PayrollPage (payroll-route.test mocks PayrollPage and drops the prop)
+    unmountNone();
+    const linkedPeriodId = "b2000000-0000-4000-8000-000000202609";
+    render(<PayrollPage canApprove={false} canManage={false} canReconcile={false} includedPeriodId={linkedPeriodId} olderPeriodCount={5} periodCount={3} periods={[period()]} />);
+    expect(screen.getByRole("link", { name: "Xem thêm 3 kỳ cũ hơn" })).toHaveAttribute("href", `/payroll?periods=6&period=${linkedPeriodId}`);
+  });
+
+  // Value: protects=the payslip dialog explains a lương khoán that contradicts its offset instead of claiming it was all paid inside lương cứng;
+  // fails_when=the dialog passes a mismatch to getPieceworkExplanation (it would print a negative or false "chưa vượt" sentence), drops the warning, or still prints the group total;
+  // why_new=summarizePiecework now reports a negative added amount as a mismatch;
+  // seam=PayrollPage → PayrollPayslipDialog with fixture lines; no_claim=does not cover the printable payslip (payslip-data fails closed there)
+  it("warns in the dialog when lương khoán is below the offset", () => {
+    const { lines, totals } = pieceworkStatement(0);
+    renderStatement(lines.map((entry) => entry.id === "w-offset" ? { ...entry, formulaSnapshot: { ...entry.formulaSnapshot, piecework_vnd: 600_000 } } : entry), totals);
+
+    const piecework = within(openPayslip()).getByRole("region", { name: "Lương khoán" });
+
+    expect(piecework).toHaveTextContent("Lương khoán chưa khớp với phần đã trả trong lương cứng. Quản lý lương cần kiểm tra");
+    expect(piecework).not.toHaveTextContent("chưa vượt");
+    expect(within(piecework).getByLabelText("Tổng Lương khoán")).toHaveTextContent("—");
   });
 
   it("keeps a real zero-statement period distinct and fails closed for unknown status", () => {

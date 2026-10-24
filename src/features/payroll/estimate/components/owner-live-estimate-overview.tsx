@@ -17,6 +17,7 @@ import { Button, getButtonClassName } from "@/components/ui/button";
 import { getPayrollPositionName } from "@/features/payroll/dashboard/aggregate";
 import { PayrollFiguresStrip } from "@/features/payroll/dashboard/components/payroll-figures-strip";
 import { formatDashboardMonth, formatVnd } from "@/features/payroll/dashboard/format";
+import { UNASSIGNED_POSITION_CODE } from "@/features/payroll/dashboard/read-models";
 import {
   buildLiveEstimateFigures,
   buildOwnerStaffRows,
@@ -121,10 +122,11 @@ export function OwnerLiveEstimateOverview({
   const staffWithoutPositionCount = countStaffWithoutPayrollPosition(estimate, { positionCode });
   // byPosition is not position-filtered: keep only the selected position so rows add up to the filtered total.
   const positionRows = positionCode ? byPosition.filter((row) => row.positionCode === positionCode) : byPosition;
+  // Keyed like byPosition: staff without a payroll position count under "__unassigned__".
   const advancesByPosition = new Map<string, number>();
   for (const statement of estimate.statements) {
-    if (!statement.positionCode) continue;
-    advancesByPosition.set(statement.positionCode, (advancesByPosition.get(statement.positionCode) ?? 0) + statement.advanceDeductionsVnd);
+    const code = statement.positionCode ?? UNASSIGNED_POSITION_CODE;
+    advancesByPosition.set(code, (advancesByPosition.get(code) ?? 0) + statement.advanceDeductionsVnd);
   }
   const hasRatioFigure = figures.some((figure) => figure.key === "ratio");
   const currentMonth = getCurrentPayrollMonth();

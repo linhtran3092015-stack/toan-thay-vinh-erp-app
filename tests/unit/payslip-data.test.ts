@@ -9,7 +9,7 @@ import type { PayrollPeriodRead } from "@/features/payroll/read-models";
 
 const mockPermissions = vi.fn();
 const mockAuthUser = vi.fn();
-const mockPeriods = vi.fn();
+const mockStatementDetails = vi.fn();
 const mockSupabaseClient = vi.fn();
 
 vi.mock("@/lib/permissions/database-permissions", () => ({
@@ -21,8 +21,16 @@ vi.mock("@/features/auth/current-user", () => ({
 }));
 
 vi.mock("@/features/payroll/data", () => ({
-  getPayrollPeriodsWithDetailsResult: () => mockPeriods(),
+  getPayrollStatementDetailsResult: (...args: unknown[]) => mockStatementDetails(...args),
 }));
+
+/** What the scoped statement read returns: the period with only the requested statement. */
+function statementDetails(
+  periods: PayrollPeriodRead[],
+  staleStatement: { currentStatementId: string | null } | null = null,
+) {
+  return { data: { olderPeriodCount: 0, periods, staleStatement }, ok: true as const };
+}
 
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: () => mockSupabaseClient(),
@@ -117,6 +125,49 @@ const samplePeriod: PayrollPeriodRead = {
   status: "draft",
 };
 
+function emptySupabaseClient() {
+  return {
+    from: () => ({
+      insert: () => Promise.resolve({ error: null }),
+      select: () => ({
+        eq: () => ({
+          limit: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }),
+          maybeSingle: () => Promise.resolve({ data: null }),
+          order: () => ({ limit: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }),
+        }),
+      }),
+    }),
+  };
+}
+
+/** A lương cứng + lương khoán statement: 900.000 of bonuses, a 900.000 offset whose snapshot records `pieceworkVnd`. */
+function pieceworkPeriod(pieceworkVnd: number): PayrollPeriodRead {
+  const base = samplePeriod.statements[0].lines[0];
+  const plain = { formulaSnapshot: {}, note: null, quantity: null, unitCount: null, unitLabel: null, unitRateVnd: null, workMinutes: null };
+  return {
+    ...samplePeriod,
+    statements: [{
+      ...samplePeriod.statements[0],
+      lines: [
+        { ...base, amountVnd: 1_500_000, id: "p-base" },
+        { ...base, ...plain, amountVnd: 900_000, id: "p-renewal", lineType: "operations_grade_renewal_bonus" },
+        {
+          ...base,
+          ...plain,
+          amountVnd: 900_000,
+          direction: "deduction",
+          formulaSnapshot: { base_salary_vnd: 1_500_000, basis_points: 8_500, piecework_vnd: pieceworkVnd },
+          id: "p-offset",
+          lineType: "piecework_offset",
+        },
+      ],
+      payableAmountVnd: 1_500_000,
+      totalDeductionsVnd: 900_000,
+      totalEarningsVnd: 2_400_000,
+    }],
+  };
+}
+
 describe("getPayslipDocumentData", () => {
   it("TEST 1: returns normalized payslip data for CURRENT statement with math integrity", async () => {
     mockPermissions.mockResolvedValue({
@@ -127,10 +178,7 @@ describe("getPayslipDocumentData", () => {
       ok: true,
       user: { id: "admin-user" },
     });
-    mockPeriods.mockResolvedValue({
-      data: [samplePeriod],
-      ok: true,
-    });
+    mockStatementDetails.mockResolvedValue(statementDetails([samplePeriod]));
     mockSupabaseClient.mockResolvedValue({
       from: () => ({
         insert: () => Promise.resolve({ error: null }),
@@ -196,7 +244,7 @@ describe("getPayslipDocumentData", () => {
   });
 
   it("TEST 2: detects STALE statement and reports STATEMENT_STALE with current statement ID", async () => {
-    const staleStatementId = "stale-statement-uuid-9999";
+    const staleStatementId = "99999999-9999-4999-8999-999999999999";
     mockPermissions.mockResolvedValue({
       ok: true,
       permissions: ["payroll.view", "payroll.manage"],
@@ -205,27 +253,10 @@ describe("getPayslipDocumentData", () => {
       ok: true,
       user: { id: "admin-user" },
     });
-    mockPeriods.mockResolvedValue({
-      data: [samplePeriod],
-      ok: true,
-    });
-    mockSupabaseClient.mockResolvedValue({
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            maybeSingle: () =>
-              Promise.resolve({
-                data: {
-                  calculation_run_id: "old-run-uuid",
-                  id: staleStatementId,
-                  payroll_period_id: testPeriodId,
-                  staff_id: staffId,
-                },
-              }),
-          }),
-        }),
-      }),
-    });
+    // The reader returns the period without the old statement and points at the current one.
+    mockStatementDetails.mockResolvedValue(
+      statementDetails([{ ...samplePeriod, statements: [] }], { currentStatementId: testStatementId }),
+    );
 
     const result = await getPayslipDocumentData(testPeriodId, staleStatementId);
 
@@ -245,10 +276,7 @@ describe("getPayslipDocumentData", () => {
       ok: true,
       user: { id: "admin-other-uuid" },
     });
-    mockPeriods.mockResolvedValue({
-      data: [samplePeriod],
-      ok: true,
-    });
+    mockStatementDetails.mockResolvedValue(statementDetails([samplePeriod]));
     mockSupabaseClient.mockResolvedValue({
       from: () => ({
         insert: () => Promise.resolve({ error: null }),
@@ -278,10 +306,7 @@ describe("getPayslipDocumentData", () => {
       ok: true,
       user: { id: "different-staff-uuid" }, // Not matching statement staffId
     });
-    mockPeriods.mockResolvedValue({
-      data: [samplePeriod],
-      ok: true,
-    });
+    mockStatementDetails.mockResolvedValue(statementDetails([samplePeriod]));
 
     const result = await getPayslipDocumentData(testPeriodId, testStatementId);
 
@@ -368,8 +393,7 @@ describe("getPayslipDocumentData", () => {
     mockPermissions.mockResolvedValue({ ok: true, permissions: ["payroll.view", "payroll.manage"] });
     mockAuthUser.mockResolvedValue({ ok: true, user: { id: "admin-user" } });
     const base = samplePeriod.statements[0].lines[0];
-    mockPeriods.mockResolvedValue({
-      data: [{
+    mockStatementDetails.mockResolvedValue(statementDetails([{
         ...samplePeriod,
         statements: [{
           ...samplePeriod.statements[0],
@@ -396,9 +420,7 @@ describe("getPayslipDocumentData", () => {
           totalDeductionsVnd: 1_100_000,
           totalEarningsVnd: 2_400_000,
         }],
-      }],
-      ok: true,
-    });
+      }]));
     mockSupabaseClient.mockResolvedValue({
       from: () => ({
         insert: () => Promise.resolve({ error: null }),
@@ -425,11 +447,148 @@ describe("getPayslipDocumentData", () => {
       baseSalaryVnd: 1_500_000,
       earnedVnd: 900_000,
       floorBasisPoints: 8_500,
+      kind: "summary",
       thresholdVnd: 1_275_000,
     });
     expect(result.data.totals.grossVnd).toBe(1_500_000);
     expect(result.data.totals.totalDeductionsVnd).toBe(200_000);
     expect(result.data.totals.grossVnd - result.data.totals.totalDeductionsVnd).toBe(result.data.totals.netVnd);
+  });
+
+  // Value: protects=the payslip page and PDF read only the requested statement (period id + statement id) instead of every period's lines;
+  // fails_when=the loader goes back to a whole-history read or swaps the two ids;
+  // why_new=the scoped read replaces the paged all-periods read of v0.39;
+  // seam=@/features/payroll/data mocked; no_claim=does not prove the RPC's own filtering (pgTAP payroll-period-details covers it)
+  it("TEST 13: reads only the requested statement", async () => {
+    mockPermissions.mockResolvedValue({ ok: true, permissions: ["payroll.view", "payroll.manage"] });
+    mockAuthUser.mockResolvedValue({ ok: true, user: { id: "admin-user" } });
+    mockStatementDetails.mockResolvedValue(statementDetails([samplePeriod]));
+    mockSupabaseClient.mockResolvedValue(emptySupabaseClient());
+
+    await getPayslipDocumentData(testPeriodId, testStatementId);
+
+    expect(mockStatementDetails).toHaveBeenLastCalledWith(testPeriodId, testStatementId);
+  });
+
+  // Value: protects=a statement whose lines did not add up to its totals on both reads is not rendered or printed;
+  // fails_when=the loader maps the "unreconciled" failure to a rendered payslip or to the generic read error;
+  // why_new=reconciliation is new: totals on the payslip are summed from lines;
+  // seam=@/features/payroll/data mocked to return the reconcile failure; no_claim=the re-read itself is covered in payroll-period-details-data.test.ts
+  it("TEST 14: fails closed when the statement lines do not reconcile", async () => {
+    mockPermissions.mockResolvedValue({ ok: true, permissions: ["payroll.view", "payroll.manage"] });
+    mockAuthUser.mockResolvedValue({ ok: true, user: { id: "admin-user" } });
+    mockStatementDetails.mockResolvedValue({ ok: false, reason: "unreconciled" });
+
+    const result = await getPayslipDocumentData(testPeriodId, testStatementId);
+
+    expect(result).toMatchObject({ error: "STATEMENT_CALCULATION_MISMATCH", ok: false });
+  });
+
+  // Value: protects=a printed payslip never shows lương khoán below the part already paid in lương cứng (a negative "cộng thêm");
+  // fails_when=summarizePiecework stops flagging a negative added amount, or the loader renders the payslip anyway;
+  // why_new=v0.39 printed earned − absorbed even when negative;
+  // seam=module mocks as in TEST 11; no_claim=does not cover the /payroll dialog or live card (component tests do)
+  it("TEST 15: fails closed when lương khoán is below the offset", async () => {
+    mockPermissions.mockResolvedValue({ ok: true, permissions: ["payroll.view", "payroll.manage"] });
+    mockAuthUser.mockResolvedValue({ ok: true, user: { id: "admin-user" } });
+    mockSupabaseClient.mockResolvedValue(emptySupabaseClient());
+    mockStatementDetails.mockResolvedValue(statementDetails([pieceworkPeriod(600_000)]));
+
+    const result = await getPayslipDocumentData(testPeriodId, testStatementId);
+
+    expect(result).toMatchObject({ error: "STATEMENT_CALCULATION_MISMATCH", ok: false });
+  });
+
+  // Value: protects=the printed Lương khoán section adds up: the engine's piecework_vnd is used when it equals the listed rows, and a payslip whose rows disagree (hourly pay the engine counted, a missing line) is refused;
+  // fails_when=the loader prints a snapshot figure the listed rows do not reach (LUONG KHOAN subtotal ≠ rows − offset) or ignores a matching snapshot;
+  // why_new=the snapshot rule is new, and the engine counts hourly_wage while the payslip lists it under Lương theo công;
+  // seam=module mocks as in TEST 11; no_claim=does not prove which lines the engine counted
+  it("TEST 16: uses the offset snapshot when it matches the listed rows and refuses when it does not", async () => {
+    mockPermissions.mockResolvedValue({ ok: true, permissions: ["payroll.view", "payroll.manage"] });
+    mockAuthUser.mockResolvedValue({ ok: true, user: { id: "admin-user" } });
+    mockSupabaseClient.mockResolvedValue(emptySupabaseClient());
+    mockStatementDetails.mockResolvedValueOnce(statementDetails([pieceworkPeriod(900_000)]));
+
+    const result = await getPayslipDocumentData(testPeriodId, testStatementId);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.piecework).toMatchObject({ absorbedVnd: 900_000, addedVnd: 0, earnedVnd: 900_000, kind: "summary" });
+
+    // The engine's 1.000.000 also counts 100.000 of hourly pay listed under Lương theo công.
+    const period = pieceworkPeriod(1_000_000);
+    const statement = period.statements[0];
+    const hourly = { ...statement.lines[0], amountVnd: 100_000, id: "p-hourly", lineType: "hourly_wage" };
+    mockStatementDetails.mockResolvedValueOnce(statementDetails([{
+      ...period,
+      statements: [{ ...statement, lines: [...statement.lines, hourly], payableAmountVnd: 1_600_000, totalEarningsVnd: 2_500_000 }],
+    }]));
+    expect(await getPayslipDocumentData(testPeriodId, testStatementId)).toMatchObject({ error: "STATEMENT_CALCULATION_MISMATCH", ok: false });
+  });
+
+  // Generated by /ship test coverage audit (pass 1).
+  // Value: protects=a failed statement read stays "không tải được" (PDF 404) and a statement the reader neither returns nor reports stale is STATEMENT_NOT_FOUND;
+  // fails_when=the loader maps reason "unavailable" to STATEMENT_CALCULATION_MISMATCH (an outage would ask for a recalculation) or treats staleStatement null as stale;
+  // why_new=TEST 14 covers only reason "unreconciled", and no test reaches STATEMENT_NOT_FOUND since the stale lookup moved into the reader;
+  // seam=none; no_claim=@/features/payroll/data is mocked; does not prove when the RPC reports staleStatement (pgTAP payroll-period-details does)
+  it("TEST 17: reports a failed read and an unknown statement as not found, not as a mismatch or a stale revision", async () => {
+    mockPermissions.mockResolvedValue({ ok: true, permissions: ["payroll.view", "payroll.manage"] });
+    mockAuthUser.mockResolvedValue({ ok: true, user: { id: "admin-user" } });
+
+    mockStatementDetails.mockResolvedValueOnce({ ok: false, reason: "unavailable" });
+    expect(await getPayslipDocumentData(testPeriodId, testStatementId)).toMatchObject({ error: "PERIOD_NOT_FOUND", ok: false });
+
+    mockStatementDetails.mockResolvedValueOnce(statementDetails([{ ...samplePeriod, statements: [] }], null));
+    const missing = await getPayslipDocumentData(testPeriodId, testStatementId);
+    expect(missing).toMatchObject({ error: "STATEMENT_NOT_FOUND", ok: false });
+    expect(missing).not.toHaveProperty("suggestedCurrentStatementId");
+
+    // Extended by /ship test coverage audit (pass 2).
+    // Value: protects=a payslip link to a period the reader does not return (not visible to this viewer, or gone) is "Không tìm thấy kỳ lương yêu cầu.", not a crash;
+    // fails_when=the loader takes the scoped read's periods[0] without checking it (TypeError on [], a 500) or reports the empty read as STATEMENT_NOT_FOUND / a read failure;
+    // why_new=every other case here returns the requested period, so the !period branch was never reached;
+    // seam=none; no_claim=@/features/payroll/data is mocked; when the RPC returns no period is pgTAP's (ordinary viewer cannot read a period without their statement)
+    mockStatementDetails.mockResolvedValueOnce(statementDetails([], null));
+    expect(await getPayslipDocumentData(testPeriodId, testStatementId)).toEqual({
+      error: "PERIOD_NOT_FOUND",
+      message: "Không tìm thấy kỳ lương yêu cầu.",
+      ok: false,
+    });
+  });
+
+  // Generated by /ship test coverage audit (pass 2).
+  // Value: protects=a payslip request without a session or without payroll.view still gets NOT_AUTHENTICATED / PERMISSION_DENIED (PDF 401/403) now that the read runs alongside those checks;
+  // fails_when=the loader drops its own payroll.view check because the RPC enforces it, or handles the read result before the session checks (both give PERIOD_NOT_FOUND, a 404);
+  // why_new=no loader test reaches NOT_AUTHENTICATED or the payroll.view denial; before this change the read started only after both checks passed;
+  // seam=none; no_claim=permissions, auth and @/features/payroll/data are mocked (the read fails as the RPC's 42501 would); the RPC's own refusal is pgTAP's
+  it("TEST 19: session checks still decide the result while the statement read runs alongside them", async () => {
+    mockStatementDetails.mockResolvedValue({ ok: false, reason: "unavailable" });
+
+    mockPermissions.mockResolvedValueOnce({ ok: true, permissions: ["payroll.view"] });
+    mockAuthUser.mockResolvedValueOnce({ error: "session_expired", ok: false });
+    expect(await getPayslipDocumentData(testPeriodId, testStatementId)).toMatchObject({ error: "NOT_AUTHENTICATED", ok: false });
+
+    mockPermissions.mockResolvedValueOnce({ ok: true, permissions: [] });
+    mockAuthUser.mockResolvedValueOnce({ ok: true, user: { id: staffId } });
+    expect(await getPayslipDocumentData(testPeriodId, testStatementId)).toEqual({
+      error: "PERMISSION_DENIED",
+      message: "Tài khoản hiện tại không có quyền xem phiếu lương.",
+      ok: false,
+    });
+  });
+
+  // Value: protects=a payslip link whose ids are not uuids reads as "không tìm thấy", not as a system failure, and never reaches the uuid-typed read;
+  // fails_when=the loader passes a malformed id to the RPC (Postgres 22P02 → reason "unavailable" → "Không tải được phiếu lương") or swaps the period/statement errors;
+  // why_new=the old loader searched periods in memory, so a bad id was simply not found;
+  // seam=@/features/payroll/data mocked; no_claim=does not prove Postgres's uuid parsing (the pattern accepts what the routes generate)
+  it("TEST 18: treats a malformed period or statement id as not found without reading", async () => {
+    mockPermissions.mockResolvedValue({ ok: true, permissions: ["payroll.view", "payroll.manage"] });
+    mockAuthUser.mockResolvedValue({ ok: true, user: { id: "admin-user" } });
+    mockStatementDetails.mockClear();
+
+    expect(await getPayslipDocumentData("not-a-period", testStatementId)).toMatchObject({ error: "PERIOD_NOT_FOUND", message: "Không tìm thấy kỳ lương yêu cầu.", ok: false });
+    expect(await getPayslipDocumentData(testPeriodId, "statement-x")).toMatchObject({ error: "STATEMENT_NOT_FOUND", ok: false });
+    expect(mockStatementDetails).not.toHaveBeenCalled();
   });
 
   // Value: protects=the downloaded PDF payslip lists the 85% floor inside "LUONG KHOAN", manual corrections under "DIEU CHINH", and keeps "KHAU TRU" to real deductions (advances);
@@ -465,7 +624,7 @@ describe("getPayslipDocumentData", () => {
       employee: { avatarUrl: null, bankAccount: null, department: null, displayName: "Trần Văn Linh", employeeCode: "NV17", joinedAt: null, positionLabel: "Trợ lý vận hành", staffId: "staff-1" },
       isStale: false,
       period: { currentRevision: 1, feedbackClosedAt: null, feedbackOpenedAt: null, id: "period-1", lastCalculatedAt: null, payDate: "2026-10-05", payDateFormatted: "05/10/2026", periodEndDate: "30/09/2026", periodMonth: "2026-09-01", periodMonthFormatted: "THÁNG 09/2026", periodStartDate: "01/09/2026", status: "draft", statusLabel: "Bản nháp" },
-      piecework: { absorbedVnd: 900_000, addedVnd: 0, baseSalaryVnd: 1_500_000, earnedVnd: 900_000, floorBasisPoints: 8_500, thresholdVnd: 1_275_000 },
+      piecework: { absorbedVnd: 900_000, addedVnd: 0, baseSalaryVnd: 1_500_000, earnedVnd: 900_000, floorBasisPoints: 8_500, kind: "summary", thresholdVnd: 1_275_000 },
       statementId: "statement-1",
       totals: { amountInWords: "-", grossFormatted: "1.530.000 VND", grossVnd: 1_530_000, netFormatted: "1.330.000 VND", netVnd: 1_330_000, totalDeductionsFormatted: "200.000 VND", totalDeductionsVnd: 200_000, workHours: 0, workMinutes: 0, workUnits: 0 },
     }));
@@ -546,7 +705,7 @@ describe("generatePayslipPdf sections", () => {
         pdfItem("k4", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 1_075_000),
         pdfItem("k5", "payroll_processing_bonus", "Thưởng tính lương nhân sự", 525_000),
       ],
-      piecework: { absorbedVnd: 2_040_000, addedVnd: 760_000, baseSalaryVnd: 2_400_000, earnedVnd: 2_800_000, floorBasisPoints: 8_500, thresholdVnd: 2_040_000 },
+      piecework: { absorbedVnd: 2_040_000, addedVnd: 760_000, baseSalaryVnd: 2_400_000, earnedVnd: 2_800_000, floorBasisPoints: 8_500, kind: "summary", thresholdVnd: 2_040_000 },
     }), "LUONG KHOAN", "TONG THU NHAP");
 
     expect(texts.slice(0, 2)).toEqual(["LUONG KHOAN", "760.000 VND"]);
@@ -603,7 +762,7 @@ describe("generatePayslipPdf sections", () => {
         pdfItem("g2", "grading_bonus", "Thưởng chấm bài", 244_660),
         pdfItem("g3", "operations_grade_renewal_bonus", "Thưởng tái phí khối phụ trách", 700_000),
       ],
-      piecework: { absorbedVnd: 900_000, addedVnd: 0, baseSalaryVnd: 1_500_000, earnedVnd: 900_000, floorBasisPoints: 8_500, thresholdVnd: 1_275_000 },
+      piecework: { absorbedVnd: 900_000, addedVnd: 0, baseSalaryVnd: 1_500_000, earnedVnd: 900_000, floorBasisPoints: 8_500, kind: "summary", thresholdVnd: 1_275_000 },
     })));
 
     expect(pdf).not.toContain("(CHAM BAI) Tj");
@@ -635,7 +794,7 @@ describe("generatePayslipPdf sections", () => {
   it("draws only printable ASCII bytes, mapping ×, dashes and quotes", () => {
     const bytes = generatePayslipPdf(pdfData({
       adjustments: [pdfItem("a1", "manual_reward", "Điều chỉnh tăng", 150_000, "earning", "Phụ cấp “điện thoại” 10 ca × 15.000 – tháng 9…")],
-      piecework: { absorbedVnd: 2_040_000, addedVnd: 760_000, baseSalaryVnd: 2_400_000, earnedVnd: 2_800_000, floorBasisPoints: 8_500, thresholdVnd: 2_040_000 },
+      piecework: { absorbedVnd: 2_040_000, addedVnd: 760_000, baseSalaryVnd: 2_400_000, earnedVnd: 2_800_000, floorBasisPoints: 8_500, kind: "summary", thresholdVnd: 2_040_000 },
     }));
 
     expect([...bytes].filter((byte) => byte > 0x7e)).toEqual([]);

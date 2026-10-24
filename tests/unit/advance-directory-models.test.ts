@@ -116,7 +116,8 @@ describe("row actions and Cần xử lý", () => {
     expect(getAdvanceRowAction(deducted, staffMember, { canViewPayroll: false })).toEqual({ kind: "view", payrollPeriodId: null });
     expect(getAdvanceRowAction(advance("no-period", { status: "deducted" }), owner, { canViewPayroll: true })).toEqual({ kind: "view", payrollPeriodId: null });
     expect(getAdvanceRowAction(advance("approved", { deductionPayrollPeriodId: "x", status: "approved" }), owner, { canViewPayroll: true })).toEqual({ kind: "view", payrollPeriodId: null });
-    expect(getPayrollPeriodHref("period-9")).toBe("/payroll#payroll-period-period-9");
+    // /payroll loads only recent and open periods, so the link names the period as well as anchoring it.
+    expect(getPayrollPeriodHref("period-9")).toBe("/payroll?period=period-9#payroll-period-period-9");
   });
 });
 
