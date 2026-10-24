@@ -1040,6 +1040,18 @@
 
 ## Bảng lương
 
+### Đọc dữ liệu bảng lương theo từng kỳ thay vì cả lịch sử
+
+**What:** Cho `get_payroll_periods_with_details` (hoặc một RPC mới) nhận kỳ hoặc phiếu lương cần đọc; trang phiếu lương và route PDF chỉ đọc đúng phiếu đó, trang `/payroll` chỉ đọc vài kỳ gần nhất và tải kỳ cũ khi mở. Sau khi đọc, kiểm tra tổng các dòng khớp tổng của phiếu; lệch thì đọc lại một lần rồi báo lỗi.
+
+**Why:** Từ v0.39.0.0, Tổng thu nhập và Khấu trừ trên phiếu tính từ các dòng lương, nên `src/features/payroll/data.ts` đọc RPC theo trang 500 dòng để không bị cắt ở 1.000 dòng. Mỗi trang chạy lại toàn bộ RPC, số trang tăng theo lịch sử, và các trang không cùng một lần đọc: nếu có người tính lại hoặc thêm điều chỉnh giữa hai trang, một dòng có thể bị sót (dòng trùng đã được loại). Trang `/payroll` cũng gửi toàn bộ lịch sử xuống trình duyệt.
+
+**Context:** Review /ship v0.39.0.0 (red team, adversarial, performance). Cùng lúc nên: lấy "Lương khoán đạt" từ `formula_snapshot.piecework_vnd` của dòng `piecework_offset` thay vì cộng lại từ các dòng (`payslip-sections.ts` `summarizePiecework`); cộng tạm ứng của nhân sự chưa có vị trí vào dòng `__unassigned__` trong `owner-live-estimate-overview.tsx` (`advancesByPosition`). Màn chủ trung tâm đang giả định chỉ có 3 loại dòng khấu trừ (ghi chú trong `overview-model.ts`).
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** None
+
 ### Số liệu đầu trang Dashboard lương lệch với số tạm tính trực tiếp
 
 **What:** Lấy tiêu đề, nhãn trạng thái và dải số liệu từ cùng một nguồn với khối tạm tính trực tiếp (hoặc ghi rõ thời điểm chụp số liệu).
