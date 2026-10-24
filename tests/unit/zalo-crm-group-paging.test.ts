@@ -69,10 +69,11 @@ describe("listAllZaloGroups", () => {
     expect(result.ok && result.data.groups).toHaveLength(200);
     expect(result.ok && result.data).toMatchObject({ total: 500, truncated: true });
 
-    // An error mid-way fails the whole read (no partial list to match against).
+    // An error mid-way fails the whole read (no partial list to match against). Pages after the
+    // first are read 5 at a time, so page 3 was already requested alongside the failing page 2.
     fetchMock = stubCrm(250, [100, 100, 50], 2);
     result = await listAllZaloGroups("acc-test");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(result).toEqual({ error: "CRM tam thoi loi.", ok: false });
   });
 

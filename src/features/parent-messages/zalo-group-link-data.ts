@@ -3,14 +3,15 @@ import "server-only";
 import {
   matchStudentsToGroups,
   normalizePhone,
+  type GroupCandidate,
   type MatchStudent,
   type StudentGroupMatch,
 } from "@/features/parent-messages/zalo-group-matching";
-import { getSystemSettings } from "@/features/settings/system-settings-data";
+import { getSystemSettings, getZaloCenterAccountId } from "@/features/settings/system-settings-data";
 import { compareStudentNames } from "@/lib/student-order";
 import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isZaloCrmConfigured, listAllZaloGroups, listZaloAccounts, type ZaloCrmAccount } from "@/lib/zalo-crm";
+import { isZaloCrmConfigured, listAllZaloGroupsCached, listZaloAccounts, type ZaloCrmAccount } from "@/lib/zalo-crm";
 
 /** Students who attend sessions now; only they get absence and comment messages. */
 const STUDYING_STATUSES = ["active", "resumed"] as const;
@@ -74,8 +75,7 @@ export async function getZaloGroupLinkWorkspace({
   includeGuardianDetails: boolean;
 }): Promise<ZaloGroupLinkWorkspaceResult> {
   const supabase = await createSupabaseServerClient();
-  const settings = await getSystemSettings();
-  const centerAccountId = settings["zalo.center_account_id"].trim();
+  const [settings, centerAccountId] = await Promise.all([getSystemSettings(), getZaloCenterAccountId()]);
   const configured = isZaloCrmConfigured();
 
   const [studentsResult, guardianLinksResult, guardiansResult, enrollmentsResult, classesResult] = await Promise.all([
@@ -168,7 +168,7 @@ export async function getZaloGroupLinkWorkspace({
   // Same gate as checklist step 3: no groups (and no table) until the center nick is in ZaloCRM and connected.
   if (!centerAccountId || status.centerAccount?.status !== "connected") return { data: { matches: [], status, students }, ok: true };
 
-  const groups = await listAllZaloGroups(centerAccountId);
+  const groups = await listAllZaloGroupsCached(centerAccountId);
   if (!groups.ok) {
     status.groupsError = groups.error;
     return { data: { matches: [], status, students }, ok: true };
@@ -188,5 +188,11 @@ export async function getZaloGroupLinkWorkspace({
   const freeGroups = groups.data.groups
     .filter((group) => !linkedThreads.has(group.externalThreadId))
     .map(({ externalThreadId, groupMembersCount, groupName, zaloAccountId }) => ({ externalThreadId, groupMembersCount, groupName, zaloAccountId }));
-  return { data: { matches: matchStudentsToGroups(unlinked.map(toMatchStudent), freeGroups, rivals), status, students }, ok: true };
+  let matches = matchStudentsToGroups(unlinked.map(toMatchStudent), freeGroups, rivals);
+  if (!includeGuardianDetails) {
+    // Guardian names and phones still steer the matching, but the page never learns which group matched a guardian.
+    const strip = (candidate: GroupCandidate) => ({ ...candidate, reasons: candidate.reasons.filter((reason) => !reason.startsWith("guardian_")) });
+    matches = matches.map((match) => ({ ...match, candidates: match.candidates.map(strip), suggestion: match.suggestion && strip(match.suggestion) }));
+  }
+  return { data: { matches, status, students }, ok: true };
 }

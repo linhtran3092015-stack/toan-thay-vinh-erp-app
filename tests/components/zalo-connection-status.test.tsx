@@ -30,9 +30,10 @@ const DONE = "Xong";
 const TODO = "Cần làm";
 const ERROR = "Lỗi";
 const WAIT = "Chờ bước trên";
+const SHORT = "Chưa đủ";
 
 function stepStates(): string[] {
-  return screen.getAllByRole("listitem").map((item) => within(item).getByText(/^(Xong|Cần làm|Lỗi|Chờ bước trên)$/).textContent ?? "");
+  return screen.getAllByRole("listitem").map((item) => within(item).getByText(/^(Xong|Cần làm|Lỗi|Chờ bước trên|Chưa đủ)$/).textContent ?? "");
 }
 
 afterEach(cleanup);
@@ -78,7 +79,7 @@ describe("ZaloConnectionStatusCard", () => {
       },
       {
         detail: /^Nick trung tâm có 3000 nhóm Zalo; lần này chỉ đọc được 1800 nhóm/,
-        expected: [DONE, DONE, DONE, DONE, DONE],
+        expected: [DONE, DONE, DONE, SHORT, DONE],
         name: "ready, truncated, all linked",
         status: { ...ready, groupsListed: 1800, groupsTotal: 3000, groupsTruncated: true, linkedStudents: 10, studyingStudents: 10 },
       },

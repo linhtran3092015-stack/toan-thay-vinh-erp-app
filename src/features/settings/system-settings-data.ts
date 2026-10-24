@@ -12,6 +12,18 @@ export async function getSystemSettings(): Promise<SystemSettings> {
   return parseSystemSettings(data);
 }
 
+/**
+ * The Zalo nick parent messages go out from (owner decision 13/10/2026),
+ * trimmed; "" when not chosen or not readable. Read through a narrow RPC:
+ * system_settings RLS needs settings.view, which staff who link groups
+ * (students.update) may not have.
+ */
+export async function getZaloCenterAccountId(): Promise<string> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("get_zalo_center_account_id");
+  return !error && typeof data === "string" ? data.trim() : "";
+}
+
 /** A deliberately narrow, non-secret branding reader for the authenticated app shell. */
 async function _getCenterDisplayName(): Promise<string> {
   const supabase = await createSupabaseServerClient();

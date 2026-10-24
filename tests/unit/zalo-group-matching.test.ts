@@ -193,4 +193,62 @@ describe("matchStudentsToGroups", () => {
     const result = byStudent(matchStudentsToGroups([student("1", "An")], [group("g1", "Lớp An Khang"), group("g2", null)]));
     expect(result["1"].confidence).toBe("none");
   });
+
+  // Value: protects=each tie-break and gate in the rewritten matcher (stronger guardian-only pair, assigned student's second group, one student on two groups, member cap, toneless+guardian name, NFC);
+  // fails_when=any of those branches is removed (each case was red under its mutant in review); why_new=cycle-2 testing review; seam=none; no_claim=real group names
+  it("lets a stronger guardian-only pair block the group for a name-only student", () => {
+    const result = byStudent(
+      matchStudentsToGroups(
+        [student("1", "Phạm Gia Bảo", { guardians: [{ fullName: "Trần Thị Hoa", phones: ["0912345678"] }] }), student("2", "Nguyễn Văn An")],
+        [group("g1", "PH Trần Thị Hoa 0912345678 - Nguyễn Văn An")],
+      ),
+    );
+    expect(result["1"].confidence).toBe("ambiguous");
+    expect(result["2"].confidence).toBe("ambiguous");
+  });
+
+  it("does not hand a second group naming an assigned student to a namesake", () => {
+    const result = byStudent(
+      matchStudentsToGroups(
+        [student("1", "Đỗ Quang Huy", { guardians: [{ fullName: "Đỗ Văn Tú", phones: ["0911222333"] }] }), student("2", "Đỗ Quang Huy")],
+        [group("g1", "SLL Đỗ Quang Huy 0911222333"), group("g2", "SLL Đỗ Quang Huy lớp 7")],
+      ),
+    );
+    expect(result["1"].suggestion?.group.externalThreadId).toBe("g1");
+    expect(result["2"].confidence).toBe("ambiguous");
+  });
+
+  it("does not pre-select when one student matches two groups equally", () => {
+    const result = byStudent(matchStudentsToGroups([student("1", "Nguyễn Văn An")], [group("g1", "SLL Nguyễn Văn An"), group("g2", "Nhóm Nguyễn Văn An (cũ)")]));
+    expect(result["1"].confidence).toBe("ambiguous");
+    expect(result["1"].candidates).toHaveLength(2);
+  });
+
+  it.each([
+    [15, "sure"],
+    [16, "ambiguous"],
+    [null, "sure"],
+  ] as const)("treats a group with %s members as %s", (members, confidence) => {
+    const result = byStudent(matchStudentsToGroups([student("1", "Nguyễn Văn An")], [group("g1", "SLL Nguyễn Văn An", members)]));
+    expect(result["1"].confidence).toBe(confidence);
+  });
+
+  it("does not pre-select a toneless name confirmed only by a guardian name", () => {
+    const result = byStudent(
+      matchStudentsToGroups([student("1", "Nguyễn Văn An", { guardians: [{ fullName: "Trần Thị Hoa", phones: [] }] })], [group("g1", "SLL Nguyen Van An - PH Tran Thi Hoa")]),
+    );
+    expect(result["1"].confidence).toBe("ambiguous");
+  });
+
+  it("matches a group name typed with decomposed tone marks exactly", () => {
+    const result = byStudent(matchStudentsToGroups([student("1", "Lê Văn Hùng")], [group("g1", "SLL Lê Văn Hùng".normalize("NFD"))]));
+    expect(result["1"].suggestion?.reasons).toEqual(["student_name"]);
+  });
+
+  it.each([
+    ["SLL An 0212 345 678", []],
+    ["SLL An 0912-345-678", ["0912345678"]],
+  ])("extracts phones from %j", (name, expected) => {
+    expect(extractPhones(name)).toEqual(expected);
+  });
 });

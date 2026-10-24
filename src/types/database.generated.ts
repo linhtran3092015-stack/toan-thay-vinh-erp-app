@@ -10671,6 +10671,7 @@ export type Database = {
         Args: { p_week_start: string }
         Returns: Json
       }
+      get_zalo_center_account_id: { Args: never; Returns: string }
       grading_rank_label: { Args: { p_score: number }; Returns: string }
       grading_raw_score: {
         Args: { p_answer_key: Json; p_verdicts: Json }

@@ -76,35 +76,66 @@ export async function searchZaloGroups(input: {
 
 /** ZaloCRM caps a page at 100 conversations. */
 const GROUP_PAGE_SIZE = 100;
+/** Pages read at once after the first one. */
+const GROUP_PAGE_CONCURRENCY = 5;
+/** One CRM call may run this long (see `call`). */
+const CALL_TIMEOUT_MS = 15_000;
+/**
+ * Paging stops starting new calls once a call could end after this budget,
+ * so 25 s + one 15 s call still leaves room inside the page's 60 s limit for
+ * the database reads, the nick check and matching.
+ */
+export const GROUP_READ_BUDGET_MS = 25_000;
+
+type GroupListResult = ZaloCrmResult<{ groups: ZaloCrmGroup[]; total: number; truncated: boolean }>;
 
 /**
- * Every group conversation of one nick, page by page (bulk linking matches
- * against all of them). Stops after `maxPages` or once `budgetMs` is spent,
- * leaving time for the rest of the page, and says so with `truncated`. The
- * CRM orders by last message, so a group that moves between pages can come
- * back twice: duplicates are dropped by thread id.
+ * Every group conversation of one nick: page 1 gives the total, the rest are
+ * read 5 at a time. Stops at `maxPages` or when the time budget runs out and
+ * says so with `truncated`. The CRM orders by last message, so a group that
+ * moves between pages can come back twice: duplicates are dropped by thread id.
  */
-export async function listAllZaloGroups(
-  zaloAccountId: string,
-  maxPages = 30,
-  budgetMs = 40_000,
-): Promise<ZaloCrmResult<{ groups: ZaloCrmGroup[]; total: number; truncated: boolean }>> {
+export async function listAllZaloGroups(zaloAccountId: string, maxPages = 30, budgetMs = GROUP_READ_BUDGET_MS): Promise<GroupListResult> {
   // Without a nick the CRM would return every nick's groups, and staff could link a group the center nick is not in.
   if (!zaloAccountId.trim()) return { error: "Chưa chọn nick trung tâm.", ok: false };
   const deadline = Date.now() + budgetMs;
+  const first = await searchZaloGroups({ limit: GROUP_PAGE_SIZE, page: 1, zaloAccountId });
+  if (!first.ok) return first;
+  const total = first.data.total;
   const byThread = new Map<string, ZaloCrmGroup>();
-  let total = 0;
-  for (let page = 1; page <= maxPages; page += 1) {
-    if (page > 1 && Date.now() > deadline) break;
-    const result = await searchZaloGroups({ limit: GROUP_PAGE_SIZE, page, zaloAccountId });
-    if (!result.ok) return result;
-    total = result.data.total;
-    for (const group of result.data.groups) if (!byThread.has(group.externalThreadId)) byThread.set(group.externalThreadId, group);
-    if (result.data.groups.length < GROUP_PAGE_SIZE || page * GROUP_PAGE_SIZE >= total) {
-      return { data: { groups: [...byThread.values()], total, truncated: false }, ok: true };
+  const keep = (groups: ZaloCrmGroup[]) => {
+    for (const group of groups) if (!byThread.has(group.externalThreadId)) byThread.set(group.externalThreadId, group);
+  };
+  keep(first.data.groups);
+  const lastPage = Math.min(maxPages, Math.ceil(total / GROUP_PAGE_SIZE));
+  let truncated = Math.ceil(total / GROUP_PAGE_SIZE) > maxPages;
+  if (first.data.groups.length < GROUP_PAGE_SIZE) return { data: { groups: [...byThread.values()], total, truncated: false }, ok: true };
+  for (let page = 2; page <= lastPage; page += GROUP_PAGE_CONCURRENCY) {
+    if (Date.now() + CALL_TIMEOUT_MS > deadline) {
+      truncated = true;
+      break;
+    }
+    const pages = Array.from({ length: Math.min(GROUP_PAGE_CONCURRENCY, lastPage - page + 1) }, (_, index) => page + index);
+    const results = await Promise.all(pages.map((number) => searchZaloGroups({ limit: GROUP_PAGE_SIZE, page: number, zaloAccountId })));
+    for (const result of results) {
+      if (!result.ok) return result;
+      keep(result.data.groups);
     }
   }
-  return { data: { groups: [...byThread.values()], total, truncated: true }, ok: true };
+  return { data: { groups: [...byThread.values()], total, truncated }, ok: true };
+}
+
+/** Group lists for matching, kept 60 s per nick so a refresh after each link does not re-read every page. */
+const GROUP_CACHE_TTL_MS = 60_000;
+const groupCache = new Map<string, { at: number; result: GroupListResult }>();
+
+export async function listAllZaloGroupsCached(zaloAccountId: string): Promise<GroupListResult> {
+  const cached = groupCache.get(zaloAccountId);
+  if (cached && Date.now() - cached.at < GROUP_CACHE_TTL_MS) return cached.result;
+  const result = await listAllZaloGroups(zaloAccountId);
+  // Only complete reads are kept; an error or a truncated read is retried next time.
+  if (result.ok && !result.data.truncated) groupCache.set(zaloAccountId, { at: Date.now(), result });
+  return result;
 }
 
 export async function getZaloGroupByThread(

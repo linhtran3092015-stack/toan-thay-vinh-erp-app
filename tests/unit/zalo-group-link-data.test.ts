@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   isZaloCrmConfigured: vi.fn(),
+  centerAccountId: vi.fn(),
   listAllZaloGroups: vi.fn(),
   listZaloAccounts: vi.fn(),
   queries: [] as { filters: string[]; table: string }[],
@@ -33,10 +34,10 @@ function query(table: string) {
 }
 
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: async () => ({ from: query }) }));
-vi.mock("@/features/settings/system-settings-data", () => ({ getSystemSettings: mocks.settings }));
+vi.mock("@/features/settings/system-settings-data", () => ({ getSystemSettings: mocks.settings, getZaloCenterAccountId: mocks.centerAccountId }));
 vi.mock("@/lib/zalo-crm", () => ({
   isZaloCrmConfigured: mocks.isZaloCrmConfigured,
-  listAllZaloGroups: mocks.listAllZaloGroups,
+  listAllZaloGroupsCached: mocks.listAllZaloGroups,
   listZaloAccounts: mocks.listZaloAccounts,
 }));
 
@@ -60,6 +61,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.queries.length = 0;
   mocks.settings.mockResolvedValue({ "zalo.center_account_id": " acc-center ", "zalo.center_account_name": "Nick Mau" });
+  mocks.centerAccountId.mockResolvedValue("acc-center");
   mocks.isZaloCrmConfigured.mockReturnValue(true);
   mocks.listZaloAccounts.mockResolvedValue({ data: [{ ...centerAccount, id: "acc-other" }, centerAccount], ok: true });
   mocks.tables = {
@@ -146,6 +148,7 @@ describe("getZaloGroupLinkWorkspace", () => {
 
     // No center nick chosen: never list groups (the CRM would return every nick's groups).
     mocks.settings.mockResolvedValueOnce({ "zalo.center_account_id": "   ", "zalo.center_account_name": "" });
+    mocks.centerAccountId.mockResolvedValueOnce("");
     result = await getZaloGroupLinkWorkspace({ includeGuardianDetails: true });
     expect(result.ok && result.data.status).toMatchObject({ centerAccount: null, centerAccountId: "", crmError: null, groupsTotal: null });
     expect(result.ok && result.data.matches).toEqual([]);
@@ -242,5 +245,14 @@ describe("getZaloGroupLinkWorkspace", () => {
     expect(an?.confidence).toBe("ambiguous");
     expect(result.data.matches.map((match) => match.studentId)).not.toContain("70000000-0000-4000-8000-000000000010");
     expect(result.data.students.map((student) => student.guardianSummary)).toEqual(["", "", ""]);
+    // No guardian association reaches the page either.
+    const reasons = result.data.matches.flatMap((match) => match.candidates.flatMap((candidate) => candidate.reasons));
+    expect(reasons.some((reason) => reason.startsWith("guardian_"))).toBe(false);
+  });
+
+  it("reports how many groups were read when the CRM read is truncated", async () => {
+    mocks.listAllZaloGroups.mockResolvedValueOnce({ data: { groups: [group("thread-an", "SLL Nguyễn Thị An")], total: 5, truncated: true }, ok: true });
+    const result = await getZaloGroupLinkWorkspace({ includeGuardianDetails: true });
+    expect(result.ok && result.data.status).toMatchObject({ groupsListed: 1, groupsTotal: 5, groupsTruncated: true });
   });
 });

@@ -56,13 +56,11 @@ function candidateLabel(candidate: GroupCandidate): string {
  * still on the page with a group from their own candidate list are sent.
  */
 export function ZaloGroupBulkLinker({
-  centerAccountId,
   linkAction = linkStudentZaloGroupsAction,
   matches,
   showGuardians,
   students,
 }: {
-  centerAccountId: string;
   /** The /dev/zalo-groups preview passes an inert stub. */
   linkAction?: typeof linkStudentZaloGroupsAction;
   matches: StudentGroupMatch[];
@@ -73,6 +71,7 @@ export function ZaloGroupBulkLinker({
   const router = useRouter();
   const searchId = useId();
   const summaryId = useId();
+  const countId = useId();
   const bannerRef = useRef<HTMLDivElement>(null);
   const matchByStudent = useMemo(() => new Map(matches.map((match) => [match.studentId, match])), [matches]);
   const counts = useMemo(() => {
@@ -124,7 +123,16 @@ export function ZaloGroupBulkLinker({
   const visibleChecked = visibleSelectable.filter((student) => checked.has(student.id)).length;
   const allVisibleChecked = visibleSelectable.length > 0 && visibleChecked === visibleSelectable.length;
 
+  const clearError = (studentId: string) =>
+    setErrors((current) => {
+      if (!(studentId in current)) return current;
+      const next = { ...current };
+      delete next[studentId];
+      return next;
+    });
+
   const toggle = (studentId: string) => {
+    clearError(studentId);
     setChecked((current) => {
       const next = new Set(current);
       if (next.has(studentId)) next.delete(studentId);
@@ -145,6 +153,7 @@ export function ZaloGroupBulkLinker({
   };
 
   const choose = (studentId: string, threadId: string) => {
+    clearError(studentId);
     setChosen((current) => ({ ...current, [studentId]: threadId }));
     setChecked((current) => {
       const next = new Set(current);
@@ -234,7 +243,7 @@ export function ZaloGroupBulkLinker({
       ) : null}
 
       <div aria-live="polite" className="flex flex-wrap items-center gap-3 rounded-lg border border-border-subtle bg-surface-sunken px-4 py-2.5" id={summaryId}>
-        <p className="text-secondary text-text-strong">
+        <p className="text-secondary text-text-strong" id={countId}>
           Đã chọn <strong>{ready.length}</strong> học sinh có nhóm
           {readyVisible < ready.length ? ` (${readyVisible} đang hiển thị, ${ready.length - readyVisible} bị ẩn bởi bộ lọc)` : null}
           {duplicates > 0 ? <span className="text-danger"> · {duplicates} nhóm đang được chọn cho nhiều học sinh</span> : null}
@@ -242,7 +251,7 @@ export function ZaloGroupBulkLinker({
         </p>
         {progress ? <p className="text-secondary text-text-muted">{progress}</p> : null}
         <Button
-          aria-describedby={summaryId}
+          aria-describedby={countId}
           className="ml-auto max-md:h-11"
           disabled={isPending || ready.length === 0 || duplicates > 0}
           isLoading={isPending}
@@ -314,10 +323,9 @@ export function ZaloGroupBulkLinker({
                   ) : null}
                   {match?.confidence !== "sure" ? (
                     <StudentZaloGroupLinkDialog
-                      centerAccountId={centerAccountId}
                       configured
                       currentThreadId={null}
-                      currentZaloAccountId={null}
+                      onLinked={(message) => setBanner({ message, ok: true })}
                       studentId={student.id}
                       studentName={student.fullName}
                       triggerLabel="Tìm nhóm"
@@ -348,7 +356,7 @@ export function ZaloGroupBulkLinker({
           <tr>
             <TableHeaderCell className="w-12">
               <input
-                aria-describedby={summaryId}
+                aria-describedby={countId}
                 aria-label="Chọn tất cả học sinh đang hiển thị có nhóm"
                 checked={allVisibleChecked}
                 className={checkboxClassName}

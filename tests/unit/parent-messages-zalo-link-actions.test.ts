@@ -15,16 +15,22 @@ const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
   searchZaloGroups: vi.fn(),
   settings: vi.fn(),
+  studentRow: vi.fn(),
 }));
 
 vi.mock("@/lib/permissions/database-permissions", () => ({ getDatabasePermissions: mocks.permissions }));
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
-    from: () => ({ select: () => ({ in: (_column: string, ids: string[]) => mocks.currentStudents(ids) }) }),
+    from: () => ({
+      select: () => ({
+        eq: (_column: string, id: string) => ({ maybeSingle: async () => mocks.studentRow(id) }),
+        in: (_column: string, ids: string[]) => mocks.currentStudents(ids),
+      }),
+    }),
     rpc: mocks.rpc,
   }),
 }));
-vi.mock("@/features/settings/system-settings-data", () => ({ getSystemSettings: mocks.settings }));
+vi.mock("@/features/settings/system-settings-data", () => ({ getZaloCenterAccountId: mocks.settings }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
 vi.mock("@/lib/zalo-crm", () => ({
   getZaloGroupByThread: mocks.getZaloGroupByThread,
@@ -55,9 +61,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.permissions.mockResolvedValue({ ok: true, permissions: ["students.view", "students.update"] });
   mocks.rpc.mockResolvedValue({ data: null, error: null });
-  mocks.settings.mockResolvedValue({ "zalo.center_account_id": " acc-center " });
+  mocks.settings.mockResolvedValue("acc-center");
   mocks.currentStudents.mockImplementation(async (ids: string[]) => ({ data: ids.map((id) => ({ id, zalo_group_thread_id: null })), error: null }));
   mocks.searchZaloGroups.mockResolvedValue({ data: { groups: [], total: 0 }, ok: true });
+  mocks.studentRow.mockResolvedValue({ data: { zalo_account_id: "acc-test", zalo_group_thread_id: "thread-1" }, error: null });
   mocks.getZaloGroupByThread.mockResolvedValue({
     data: { groupMembersCount: 3, groupName: "SLL Hoc Sinh Mau", zaloAccount: { status: "connected" } },
     ok: true,
@@ -66,7 +73,7 @@ beforeEach(() => {
 
 describe("Zalo group link actions", () => {
   it("requires students.update before reading a group from ZaloCRM or linking", async () => {
-    const check = { threadId: "thread-1", zaloAccountId: "acc-test" };
+    const check = { studentId: studentId(1) };
 
     mocks.permissions.mockResolvedValue({ ok: true, permissions: ["students.view", "attendance.mark"] });
     const deniedCheck = await checkStudentZaloGroupAction(check);
@@ -89,7 +96,13 @@ describe("Zalo group link actions", () => {
       ok: true,
       present: true,
     });
+    // Thread and nick come from the student row, not the caller.
     expect(mocks.getZaloGroupByThread).toHaveBeenCalledWith("thread-1", "acc-test");
+    mocks.studentRow.mockResolvedValueOnce({ data: { zalo_account_id: null, zalo_group_thread_id: "thread-9" }, error: null });
+    await checkStudentZaloGroupAction(check);
+    expect(mocks.getZaloGroupByThread).toHaveBeenLastCalledWith("thread-9", "acc-center");
+    mocks.studentRow.mockResolvedValueOnce({ data: { zalo_account_id: null, zalo_group_thread_id: null }, error: null });
+    expect(await checkStudentZaloGroupAction(check)).toEqual({ message: "Học sinh chưa liên kết nhóm.", ok: false });
   });
 
   it("rejects malformed and duplicate batches before any RPC", async () => {
@@ -164,15 +177,20 @@ describe("Zalo group link actions", () => {
       data: [
         { id: studentId(1), zalo_group_thread_id: "thread-from-profile" },
         { id: studentId(2), zalo_group_thread_id: null },
+        // Retry after a lost response: the student already has this very group.
+        { id: studentId(4), zalo_group_thread_id: "thread-4" },
       ],
       error: null,
     });
-    const result = await linkStudentZaloGroupsAction({ links: [link(1), link(2)] });
+    // Student 3 is missing from the read (RLS hides it): refused, never treated as unlinked.
+    const result = await linkStudentZaloGroupsAction({ links: [link(1), link(2), link(3), link(4)] });
     expect(result).toEqual({
       ok: true,
       results: [
         { message: "Học sinh này vừa được liên kết nhóm khác. Tải lại trang để xem.", ok: false, studentId: studentId(1) },
         { message: "Đã liên kết.", ok: true, studentId: studentId(2) },
+        { message: "Không đọc được học sinh này. Tải lại trang.", ok: false, studentId: studentId(3) },
+        { message: "Đã liên kết.", ok: true, studentId: studentId(4) },
       ],
     });
     expect(mocks.rpc).toHaveBeenCalledTimes(1);
@@ -196,7 +214,7 @@ describe("Zalo group link actions", () => {
     await searchZaloGroupsAction({ search: "Hoc Sinh" });
     expect(mocks.searchZaloGroups).toHaveBeenCalledWith({ limit: 20, search: "Hoc Sinh", zaloAccountId: "acc-center" });
 
-    mocks.settings.mockResolvedValue({ "zalo.center_account_id": "  " });
+    mocks.settings.mockResolvedValue("");
     const noNick = "Chưa chọn nick trung tâm. Chọn nick trong Cài đặt → Chung trước khi liên kết nhóm.";
     expect(await linkStudentZaloGroupsAction({ links: [link(6)] })).toEqual({ message: noNick, ok: false });
     expect(await linkStudentZaloGroupAction({ groupName: null, studentId: studentId(6), threadId: "thread-6" })).toEqual({ message: noNick, ok: false });

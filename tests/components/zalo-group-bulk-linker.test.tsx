@@ -54,7 +54,7 @@ function matchesFor(list: ZaloLinkStudent[], groupList: MatchGroup[] = groups) {
 }
 
 function renderLinker({ showGuardians = true }: { showGuardians?: boolean } = {}) {
-  return render(<ZaloGroupBulkLinker centerAccountId="acc-1" matches={matchesFor(students)} showGuardians={showGuardians} students={students} />);
+  return render(<ZaloGroupBulkLinker matches={matchesFor(students)} showGuardians={showGuardians} students={students} />);
 }
 
 afterEach(() => {
@@ -151,7 +151,7 @@ describe("ZaloGroupBulkLinker", () => {
       ok: true,
       results: links.map((link) => ({ message: "Đã liên kết.", ok: true, studentId: link.studentId })),
     }));
-    render(<ZaloGroupBulkLinker centerAccountId="acc-1" matches={matchesFor(many, manyGroups)} showGuardians students={many} />);
+    render(<ZaloGroupBulkLinker matches={matchesFor(many, manyGroups)} showGuardians students={many} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Liên kết 26 học sinh" }));
     await waitFor(() => expect(router.refresh).toHaveBeenCalled());
@@ -197,14 +197,14 @@ describe("ZaloGroupBulkLinker", () => {
     // After a refresh: Bảo was linked from the dialog, and An's group was taken elsewhere.
     const remaining = students.filter((student) => student.id !== ids.bao);
     view.rerender(
-      <ZaloGroupBulkLinker centerAccountId="acc-1" matches={matchesFor(remaining, groups.filter((group) => group.externalThreadId !== "g-an"))} showGuardians students={remaining} />,
+      <ZaloGroupBulkLinker matches={matchesFor(remaining, groups.filter((group) => group.externalThreadId !== "g-an"))} showGuardians students={remaining} />,
     );
     expect(screen.getByRole("button", { name: "Liên kết 0 học sinh" })).toBeDisabled();
   });
 
   it("opens on the first non-empty chip and leaves guardians out without guardians.view", () => {
     const noSure = [linkStudent(ids.minh, "Lê Minh")];
-    render(<ZaloGroupBulkLinker centerAccountId="acc-1" matches={matchesFor(noSure)} showGuardians={false} students={noSure} />);
+    render(<ZaloGroupBulkLinker matches={matchesFor(noSure)} showGuardians={false} students={noSure} />);
     expect(screen.getByRole("button", { name: /Không tìm thấy/ })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Lê Minh")).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Phụ huynh" })).not.toBeInTheDocument();

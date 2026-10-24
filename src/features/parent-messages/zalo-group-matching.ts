@@ -31,7 +31,9 @@ export interface GroupCandidate {
 }
 
 /**
- * `sure`: one best group that no other student ties for; pre-ticked.
+ * `sure`: pre-ticked. Rests on the student's own code, exact name (tone marks kept) or
+ *   toneless name plus a guardian phone; the group has at most MAX_SURE_GROUP_MEMBERS
+ *   members; no other student (rivals included) ties for it or has a stronger claim.
  * `ambiguous`: candidates exist but staff must pick (namesakes, siblings sharing a phone, weak match).
  * `none`: nothing in the group names points at this student.
  */
@@ -58,7 +60,7 @@ export const MAX_BULK_ZALO_LINKS = 25;
 
 /** A "sổ liên lạc" group is the family plus a few staff; a bigger group is a class or broadcast group and is never pre-ticked. */
 export const MAX_SURE_GROUP_MEMBERS = 15;
-/** Pairs below this never block another student's group. */
+/** Pairs below this are never assigned and never block another student's group. */
 const STRONG_SCORE = REASON_SCORE.student_name;
 const MAX_CANDIDATES = 5;
 
@@ -97,6 +99,8 @@ function padded(value: string): string {
 
 interface PreparedStudent {
   code: string;
+  /** Last word of the code, name and guardian names, plus guardian phones: a group must contain one to score at all. */
+  keys: string[];
   exactName: string;
   foldedName: string;
   guardianNames: string[];
@@ -111,10 +115,19 @@ interface PreparedGroup {
   phones: Set<string>;
 }
 
+const lastWord = (value: string) => value.trim().split(" ").pop() ?? "";
+
 function prepareStudent(student: MatchStudent): PreparedStudent {
   const exactName = normalizeExact(student.fullName);
   const foldedName = normalizeForMatch(student.fullName);
+  const phones = student.guardians.flatMap((guardian) => guardian.phones);
   return {
+    keys: [
+      lastWord(normalizeForMatch(student.publicCode)),
+      foldedName.includes(" ") ? lastWord(foldedName) : "",
+      ...student.guardians.map((guardian) => normalizeForMatch(guardian.fullName)).filter((name) => name.includes(" ")).map(lastWord),
+      ...phones,
+    ].filter(Boolean),
     code: padded(normalizeForMatch(student.publicCode)),
     // A one-word name ("An") would match far too many groups.
     exactName: exactName.includes(" ") ? padded(exactName) : "",
@@ -175,14 +188,25 @@ export function matchStudentsToGroups(students: MatchStudent[], groups: MatchGro
       const raw = group.groupName ?? "";
       return { exact: padded(normalizeExact(raw)), folded: padded(normalizeForMatch(raw)), group, phones: new Set(extractPhones(raw)) };
     })
-    .filter((entry) => entry.folded || entry.phones.size > 0);
+    .filter((entry) => entry.folded);
+
+  // Word or phone → groups containing it. Every reason needs one of the student's keys in the
+  // group name (an exact match is also a toneless match), so only those groups are scored.
+  const byKey = new Map<string, PreparedGroup[]>();
+  for (const entry of prepared) {
+    for (const key of new Set([...entry.folded.trim().split(" "), ...entry.phones])) {
+      const list = byKey.get(key) ?? [];
+      list.push(entry);
+      byKey.set(key, list);
+    }
+  }
 
   const pairs: Pair[] = [];
   const pairsByStudent = new Map<string, Pair[]>();
   const pairsByGroup = new Map<string, Pair[]>();
   for (const student of [...students, ...rivals].map(prepareStudent)) {
     const own: Pair[] = [];
-    for (const entry of prepared) {
+    for (const entry of new Set(student.keys.flatMap((key) => byKey.get(key) ?? []))) {
       const reasons = scoreGroup(student, entry);
       if (reasons.length === 0) continue;
       const score = reasons.reduce((sum, reason) => sum + REASON_SCORE[reason], 0);

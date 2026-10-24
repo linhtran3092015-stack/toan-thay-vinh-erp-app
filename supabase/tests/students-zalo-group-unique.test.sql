@@ -1,8 +1,9 @@
 begin;
-select plan(5);
+select plan(8);
 
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at) values
-  ('2f100000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'zalo-unique-owner@example.test', '{"provider":"email"}', '{}', now(), now());
+  ('2f100000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'zalo-unique-owner@example.test', '{"provider":"email"}', '{}', now(), now()),
+  ('2f100000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'zalo-unique-norole@example.test', '{"provider":"email"}', '{}', now(), now());
 insert into public.user_role_assignments (user_id, role_id, assignment_reason)
 select '2f100000-0000-4000-8000-000000000001', id, 'fixture' from public.roles where code = 'owner';
 select set_config('request.jwt.claim.sub', '2f100000-0000-4000-8000-000000000001', true);
@@ -31,6 +32,12 @@ select lives_ok(
 select lives_ok(
   $$select public.link_student_zalo_group('2f100000-0000-4000-8000-000000000042', 'g-unique-1', 'nick-center', 'SLL Khang')$$,
   'a freed group can be linked to another student');
+
+-- Center nick: readable by staff who link or send, refused to an account with no role.
+select lives_ok($$select public.update_system_settings('{"zalo.center_account_id":" nick-center "}'::jsonb)$$, 'owner stores the center nick');
+select is(public.get_zalo_center_account_id(), 'nick-center', 'the center nick comes back trimmed');
+select set_config('request.jwt.claim.sub', '2f100000-0000-4000-8000-000000000002', true);
+select throws_ok($$select public.get_zalo_center_account_id()$$, '42501', 'ZALO_CENTER_ACCOUNT_PERMISSION_DENIED', 'an account without link or send rights cannot read it');
 
 select * from finish();
 rollback;

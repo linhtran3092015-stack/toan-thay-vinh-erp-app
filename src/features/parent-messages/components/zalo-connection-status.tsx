@@ -5,12 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ZaloConnectionStatus } from "@/features/parent-messages/zalo-group-link-data";
 
-type StepState = "ok" | "todo" | "error" | "waiting";
+type StepState = "ok" | "warn" | "todo" | "error" | "waiting";
 
 const stateMeta: Record<StepState, { label: string; tone: "danger" | "neutral" | "success" | "warning" }> = {
   error: { label: "Lỗi", tone: "danger" },
   ok: { label: "Xong", tone: "success" },
   todo: { label: "Cần làm", tone: "warning" },
+  warn: { label: "Chưa đủ", tone: "warning" },
   waiting: { label: "Chờ bước trên", tone: "neutral" },
 };
 
@@ -70,7 +71,7 @@ function buildSteps(status: ZaloConnectionStatus): Step[] {
           : status.groupsTruncated
             ? `Nick trung tâm có ${status.groupsTotal ?? 0} nhóm Zalo; lần này chỉ đọc được ${status.groupsListed ?? 0} nhóm (ZaloCRM chậm hoặc quá nhiều nhóm). Học sinh có nhóm chưa đọc tới sẽ ở mục Không tìm thấy.`
             : `${status.groupsTotal ?? 0} nhóm Zalo trên nick trung tâm.`,
-      state: !accountReady ? "waiting" : status.groupsError ? "error" : "ok",
+      state: !accountReady ? "waiting" : status.groupsError ? "error" : status.groupsTruncated ? "warn" : "ok",
       title: "Danh sách nhóm trên ZaloCRM",
     },
     {
@@ -85,6 +86,7 @@ const detailInk: Record<StepState, string> = {
   error: "text-danger",
   ok: "text-text-muted",
   todo: "text-text-default",
+  warn: "text-text-default",
   waiting: "text-text-muted",
 };
 

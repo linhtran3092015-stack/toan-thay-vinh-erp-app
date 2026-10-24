@@ -19,19 +19,18 @@ import {
 type GroupHit = Extract<ZaloGroupSearchResult, { ok: true }>["groups"][number];
 
 export function StudentZaloGroupLinkDialog({
-  centerAccountId,
   configured,
   currentThreadId,
-  currentZaloAccountId,
   studentId,
+  onLinked,
   studentName,
   triggerLabel,
   triggerVariant,
 }: {
-  centerAccountId: string;
   configured: boolean;
   currentThreadId: string | null;
-  currentZaloAccountId: string | null;
+  /** Bulk page: the row disappears on refresh, so the table shows the result instead. */
+  onLinked?: (message: string) => void;
   studentId: string;
   studentName: string;
   /** The bulk link table uses a short ghost "Tìm nhóm" per row instead of the profile's primary button. */
@@ -92,6 +91,7 @@ export function StudentZaloGroupLinkDialog({
       setFeedback(result);
       if (result.ok) {
         setIsOpen(false);
+        onLinked?.(`${studentName}: ${result.message}`);
         router.refresh();
       }
     });
@@ -101,7 +101,7 @@ export function StudentZaloGroupLinkDialog({
     if (!currentThreadId || isPending) return;
     setCheckText(null);
     startTransition(async () => {
-      const result = await checkStudentZaloGroupAction({ threadId: currentThreadId, zaloAccountId: currentZaloAccountId ?? centerAccountId });
+      const result = await checkStudentZaloGroupAction({ studentId });
       if (!result.ok) {
         setCheckText(`Không kiểm tra được: ${result.message}`);
         return;
@@ -193,8 +193,8 @@ export function StudentZaloGroupLinkDialog({
                     ) : null}
                   </div>
                   <Button disabled={isPending || group.externalThreadId === currentThreadId} onClick={() => link(group)} size="sm" type="button">
-                    {/* On the bulk page the row's own picker only stages a choice; this button saves at once, so say so. */}
-                    {triggerLabel ? "Liên kết nhóm này" : "Chọn nhóm này"}
+                    {/* Saves at once (unlike the bulk table's picker, which only stages a choice). */}
+                    Liên kết nhóm này
                   </Button>
                 </li>
               ))}

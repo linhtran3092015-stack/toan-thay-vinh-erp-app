@@ -90,7 +90,7 @@ export function ZaloGroupsPreview({ state }: { state: ZaloGroupsPreviewState }) 
         </PageHeader>
         <ZaloConnectionStatusCard status={status} />
         {status.groupsTotal !== null ? (
-          <ZaloGroupBulkLinker centerAccountId={status.centerAccountId} linkAction={previewLinkAction} matches={matchStudentsToGroups(fixtures, groups)} showGuardians students={students} />
+          <ZaloGroupBulkLinker linkAction={previewLinkAction} matches={matchStudentsToGroups(fixtures, groups)} showGuardians students={students} />
         ) : (
           <Card>
             <CardContent>

@@ -12,7 +12,7 @@ import { getZaloGroupLinkWorkspace } from "@/features/parent-messages/zalo-group
 import { getCachedDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { permissionDeniedDescription } from "@/lib/permissions/labels";
 
-// Reads every group of the center nick from ZaloCRM (100 per call, 15 s timeout each).
+// Reads the center nick's groups from ZaloCRM: at most GROUP_READ_BUDGET_MS (25 s) plus one 15 s call, then a truncated list.
 export const maxDuration = 60;
 
 export default async function ZaloGroupLinkPage() {
@@ -53,7 +53,7 @@ export default async function ZaloGroupLinkPage() {
       <ZaloConnectionStatusCard status={status} />
 
       {groupsLoaded ? (
-        <ZaloGroupBulkLinker centerAccountId={status.centerAccountId} matches={matches} showGuardians={canViewGuardians} students={students} />
+        <ZaloGroupBulkLinker matches={matches} showGuardians={canViewGuardians} students={students} />
       ) : (
         <Card>
           <CardContent>

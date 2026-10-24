@@ -8,7 +8,6 @@ import { isZaloCrmConfigured } from "@/lib/zalo-crm";
 /** Server card: which Zalo "sổ liên lạc" group receives this student's parent messages. */
 export async function StudentZaloGroupCard({ canUpdate, studentId, studentName }: { canUpdate: boolean; studentId: string; studentName: string }) {
   const [link, settings] = await Promise.all([getStudentZaloLink(studentId), getSystemSettings()]);
-  const centerAccountId = settings["zalo.center_account_id"];
   const centerAccountName = settings["zalo.center_account_name"];
   const configured = isZaloCrmConfigured();
 
@@ -36,10 +35,8 @@ export async function StudentZaloGroupCard({ canUpdate, studentId, studentName }
         )}
         {canUpdate ? (
           <StudentZaloGroupLinkDialog
-            centerAccountId={centerAccountId}
             configured={configured}
             currentThreadId={link?.threadId ?? null}
-            currentZaloAccountId={link?.zaloAccountId ?? null}
             studentId={studentId}
             studentName={studentName}
           />
