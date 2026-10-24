@@ -1,9 +1,11 @@
 import Link from "next/link";
 
 import { PageHeader } from "@/components/patterns/page-header";
+import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PermissionDeniedState } from "@/components/shared/permission-denied-state";
 import { getButtonClassName } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { ZaloConnectionStatusCard } from "@/features/parent-messages/components/zalo-connection-status";
 import { ZaloGroupBulkLinker } from "@/features/parent-messages/components/zalo-group-bulk-linker";
 import { getZaloGroupLinkWorkspace } from "@/features/parent-messages/zalo-group-link-data";
@@ -24,7 +26,8 @@ export default async function ZaloGroupLinkPage() {
     }
   }
 
-  const workspace = await getZaloGroupLinkWorkspace();
+  const canViewGuardians = permissionResult.permissions.includes("guardians.view");
+  const workspace = await getZaloGroupLinkWorkspace({ includeGuardianDetails: canViewGuardians });
   if (!workspace.ok) {
     return <ErrorState description={workspace.error} title="Không tải được dữ liệu liên kết" />;
   }
@@ -50,9 +53,16 @@ export default async function ZaloGroupLinkPage() {
       <ZaloConnectionStatusCard status={status} />
 
       {groupsLoaded ? (
-        <ZaloGroupBulkLinker centerAccountId={status.centerAccountId} matches={matches} students={students} />
+        <ZaloGroupBulkLinker centerAccountId={status.centerAccountId} matches={matches} showGuardians={canViewGuardians} students={students} />
       ) : (
-        <p className="text-secondary text-text-muted">Bảng gợi ý nhóm hiện ra khi các bước kết nối ở trên đã xong.</p>
+        <Card>
+          <CardContent>
+            <EmptyState
+              description={`Bảng gợi ý nhóm cho ${students.length} học sinh chưa liên kết hiện ra khi các bước kết nối ở trên đã xong.`}
+              title="Chưa có gợi ý nhóm"
+            />
+          </CardContent>
+        </Card>
       )}
     </div>
   );

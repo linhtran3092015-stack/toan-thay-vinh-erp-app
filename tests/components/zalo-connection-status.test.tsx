@@ -2,6 +2,8 @@
 // fails_when=a nick that is missing or not "connected" shows Xong, a CRM error is not shown, later steps stop waiting, or truncation / all-linked is misreported;
 // why_new=ZaloConnectionStatusCard had no test, only the /dev/zalo-groups preview showed 4 of its states by eye;
 // seam=none; no_claim=does not prove the loader fills the status correctly or that the Settings link target is right
+// Value (second pass): protects=once steps 1-4 are done the card folds into one "Đã kết nối" line and a truncated read says how many groups were read;
+// fails_when=the fold shows while a step still fails, or the truncation text drifts from the real count; why_new=design and maintainability review; seam=none; no_claim=visual layout
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -17,6 +19,7 @@ const ready: ZaloConnectionStatus = {
   configured: true,
   crmError: null,
   groupsError: null,
+  groupsListed: 120,
   groupsTotal: 120,
   groupsTruncated: false,
   linkedStudents: 7,
@@ -74,10 +77,10 @@ describe("ZaloConnectionStatusCard", () => {
         status: { ...ready, groupsError: "timeout", groupsTotal: null },
       },
       {
-        detail: "3000 nhóm Zalo trên nick trung tâm (chỉ đọc 3.000 nhóm đầu).",
+        detail: /^Nick trung tâm có 3000 nhóm Zalo; lần này chỉ đọc được 1800 nhóm/,
         expected: [DONE, DONE, DONE, DONE, DONE],
         name: "ready, truncated, all linked",
-        status: { ...ready, groupsTotal: 3000, groupsTruncated: true, linkedStudents: 10, studyingStudents: 10 },
+        status: { ...ready, groupsListed: 1800, groupsTotal: 3000, groupsTruncated: true, linkedStudents: 10, studyingStudents: 10 },
       },
     ];
 
@@ -85,6 +88,8 @@ describe("ZaloConnectionStatusCard", () => {
       render(<ZaloConnectionStatusCard status={status} />);
       expect(stepStates(), name).toEqual(expected);
       expect(screen.getByText(detail), name).toBeInTheDocument();
+      // Folded into one line only when steps 1-4 are all done.
+      expect(screen.queryByText("Đã kết nối") !== null, name).toBe(expected.slice(0, 4).every((state) => state === DONE));
       cleanup();
     }
 
@@ -92,5 +97,6 @@ describe("ZaloConnectionStatusCard", () => {
     expect(stepStates()).toEqual([DONE, DONE, DONE, DONE, TODO]);
     expect(screen.getByText("120 nhóm Zalo trên nick trung tâm.")).toBeInTheDocument();
     expect(screen.getByText(/^7\/10 học sinh đang học đã liên kết/)).toBeInTheDocument();
+    expect(screen.getByText(/Nick Mau · 120 nhóm · 7\/10 học sinh đã liên kết/)).toBeInTheDocument();
   });
 });

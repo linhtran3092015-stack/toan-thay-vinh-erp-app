@@ -26,6 +26,8 @@ export interface ZaloConnectionStatus {
   /** Why ZaloCRM could not be read (wrong key, server down). */
   crmError: string | null;
   groupsError: string | null;
+  /** Groups actually read (after dropping duplicates); fewer than `groupsTotal` when truncated. */
+  groupsListed: number | null;
   groupsTotal: number | null;
   groupsTruncated: boolean;
   linkedStudents: number;
@@ -36,6 +38,7 @@ export interface ZaloLinkStudent {
   birthYear: number;
   classCodes: string[];
   fullName: string;
+  /** Empty without guardians.view: names and phones still feed the matching on the server. */
   guardianSummary: string;
   id: string;
   publicCode: string;
@@ -54,28 +57,34 @@ interface StudentRow {
   birth_year: number;
   full_name: string;
   id: string;
+  lifecycle_status: string;
   public_code: string;
   zalo_group_thread_id: string | null;
 }
 
-export async function getZaloGroupLinkWorkspace(): Promise<ZaloGroupLinkWorkspaceResult> {
+/**
+ * Everything the bulk link page needs. Groups are matched against every
+ * student: unlinked studying students get rows, all others (linked, reserved,
+ * withdrawn) compete as rivals so a namesake's group is never pre-ticked.
+ */
+export async function getZaloGroupLinkWorkspace({
+  includeGuardianDetails,
+}: {
+  /** guardians.view: show guardian names and phones in the table. */
+  includeGuardianDetails: boolean;
+}): Promise<ZaloGroupLinkWorkspaceResult> {
   const supabase = await createSupabaseServerClient();
   const settings = await getSystemSettings();
   const centerAccountId = settings["zalo.center_account_id"].trim();
   const configured = isZaloCrmConfigured();
 
-  const [studentsResult, linkedResult, guardianLinksResult, guardiansResult, enrollmentsResult, classesResult] = await Promise.all([
+  const [studentsResult, guardianLinksResult, guardiansResult, enrollmentsResult, classesResult] = await Promise.all([
     fetchAllPages<StudentRow>((from, to) =>
       supabase
         .from("students")
-        .select("id, public_code, full_name, birth_year, zalo_group_thread_id")
-        .in("lifecycle_status", [...STUDYING_STATUSES])
+        .select("id, public_code, full_name, birth_year, lifecycle_status, zalo_group_thread_id")
         .order("id")
         .range(from, to),
-    ),
-    // Groups already linked to any student (studying or not) cannot be offered again.
-    fetchAllPages<{ id: string; zalo_group_thread_id: string | null }>((from, to) =>
-      supabase.from("students").select("id, zalo_group_thread_id").not("zalo_group_thread_id", "is", null).order("id").range(from, to),
     ),
     fetchAllPages<{ guardian_id: string; id: string; is_primary: boolean; student_id: string }>((from, to) =>
       supabase.from("student_guardians").select("id, student_id, guardian_id, is_primary").is("ended_at", null).order("id").range(from, to),
@@ -88,12 +97,15 @@ export async function getZaloGroupLinkWorkspace(): Promise<ZaloGroupLinkWorkspac
     ),
     fetchAllPages<{ code: string; id: string }>((from, to) => supabase.from("classes").select("id, code").order("id").range(from, to)),
   ]);
-  if (studentsResult.error || linkedResult.error || guardianLinksResult.error || guardiansResult.error || enrollmentsResult.error || classesResult.error) {
+  if (studentsResult.error || guardianLinksResult.error || guardiansResult.error || enrollmentsResult.error || classesResult.error) {
     return { error: "Không tải được danh sách học sinh và phụ huynh.", ok: false };
   }
 
-  const studying = studentsResult.data ?? [];
-  const linkedThreads = new Set((linkedResult.data ?? []).map((row) => row.zalo_group_thread_id).filter((id): id is string => Boolean(id)));
+  const allStudents = studentsResult.data ?? [];
+  const studyingStatuses: readonly string[] = STUDYING_STATUSES;
+  const studying = allStudents.filter((row) => studyingStatuses.includes(row.lifecycle_status));
+  // Groups already linked to any student (studying or not) cannot be offered again.
+  const linkedThreads = new Set(allStudents.map((row) => row.zalo_group_thread_id).filter((id): id is string => Boolean(id)));
   const guardiansById = new Map((guardiansResult.data ?? []).map((row) => [row.id, row]));
   const classCodeById = new Map((classesResult.data ?? []).map((row) => [row.id, row.code]));
 
@@ -124,7 +136,9 @@ export async function getZaloGroupLinkWorkspace(): Promise<ZaloGroupLinkWorkspac
       birthYear: row.birth_year,
       classCodes: [...(classCodesByStudent.get(row.id) ?? [])].sort(),
       fullName: row.full_name,
-      guardianSummary: guardians.map((guardian) => [guardian.fullName, guardian.phones[0]].filter(Boolean).join(" · ")).join("; "),
+      guardianSummary: includeGuardianDetails
+        ? guardians.map((guardian) => [guardian.fullName, guardian.phones[0]].filter(Boolean).join(" · ")).join("; ")
+        : "",
       id: row.id,
       publicCode: row.public_code,
     };
@@ -137,6 +151,7 @@ export async function getZaloGroupLinkWorkspace(): Promise<ZaloGroupLinkWorkspac
     configured,
     crmError: null,
     groupsError: null,
+    groupsListed: null,
     groupsTotal: null,
     groupsTruncated: false,
     linkedStudents: studying.length - unlinked.length,
@@ -150,24 +165,28 @@ export async function getZaloGroupLinkWorkspace(): Promise<ZaloGroupLinkWorkspac
     return { data: { matches: [], status, students }, ok: true };
   }
   status.centerAccount = accounts.data.find((account) => account.id === centerAccountId) ?? null;
-  if (!centerAccountId) return { data: { matches: [], status, students }, ok: true };
+  // Same gate as checklist step 3: no groups (and no table) until the center nick is in ZaloCRM and connected.
+  if (!centerAccountId || status.centerAccount?.status !== "connected") return { data: { matches: [], status, students }, ok: true };
 
   const groups = await listAllZaloGroups(centerAccountId);
   if (!groups.ok) {
     status.groupsError = groups.error;
     return { data: { matches: [], status, students }, ok: true };
   }
+  status.groupsListed = groups.data.groups.length;
   status.groupsTotal = groups.data.total;
   status.groupsTruncated = groups.data.truncated;
 
-  const matchStudents: MatchStudent[] = unlinked.map((row) => ({
+  const toMatchStudent = (row: StudentRow): MatchStudent => ({
     fullName: row.full_name,
     guardians: (guardiansByStudent.get(row.id) ?? []).map(({ fullName, phones }) => ({ fullName, phones })),
     id: row.id,
     publicCode: row.public_code,
-  }));
+  });
+  const unlinkedIds = new Set(unlinked.map((row) => row.id));
+  const rivals = allStudents.filter((row) => !unlinkedIds.has(row.id)).map(toMatchStudent);
   const freeGroups = groups.data.groups
     .filter((group) => !linkedThreads.has(group.externalThreadId))
     .map(({ externalThreadId, groupMembersCount, groupName, zaloAccountId }) => ({ externalThreadId, groupMembersCount, groupName, zaloAccountId }));
-  return { data: { matches: matchStudentsToGroups(matchStudents, freeGroups), status, students }, ok: true };
+  return { data: { matches: matchStudentsToGroups(unlinked.map(toMatchStudent), freeGroups, rivals), status, students }, ok: true };
 }

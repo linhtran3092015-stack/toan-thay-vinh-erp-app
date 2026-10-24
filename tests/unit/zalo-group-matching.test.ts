@@ -13,8 +13,8 @@ function student(id: string, fullName: string, extra: Partial<MatchStudent> = {}
   return { fullName, guardians: [], id, publicCode: `TV-2026-${id.padStart(5, "0")}`, ...extra };
 }
 
-function group(threadId: string, groupName: string | null): MatchGroup {
-  return { externalThreadId: threadId, groupMembersCount: 3, groupName, zaloAccountId: "acc-1" };
+function group(threadId: string, groupName: string | null, groupMembersCount: number | null = 3): MatchGroup {
+  return { externalThreadId: threadId, groupMembersCount, groupName, zaloAccountId: "acc-1" };
 }
 
 function byStudent(matches: ReturnType<typeof matchStudentsToGroups>) {
@@ -32,8 +32,13 @@ describe("phones", () => {
     expect(extractPhones("PH Hoa 0912.345.678 / +84 987 654 321")).toEqual(["0912345678", "0987654321"]);
   });
 
-  it("ignores longer digit runs", () => {
+  it("ignores longer digit runs on either side", () => {
     expect(extractPhones("Mã 091234567890")).toEqual([]);
+    expect(extractPhones("Mã 10912345678")).toEqual([]);
+  });
+
+  it("keeps a class number next to the phone apart", () => {
+    expect(extractPhones("SLL An lớp 5 0912 345 678")).toEqual(["0912345678"]);
   });
 
   it("normalizes 84… and 0… forms", () => {
@@ -47,11 +52,73 @@ describe("phones", () => {
 describe("matchStudentsToGroups", () => {
   it("pre-selects the one group that carries the student's full name", () => {
     const result = byStudent(
-      matchStudentsToGroups([student("1", "Nguyễn Văn An")], [group("g1", "SLL Nguyen Van An - 5A"), group("g2", "SLL Trần Bình")]),
+      matchStudentsToGroups([student("1", "Nguyễn Văn An")], [group("g1", "SLL Nguyễn Văn An - 5A"), group("g2", "SLL Trần Bình")]),
     );
     expect(result["1"].confidence).toBe("sure");
     expect(result["1"].suggestion?.group.externalThreadId).toBe("g1");
     expect(result["1"].suggestion?.reasons).toEqual(["student_name"]);
+  });
+
+  // Value: protects=a name that only matches after dropping tone marks (Hùng vs Hưng) is never pre-ticked on its own; fails_when=sure is decided on the toneless name; why_new=red-team found Hùng/Hưng pre-ticked; seam=none; no_claim=real group naming habits on the center nick
+  it("never pre-selects a name that only matches without tone marks", () => {
+    const result = byStudent(
+      matchStudentsToGroups([student("1", "Lê Văn Hùng"), student("2", "Nguyễn Văn An")], [group("g1", "SLL Lê Văn Hưng 9A"), group("g2", "SLL Nguyen Van An")]),
+    );
+    expect(result["1"].confidence).toBe("ambiguous");
+    expect(result["1"].candidates[0].reasons).toEqual(["student_name_loose"]);
+    expect(result["2"].confidence).toBe("ambiguous");
+  });
+
+  it("pre-selects a toneless name when a guardian phone confirms the family", () => {
+    const result = byStudent(
+      matchStudentsToGroups(
+        [student("1", "Nguyễn Văn An", { guardians: [{ fullName: "Trần Thị Hoa", phones: ["0912345678"] }] })],
+        [group("g1", "SLL Nguyen Van An 0912345678")],
+      ),
+    );
+    expect(result["1"].confidence).toBe("sure");
+    expect(result["1"].suggestion?.reasons).toEqual(["student_name_loose", "guardian_phone"]);
+  });
+
+  it("never pre-selects on guardian evidence alone, even phone plus name", () => {
+    const result = byStudent(
+      matchStudentsToGroups(
+        [student("1", "Phạm Gia Bảo", { guardians: [{ fullName: "Trần Thị Hoa", phones: ["0912345678"] }] })],
+        [group("g1", "PH Trần Thị Hoa 0912345678")],
+      ),
+    );
+    expect(result["1"].confidence).toBe("ambiguous");
+    expect(result["1"].candidates[0].reasons).toEqual(["guardian_phone", "guardian_name"]);
+  });
+
+  it("never pre-selects a large group even when it carries the student's name", () => {
+    const result = byStudent(matchStudentsToGroups([student("1", "Nguyễn Văn An")], [group("g1", "Lớp 5A - Nguyễn Văn An lớp trưởng", 40)]));
+    expect(result["1"].confidence).toBe("ambiguous");
+  });
+
+  // Value: protects=a group named after a reserved/withdrawn/linked namesake is not handed to the current student; fails_when=rivals are ignored in the tie check; why_new=red-team: rivals were only unlinked studying students; seam=none; no_claim=rival list completeness (loader test covers it)
+  it("lets students without a row compete for groups", () => {
+    const result = byStudent(
+      matchStudentsToGroups([student("1", "Trần Gia Bảo")], [group("g1", "SLL Trần Gia Bảo Ngọc")], [student("9", "Trần Gia Bảo Ngọc")]),
+    );
+    expect(result["1"].confidence).toBe("ambiguous");
+    expect(result["9"]).toBeUndefined();
+  });
+
+  it("does not offer a group a rival clearly owns", () => {
+    const result = byStudent(
+      matchStudentsToGroups([student("1", "Đỗ Minh Khoa")], [group("g1", "Sổ liên lạc TV-2026-00009 Đỗ Minh Khoa")], [student("9", "Đỗ Minh Khôi")]),
+    );
+    // The rival's code wins the group, so it is not offered to the current student at all.
+    expect(result["1"].confidence).toBe("none");
+    expect(result["1"].candidates).toEqual([]);
+  });
+
+  it("offers at most five candidates", () => {
+    const groups = [1, 2, 3, 4, 5, 6].map((n) => group(`g${n}`, `PH Trần Thị Hoa nhóm ${n}`));
+    const result = byStudent(matchStudentsToGroups([student("1", "Phạm Gia Bảo", { guardians: [{ fullName: "Trần Thị Hoa", phones: [] }] })], groups));
+    expect(result["1"].candidates).toHaveLength(5);
+    expect(result["1"].candidates[0].reasons).toEqual(["guardian_name"]);
   });
 
   it("does not match a name inside a longer name", () => {

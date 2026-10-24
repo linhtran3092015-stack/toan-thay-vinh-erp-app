@@ -87,4 +87,27 @@ describe("listAllZaloGroups", () => {
     }
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  // Value: protects=a group that moves between pages while paging is kept once, and a slow CRM ends in a truncated read the page can show instead of a timeout;
+  // fails_when=duplicates reach the matcher (a student then ties with itself) or paging ignores the time budget; why_new=red-team and performance review;
+  // seam=none; no_claim=real CRM ordering and latency
+  it("drops a group seen twice and stops when the time budget is spent", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      const page = Number(new URL(url).searchParams.get("page"));
+      const groups = conversations(page, 100);
+      // A message moved thread-1-99 down to page 2 between the two reads.
+      if (page === 2) groups[0] = conversations(1, 100)[99];
+      return new Response(JSON.stringify({ conversations: page <= 2 ? groups : conversations(page, 50), total: 250 }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await listAllZaloGroups("acc-test");
+    expect(result.ok && result.data.groups).toHaveLength(249);
+    expect(result.ok && new Set(result.data.groups.map((group) => group.externalThreadId)).size).toBe(249);
+    expect(result.ok && result.data.truncated).toBe(false);
+
+    fetchMock.mockClear();
+    const slow = await listAllZaloGroups("acc-test", 30, -1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(slow).toEqual({ data: { groups: expect.any(Array), total: 250, truncated: true }, ok: true });
+  });
 });

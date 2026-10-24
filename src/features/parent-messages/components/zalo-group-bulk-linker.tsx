@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useMemo, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 
 import { DataTableFrame, TableCell, TableHeaderCell, TableRow } from "@/components/patterns/data-table-frame";
 import { QuickFilterChips } from "@/components/patterns/quick-filter-chips";
@@ -28,10 +28,20 @@ const reasonLabel: Record<MatchReason, string> = {
   guardian_phone: "Có SĐT phụ huynh",
   student_code: "Trùng mã học sinh",
   student_name: "Trùng tên học sinh",
+  student_name_loose: "Trùng tên (không dấu)",
 };
 
 const checkboxClassName =
   "h-4 w-4 cursor-pointer rounded border-border-strong accent-[var(--action-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus";
+
+const strongReasons = new Set<MatchReason>(["student_code", "student_name"]);
+
+function firstNonEmptyFilter(counts: Record<MatchConfidence, number>): Filter {
+  if (counts.sure > 0) return "sure";
+  if (counts.ambiguous > 0) return "ambiguous";
+  if (counts.none > 0) return "none";
+  return "all";
+}
 
 function candidateLabel(candidate: GroupCandidate): string {
   const members = candidate.group.groupMembersCount === null ? "" : ` · ${candidate.group.groupMembersCount} thành viên`;
@@ -42,25 +52,35 @@ function candidateLabel(candidate: GroupCandidate): string {
  * Bulk "sổ liên lạc" linking: one row per unlinked studying student with the
  * group suggested from ZaloCRM group names. Sure matches start ticked; staff
  * pick for the rest (or search with the per-student dialog), then save in
- * chunks. Nothing is linked without the final "Liên kết" click.
+ * chunks. Nothing is linked without the final "Liên kết" click, and only rows
+ * still on the page with a group from their own candidate list are sent.
  */
 export function ZaloGroupBulkLinker({
   centerAccountId,
   linkAction = linkStudentZaloGroupsAction,
   matches,
+  showGuardians,
   students,
 }: {
   centerAccountId: string;
   /** The /dev/zalo-groups preview passes an inert stub. */
   linkAction?: typeof linkStudentZaloGroupsAction;
   matches: StudentGroupMatch[];
+  /** guardians.view: the Phụ huynh column is left out without it. */
+  showGuardians: boolean;
   students: ZaloLinkStudent[];
 }) {
   const router = useRouter();
   const searchId = useId();
   const summaryId = useId();
+  const bannerRef = useRef<HTMLDivElement>(null);
   const matchByStudent = useMemo(() => new Map(matches.map((match) => [match.studentId, match])), [matches]);
-  const [filter, setFilter] = useState<Filter>("sure");
+  const counts = useMemo(() => {
+    const result: Record<MatchConfidence, number> = { ambiguous: 0, none: 0, sure: 0 };
+    for (const student of students) result[matchByStudent.get(student.id)?.confidence ?? "none"] += 1;
+    return result;
+  }, [matchByStudent, students]);
+  const [filter, setFilter] = useState<Filter>(() => firstNonEmptyFilter(counts));
   const [search, setSearch] = useState("");
   const [chosen, setChosen] = useState<Record<string, string>>(() =>
     Object.fromEntries(matches.filter((match) => match.suggestion).map((match) => [match.studentId, match.suggestion!.group.externalThreadId])),
@@ -71,11 +91,17 @@ export function ZaloGroupBulkLinker({
   const [banner, setBanner] = useState<{ message: string; ok: boolean } | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const counts = useMemo(() => {
-    const result: Record<MatchConfidence, number> = { ambiguous: 0, none: 0, sure: 0 };
-    for (const student of students) result[matchByStudent.get(student.id)?.confidence ?? "none"] += 1;
-    return result;
-  }, [matchByStudent, students]);
+  useEffect(() => {
+    if (banner) bannerRef.current?.focus();
+  }, [banner]);
+
+  // A pick counts only while its student is still unlinked on this page and the group is one of
+  // its current candidates; after a refresh (dialog link, another tab) stale picks drop out.
+  const pickOf = (studentId: string): string => {
+    const threadId = chosen[studentId];
+    if (!threadId) return "";
+    return matchByStudent.get(studentId)?.candidates.some((candidate) => candidate.group.externalThreadId === threadId) ? threadId : "";
+  };
 
   const visible = useMemo(() => {
     const needle = normalizeForMatch(search);
@@ -87,21 +113,16 @@ export function ZaloGroupBulkLinker({
     });
   }, [filter, matchByStudent, search, students]);
 
+  const ready = students.filter((student) => checked.has(student.id) && pickOf(student.id)).map((student) => student.id);
   // Thread id → students that currently pick it (a group can only go to one student).
-  const pickedBy = useMemo(() => {
-    const map = new Map<string, string[]>();
-    for (const studentId of checked) {
-      const threadId = chosen[studentId];
-      if (!threadId) continue;
-      map.set(threadId, [...(map.get(threadId) ?? []), studentId]);
-    }
-    return map;
-  }, [checked, chosen]);
-
-  const ready = [...checked].filter((studentId) => chosen[studentId]);
+  const pickedBy = new Map<string, string[]>();
+  for (const studentId of ready) pickedBy.set(pickOf(studentId), [...(pickedBy.get(pickOf(studentId)) ?? []), studentId]);
   const duplicates = [...pickedBy.values()].filter((ids) => ids.length > 1).length;
-  const visibleSelectable = visible.filter((student) => chosen[student.id]);
-  const allVisibleChecked = visibleSelectable.length > 0 && visibleSelectable.every((student) => checked.has(student.id));
+  const visibleIds = new Set(visible.map((student) => student.id));
+  const readyVisible = ready.filter((studentId) => visibleIds.has(studentId)).length;
+  const visibleSelectable = visible.filter((student) => pickOf(student.id));
+  const visibleChecked = visibleSelectable.filter((student) => checked.has(student.id)).length;
+  const allVisibleChecked = visibleSelectable.length > 0 && visibleChecked === visibleSelectable.length;
 
   const toggle = (studentId: string) => {
     setChecked((current) => {
@@ -137,13 +158,9 @@ export function ZaloGroupBulkLinker({
     if (isPending || ready.length === 0 || duplicates > 0) return;
     setBanner(null);
     const links = ready.map((studentId) => {
-      const candidate = matchByStudent.get(studentId)?.candidates.find((item) => item.group.externalThreadId === chosen[studentId]);
-      return {
-        groupName: candidate?.group.groupName ?? null,
-        studentId,
-        threadId: chosen[studentId],
-        zaloAccountId: candidate?.group.zaloAccountId || centerAccountId,
-      };
+      const threadId = pickOf(studentId);
+      const candidate = matchByStudent.get(studentId)?.candidates.find((item) => item.group.externalThreadId === threadId);
+      return { groupName: candidate?.group.groupName ?? null, studentId, threadId };
     });
     startTransition(async () => {
       let linked = 0;
@@ -188,7 +205,7 @@ export function ZaloGroupBulkLinker({
           </h2>
           <p className="mt-1 text-secondary text-text-muted">
             Gợi ý lấy từ tên nhóm hiện tại trên ZaloCRM. Dòng &quot;Chắc chắn&quot; đã được chọn sẵn; kiểm tra rồi bấm Liên kết. Dòng
-            &quot;Cần chọn&quot; có nhiều nhóm giống nhau (anh em, trùng tên), hãy bấm Tìm nhóm để xem thành viên.
+            &quot;Cần chọn&quot; có nhiều nhóm giống nhau (anh em, trùng tên, tên không dấu), hãy bấm Tìm nhóm để xem thành viên.
           </p>
         </div>
         <div className="grid min-w-[220px] gap-1.5">
@@ -210,15 +227,29 @@ export function ZaloGroupBulkLinker({
         value={filter}
       />
 
-      {banner ? <ResultBanner title={banner.message} tone={banner.ok ? "success" : "warning"} /> : null}
+      {banner ? (
+        <div className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus" ref={bannerRef} tabIndex={-1}>
+          <ResultBanner title={banner.message} tone={banner.ok ? "success" : "warning"} />
+        </div>
+      ) : null}
 
       <div aria-live="polite" className="flex flex-wrap items-center gap-3 rounded-lg border border-border-subtle bg-surface-sunken px-4 py-2.5" id={summaryId}>
         <p className="text-secondary text-text-strong">
           Đã chọn <strong>{ready.length}</strong> học sinh có nhóm
+          {readyVisible < ready.length ? ` (${readyVisible} đang hiển thị, ${ready.length - readyVisible} bị ẩn bởi bộ lọc)` : null}
           {duplicates > 0 ? <span className="text-danger"> · {duplicates} nhóm đang được chọn cho nhiều học sinh</span> : null}
+          {ready.length === 0 ? <span className="text-text-muted"> · chọn nhóm cho ít nhất một học sinh để liên kết</span> : null}
         </p>
         {progress ? <p className="text-secondary text-text-muted">{progress}</p> : null}
-        <Button className="ml-auto max-md:h-11" disabled={isPending || ready.length === 0 || duplicates > 0} isLoading={isPending} onClick={save} size="sm" type="button">
+        <Button
+          aria-describedby={summaryId}
+          className="ml-auto max-md:h-11"
+          disabled={isPending || ready.length === 0 || duplicates > 0}
+          isLoading={isPending}
+          onClick={save}
+          size="sm"
+          type="button"
+        >
           Liên kết {ready.length} học sinh
         </Button>
       </div>
@@ -227,11 +258,12 @@ export function ZaloGroupBulkLinker({
         body={visible.map((student) => {
           const match = matchByStudent.get(student.id);
           const candidates = match?.candidates ?? [];
-          const threadId = chosen[student.id] ?? "";
-          const isChecked = checked.has(student.id);
-          const shared = threadId && isChecked ? (pickedBy.get(threadId)?.length ?? 0) > 1 : false;
+          const threadId = pickOf(student.id);
+          const isChecked = checked.has(student.id) && Boolean(threadId);
+          const shared = isChecked ? (pickedBy.get(threadId)?.length ?? 0) > 1 : false;
           const current = candidates.find((candidate) => candidate.group.externalThreadId === threadId);
           const error = errors[student.id];
+          const messageId = `${summaryId}-${student.id}-message`;
           return (
             <TableRow key={student.id} selected={isChecked} tall>
               <TableCell className="w-12">
@@ -251,11 +283,15 @@ export function ZaloGroupBulkLinker({
                   {student.classCodes.length > 0 ? ` · ${student.classCodes.join(", ")}` : ""}
                 </p>
               </TableCell>
-              <TableCell className="min-w-[180px] py-2 text-caption text-text-default">{student.guardianSummary || "—"}</TableCell>
+              {showGuardians ? (
+                <TableCell className="min-w-[180px] py-2 text-secondary text-text-default">{student.guardianSummary || "—"}</TableCell>
+              ) : null}
               <TableCell className="min-w-[340px] py-2">
                 <div className="grid gap-1.5">
                   {candidates.length > 0 ? (
                     <Select
+                      aria-describedby={shared || error ? messageId : undefined}
+                      aria-invalid={shared || Boolean(error) || undefined}
                       aria-label={`Nhóm Zalo cho ${student.fullName}`}
                       disabled={isPending}
                       onChange={(event) => choose(student.id, event.target.value)}
@@ -271,8 +307,11 @@ export function ZaloGroupBulkLinker({
                   ) : (
                     <p className="text-caption text-text-muted">Không có nhóm nào khớp tên.</p>
                   )}
-                  {shared ? <p className="text-caption text-danger">Nhóm này đang được chọn cho học sinh khác.</p> : null}
-                  {error ? <p className="text-caption text-danger">{error}</p> : null}
+                  {shared || error ? (
+                    <p className="text-caption text-danger" id={messageId}>
+                      {[shared ? "Nhóm này đang được chọn cho học sinh khác." : null, error].filter(Boolean).join(" ")}
+                    </p>
+                  ) : null}
                   {match?.confidence !== "sure" ? (
                     <StudentZaloGroupLinkDialog
                       centerAccountId={centerAccountId}
@@ -288,13 +327,17 @@ export function ZaloGroupBulkLinker({
                 </div>
               </TableCell>
               <TableCell className="py-2">
-                <div className="flex flex-wrap gap-1">
-                  {(current ?? candidates[0])?.reasons.map((reason) => (
-                    <Badge key={reason} tone={reason === "student_code" || reason === "student_name" ? "success" : "neutral"}>
-                      {reasonLabel[reason]}
-                    </Badge>
-                  )) ?? null}
-                </div>
+                {current ? (
+                  <div className="flex flex-wrap gap-1">
+                    {current.reasons.map((reason) => (
+                      <Badge key={reason} tone={strongReasons.has(reason) ? "success" : "neutral"}>
+                        {reasonLabel[reason]}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-caption text-text-muted">Chưa chọn nhóm</span>
+                )}
               </TableCell>
             </TableRow>
           );
@@ -311,11 +354,14 @@ export function ZaloGroupBulkLinker({
                 className={checkboxClassName}
                 disabled={visibleSelectable.length === 0 || isPending}
                 onChange={toggleAllVisible}
+                ref={(node) => {
+                  if (node) node.indeterminate = visibleChecked > 0 && !allVisibleChecked;
+                }}
                 type="checkbox"
               />
             </TableHeaderCell>
             <TableHeaderCell>Học sinh</TableHeaderCell>
-            <TableHeaderCell>Phụ huynh</TableHeaderCell>
+            {showGuardians ? <TableHeaderCell>Phụ huynh</TableHeaderCell> : null}
             <TableHeaderCell>Nhóm Zalo</TableHeaderCell>
             <TableHeaderCell>Căn cứ</TableHeaderCell>
           </tr>

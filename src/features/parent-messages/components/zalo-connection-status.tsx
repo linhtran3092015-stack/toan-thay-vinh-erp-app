@@ -67,7 +67,9 @@ function buildSteps(status: ZaloConnectionStatus): Step[] {
         ? "Cần nick trung tâm ở bước 3."
         : status.groupsError
           ? `Không tải được danh sách nhóm: ${status.groupsError}`
-          : `${status.groupsTotal ?? 0} nhóm Zalo trên nick trung tâm${status.groupsTruncated ? " (chỉ đọc 3.000 nhóm đầu)" : ""}.`,
+          : status.groupsTruncated
+            ? `Nick trung tâm có ${status.groupsTotal ?? 0} nhóm Zalo; lần này chỉ đọc được ${status.groupsListed ?? 0} nhóm (ZaloCRM chậm hoặc quá nhiều nhóm). Học sinh có nhóm chưa đọc tới sẽ ở mục Không tìm thấy.`
+            : `${status.groupsTotal ?? 0} nhóm Zalo trên nick trung tâm.`,
       state: !accountReady ? "waiting" : status.groupsError ? "error" : "ok",
       title: "Danh sách nhóm trên ZaloCRM",
     },
@@ -79,29 +81,60 @@ function buildSteps(status: ZaloConnectionStatus): Step[] {
   ];
 }
 
-/** Five-step checklist that says whether the ERP ↔ ZaloCRM connection works and what to do next. */
+const detailInk: Record<StepState, string> = {
+  error: "text-danger",
+  ok: "text-text-muted",
+  todo: "text-text-default",
+  waiting: "text-text-muted",
+};
+
+function StepList({ steps }: { steps: Step[] }) {
+  return (
+    <ol className="grid gap-3">
+      {steps.map((step, index) => (
+        <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5" key={step.title}>
+          <span className="text-secondary font-semibold text-text-muted tabular-nums">{index + 1}.</span>
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-center gap-2 font-semibold text-text-strong">
+              {step.title}
+              <Badge tone={stateMeta[step.state].tone}>{stateMeta[step.state].label}</Badge>
+            </p>
+            <p className={`mt-0.5 text-secondary ${detailInk[step.state]}`}>{step.detail}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * Five-step checklist that says whether the ERP ↔ ZaloCRM connection works
+ * and what to do next. Once steps 1–4 are done it folds into one line (the
+ * table below is the work), with the full list behind a disclosure.
+ */
 export function ZaloConnectionStatusCard({ status }: { status: ZaloConnectionStatus }) {
   const steps = buildSteps(status);
+  const connected = steps.slice(0, 4).every((step) => step.state === "ok");
   return (
     <Card>
       <CardHeader>
         <CardTitle>Kết nối ZaloCRM</CardTitle>
       </CardHeader>
       <CardContent>
-        <ol className="grid gap-3">
-          {steps.map((step, index) => (
-            <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5" key={step.title}>
-              <span className="text-secondary font-semibold text-text-muted tabular-nums">{index + 1}.</span>
-              <div className="min-w-0">
-                <p className="flex flex-wrap items-center gap-2 font-semibold text-text-strong">
-                  {step.title}
-                  <Badge tone={stateMeta[step.state].tone}>{stateMeta[step.state].label}</Badge>
-                </p>
-                <p className="mt-0.5 text-secondary text-text-muted">{step.detail}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        {connected ? (
+          <details>
+            <summary className="cursor-pointer text-secondary text-text-default">
+              <Badge tone="success">Đã kết nối</Badge>{" "}
+              {status.centerAccount?.displayName || status.centerAccountName || "Nick trung tâm"} · {status.groupsTotal ?? 0} nhóm ·{" "}
+              {status.linkedStudents}/{status.studyingStudents} học sinh đã liên kết
+            </summary>
+            <div className="mt-3">
+              <StepList steps={steps} />
+            </div>
+          </details>
+        ) : (
+          <StepList steps={steps} />
+        )}
       </CardContent>
     </Card>
   );

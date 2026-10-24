@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { PARENT_MESSAGE_MAX_CHARS, planMessageParts } from "@/features/parent-messages/comment-template";
 import { MAX_BULK_ZALO_LINKS } from "@/features/parent-messages/zalo-group-matching";
+import { getSystemSettings } from "@/features/settings/system-settings-data";
 import { getDatabasePermissions } from "@/lib/permissions/database-permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -200,11 +201,21 @@ export type ZaloGroupSearchResult =
   | { groups: (ZaloCrmGroup & { members?: ZaloCrmGroupMember[] })[]; ok: true; total: number }
   | { message: string; ok: false };
 
+/** Parent messages go out from the center nick only (owner decision 13/10/2026), so links always use it. */
+const NO_CENTER_NICK = "Chưa chọn nick trung tâm. Chọn nick trong Cài đặt → Chung trước khi liên kết nhóm.";
+
+async function getCenterZaloAccountId(): Promise<string> {
+  const settings = await getSystemSettings();
+  return settings["zalo.center_account_id"].trim();
+}
+
 export async function searchZaloGroupsAction(input: { search: string; withMembers?: boolean }): Promise<ZaloGroupSearchResult> {
   const denied = await requirePermission("students.update");
   if (denied) return { message: denied, ok: false };
+  const zaloAccountId = await getCenterZaloAccountId();
+  if (!zaloAccountId) return { message: NO_CENTER_NICK, ok: false };
   const search = input.search.trim().slice(0, 100);
-  const result = await searchZaloGroups({ limit: 20, search });
+  const result = await searchZaloGroups({ limit: 20, search, zaloAccountId });
   if (!result.ok) return { message: result.error, ok: false };
   const groups = await Promise.all(
     result.data.groups.map(async (group) => {
@@ -220,7 +231,6 @@ export async function linkStudentZaloGroupAction(input: {
   groupName: string | null;
   studentId: string;
   threadId: string;
-  zaloAccountId: string;
 }): Promise<ParentMessageActionResult> {
   const denied = await requirePermission("students.update");
   if (denied) return { message: denied, ok: false };
@@ -229,16 +239,17 @@ export async function linkStudentZaloGroupAction(input: {
       groupName: z.string().trim().max(200).nullable(),
       studentId: z.string().uuid(),
       threadId: z.string().trim().min(1).max(120),
-      zaloAccountId: z.string().trim().min(1).max(120),
     })
     .safeParse(input);
   if (!parsed.success) return { message: "Thông tin nhóm không hợp lệ.", ok: false };
+  const zaloAccountId = await getCenterZaloAccountId();
+  if (!zaloAccountId) return { message: NO_CENTER_NICK, ok: false };
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("link_student_zalo_group", {
     p_group_name: parsed.data.groupName ?? "",
     p_student_id: parsed.data.studentId,
     p_thread_id: parsed.data.threadId,
-    p_zalo_account_id: parsed.data.zaloAccountId,
+    p_zalo_account_id: zaloAccountId,
   });
   if (error) return { message: rpcErrorMessage(error), ok: false };
   revalidatePath(`/students/${parsed.data.studentId}`);
@@ -258,7 +269,6 @@ const bulkLinkSchema = z
       groupName: z.string().trim().max(200).nullable(),
       studentId: z.string().uuid(),
       threadId: z.string().trim().min(1).max(120),
-      zaloAccountId: z.string().trim().min(1).max(120),
     }),
   )
   .min(1)
@@ -266,11 +276,14 @@ const bulkLinkSchema = z
 
 /**
  * Bulk link page: saves the groups staff confirmed, one link RPC per student
- * (each audited on its own). A row that fails (group taken meanwhile) does not
- * stop the others; the page shows the per-row result.
+ * (each audited on its own). Only students still without a group are linked,
+ * so a stale page never replaces a group someone linked meanwhile. A row that
+ * fails does not stop the others; the page shows the per-row result. No
+ * revalidatePath: the page refreshes once after its last chunk instead of
+ * re-reading every ZaloCRM group per chunk.
  */
 export async function linkStudentZaloGroupsAction(input: {
-  links: { groupName: string | null; studentId: string; threadId: string; zaloAccountId: string }[];
+  links: { groupName: string | null; studentId: string; threadId: string }[];
 }): Promise<BulkZaloLinkResult> {
   const denied = await requirePermission("students.update");
   if (denied) return { message: denied, ok: false };
@@ -284,18 +297,31 @@ export async function linkStudentZaloGroupsAction(input: {
     return { message: "Mỗi học sinh chỉ chọn một nhóm.", ok: false };
   }
 
+  const zaloAccountId = await getCenterZaloAccountId();
+  if (!zaloAccountId) return { message: NO_CENTER_NICK, ok: false };
+
   const supabase = await createSupabaseServerClient();
+  const { data: current, error: currentError } = await supabase
+    .from("students")
+    .select("id, zalo_group_thread_id")
+    .in("id", links.map((link) => link.studentId));
+  if (currentError) return { message: "Không kiểm tra được học sinh. Vui lòng thử lại.", ok: false };
+  const alreadyLinked = new Set((current ?? []).filter((row) => row.zalo_group_thread_id).map((row) => row.id));
+
   const results: { message: string; ok: boolean; studentId: string }[] = [];
   for (let index = 0; index < links.length; index += BULK_LINK_CONCURRENCY) {
     const slice = links.slice(index, index + BULK_LINK_CONCURRENCY);
     results.push(
       ...(await Promise.all(
         slice.map(async (link) => {
+          if (alreadyLinked.has(link.studentId)) {
+            return { message: "Học sinh này vừa được liên kết nhóm khác. Tải lại trang để xem.", ok: false, studentId: link.studentId };
+          }
           const { error } = await supabase.rpc("link_student_zalo_group", {
             p_group_name: link.groupName ?? "",
             p_student_id: link.studentId,
             p_thread_id: link.threadId,
-            p_zalo_account_id: link.zaloAccountId,
+            p_zalo_account_id: zaloAccountId,
           });
           return error
             ? { message: rpcErrorMessage(error), ok: false, studentId: link.studentId }
@@ -304,7 +330,6 @@ export async function linkStudentZaloGroupsAction(input: {
       )),
     );
   }
-  revalidatePath("/parent-messages/groups");
   return { ok: true, results };
 }
 

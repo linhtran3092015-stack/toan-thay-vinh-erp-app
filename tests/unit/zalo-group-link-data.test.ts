@@ -2,6 +2,9 @@
 // fails_when=the linked-thread filter, phone normalization, given-name order or a CRM step guard is dropped or reordered, or a load error is swallowed;
 // why_new=getZaloGroupLinkWorkspace had no test, and the checklist and suggestion table read only what it returns;
 // seam=none; no_claim=does not prove the real PostgREST filters return these rows or that ZaloCRM answers this way
+// Value (second pass): protects=every student outside the table competes for groups, no groups load for a missing or offline nick, guardian details need guardians.view;
+// fails_when=rivals are dropped, the nick gate only checks a blank id, or guardian names/phones reach the page without guardians.view;
+// why_new=red-team, testing and security review of the first version; seam=none; no_claim=real PostgREST filtering (filters are only recorded)
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -13,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   tables: {} as Record<string, { data: unknown[] | null; error: unknown }>,
 }));
 
-/** Answers each query by table; the two students queries are told apart by their filter. */
+/** Answers each query by table and records its filters. */
 function query(table: string) {
   const record = { filters: [] as string[], table };
   mocks.queries.push(record);
@@ -23,15 +26,7 @@ function query(table: string) {
     is: (column: string, value: unknown) => (record.filters.push(`is:${column}=${String(value)}`), builder),
     not: (column: string, operator: string, value: unknown) => (record.filters.push(`not:${column}:${operator}=${String(value)}`), builder),
     order: () => builder,
-    range: async () => {
-      const key =
-        table !== "students"
-          ? table
-          : record.filters.some((filter) => filter.startsWith("not:zalo_group_thread_id"))
-            ? "students:linked"
-            : "students:studying";
-      return mocks.tables[key] ?? { data: null, error: { message: `unexpected query ${key}` } };
-    },
+    range: async () => mocks.tables[table] ?? { data: null, error: { message: `unexpected query ${table}` } },
     select: () => builder,
   };
   return builder;
@@ -97,19 +92,13 @@ beforeEach(() => {
       ],
       error: null,
     },
-    "students:linked": {
+    students: {
       data: [
-        { id: ids.chau, zalo_group_thread_id: "thread-linked-studying" },
-        { id: ids.paused, zalo_group_thread_id: "thread-linked-paused" },
-      ],
-      error: null,
-    },
-    "students:studying": {
-      data: [
-        { birth_year: 2015, full_name: "Nguyễn Thị An", id: ids.an, public_code: "TV-MAU-001", zalo_group_thread_id: null },
-        { birth_year: 2014, full_name: "Trần Văn Bình", id: ids.binh, public_code: "TV-MAU-002", zalo_group_thread_id: null },
-        { birth_year: 2013, full_name: "Lê Minh Châu", id: ids.chau, public_code: "TV-MAU-003", zalo_group_thread_id: "thread-linked-studying" },
-        { birth_year: 2016, full_name: "Phạm Gia Dũng", id: ids.dung, public_code: "TV-MAU-004", zalo_group_thread_id: null },
+        { birth_year: 2015, full_name: "Nguyễn Thị An", id: ids.an, lifecycle_status: "active", public_code: "TV-MAU-001", zalo_group_thread_id: null },
+        { birth_year: 2014, full_name: "Trần Văn Bình", id: ids.binh, lifecycle_status: "resumed", public_code: "TV-MAU-002", zalo_group_thread_id: null },
+        { birth_year: 2013, full_name: "Lê Minh Châu", id: ids.chau, lifecycle_status: "active", public_code: "TV-MAU-003", zalo_group_thread_id: "thread-linked-studying" },
+        { birth_year: 2016, full_name: "Phạm Gia Dũng", id: ids.dung, lifecycle_status: "active", public_code: "TV-MAU-004", zalo_group_thread_id: null },
+        { birth_year: 2012, full_name: "Đỗ Văn Tạm Nghỉ", id: ids.paused, lifecycle_status: "reserved", public_code: "TV-MAU-009", zalo_group_thread_id: "thread-linked-paused" },
       ].reverse(),
       error: null,
     },
@@ -134,7 +123,7 @@ beforeEach(() => {
 describe("getZaloGroupLinkWorkspace", () => {
   it("fails when any student or guardian list cannot be read, before calling ZaloCRM", async () => {
     mocks.tables.guardians = { data: null, error: { message: "permission denied for table guardians" } };
-    expect(await getZaloGroupLinkWorkspace()).toEqual({ error: "Không tải được danh sách học sinh và phụ huynh.", ok: false });
+    expect(await getZaloGroupLinkWorkspace({ includeGuardianDetails: true })).toEqual({ error: "Không tải được danh sách học sinh và phụ huynh.", ok: false });
     expect(mocks.listZaloAccounts).not.toHaveBeenCalled();
     expect(mocks.listAllZaloGroups).not.toHaveBeenCalled();
   });
@@ -142,7 +131,7 @@ describe("getZaloGroupLinkWorkspace", () => {
   it("stops at the first connection step that is not ready, without calling the next one", async () => {
     // Not configured: no CRM calls, counts still known.
     mocks.isZaloCrmConfigured.mockReturnValue(false);
-    let result = await getZaloGroupLinkWorkspace();
+    let result = await getZaloGroupLinkWorkspace({ includeGuardianDetails: true });
     expect(result.ok && result.data.status).toMatchObject({ configured: false, crmError: null, groupsTotal: null, linkedStudents: 1, studyingStudents: 4 });
     expect(result.ok && result.data.matches).toEqual([]);
     expect(mocks.listZaloAccounts).not.toHaveBeenCalled();
@@ -151,20 +140,30 @@ describe("getZaloGroupLinkWorkspace", () => {
     // CRM unreachable or key refused.
     mocks.isZaloCrmConfigured.mockReturnValue(true);
     mocks.listZaloAccounts.mockResolvedValueOnce({ error: "Invalid API key.", ok: false });
-    result = await getZaloGroupLinkWorkspace();
+    result = await getZaloGroupLinkWorkspace({ includeGuardianDetails: true });
     expect(result.ok && result.data.status).toMatchObject({ centerAccount: null, configured: true, crmError: "Invalid API key.", groupsTotal: null });
     expect(mocks.listAllZaloGroups).not.toHaveBeenCalled();
 
     // No center nick chosen: never list groups (the CRM would return every nick's groups).
     mocks.settings.mockResolvedValueOnce({ "zalo.center_account_id": "   ", "zalo.center_account_name": "" });
-    result = await getZaloGroupLinkWorkspace();
+    result = await getZaloGroupLinkWorkspace({ includeGuardianDetails: true });
     expect(result.ok && result.data.status).toMatchObject({ centerAccount: null, centerAccountId: "", crmError: null, groupsTotal: null });
+    expect(result.ok && result.data.matches).toEqual([]);
+    expect(mocks.listAllZaloGroups).not.toHaveBeenCalled();
+
+    // The chosen nick is gone from ZaloCRM, or not connected: same gate as checklist step 3.
+    mocks.listZaloAccounts.mockResolvedValueOnce({ data: [{ ...centerAccount, id: "acc-other" }], ok: true });
+    result = await getZaloGroupLinkWorkspace({ includeGuardianDetails: true });
+    expect(result.ok && result.data.status).toMatchObject({ centerAccount: null, groupsTotal: null });
+    mocks.listZaloAccounts.mockResolvedValueOnce({ data: [{ ...centerAccount, status: "disconnected" }], ok: true });
+    result = await getZaloGroupLinkWorkspace({ includeGuardianDetails: true });
+    expect(result.ok && result.data.status).toMatchObject({ centerAccount: { status: "disconnected" }, groupsTotal: null });
     expect(result.ok && result.data.matches).toEqual([]);
     expect(mocks.listAllZaloGroups).not.toHaveBeenCalled();
 
     // Groups could not be listed.
     mocks.listAllZaloGroups.mockResolvedValueOnce({ error: "Không kết nối được ZaloCRM: timeout", ok: false });
-    result = await getZaloGroupLinkWorkspace();
+    result = await getZaloGroupLinkWorkspace({ includeGuardianDetails: true });
     expect(result.ok && result.data.status).toMatchObject({
       centerAccount,
       groupsError: "Không kết nối được ZaloCRM: timeout",
@@ -175,12 +174,15 @@ describe("getZaloGroupLinkWorkspace", () => {
   });
 
   it("lists unlinked studying students in given-name order and never offers a group linked to anyone", async () => {
-    const result = await getZaloGroupLinkWorkspace();
+    const result = await getZaloGroupLinkWorkspace({ includeGuardianDetails: true });
     if (!result.ok) throw new Error(result.error);
     const { matches, status, students } = result.data;
 
-    const studying = mocks.queries.find((entry) => entry.table === "students" && !entry.filters.some((filter) => filter.startsWith("not:")));
-    expect(studying?.filters).toContain("in:lifecycle_status=active,resumed");
+    // Ended guardian links and past enrollments never feed names, phones or class codes.
+    expect(mocks.queries.find((entry) => entry.table === "student_guardians")?.filters).toContain("is:ended_at=null");
+    expect(mocks.queries.find((entry) => entry.table === "student_enrollments")?.filters).toEqual(
+      expect.arrayContaining(["eq:status=active", "is:effective_to=null"]),
+    );
     expect(status).toEqual({
       centerAccount,
       centerAccountId: "acc-center",
@@ -188,6 +190,7 @@ describe("getZaloGroupLinkWorkspace", () => {
       configured: true,
       crmError: null,
       groupsError: null,
+      groupsListed: 5,
       groupsTotal: 5,
       groupsTruncated: false,
       linkedStudents: 1,
@@ -222,5 +225,22 @@ describe("getZaloGroupLinkWorkspace", () => {
       // Phone found only through the guardian's zalo field ("84966000555").
       { candidates: [["thread-long-ph", "guardian_phone"]], confidence: "ambiguous", studentId: ids.dung },
     ]);
+  });
+
+  it("lets every student outside the table compete, and hides guardian details without guardians.view", async () => {
+    // A withdrawn namesake of An, never linked: "SLL Nguyễn Thị An" may be hers.
+    mocks.tables.students = {
+      data: [
+        ...(mocks.tables.students.data ?? []),
+        { birth_year: 2009, full_name: "Nguyễn Thị An", id: "70000000-0000-4000-8000-000000000010", lifecycle_status: "withdrawn", public_code: "TV-MAU-010", zalo_group_thread_id: null },
+      ],
+      error: null,
+    };
+    const result = await getZaloGroupLinkWorkspace({ includeGuardianDetails: false });
+    if (!result.ok) throw new Error(result.error);
+    const an = result.data.matches.find((match) => match.studentId === ids.an);
+    expect(an?.confidence).toBe("ambiguous");
+    expect(result.data.matches.map((match) => match.studentId)).not.toContain("70000000-0000-4000-8000-000000000010");
+    expect(result.data.students.map((student) => student.guardianSummary)).toEqual(["", "", ""]);
   });
 });

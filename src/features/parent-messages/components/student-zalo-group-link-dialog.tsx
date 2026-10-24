@@ -88,7 +88,6 @@ export function StudentZaloGroupLinkDialog({
         groupName: group.groupName,
         studentId,
         threadId: group.externalThreadId,
-        zaloAccountId: group.zaloAccountId || centerAccountId,
       });
       setFeedback(result);
       if (result.ok) {
@@ -194,7 +193,8 @@ export function StudentZaloGroupLinkDialog({
                     ) : null}
                   </div>
                   <Button disabled={isPending || group.externalThreadId === currentThreadId} onClick={() => link(group)} size="sm" type="button">
-                    Chọn nhóm này
+                    {/* On the bulk page the row's own picker only stages a choice; this button saves at once, so say so. */}
+                    {triggerLabel ? "Liên kết nhóm này" : "Chọn nhóm này"}
                   </Button>
                 </li>
               ))}

@@ -81,6 +81,13 @@ export function ParentMessageQueue({
               ? "Làm theo các bước ở trang Liên kết nhóm Zalo (khóa ZaloCRM trên máy chủ, nick trung tâm, nhóm cho từng học sinh). Tin vẫn được xếp hàng nhưng chưa gửi được."
               : "Đặt ZALOCRM_BASE_URL và ZALOCRM_API_KEY trên máy chủ, rồi chọn nick trung tâm trong Cài đặt → Chung. Tin vẫn được xếp hàng nhưng chưa gửi được."
           }
+          action={
+            canLinkGroups ? (
+              <Link className="font-semibold text-action-link! hover:underline" href="/parent-messages/groups">
+                Mở trang Liên kết nhóm Zalo
+              </Link>
+            ) : undefined
+          }
           title="Chưa kết nối ZaloCRM"
           tone="warning"
         />

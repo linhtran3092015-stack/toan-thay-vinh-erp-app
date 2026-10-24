@@ -4,6 +4,9 @@
  * the server and staff confirm every suggestion before anything is saved.
  */
 
+import { normalizeVietnamPhoneNumber } from "@/lib/phone";
+import { normalizeSearchText } from "@/lib/search";
+
 export interface MatchStudent {
   fullName: string;
   guardians: { fullName: string; phones: string[] }[];
@@ -18,8 +21,8 @@ export interface MatchGroup {
   zaloAccountId: string;
 }
 
-/** Why a group was suggested, strongest first. */
-export type MatchReason = "student_code" | "student_name" | "guardian_phone" | "guardian_name";
+/** Why a group was suggested, strongest first. `student_name_loose` matched only after dropping tone marks. */
+export type MatchReason = "student_code" | "student_name" | "student_name_loose" | "guardian_phone" | "guardian_name";
 
 export interface GroupCandidate {
   group: MatchGroup;
@@ -47,63 +50,104 @@ const REASON_SCORE: Record<MatchReason, number> = {
   guardian_phone: 40,
   student_code: 100,
   student_name: 60,
+  student_name_loose: 45,
 };
 
 /** The bulk link page saves this many links per server action call (stays well inside the function time limit). */
 export const MAX_BULK_ZALO_LINKS = 25;
 
-/** A suggestion is only pre-ticked when it rests on the student's own name or code. */
-export const SURE_MIN_SCORE = REASON_SCORE.student_name;
+/** A "sổ liên lạc" group is the family plus a few staff; a bigger group is a class or broadcast group and is never pre-ticked. */
+export const MAX_SURE_GROUP_MEMBERS = 15;
+/** Pairs below this never block another student's group. */
+const STRONG_SCORE = REASON_SCORE.student_name;
 const MAX_CANDIDATES = 5;
 
 /** Lower case, no Vietnamese tone marks, đ → d, words separated by single spaces. */
 export function normalizeForMatch(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[đĐ]/g, "d")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return normalizeSearchText(value).replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/** Lower case with tone marks kept (Hùng and Hưng stay different), words separated by single spaces. */
+function normalizeExact(value: string): string {
+  return value.normalize("NFC").toLocaleLowerCase("vi").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 }
 
 /** Vietnamese mobile numbers in a free-text name, as 0xxxxxxxxx ("+84 912.345.678" → "0912345678"). */
 export function extractPhones(value: string): string[] {
-  const compact = value.replace(/[\s.\-()]/g, "");
   const found = new Set<string>();
-  for (const match of compact.matchAll(/(?:\+?84|0)(\d{9})(?!\d)/g)) found.add(`0${match[1]}`);
+  // Digits may be split by single spaces, dots or dashes; a longer digit run on either side is not a phone.
+  for (const match of value.matchAll(/(?<!\d)(?:\+?84|0)((?:[\s.\-]?\d){9})(?!\d)/g)) {
+    const phone = normalizeVietnamPhoneNumber(`0${match[1].replace(/\D/g, "")}`);
+    if (phone.isValid) found.add(phone.normalized);
+  }
   return [...found];
 }
 
-/** Any phone format ("84912…", "0912 345 678", "+84 …") → 0xxxxxxxxx, or null. */
+/** A guardian's phone in any stored format ("84912…", "0912 345 678", "+84 …") → 0xxxxxxxxx, or null. */
 export function normalizePhone(value: string | null | undefined): string | null {
-  const digits = (value ?? "").replace(/\D/g, "");
-  if (/^84\d{9}$/.test(digits)) return `0${digits.slice(2)}`;
-  if (/^0\d{9}$/.test(digits)) return digits;
-  return null;
+  if (!value) return null;
+  const phone = normalizeVietnamPhoneNumber(value);
+  return phone.isValid ? phone.normalized : null;
 }
 
-function containsWords(haystack: string, needle: string): boolean {
-  return needle.length > 0 && ` ${haystack} `.includes(` ${needle} `);
+/** " a b " so a whole-word search is one `includes`. */
+function padded(value: string): string {
+  return value ? ` ${value} ` : "";
 }
 
-function scoreGroup(student: MatchStudent, groupName: string, groupPhones: Set<string>): GroupCandidate["reasons"] {
+interface PreparedStudent {
+  code: string;
+  exactName: string;
+  foldedName: string;
+  guardianNames: string[];
+  id: string;
+  phones: Set<string>;
+}
+
+interface PreparedGroup {
+  exact: string;
+  folded: string;
+  group: MatchGroup;
+  phones: Set<string>;
+}
+
+function prepareStudent(student: MatchStudent): PreparedStudent {
+  const exactName = normalizeExact(student.fullName);
+  const foldedName = normalizeForMatch(student.fullName);
+  return {
+    code: padded(normalizeForMatch(student.publicCode)),
+    // A one-word name ("An") would match far too many groups.
+    exactName: exactName.includes(" ") ? padded(exactName) : "",
+    foldedName: foldedName.includes(" ") ? padded(foldedName) : "",
+    guardianNames: student.guardians
+      .map((guardian) => normalizeForMatch(guardian.fullName))
+      .filter((name) => name.includes(" "))
+      .map(padded),
+    id: student.id,
+    phones: new Set(student.guardians.flatMap((guardian) => guardian.phones)),
+  };
+}
+
+function scoreGroup(student: PreparedStudent, group: PreparedGroup): MatchReason[] {
   const reasons: MatchReason[] = [];
-  const code = normalizeForMatch(student.publicCode);
-  if (code && containsWords(groupName, code)) reasons.push("student_code");
-  const name = normalizeForMatch(student.fullName);
-  // A one-word name ("An") would match far too many groups.
-  if (name.includes(" ") && containsWords(groupName, name)) reasons.push("student_name");
-  if (student.guardians.some((guardian) => guardian.phones.some((phone) => groupPhones.has(phone)))) reasons.push("guardian_phone");
-  if (
-    student.guardians.some((guardian) => {
-      const guardianName = normalizeForMatch(guardian.fullName);
-      return guardianName.includes(" ") && containsWords(groupName, guardianName);
-    })
-  ) {
-    reasons.push("guardian_name");
-  }
+  if (student.code && group.folded.includes(student.code)) reasons.push("student_code");
+  if (student.exactName && group.exact.includes(student.exactName)) reasons.push("student_name");
+  else if (student.foldedName && group.folded.includes(student.foldedName)) reasons.push("student_name_loose");
+  if (group.phones.size > 0 && [...student.phones].some((phone) => group.phones.has(phone))) reasons.push("guardian_phone");
+  if (student.guardianNames.some((name) => group.folded.includes(name))) reasons.push("guardian_name");
   return reasons;
+}
+
+/**
+ * Only the student's own code, own name with tone marks, or own name without
+ * tone marks plus a guardian phone can pre-tick a group, and never a large one.
+ * Guardian evidence alone (siblings share it) never does.
+ */
+function canBeSure(pair: Pair): boolean {
+  const members = pair.group.groupMembersCount;
+  if (members !== null && members > MAX_SURE_GROUP_MEMBERS) return false;
+  const has = (reason: MatchReason) => pair.reasons.includes(reason);
+  return has("student_code") || has("student_name") || (has("student_name_loose") && has("guardian_phone"));
 }
 
 interface Pair {
@@ -117,24 +161,36 @@ interface Pair {
  * Scores every student against every group name, then assigns `sure` pairs
  * greedily from the highest score down. A tie at the top (two students on one
  * group, or one student on two groups) blocks both sides, so a namesake never
- * gets a group by luck; a guardian phone in the name breaks such ties.
+ * gets a group by luck; a guardian phone in the name breaks such ties. A
+ * stronger pair that cannot be sure (guardian evidence only) blocks its group
+ * and student too.
+ *
+ * `rivals` are students who get no row (already linked, reserved, withdrawn):
+ * they compete for groups, so a group named after a former student with the
+ * same name is never handed to the current one.
  */
-export function matchStudentsToGroups(students: MatchStudent[], groups: MatchGroup[]): StudentGroupMatch[] {
-  const prepared = groups.map((group) => {
-    const raw = group.groupName ?? "";
-    return { group, name: normalizeForMatch(raw), phones: new Set(extractPhones(raw)) };
-  });
+export function matchStudentsToGroups(students: MatchStudent[], groups: MatchGroup[], rivals: MatchStudent[] = []): StudentGroupMatch[] {
+  const prepared: PreparedGroup[] = groups
+    .map((group) => {
+      const raw = group.groupName ?? "";
+      return { exact: padded(normalizeExact(raw)), folded: padded(normalizeForMatch(raw)), group, phones: new Set(extractPhones(raw)) };
+    })
+    .filter((entry) => entry.folded || entry.phones.size > 0);
 
   const pairs: Pair[] = [];
   const pairsByStudent = new Map<string, Pair[]>();
-  for (const student of students) {
+  const pairsByGroup = new Map<string, Pair[]>();
+  for (const student of [...students, ...rivals].map(prepareStudent)) {
     const own: Pair[] = [];
     for (const entry of prepared) {
-      if (!entry.name && entry.phones.size === 0) continue;
-      const reasons = scoreGroup(student, entry.name, entry.phones);
+      const reasons = scoreGroup(student, entry);
       if (reasons.length === 0) continue;
       const score = reasons.reduce((sum, reason) => sum + REASON_SCORE[reason], 0);
-      own.push({ group: entry.group, reasons, score, studentId: student.id });
+      const pair = { group: entry.group, reasons, score, studentId: student.id };
+      own.push(pair);
+      const onGroup = pairsByGroup.get(entry.group.externalThreadId) ?? [];
+      onGroup.push(pair);
+      pairsByGroup.set(entry.group.externalThreadId, onGroup);
     }
     own.sort((a, b) => b.score - a.score);
     pairsByStudent.set(student.id, own);
@@ -145,24 +201,29 @@ export function matchStudentsToGroups(students: MatchStudent[], groups: MatchGro
   const takenGroups = new Set<string>();
   const blockedStudents = new Set<string>();
   const blockedGroups = new Set<string>();
-  const sorted = pairs.filter((pair) => pair.score >= SURE_MIN_SCORE).sort((a, b) => b.score - a.score);
-  for (const pair of sorted) {
+  const block = (pair: Pair) => {
+    blockedStudents.add(pair.studentId);
+    blockedGroups.add(pair.group.externalThreadId);
+  };
+  for (const pair of pairs.filter((candidate) => candidate.score >= STRONG_SCORE).sort((a, b) => b.score - a.score)) {
     const threadId = pair.group.externalThreadId;
-    if (assigned.has(pair.studentId) || takenGroups.has(threadId)) continue;
+    if (takenGroups.has(threadId)) continue;
+    if (assigned.has(pair.studentId)) {
+      // The group names a student who already has a better one: not safe to hand to anyone else.
+      blockedGroups.add(threadId);
+      continue;
+    }
     if (blockedStudents.has(pair.studentId) || blockedGroups.has(threadId)) continue;
-    const rivals = sorted.filter(
+    const tied = [...(pairsByStudent.get(pair.studentId) ?? []), ...(pairsByGroup.get(threadId) ?? [])].filter(
       (other) =>
         other !== pair &&
         other.score === pair.score &&
         !assigned.has(other.studentId) &&
-        !takenGroups.has(other.group.externalThreadId) &&
-        (other.studentId === pair.studentId || other.group.externalThreadId === threadId),
+        !takenGroups.has(other.group.externalThreadId),
     );
-    if (rivals.length > 0) {
-      for (const tied of [pair, ...rivals]) {
-        blockedStudents.add(tied.studentId);
-        blockedGroups.add(tied.group.externalThreadId);
-      }
+    if (tied.length > 0 || !canBeSure(pair)) {
+      block(pair);
+      tied.forEach(block);
       continue;
     }
     assigned.set(pair.studentId, pair);

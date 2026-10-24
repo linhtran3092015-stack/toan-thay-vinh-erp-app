@@ -79,26 +79,32 @@ const GROUP_PAGE_SIZE = 100;
 
 /**
  * Every group conversation of one nick, page by page (bulk linking matches
- * against all of them). Stops after `maxPages` and says so with `truncated`.
+ * against all of them). Stops after `maxPages` or once `budgetMs` is spent,
+ * leaving time for the rest of the page, and says so with `truncated`. The
+ * CRM orders by last message, so a group that moves between pages can come
+ * back twice: duplicates are dropped by thread id.
  */
 export async function listAllZaloGroups(
   zaloAccountId: string,
   maxPages = 30,
+  budgetMs = 40_000,
 ): Promise<ZaloCrmResult<{ groups: ZaloCrmGroup[]; total: number; truncated: boolean }>> {
   // Without a nick the CRM would return every nick's groups, and staff could link a group the center nick is not in.
   if (!zaloAccountId.trim()) return { error: "Chưa chọn nick trung tâm.", ok: false };
-  const groups: ZaloCrmGroup[] = [];
+  const deadline = Date.now() + budgetMs;
+  const byThread = new Map<string, ZaloCrmGroup>();
   let total = 0;
   for (let page = 1; page <= maxPages; page += 1) {
+    if (page > 1 && Date.now() > deadline) break;
     const result = await searchZaloGroups({ limit: GROUP_PAGE_SIZE, page, zaloAccountId });
     if (!result.ok) return result;
     total = result.data.total;
-    groups.push(...result.data.groups);
-    if (result.data.groups.length < GROUP_PAGE_SIZE || groups.length >= total) {
-      return { data: { groups, total, truncated: false }, ok: true };
+    for (const group of result.data.groups) if (!byThread.has(group.externalThreadId)) byThread.set(group.externalThreadId, group);
+    if (result.data.groups.length < GROUP_PAGE_SIZE || page * GROUP_PAGE_SIZE >= total) {
+      return { data: { groups: [...byThread.values()], total, truncated: false }, ok: true };
     }
   }
-  return { data: { groups, total, truncated: groups.length < total }, ok: true };
+  return { data: { groups: [...byThread.values()], total, truncated: true }, ok: true };
 }
 
 export async function getZaloGroupByThread(

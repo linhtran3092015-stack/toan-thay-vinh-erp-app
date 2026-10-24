@@ -40,18 +40,21 @@ const groups: MatchGroup[] = [
   { externalThreadId: "g-sib", groupMembersCount: 3, groupName: "PH Hoa 0912345678", zaloAccountId: "acc-1" },
 ];
 
-function renderLinker() {
+function matchesFor(list: ZaloLinkStudent[], groupList: MatchGroup[] = groups) {
   const guardians = [{ fullName: "Trần Thị Hoa", phones: ["0912345678"] }];
-  const matches = matchStudentsToGroups(
-    students.map((student) => ({
+  return matchStudentsToGroups(
+    list.map((student) => ({
       fullName: student.fullName,
       guardians: student.id === ids.bao || student.id === ids.han ? guardians : [],
       id: student.id,
       publicCode: student.publicCode,
     })),
-    groups,
+    groupList,
   );
-  return render(<ZaloGroupBulkLinker centerAccountId="acc-1" matches={matches} students={students} />);
+}
+
+function renderLinker({ showGuardians = true }: { showGuardians?: boolean } = {}) {
+  return render(<ZaloGroupBulkLinker centerAccountId="acc-1" matches={matchesFor(students)} showGuardians={showGuardians} students={students} />);
 }
 
 afterEach(() => {
@@ -95,8 +98,8 @@ describe("ZaloGroupBulkLinker", () => {
     await waitFor(() => expect(router.refresh).toHaveBeenCalled());
     expect(actions.linkStudentZaloGroupsAction).toHaveBeenCalledWith({
       links: [
-        { groupName: "SLL Nguyễn Văn An", studentId: ids.an, threadId: "g-an", zaloAccountId: "acc-1" },
-        { groupName: "PH Hoa 0912345678", studentId: ids.bao, threadId: "g-sib", zaloAccountId: "acc-1" },
+        { groupName: "SLL Nguyễn Văn An", studentId: ids.an, threadId: "g-an" },
+        { groupName: "PH Hoa 0912345678", studentId: ids.bao, threadId: "g-sib" },
       ],
     });
     expect(screen.getByText(/Đã liên kết 1 học sinh; 1 học sinh chưa liên kết được/)).toBeInTheDocument();
@@ -134,5 +137,77 @@ describe("ZaloGroupBulkLinker", () => {
     fireEvent.click(screen.getByRole("button", { name: /Không tìm thấy/ }));
     expect(screen.getByText("Không có nhóm nào khớp tên.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tìm nhóm cho Lê Minh" })).toBeEnabled();
+  });
+
+  // Value: protects=more than 25 ticked rows go to the server in chunks of 25 and the totals add up across chunks;
+  // fails_when=the client sends one oversized call (the server refuses 26+ rows) or loses a chunk's results; why_new=every save test used 1-2 rows;
+  // seam=none; no_claim=server-side chunk handling (actions test)
+  it("saves more than 25 ticked rows in chunks of 25", async () => {
+    const many = Array.from({ length: 26 }, (_, index) =>
+      linkStudent(`50000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`, `Học Sinh Mẫu Số ${index + 1}`),
+    );
+    const manyGroups = many.map((student, index) => ({ externalThreadId: `g-${index + 1}`, groupMembersCount: 3, groupName: `SLL ${student.fullName}`, zaloAccountId: "acc-1" }));
+    actions.linkStudentZaloGroupsAction.mockImplementation(async ({ links }: { links: { studentId: string }[] }) => ({
+      ok: true,
+      results: links.map((link) => ({ message: "Đã liên kết.", ok: true, studentId: link.studentId })),
+    }));
+    render(<ZaloGroupBulkLinker centerAccountId="acc-1" matches={matchesFor(many, manyGroups)} showGuardians students={many} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Liên kết 26 học sinh" }));
+    await waitFor(() => expect(router.refresh).toHaveBeenCalled());
+    expect(actions.linkStudentZaloGroupsAction.mock.calls.map(([input]) => input.links.length)).toEqual([25, 1]);
+    expect(screen.getByText("Đã liên kết 26 học sinh với nhóm sổ liên lạc.")).toBeInTheDocument();
+  });
+
+  it("selects only visible rows, keeps hidden ticks counted, and drops a row whose group is cleared", () => {
+    renderLinker();
+    fireEvent.click(screen.getByRole("button", { name: /Cần chọn/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Nhóm Zalo cho Phạm Gia Bảo" }), { target: { value: "g-sib" } });
+    // An (sure, ticked) is hidden by the filter but still counted, and the bar says so.
+    expect(screen.getByText(/Đã chọn/)).toHaveTextContent("Đã chọn 2 học sinh có nhóm (1 đang hiển thị, 1 bị ẩn bởi bộ lọc)");
+    const selectAll = screen.getByRole("checkbox", { name: "Chọn tất cả học sinh đang hiển thị có nhóm" });
+    expect((selectAll as HTMLInputElement).indeterminate).toBe(false);
+    expect(selectAll).toBeChecked();
+
+    fireEvent.click(selectAll);
+    expect(screen.getByRole("checkbox", { name: "Chọn Phạm Gia Bảo" })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Liên kết 1 học sinh" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Chọn Phạm Gia Bảo" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Nhóm Zalo cho Phạm Gia Hân" }), { target: { value: "g-sib" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Nhóm Zalo cho Phạm Gia Hân" }), { target: { value: "" } });
+    expect(screen.getByRole("checkbox", { name: "Chọn Phạm Gia Hân" })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Liên kết 2 học sinh" })).toBeEnabled();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Tìm học sinh" }), { target: { value: "han" } });
+    expect(screen.queryByText("Phạm Gia Bảo")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Liên kết 2 học sinh" })).toBeEnabled();
+  });
+
+  // Value: protects=a pick whose student left the page (linked from the dialog or another tab) or whose group is no longer a candidate is never sent;
+  // fails_when=ready is built from client state alone again; why_new=red-team: a stale pick could replace a group just linked from the dialog;
+  // seam=none; no_claim=server-side already-linked check (actions test)
+  it("never sends a pick for a student who left the page or a group no longer offered", async () => {
+    actions.linkStudentZaloGroupsAction.mockResolvedValue({ ok: true, results: [] });
+    const view = renderLinker();
+    fireEvent.click(screen.getByRole("button", { name: /Cần chọn/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Nhóm Zalo cho Phạm Gia Bảo" }), { target: { value: "g-sib" } });
+    expect(screen.getByRole("button", { name: "Liên kết 2 học sinh" })).toBeEnabled();
+
+    // After a refresh: Bảo was linked from the dialog, and An's group was taken elsewhere.
+    const remaining = students.filter((student) => student.id !== ids.bao);
+    view.rerender(
+      <ZaloGroupBulkLinker centerAccountId="acc-1" matches={matchesFor(remaining, groups.filter((group) => group.externalThreadId !== "g-an"))} showGuardians students={remaining} />,
+    );
+    expect(screen.getByRole("button", { name: "Liên kết 0 học sinh" })).toBeDisabled();
+  });
+
+  it("opens on the first non-empty chip and leaves guardians out without guardians.view", () => {
+    const noSure = [linkStudent(ids.minh, "Lê Minh")];
+    render(<ZaloGroupBulkLinker centerAccountId="acc-1" matches={matchesFor(noSure)} showGuardians={false} students={noSure} />);
+    expect(screen.getByRole("button", { name: /Không tìm thấy/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Lê Minh")).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Phụ huynh" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Trần Thị Hoa · 0912345678")).not.toBeInTheDocument();
   });
 });
